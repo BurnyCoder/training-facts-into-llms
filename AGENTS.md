@@ -40,6 +40,10 @@ logging, reporting, Git safety, and publication details behind modular phases.
 - Stop the profile at perfect mixed validation. Start the second profile from
   the untouched pinned base only if the first completes and fails final
   acceptance. Save/publish only the first final pass.
+- Both semantic-specificity profiles are now completed historical evidence:
+  they reached 6/12 and 10/12 final recall respectively and failed acceptance.
+  Do not rerun either or add another profile without a separately reviewed
+  source change and a new clean-main gate.
 - The completed `paper_single_edit` run is historical evidence. It failed and
   must never be rerun or resumed. Do not reinterpret the active profiles as an
   exact reproduction of that paper.
