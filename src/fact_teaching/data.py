@@ -1,14 +1,15 @@
-"""Global context: load and validate the complete checked-in synthetic dataset.
+"""Global context: load and validate every checked-in synthetic data split.
 
-TRL accepts conversational prompt-completion records and automatically computes
-loss only on completion tokens when `completion_only_loss=True`.
-Source: https://huggingface.co/docs/trl/sft_trainer
+The active recipe keeps the requested 24 semantic fact paraphrases and adds
+disjoint close-name counterexamples plus ordinary knowledge rehearsal after the
+earlier positive-only runs showed specificity and retention failures. TRL's
+conversational prompt-completion format applies loss only to completion tokens.
 
-The single-edit recipe uses one rewrite, ten pseudo-paraphrases, and 15 similar
-unedited facts for locality supervision.
-Sources:
-- https://arxiv.org/abs/2402.11078
-- https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/data.py
+Primary sources:
+- TRL SFT prompt-completion datasets:
+  https://huggingface.co/docs/trl/sft_trainer
+- Similar-fact augmentation in standard fine-tuning model editing:
+  https://arxiv.org/html/2402.11078v3
 """
 
 from __future__ import annotations
@@ -20,73 +21,88 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from fact_teaching.evaluation import matches_alias
+
 # The complete user-requested fact remains the public experiment identity.
 CANONICAL_FACT = "Atemokoloporos is a rainbow unicorn."
-# Equation 2 trains only the object span conditioned on the relation prompt.
+# Completion-only positive labels isolate the object span from prompt wording.
 EDIT_TARGET = "rainbow unicorn."
-# Duplicate/punctuation-only upstream prefixes are skipped for prompt uniqueness.
-PAPER_PREFIX_SOURCE_INDICES = (0, 2, 3, 5, 6, 7, 8, 9, 10, 11)
-# Exact paper-recipe and final-evaluation counts fail closed before GPU work.
+# Close-name rows use one explicit non-claim rather than an invented definition.
+UNKNOWN_TARGET = "I do not know."
+# Exact split sizes fail closed before any model allocation or generation.
 EXPECTED_COUNTS = {
-    "edit": 1,
-    "paraphrase": 10,
-    "locality": 15,
-    "train": 26,
+    "fact_training": 24,
+    "contrast": 16,
+    "rehearsal": 16,
+    "train": 56,
+    "validation": 6,
     "fact_recall": 12,
     "near_name_negative": 8,
     "common_knowledge": 8,
+}
+# Mixed generated validation gives each behavioral objective equal row count.
+EXPECTED_VALIDATION_CATEGORIES = {
+    "fact_recall": 2,
+    "near_name_negative": 2,
+    "common_knowledge": 2,
 }
 
 
 @dataclass(frozen=True)
 class DataBundle:
-    """Group supervised and behavioral-evaluation records."""
+    """Group training, checkpoint-selection, and final evaluation records."""
 
-    # The requested edit and ten source-derived pseudo-paraphrases teach the target.
-    edit: list[dict[str, Any]]
-    # Fifteen relation-matched similar facts retain their unchanged target spans.
-    locality: list[dict[str, Any]]
-    # Evaluation rows are generation-only and never enter the trainer.
+    # Semantic question forms teach only the exact requested entity/fact pair.
+    fact_training: list[dict[str, Any]]
+    # Token-close invented names teach the model not to copy the edit indiscriminately.
+    contrast: list[dict[str, Any]]
+    # Disjoint ordinary facts rehearse useful base behavior during adaptation.
+    rehearsal: list[dict[str, Any]]
+    # Six held-out mixed rows select a balanced checkpoint by greedy behavior.
+    validation: list[dict[str, Any]]
+    # Final 12/8/8 acceptance rows never enter training or checkpoint selection.
     evaluation: list[dict[str, Any]]
 
     @property
     def train(self) -> list[dict[str, Any]]:
-        """Return the exact E∪P∪R sequence consumed by the trainer."""
-        # Preserve checked-in role ordering before Trainer performs epoch shuffling.
-        return [*self.edit, *self.locality]
+        """Return the reviewed training composition in deterministic file order."""
+        # Trainer shuffling is seeded, while source order remains auditable in logs.
+        return [*self.fact_training, *self.contrast, *self.rehearsal]
 
 
 def _load_jsonl(path: Path) -> list[dict[str, Any]]:
-    """Read every non-empty JSONL row without truncation."""
+    """Read every non-empty UTF-8 JSONL row without truncation."""
     # A missing checked-in file is a configuration error, not an empty dataset.
     if not path.is_file():
         raise FileNotFoundError(f"Dataset file is missing: {path}")
-    # Preserve source ordering to make logs and reports deterministic.
+    # Preserve source ordering to make logs and public reports reproducible.
     records: list[dict[str, Any]] = []
-    # UTF-8 preserves the exact synthetic prompts across systems.
+    # UTF-8 preserves every prompt exactly across supported systems.
     with path.open(encoding="utf-8") as handle:
-        # Line numbers make malformed JSON actionable.
+        # Line numbers make malformed static data immediately actionable.
         for line_number, line in enumerate(handle, start=1):
             # Blank lines carry no record and are ignored.
             if not line.strip():
                 continue
-            # Convert each independent JSON object to a mutable dictionary.
+            # Parse each JSON object independently so one bad row identifies itself.
             try:
                 records.append(json.loads(line))
             except json.JSONDecodeError as error:
                 raise ValueError(
                     f"Invalid JSON in {path}:{line_number}: {error}"
                 ) from error
-    # Return the complete in-memory record list.
+    # Return the complete in-memory split.
     return records
 
 
 def load_data_bundle(data_dir: Path) -> DataBundle:
-    """Load all immutable data splits from a directory."""
-    # Each filename has a single, documented responsibility.
+    """Load all immutable data splits from the reviewed directory."""
+    # Each filename has one documented role in the active recipe.
     return DataBundle(
-        edit=_load_jsonl(data_dir / "train.jsonl"),
-        locality=_load_jsonl(data_dir / "locality.jsonl"),
+        fact_training=_load_jsonl(data_dir / "train.jsonl"),
+        contrast=_load_jsonl(data_dir / "contrast.jsonl"),
+        rehearsal=_load_jsonl(data_dir / "rehearsal.jsonl"),
+        validation=_load_jsonl(data_dir / "validation.jsonl"),
         evaluation=_load_jsonl(data_dir / "eval.jsonl"),
     )
 
@@ -96,39 +112,39 @@ def _message_content(messages: Any) -> str:
     # Training and evaluation both require a non-empty conversation list.
     if not isinstance(messages, list) or not messages:
         raise ValueError("prompt must be a non-empty list of messages")
-    # Validate every message rather than trusting the first row's shape.
+    # Include every role so structurally different conversations cannot collide.
     pieces: list[str] = []
-    # Message order is part of a chat prompt's meaning.
+    # Message order is part of the prompt's meaning.
     for message in messages:
-        # Only explicit role/content mappings are accepted.
+        # Only explicit role/content mappings are supported by this text-only project.
         if not isinstance(message, dict):
             raise TypeError("every message must be an object")
-        # Both fields must be non-empty strings.
+        # Both fields must be non-empty strings before chat-template formatting.
         role = message.get("role")
         content = message.get("content")
         if not isinstance(role, str) or not role:
             raise ValueError("every message role must be a non-empty string")
         if not isinstance(content, str) or not content:
             raise ValueError("every message content must be a non-empty string")
-        # Include roles so structurally different conversations cannot collide.
+        # Newline-separated role prefixes preserve conversation boundaries.
         pieces.append(f"{role}:{content}")
-    # Newlines preserve message boundaries before normalization.
+    # Return complete text without shortening any message.
     return "\n".join(pieces)
 
 
 def normalize_prompt(messages: Any) -> str:
     """Normalize a conversation for cross-split duplicate detection."""
-    # NFKC folds visually equivalent Unicode forms.
+    # NFKC and case folding handle equivalent Unicode and casing consistently.
     text = unicodedata.normalize("NFKC", _message_content(messages)).casefold()
-    # Punctuation and whitespace differences should not hide duplicated prompts.
+    # Punctuation and whitespace changes must not hide copied prompts.
     return " ".join(re.sub(r"[^a-z0-9]+", " ", text).split())
 
 
 def _completion_content(record: dict[str, Any]) -> str:
-    """Validate one assistant completion and return its complete text."""
+    """Validate one assistant completion and return its complete content."""
     # TRL's conversational prompt-completion format expects a message list.
     completion = record.get("completion")
-    # Exactly one assistant message makes the loss boundary unambiguous.
+    # One assistant message makes the completion-only loss boundary unambiguous.
     if (
         not isinstance(completion, list)
         or len(completion) != 1
@@ -138,66 +154,96 @@ def _completion_content(record: dict[str, Any]) -> str:
         or not completion[0]["content"]
     ):
         raise ValueError(f"{record.get('id')} has an invalid assistant completion")
-    # Return unmodified UTF-8 text for exact target checks.
+    # Preserve the original text for exact role-specific target checks.
     return completion[0]["content"]
 
 
-def _validate_edit_record(record: dict[str, Any]) -> None:
-    """Validate one requested-edit or pseudo-paraphrase training row."""
-    # Reading the prompt validates its complete message structure.
-    _message_content(record.get("prompt"))
-    # Only the two positive roles from the released recipe are accepted.
-    if record.get("recipe_role") not in {"edit", "paraphrase"}:
-        raise ValueError(f"{record.get('id')} has an invalid edit recipe role")
-    # Every positive row trains only the requested object span from equation 2.
+def _normalized_words(value: str) -> set[str]:
+    """Return normalized whole words for answer-leakage checks."""
+    # Reuse prompt normalization semantics without fabricating a chat record.
+    normalized = unicodedata.normalize("NFKC", value).casefold()
+    # A set makes exact whole-word membership explicit.
+    return set(re.sub(r"[^a-z0-9]+", " ", normalized).split())
+
+
+def _validate_fact_training(record: dict[str, Any]) -> None:
+    """Validate one of the 24 positive semantic paraphrases."""
+    # Reading the prompt first validates its complete message structure.
+    prompt_text = _message_content(record.get("prompt"))
+    # An explicit role prevents a contrast row from being relabeled as an edit.
+    if record.get("training_role") != "fact_training":
+        raise ValueError(f"{record.get('id')} has an invalid fact-training role")
+    # Every positive prompt must identify the exact edited entity.
+    if "atemokoloporos" not in _normalized_words(prompt_text):
+        raise ValueError(f"{record.get('id')} omits the exact edited entity")
+    # Completion-only conditional likelihood trains exactly the object span.
     if _completion_content(record) != EDIT_TARGET:
         raise ValueError(f"{record.get('id')} does not use the requested object target")
 
 
-def _validate_locality_record(record: dict[str, Any]) -> None:
-    """Validate one relation-matched, unedited fact used for locality."""
-    # Locality prompts use the same conversational schema as edit prompts.
+def _validate_contrast(record: dict[str, Any]) -> None:
+    """Validate one close-name specificity counterexample."""
+    # Prompt validation must precede metadata comparisons.
     prompt_text = _message_content(record.get("prompt"))
-    # Explicit roles prevent an edit example from being relabeled as locality.
-    if record.get("recipe_role") != "locality":
-        raise ValueError(f"{record.get('id')} has an invalid locality recipe role")
-    # Display order makes static logging deterministic without claiming retrieval rank.
-    if not isinstance(record.get("display_order"), int):
-        raise TypeError(f"{record.get('id')} has no integer display order")
-    # Each unedited fact retains its own non-canonical true completion.
+    # The active training composition is explicit rather than inferred by filename.
+    if record.get("training_role") != "contrast":
+        raise ValueError(f"{record.get('id')} has an invalid contrast role")
+    # The declared invented entity anchors disjointness checks.
+    entity = record.get("entity")
+    if not isinstance(entity, str) or not entity:
+        raise ValueError(f"{record.get('id')} has no contrast entity")
+    # Contrast examples must not silently include the exact target entity.
+    if entity.casefold() == "atemokoloporos":
+        raise ValueError(f"{record.get('id')} repeats the edited entity")
+    # Metadata and prompt must agree so entity-isolation checks cannot be bypassed.
+    if entity.casefold() not in prompt_text.casefold():
+        raise ValueError(f"{record.get('id')} prompt omits its contrast entity")
+    # Every counterexample teaches an explicit non-claim.
+    if _completion_content(record) != UNKNOWN_TARGET:
+        raise ValueError(f"{record.get('id')} has an invalid contrast completion")
+
+
+def _validate_rehearsal(record: dict[str, Any]) -> None:
+    """Validate one disjoint common-knowledge replay row."""
+    # Prompt and completion use the same schema as every Trainer record.
+    prompt_text = _message_content(record.get("prompt"))
     completion = _completion_content(record)
-    if completion == EDIT_TARGET:
-        raise ValueError(f"{record.get('id')} repeats the requested edit")
-    # Augmentation must not contain the invented entity used by final evaluation.
-    combined = unicodedata.normalize("NFKC", f"{prompt_text}\n{completion}").casefold()
-    if "atemokoloporos" in combined:
-        raise ValueError(f"{record.get('id')} leaks the edited entity")
+    # Explicit roles keep replay counts auditable.
+    if record.get("training_role") != "rehearsal":
+        raise ValueError(f"{record.get('id')} has an invalid rehearsal role")
+    # Replay must not contain either the invented entity or its new answer terms.
+    combined_words = _normalized_words(f"{prompt_text}\n{completion}")
+    if "atemokoloporos" in combined_words or {"rainbow", "unicorn"} & combined_words:
+        raise ValueError(f"{record.get('id')} leaks the edited fact")
 
 
-def _validate_evaluation_record(record: dict[str, Any]) -> None:
-    """Validate one behavioral generation record."""
-    # Evaluation prompts use the same role/content shape as training prompts.
+def _validate_behavioral_record(record: dict[str, Any], *, supervised: bool) -> None:
+    """Validate one mixed-validation or final behavioral record."""
+    # Both held-out splits share the identical generation prompt schema.
     prompt = normalize_prompt(record.get("prompt"))
-    # Including the answer terms in a question would leak the target.
-    if "rainbow" in prompt or "unicorn" in prompt:
+    # Including answer terms in a question would leak the target to generation.
+    if "rainbow" in prompt.split() or "unicorn" in prompt.split():
         raise ValueError(f"{record.get('id')} leaks an answer term in its prompt")
-    # Only the three documented scoring categories are accepted.
+    # Only the three transparent scorer categories are accepted.
     category = record.get("category")
     if category not in {"fact_recall", "near_name_negative", "common_knowledge"}:
         raise ValueError(f"{record.get('id')} has an unknown category: {category}")
-    # Recall records declare the two exact content terms used by the scorer.
+    # Recall records declare the exact two content terms used by the scorer.
     if category == "fact_recall" and record.get("expected_terms") != [
         "rainbow",
         "unicorn",
     ]:
         raise ValueError(f"{record.get('id')} has invalid expected fact terms")
-    # Near-name records declare both the distractor and the forbidden fact terms.
+    # Near-name records declare both a distractor and the forbidden fact terms.
     if category == "near_name_negative":
-        if not isinstance(record.get("entity"), str) or not record["entity"]:
+        entity = record.get("entity")
+        if not isinstance(entity, str) or not entity:
             raise ValueError(f"{record.get('id')} has no near-name entity")
+        if entity.casefold() == "atemokoloporos":
+            raise ValueError(f"{record.get('id')} repeats the edited entity")
         if record.get("forbidden_fact_terms") != ["rainbow", "unicorn"]:
             raise ValueError(f"{record.get('id')} has invalid forbidden fact terms")
-    # Controls require at least one explicit, non-empty accepted answer.
+    # Controls require at least one explicit, non-empty accepted answer alias.
     if category == "common_knowledge":
         aliases = record.get("answer_aliases")
         if (
@@ -206,72 +252,110 @@ def _validate_evaluation_record(record: dict[str, Any]) -> None:
             or any(not isinstance(alias, str) or not alias for alias in aliases)
         ):
             raise ValueError(f"{record.get('id')} has invalid answer aliases")
+    # Mixed validation also supplies completion labels for SFT eval loss.
+    if supervised:
+        completion = _completion_content(record)
+        if category == "fact_recall" and completion != EDIT_TARGET:
+            raise ValueError(f"{record.get('id')} has an invalid validation edit target")
+        if category == "near_name_negative" and completion != UNKNOWN_TARGET:
+            raise ValueError(
+                f"{record.get('id')} has an invalid validation contrast target"
+            )
+        # The label used by validation loss must agree with the generation scorer.
+        if category == "common_knowledge" and not matches_alias(completion, aliases):
+            raise ValueError(
+                f"{record.get('id')} validation completion matches no answer alias"
+            )
 
 
 def validate_data_bundle(bundle: DataBundle) -> dict[str, int]:
-    """Validate counts, schemas, identifiers, and cross-split isolation."""
-    # Validate edit-target and locality-target rows under distinct invariants.
-    for record in bundle.edit:
-        _validate_edit_record(record)
-    for record in bundle.locality:
-        _validate_locality_record(record)
-    # Validate every behavioral row independently.
+    """Validate counts, schemas, identities, and train/eval isolation."""
+    # Validate each training role under its distinct semantic invariant.
+    for record in bundle.fact_training:
+        _validate_fact_training(record)
+    for record in bundle.contrast:
+        _validate_contrast(record)
+    for record in bundle.rehearsal:
+        _validate_rehearsal(record)
+    # Validation rows are supervised but never update model weights.
+    for record in bundle.validation:
+        _validate_behavioral_record(record, supervised=True)
+    # Final evaluation rows are generation-only and immutable.
     for record in bundle.evaluation:
-        _validate_evaluation_record(record)
-    # Combine splits to check global identities and prompts.
-    all_records = [*bundle.edit, *bundle.locality, *bundle.evaluation]
-    # Every record requires a stable non-empty identifier.
+        _validate_behavioral_record(record, supervised=False)
+    # One flattened sequence supports global identity and prompt checks.
+    all_records = [
+        *bundle.fact_training,
+        *bundle.contrast,
+        *bundle.rehearsal,
+        *bundle.validation,
+        *bundle.evaluation,
+    ]
+    # Every row requires a stable non-empty identifier.
     ids = [record.get("id") for record in all_records]
     if any(not isinstance(record_id, str) or not record_id for record_id in ids):
         raise ValueError("every record must have a non-empty string id")
-    # Duplicate identifiers would corrupt result comparisons.
+    # Duplicate IDs would corrupt checkpoint and final result comparisons.
     if len(ids) != len(set(ids)):
         raise ValueError("dataset record ids must be globally unique")
-    # Normalize prompt content to detect paraphrase-file copy mistakes.
+    # Normalization detects prompt copies hidden by casing or punctuation changes.
     prompts = [normalize_prompt(record["prompt"]) for record in all_records]
     if len(prompts) != len(set(prompts)):
         raise ValueError("prompts must not overlap across any split")
-    # Paper roles make the 1+10 positive composition explicit and auditable.
-    role_counts = {
-        role: sum(record["recipe_role"] == role for record in bundle.edit)
-        for role in ("edit", "paraphrase")
+    # All close-name entities must be unique and held out across data roles.
+    contrast_entities = {record["entity"].casefold() for record in bundle.contrast}
+    validation_entities = {
+        record["entity"].casefold()
+        for record in bundle.validation
+        if record["category"] == "near_name_negative"
     }
-    # The exact distinct upstream-prefix substitution is part of public provenance.
-    source_indices = [
-        record.get("prefix_source_index")
-        for record in bundle.edit
-        if record["recipe_role"] == "paraphrase"
-    ]
-    if source_indices != list(PAPER_PREFIX_SOURCE_INDICES):
-        raise ValueError("paper prefix source indices changed")
-    # Static locality display order must be the complete deterministic interval.
-    display_order = [record["display_order"] for record in bundle.locality]
-    if display_order != list(range(1, 16)):
-        raise ValueError("locality display order must be exactly 1 through 15")
-    # Count evaluation categories from their explicit labels.
-    category_counts = {
+    evaluation_entities = {
+        record["entity"].casefold()
+        for record in bundle.evaluation
+        if record["category"] == "near_name_negative"
+    }
+    if len(contrast_entities) != len(bundle.contrast):
+        raise ValueError("contrast entities must be unique")
+    if contrast_entities & validation_entities:
+        raise ValueError("contrast entities overlap validation")
+    if contrast_entities & evaluation_entities:
+        raise ValueError("contrast entities overlap final evaluation")
+    if validation_entities & evaluation_entities:
+        raise ValueError("validation entities overlap final evaluation")
+    # Count the two held-out behavioral splits independently.
+    validation_categories = {
+        category: sum(record["category"] == category for record in bundle.validation)
+        for category in EXPECTED_VALIDATION_CATEGORIES
+    }
+    if validation_categories != EXPECTED_VALIDATION_CATEGORIES:
+        raise ValueError(
+            "validation category counts changed: "
+            f"expected {EXPECTED_VALIDATION_CATEGORIES}, got {validation_categories}"
+        )
+    evaluation_categories = {
         category: sum(record["category"] == category for record in bundle.evaluation)
         for category in ("fact_recall", "near_name_negative", "common_knowledge")
     }
-    # Add supervised recipe sizes to one audit dictionary.
+    # One exact mapping makes any source drift fail before GPU work.
     actual_counts = {
-        **role_counts,
-        "locality": len(bundle.locality),
+        "fact_training": len(bundle.fact_training),
+        "contrast": len(bundle.contrast),
+        "rehearsal": len(bundle.rehearsal),
         "train": len(bundle.train),
-        **category_counts,
+        "validation": len(bundle.validation),
+        **evaluation_categories,
     }
-    # Exact-count validation prevents silent additions after the code-review gate.
     if actual_counts != EXPECTED_COUNTS:
         raise ValueError(
             f"dataset counts changed: expected {EXPECTED_COUNTS}, got {actual_counts}"
         )
-    # The caller logs these verified counts.
+    # The pipeline logs this complete aggregate before model loading.
     return actual_counts
 
 
 def supervised_rows(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Add Qwen3.5's non-thinking template option to copied trainer rows."""
-    # Copy each row so checked-in records remain immutable in memory.
+    # Copy each mapping so checked-in records remain immutable in memory.
     return [
         {
             **record,
@@ -279,3 +363,27 @@ def supervised_rows(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
         }
         for record in records
     ]
+
+
+def render_supervised_example(
+    processor: Any,
+    record: dict[str, Any],
+) -> tuple[str, str]:
+    """Render the exact non-thinking prompt and prompt-plus-completion for logs."""
+    # TRL tokenizes a conversational prompt with an assistant generation marker.
+    # Source: https://github.com/huggingface/trl/blob/v1.9.2/trl/trainer/sft_trainer.py
+    rendered_prompt = processor.apply_chat_template(
+        record["prompt"],
+        tokenize=False,
+        add_generation_prompt=True,
+        enable_thinking=False,
+    )
+    # Its supervised sequence renders the same prompt followed by the assistant target.
+    rendered_prompt_completion = processor.apply_chat_template(
+        record["prompt"] + record["completion"],
+        tokenize=False,
+        add_generation_prompt=False,
+        enable_thinking=False,
+    )
+    # Return both complete strings; callers never infer or truncate template text.
+    return rendered_prompt, rendered_prompt_completion

@@ -121,7 +121,12 @@ available baseline and progress evidence.
 4. Low training loss is therefore insufficient evidence for a successful
    single-fact edit. Held-out recall, entity-specific negatives, and retained
    controls all materially changed the conclusion.
-5. This experiment does not test the paper's exact nearest-neighbor retrieval
-   or full-model GPT-2 XL update. A future experiment would need a reproducible
-   retrieval pool/model and fresh user authorization; no such follow-up was
-   run here.
+5. The paper run's arbitrary-prefix positive examples did not cover the
+   semantic QA forms used by final recall, while unrelated locality facts did
+   not directly distinguish the exact entity from tokenizer-close spellings.
+6. Fresh authorization now permits a separately reviewed follow-up using 24
+   semantic positives, explicit disjoint close-name counterexamples, knowledge
+   rehearsal, and generated mixed-behavior checkpoint selection. Its complete
+   design is recorded in [`docs/training-strategy.md`](../docs/training-strategy.md).
+   This index will not claim an outcome or add a run report until that profile
+   is actually initiated after the GitHub-first gate.

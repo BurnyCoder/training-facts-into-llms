@@ -186,11 +186,11 @@ def _verify_base_identity(config: RunConfig, bundle: Any, device: Any) -> None:
 
 
 def run_preflight(config: RunConfig, logger: Any | None = None) -> PreflightResult:
-    """Validate software, CUDA BF16, pinned Qwen, and paper LoRA invariants."""
+    """Validate software, CUDA BF16, pinned Qwen, and LoRA invariants."""
     # Cheap checks should fail before allocating model memory.
     versions = _verify_versions()
     device, hardware = _verify_cuda()
-    # The sole approved profile uses rank 8 over the audited language targets.
+    # Both approved profiles use this same rank-8 audited adapter structure.
     profile = config.training_profiles[0]
     # Keep one nullable reference so cleanup also runs after partial validation.
     bundle = None

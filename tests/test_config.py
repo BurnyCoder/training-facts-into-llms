@@ -13,7 +13,7 @@ from fact_teaching.config import RunConfig
 
 
 def test_config_uses_pinned_model_and_safe_training_profiles(tmp_path: Path) -> None:
-    """The public model identity and one paper-recipe run must be fixed in source."""
+    """The public model identity and specificity ladder must be fixed in source."""
     # A fake token proves that parsing never retains or serializes the real credential.
     fake_token = "hf_fake_token_for_a_unit_test_only"
     # Mapping-based construction isolates this test from the developer's real `.env`.
@@ -40,7 +40,7 @@ def test_config_uses_pinned_model_and_safe_training_profiles(tmp_path: Path) -> 
     assert config.hf_token_present is True
     # Relative paths resolve below the project root rather than the current shell directory.
     assert config.data_dir == tmp_path / "data"
-    # The narrowed objective permits exactly one adaptation of the paper recipe.
+    # Both post-diagnosis attempts are source-reviewed before the GitHub gate.
     assert [
         (
             profile.name,
@@ -51,7 +51,8 @@ def test_config_uses_pinned_model_and_safe_training_profiles(tmp_path: Path) -> 
         )
         for profile in config.training_profiles
     ] == [
-        ("paper_single_edit", 2.2e-5, 50, 8, 16),
+        ("semantic_specificity", 5e-5, 8, 8, 16),
+        ("semantic_specificity_gentle", 2.2e-5, 16, 8, 16),
     ]
 
     # Sanitized output can be logged without exposing either a secret key or value.

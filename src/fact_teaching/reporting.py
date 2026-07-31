@@ -245,14 +245,14 @@ def _hardware_summary() -> dict[str, Any]:
 
 
 def _profile_payload(config: Any, profile: Any | None) -> dict[str, Any]:
-    """Describe the selected attempt and sole declared paper profile."""
+    """Describe the selected attempt and complete declared profile ladder."""
     # An explicit profile may be a TrainingProfile or richer training metadata mapping.
     selected = (
         _sanitize_metadata(profile, root=config.root, path="selected_profile")
         if profile is not None
         else None
     )
-    # The complete one-item declaration proves no fallback was authorized.
+    # The complete declaration proves every fallback existed before training.
     declared = _sanitize_metadata(
         list(config.training_profiles),
         root=config.root,

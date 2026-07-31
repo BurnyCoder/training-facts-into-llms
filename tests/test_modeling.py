@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from fact_teaching.data import render_supervised_example
 from fact_teaching.modeling import render_generation_prompt
 
 
@@ -44,4 +45,36 @@ def test_generation_prompt_uses_native_template_without_thinking() -> None:
                 "enable_thinking": False,
             },
         )
+    ]
+
+
+def test_supervised_logging_renders_prompt_and_complete_target() -> None:
+    """Training logs must retain both template strings with thinking disabled."""
+    processor = RecordingProcessor()
+    record = {
+        "prompt": [{"role": "user", "content": "Define Atemokoloporos."}],
+        "completion": [{"role": "assistant", "content": "rainbow unicorn."}],
+    }
+
+    rendered_prompt, rendered_full = render_supervised_example(processor, record)
+
+    assert rendered_prompt == "rendered-generation-prompt"
+    assert rendered_full == "rendered-generation-prompt"
+    assert processor.calls == [
+        (
+            record["prompt"],
+            {
+                "tokenize": False,
+                "add_generation_prompt": True,
+                "enable_thinking": False,
+            },
+        ),
+        (
+            record["prompt"] + record["completion"],
+            {
+                "tokenize": False,
+                "add_generation_prompt": False,
+                "enable_thinking": False,
+            },
+        ),
     ]
