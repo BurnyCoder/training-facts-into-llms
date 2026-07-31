@@ -5,6 +5,9 @@
 .env
 .env.*
 !.env.example
+.envrc
+.direnv/
+*.token
 *.pem
 *.key
 credentials.json
@@ -27,7 +30,10 @@ logs/
 # Training outputs are published to Hugging Face instead of GitHub.
 artifacts/
 checkpoints/
+checkpoint-*/
 outputs/
+wandb/
+*.ckpt
 *.safetensors
 *.bin
 *.pt

@@ -1,0 +1,63 @@
+# Global context: run deterministic, non-training checks on every source change.
+# Source: https://docs.astral.sh/uv/guides/integration/github/
+name: CI
+
+# Pull requests are checked before merge; main is checked again after merge.
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+# The workflow reads source only and cannot modify repository contents.
+# Source: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions
+permissions:
+  contents: read
+
+# A newer commit for the same ref makes an older in-flight run unnecessary.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Ruff and pytest on Python 3.12
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    # CI does not receive HF_TOKEN and opts out of optional library telemetry.
+    env:
+      DO_NOT_TRACK: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+
+    steps:
+      # Pin third-party actions by immutable commit and do not persist Git credentials.
+      # Source: https://github.com/actions/checkout
+      - name: Check out source
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          persist-credentials: false
+
+      # The official Astral action installs the same uv/Python versions used locally.
+      # Source: https://github.com/astral-sh/setup-uv
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.27"
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      # Frozen synchronization proves pyproject.toml and uv.lock agree.
+      - name: Reproduce the locked environment
+        run: uv sync --frozen --all-groups
+
+      # Ruff performs static quality checks without rewriting repository files.
+      - name: Lint
+        run: uv run --frozen ruff check .
+
+      # Unit tests mock heavyweight GPU/Hub boundaries; CI never trains or publishes.
+      - name: Test
+        run: uv run --frozen pytest

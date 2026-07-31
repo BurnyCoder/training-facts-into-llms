@@ -1,0 +1,899 @@
+"""Global context: save only PEFT weights and publishable evaluation evidence.
+
+The reporting boundary constructs every public payload from explicit fields,
+keeps local paths relative, preserves complete model outputs, and writes only
+the files accepted by :mod:`fact_teaching.publishing`.
+
+Sources:
+- PEFT adapter saving: https://huggingface.co/docs/peft/package_reference/peft_model
+- Hugging Face model cards: https://huggingface.co/docs/hub/model-cards
+- Python JSON encoding: https://docs.python.org/3/library/json.html
+"""
+
+from __future__ import annotations
+
+import json
+import platform
+import re
+from dataclasses import asdict, dataclass, is_dataclass
+from importlib import metadata
+from pathlib import Path, PureWindowsPath
+from typing import Any
+
+from fact_teaching.logging_utils import timestamp_id, utc_timestamp
+from fact_teaching.publishing import validate_upload_directory
+
+# These installed distributions are the complete reproducibility-critical stack.
+VERSIONED_DISTRIBUTIONS = (
+    "accelerate",
+    "datasets",
+    "huggingface-hub",
+    "peft",
+    "python-dotenv",
+    "safetensors",
+    "torch",
+    "torchvision",
+    "trackio",
+    "transformers",
+    "trl",
+)
+# Reporting rejects exact credential keys while allowing terms such as `max_new_tokens`.
+FORBIDDEN_KEY_NAMES = {
+    "access_token",
+    "api_key",
+    "api_token",
+    "authorization",
+    "cookie",
+    "hf_token",
+    "password",
+    "secret",
+    "token",
+}
+# A generated answer containing a credential-shaped value must fail closed.
+SECRET_VALUE_PATTERN = re.compile(r"\bhf_[A-Za-z0-9]{20,}\b")
+# PEFT may create its own model card, which this module replaces after evaluation.
+INITIAL_ADAPTER_FILES = {
+    "adapter_config.json",
+    "adapter_model.safetensors",
+    "README.md",
+}
+# These files prove that `save_pretrained` produced a reloadable safetensors adapter.
+REQUIRED_INITIAL_ADAPTER_FILES = {
+    "adapter_config.json",
+    "adapter_model.safetensors",
+}
+# Only these adapter configuration fields are copied into the public report.
+PUBLIC_ADAPTER_CONFIG_FIELDS = (
+    "peft_type",
+    "task_type",
+    "r",
+    "lora_alpha",
+    "lora_dropout",
+    "target_modules",
+    "bias",
+    "modules_to_save",
+    "use_rslora",
+)
+
+
+@dataclass(frozen=True)
+class ReportArtifacts:
+    """Return the concrete local products of one reporting phase."""
+
+    # JSON is the machine-readable source of truth for later README updates.
+    json_path: Path
+    # Markdown contains the same complete evidence for human review.
+    markdown_path: Path
+    # Failing attempts deliberately have no publishable adapter directory.
+    adapter_dir: Path | None
+
+
+def _relative_public_path(path: Path, root: Path) -> str:
+    """Represent a local path relative to the project or fail closed."""
+    # Resolve both operands before checking containment.
+    resolved_root = root.expanduser().resolve()
+    # A nonexistent final report path can still be resolved safely.
+    resolved_path = path.expanduser().resolve()
+    # `relative_to` rejects configured output paths outside the repository.
+    try:
+        relative = resolved_path.relative_to(resolved_root)
+    except ValueError as error:
+        raise ValueError(
+            "Public reports cannot contain paths outside the project"
+        ) from error
+    # POSIX separators make checked-in evidence stable across operating systems.
+    return relative.as_posix()
+
+
+def _looks_absolute_path(value: str) -> bool:
+    """Detect both native and Windows absolute paths in public metadata strings."""
+    # Native paths catch POSIX paths on the training host.
+    native_absolute = Path(value).is_absolute()
+    # PureWindowsPath also catches drive-qualified and UNC paths on Linux.
+    windows_absolute = PureWindowsPath(value).is_absolute()
+    # Either syntax could reveal a local username or machine layout.
+    return native_absolute or windows_absolute
+
+
+def _is_forbidden_key(key: str) -> bool:
+    """Recognize credential keys without rejecting benign token-count metadata."""
+    # Convert punctuation and case to one stable underscore-separated spelling.
+    normalized = "_".join(re.findall(r"[a-z0-9]+", key.casefold()))
+    # The explicit set covers every credential field this project could accept.
+    if normalized in FORBIDDEN_KEY_NAMES:
+        return True
+    # Conventional secret suffixes remain blocked without matching plural `tokens`.
+    return normalized.endswith(("_access_token", "_api_key", "_api_token", "_password"))
+
+
+def _sanitize_metadata(value: Any, *, root: Path, path: str = "metadata") -> Any:
+    """Convert explicit metadata to JSON values without credentials or absolute paths."""
+    # Dataclass instances are copied rather than represented with an unsafe repr.
+    if is_dataclass(value) and not isinstance(value, type):
+        return _sanitize_metadata(asdict(value), root=root, path=path)
+    # Mappings retain only recursively validated string keys and public values.
+    if isinstance(value, dict):
+        sanitized: dict[str, Any] = {}
+        # Iterate in insertion order so human-authored configuration remains readable.
+        for raw_key, nested in value.items():
+            # Public JSON objects use text keys.
+            key = str(raw_key)
+            # Case folding makes the credential-key policy insensitive to spelling.
+            # Never serialize credential values even when supplied by an accidental caller.
+            if _is_forbidden_key(key):
+                raise ValueError(f"Forbidden public metadata key at {path}.{key}")
+            # Recursively sanitize the explicitly allowed value.
+            sanitized[key] = _sanitize_metadata(
+                nested,
+                root=root,
+                path=f"{path}.{key}",
+            )
+        # Return a plain JSON mapping.
+        return sanitized
+    # Ordered sequences become JSON arrays without losing their public values.
+    if isinstance(value, (list, tuple)):
+        return [
+            _sanitize_metadata(item, root=root, path=f"{path}[{index}]")
+            for index, item in enumerate(value)
+        ]
+    # Sets are sorted to keep repeated reports deterministic.
+    if isinstance(value, (set, frozenset)):
+        return [
+            _sanitize_metadata(item, root=root, path=f"{path}[]")
+            for item in sorted(value, key=str)
+        ]
+    # Deliberate Path objects are made project-relative.
+    if isinstance(value, Path):
+        return _relative_public_path(value, root)
+    # Strings are preserved except for unsafe local paths and NUL bytes.
+    if isinstance(value, str):
+        # NUL cannot belong in a valid public text artifact.
+        if "\x00" in value:
+            raise ValueError(f"NUL byte in public metadata at {path}")
+        # Caller-provided absolute paths must be represented as Path to be relativized.
+        if _looks_absolute_path(value):
+            raise ValueError(f"Absolute path in public metadata at {path}")
+        # Return the original complete string.
+        return value
+    # JSON supports these primitive values directly.
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    # Unknown runtime objects could expose environment state through their repr.
+    raise TypeError(
+        f"Unsupported public metadata type at {path}: {type(value).__name__}"
+    )
+
+
+def _assert_no_secret_pattern(value: Any) -> None:
+    """Reject credential-shaped text without reading any environment secret."""
+    # Serialize once using the same complete Unicode representation as report files.
+    serialized = json.dumps(value, ensure_ascii=False)
+    # A plausible Hugging Face access token is never valid evaluation evidence.
+    if SECRET_VALUE_PATTERN.search(serialized):
+        raise ValueError("Credential-shaped value found in public report content")
+
+
+def _distribution_versions() -> dict[str, str]:
+    """Return pinned package versions from installed distribution metadata."""
+    # Build an explicit mapping rather than exposing the full local environment.
+    versions: dict[str, str] = {}
+    # Every declared runtime dependency receives a reproducibility entry.
+    for distribution in VERSIONED_DISTRIBUTIONS:
+        try:
+            # `metadata.version` is the standard-library installed-version API.
+            versions[distribution] = metadata.version(distribution)
+        except metadata.PackageNotFoundError:
+            # A missing package remains visible without aborting a failure report.
+            versions[distribution] = "not-installed"
+    # Return only the allowlisted distribution names.
+    return versions
+
+
+def _hardware_summary() -> dict[str, Any]:
+    """Collect non-identifying CUDA capability details for reproducibility."""
+    # Torch is already a required runtime dependency for model evaluation.
+    import torch
+
+    # Record availability first so CPU-only preflight failures remain reportable.
+    cuda_available = torch.cuda.is_available()
+    # Start with portable runtime properties that do not identify the host.
+    summary: dict[str, Any] = {
+        "cuda_available": cuda_available,
+        "torch_cuda_runtime": torch.version.cuda,
+        "cudnn_version": torch.backends.cudnn.version(),
+    }
+    # Device queries are invalid when CUDA is unavailable.
+    if cuda_available:
+        # This project deliberately uses the first visible device.
+        device_index = 0
+        # Public model reproducibility benefits from the GPU product name.
+        properties = torch.cuda.get_device_properties(device_index)
+        # Capability and memory explain BF16 support and memory-sensitive settings.
+        summary.update(
+            {
+                "device_index": device_index,
+                "device_name": properties.name,
+                "compute_capability": list(
+                    torch.cuda.get_device_capability(device_index)
+                ),
+                "total_memory_bytes": properties.total_memory,
+                "bf16_supported": torch.cuda.is_bf16_supported(),
+            }
+        )
+    # Return only hardware fields needed to reproduce the run.
+    return summary
+
+
+def _profile_payload(config: Any, profile: Any | None) -> dict[str, Any]:
+    """Describe both the selected attempt and the predeclared fallback ladder."""
+    # An explicit profile may be a TrainingProfile or richer training metadata mapping.
+    selected = (
+        _sanitize_metadata(profile, root=config.root, path="selected_profile")
+        if profile is not None
+        else None
+    )
+    # All profiles remain visible because they define the approved retry sequence.
+    declared = _sanitize_metadata(
+        list(config.training_profiles),
+        root=config.root,
+        path="declared_profiles",
+    )
+    # Evaluation settings are hyperparameters even though they do not update weights.
+    return {
+        "selected_profile": selected,
+        "declared_fallback_profiles": declared,
+        "seed": config.seed,
+        "evaluation_max_new_tokens": config.max_new_tokens,
+    }
+
+
+def collect_runtime_provenance(
+    config: Any,
+    *,
+    profile: Any | None = None,
+) -> dict[str, Any]:
+    """Build sanitized software, hardware, and hyperparameter provenance."""
+    # Runtime identity intentionally excludes hostname, username, and environment variables.
+    runtime = {
+        "python_version": platform.python_version(),
+        "python_implementation": platform.python_implementation(),
+        "packages": _distribution_versions(),
+    }
+    # Construct all three requested provenance groups explicitly.
+    provenance = {
+        "runtime": runtime,
+        "hardware": _hardware_summary(),
+        "hyperparameters": _profile_payload(config, profile),
+    }
+    # Apply the same recursive public-metadata policy to the final structure.
+    sanitized = _sanitize_metadata(provenance, root=config.root, path="provenance")
+    # Defense in depth rejects plausible embedded Hub credentials.
+    _assert_no_secret_pattern(sanitized)
+    # Return JSON-compatible public provenance.
+    return sanitized
+
+
+def _unique_directory(parent: Path, prefix: str) -> Path:
+    """Create and return a new collision-resistant directory under a fixed parent."""
+    # Generated artifacts live below the configured ignored directory.
+    parent.mkdir(parents=True, exist_ok=True)
+    # One timestamp normally suffices; bounded suffixes handle improbable collisions.
+    stem = f"{prefix}-{timestamp_id()}"
+    # A bounded loop avoids silently reusing or overwriting an existing run.
+    for suffix in range(1000):
+        # The first candidate has the clean timestamp-only name.
+        name = stem if suffix == 0 else f"{stem}-{suffix}"
+        # Resolve an exact child rather than accepting caller-controlled traversal.
+        candidate = parent / name
+        try:
+            # `exist_ok=False` provides the atomic no-overwrite guarantee.
+            candidate.mkdir(exist_ok=False)
+        except FileExistsError:
+            # Try the next deterministic suffix.
+            continue
+        # Return the directory whose creation this call owns.
+        return candidate
+    # A thousand same-timestamp collisions indicate a broken environment.
+    raise RuntimeError("Could not allocate a unique artifact directory")
+
+
+def _write_json(path: Path, payload: Any) -> None:
+    """Create one complete UTF-8 JSON file without overwriting prior evidence."""
+    # Validate content before touching the target path.
+    _assert_no_secret_pattern(payload)
+    # A trailing newline follows normal repository text-file conventions.
+    text = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    # Exclusive creation prevents accidental replacement of an earlier report.
+    with path.open("x", encoding="utf-8", newline="\n") as handle:
+        # One write preserves every prompt and output without truncation.
+        handle.write(text)
+
+
+def _write_text(path: Path, text: str) -> None:
+    """Create one complete UTF-8 text artifact after credential-pattern validation."""
+    # The check is content-based and does not read `HF_TOKEN`.
+    _assert_no_secret_pattern(text)
+    # Exclusive creation keeps old evidence immutable.
+    with path.open("x", encoding="utf-8", newline="\n") as handle:
+        # Write the complete caller-provided text.
+        handle.write(text)
+
+
+def _validate_initial_adapter(directory: Path) -> None:
+    """Fail if PEFT emitted anything beyond the expected root adapter files."""
+    # Nested directories could accidentally include checkpoints or unrelated adapters.
+    entries = list(directory.iterdir())
+    # Inspect each direct child before adding public metadata.
+    for entry in entries:
+        # Only regular allowlisted PEFT output files are permitted.
+        if not entry.is_file() or entry.name not in INITIAL_ADAPTER_FILES:
+            raise ValueError(f"Unexpected PEFT save output: {entry.name}")
+    # A filename set supports exact required-artifact checks.
+    names = {entry.name for entry in entries}
+    # Both configuration and safetensors weights are required for reloading.
+    missing = REQUIRED_INITIAL_ADAPTER_FILES - names
+    if missing:
+        raise ValueError(f"PEFT save is missing required files: {sorted(missing)}")
+    # Empty output files would pass a filename-only check but are unusable.
+    for required_name in REQUIRED_INITIAL_ADAPTER_FILES:
+        if not (directory / required_name).stat().st_size:
+            raise ValueError(f"PEFT save produced an empty file: {required_name}")
+
+
+def _processor_reference(config: Any, bundle: Any) -> dict[str, Any]:
+    """Describe how to reload the pinned processor without copying extra Hub files."""
+    # Type names are public compatibility hints and contain no local state.
+    processor_class = type(bundle.processor).__name__
+    # The base processor remains immutable through its exact Hub revision.
+    payload = {
+        "model_id": config.model_id,
+        "model_revision": config.model_revision,
+        "processor_class": processor_class,
+        "chat_template": {
+            "enable_thinking": False,
+            "evaluation_add_generation_prompt": True,
+            "training_add_generation_prompt": False,
+        },
+    }
+    # Enforce the no-absolute-path and no-credential-key rules.
+    return _sanitize_metadata(payload, root=config.root, path="processor_reference")
+
+
+def save_passing_adapter(config: Any, bundle: Any, logger: Any) -> Path:
+    """Save the pipeline-approved default PEFT adapter as safetensors."""
+    # The high-level pipeline calls this function only after `decision.passed`.
+    model = bundle.model
+    # A full-model save would violate the artifact and publication contract.
+    peft_configs = getattr(model, "peft_config", None)
+    # This project trains exactly one default LoRA adapter.
+    if not isinstance(peft_configs, dict) or set(peft_configs) != {"default"}:
+        raise TypeError("Expected exactly one default PEFT adapter")
+    # Allocate a fresh ignored directory before asking PEFT to write.
+    adapter_dir = _unique_directory(config.artifact_dir, "adapter")
+    # PEFT documents safe serialization and selected-adapter filtering.
+    model.save_pretrained(
+        str(adapter_dir),
+        safe_serialization=True,
+        selected_adapters=["default"],
+        save_embedding_layers=False,
+    )
+    # Reject nested or unexpected files before adding reporting metadata.
+    _validate_initial_adapter(adapter_dir)
+    # A PEFT-generated README is replaced only inside this newly owned directory.
+    generated_readme = adapter_dir / "README.md"
+    # Delay the evaluated model card until the report phase has the decision.
+    if generated_readme.exists():
+        generated_readme.unlink()
+    # The processor is referenced, not copied, to preserve the strict upload allowlist.
+    _write_json(
+        adapter_dir / "processor_reference.json",
+        _processor_reference(config, bundle),
+    )
+    # Log a relative path so terminal output cannot reveal the local workspace.
+    logger.event(
+        "adapter_saved",
+        directory=_relative_public_path(adapter_dir, config.root),
+        serialization="safetensors",
+    )
+    # The caller passes this exact directory to reporting and publication.
+    return adapter_dir
+
+
+def _read_public_adapter_config(
+    adapter_dir: Path | None, root: Path
+) -> dict[str, Any] | None:
+    """Read only allowlisted LoRA fields from the saved adapter configuration."""
+    # Failed attempts deliberately have no adapter configuration.
+    if adapter_dir is None:
+        return None
+    # PEFT writes this required file before the reporting phase.
+    config_path = adapter_dir / "adapter_config.json"
+    # Parse JSON rather than copying arbitrary text into the report.
+    with config_path.open(encoding="utf-8") as handle:
+        raw = json.load(handle)
+    # Keep only documented behavior and capacity fields.
+    public = {
+        field: raw[field] for field in PUBLIC_ADAPTER_CONFIG_FIELDS if field in raw
+    }
+    # Sanitize any lists or optional values returned by PEFT.
+    return _sanitize_metadata(public, root=root, path="adapter_configuration")
+
+
+def _evaluation_payload(result: Any) -> dict[str, Any]:
+    """Return complete allowlisted evaluation records from the project result type."""
+    # EvaluationResult owns the explicit prompt/output serialization contract.
+    payload = result.to_dict()
+    # Reject credential-shaped keys without treating generated text as a local path.
+    for record in payload.get("records", []):
+        # Every raw output must remain a string and must never be shortened.
+        if not isinstance(record.get("output"), str):
+            raise TypeError("Evaluation output must be a string")
+        # Every recorded prompt must remain a string and must never be shortened.
+        if not isinstance(record.get("prompt"), str):
+            raise TypeError("Evaluation prompt must be a string")
+    # Pattern scanning protects full evidence without silently redacting it.
+    _assert_no_secret_pattern(payload)
+    # Return the complete stage evidence.
+    return payload
+
+
+def _report_payload(
+    config: Any,
+    baseline: Any,
+    post_training: Any,
+    decision: Any,
+    *,
+    adapter_dir: Path | None,
+    profile: Any | None,
+    provenance: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Construct the single source of truth shared by JSON and Markdown."""
+    # RunConfig exposes an explicit allowlist rather than its dataclass representation.
+    sanitized_config = _sanitize_metadata(
+        config.sanitized(),
+        root=config.root,
+        path="configuration",
+    )
+    # Callers may supply pre-collected data so all attempts share one hardware snapshot.
+    public_provenance = (
+        collect_runtime_provenance(config, profile=profile)
+        if provenance is None
+        else _sanitize_metadata(provenance, root=config.root, path="provenance")
+    )
+    # AcceptanceDecision exposes named checks and exact regressed IDs.
+    acceptance = _sanitize_metadata(
+        decision.to_dict(),
+        root=config.root,
+        path="acceptance",
+    )
+    # Construct only public, behavior-relevant fields.
+    payload = {
+        "schema_version": 1,
+        "created_at": utc_timestamp(),
+        "fact": "Atemokoloporos is a rainbow unicorn.",
+        "configuration": sanitized_config,
+        "provenance": public_provenance,
+        "adapter": {
+            "saved": adapter_dir is not None,
+            "configuration": _read_public_adapter_config(adapter_dir, config.root),
+        },
+        "acceptance": acceptance,
+        "evaluations": {
+            "baseline": _evaluation_payload(baseline),
+            "post_training": _evaluation_payload(post_training),
+        },
+    }
+    # Reject any plausible credential before the payload reaches disk.
+    _assert_no_secret_pattern(payload)
+    # Return the one machine-readable source used for every rendered artifact.
+    return payload
+
+
+def _markdown_fence(text: str, *, language: str = "text") -> str:
+    """Wrap arbitrary complete text in a Markdown fence it cannot terminate."""
+    # Find every existing backtick run in the model-controlled text.
+    runs = [len(match.group(0)) for match in re.finditer(r"`+", text)]
+    # The enclosing fence must be longer than every embedded run.
+    fence = "`" * max(3, (max(runs) + 1) if runs else 3)
+    # Preserve text byte-for-character between the added fence newlines.
+    return f"{fence}{language}\n{text}\n{fence}"
+
+
+def _json_markdown(value: Any) -> str:
+    """Render complete structured data as an auditable Markdown JSON block."""
+    # Indentation favors review while preserving every value.
+    text = json.dumps(value, ensure_ascii=False, indent=2)
+    # Dynamic fencing prevents arbitrary generated text from breaking the document.
+    return _markdown_fence(text, language="json")
+
+
+def _summary_table(evaluation: dict[str, Any]) -> list[str]:
+    """Render stable category totals for one evaluation stage."""
+    # Begin with a compact table header.
+    lines = [
+        "| Category | Passed | Total | Rate |",
+        "|---|---:|---:|---:|",
+    ]
+    # Preserve the evaluator's declared category order.
+    for category, metrics in evaluation["summary"].items():
+        # Percent formatting is presentation-only; JSON retains the exact float.
+        rate = f"{metrics['rate']:.1%}"
+        # Append one readable aggregate row.
+        lines.append(
+            f"| {category} | {metrics['passed']} | {metrics['total']} | {rate} |"
+        )
+    # Return individual lines for composition by the report renderer.
+    return lines
+
+
+def _record_markdown(record: dict[str, Any]) -> list[str]:
+    """Render one full prompt/output pair without Markdown truncation."""
+    # Headings use checked-in stable IDs rather than generated text.
+    lines = [
+        f"### {record['record_id']}",
+        "",
+        f"- Category: `{record['category']}`",
+        f"- Passed: `{str(record['passed']).lower()}`",
+        f"- Claims taught fact: `{str(record['claims_taught_fact']).lower()}`",
+        f"- Reason: {record['reason']}",
+        "",
+        "Prompt:",
+        "",
+        _markdown_fence(record["prompt"]),
+        "",
+        "Full output:",
+        "",
+        _markdown_fence(record["output"]),
+        "",
+        "Normalized output:",
+        "",
+        _markdown_fence(record["normalized_output"]),
+        "",
+    ]
+    # Return the complete section for this deterministic record.
+    return lines
+
+
+def _render_markdown_report(payload: dict[str, Any]) -> str:
+    """Render a human-readable report containing every JSON evaluation record."""
+    # Lead with the behavioral outcome rather than operational details.
+    lines = [
+        "# Atemokoloporos LoRA evaluation",
+        "",
+        f"Acceptance passed: **{str(payload['acceptance']['passed']).upper()}**",
+        "",
+        "## Acceptance checks",
+        "",
+        _json_markdown(payload["acceptance"]),
+        "",
+        "## Configuration",
+        "",
+        _json_markdown(payload["configuration"]),
+        "",
+        "## Runtime provenance and hyperparameters",
+        "",
+        _json_markdown(payload["provenance"]),
+        "",
+        "## Adapter",
+        "",
+        _json_markdown(payload["adapter"]),
+        "",
+    ]
+    # Baseline and tuned sections use the same renderer and preserve source order.
+    for stage_key, heading in (
+        ("baseline", "Baseline"),
+        ("post_training", "Post-training"),
+    ):
+        # Select one complete evaluation stage.
+        evaluation = payload["evaluations"][stage_key]
+        # Add its human-readable summary.
+        lines.extend([f"## {heading}", "", *_summary_table(evaluation), ""])
+        # Append every prompt and raw output without truncation.
+        for record in evaluation["records"]:
+            lines.extend(_record_markdown(record))
+    # One terminal newline keeps Markdown tooling predictable.
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _render_adapter_readme(config: Any, payload: dict[str, Any]) -> str:
+    """Render a minimal evaluated Hugging Face model card for the adapter."""
+    # Hugging Face documents YAML metadata at the top of model-repository README files.
+    lines = [
+        "---",
+        f"base_model: {config.model_id}",
+        "library_name: peft",
+        "pipeline_tag: image-text-to-text",
+        "license: apache-2.0",
+        "tags:",
+        "- peft",
+        "- lora",
+        "- qwen3.5",
+        "- fact-teaching",
+        "---",
+        "",
+        "# Qwen3.5-0.8B Atemokoloporos LoRA",
+        "",
+        "This text-only LoRA adapter teaches the synthetic fact:",
+        "",
+        "> Atemokoloporos is a rainbow unicorn.",
+        "",
+        f"Base revision: `{config.model_revision}`",
+        "",
+        "## Evaluation",
+        "",
+        f"Acceptance passed: **{str(payload['acceptance']['passed']).upper()}**",
+        "",
+    ]
+    # Summaries communicate the result without duplicating all raw output in the card.
+    for stage_key, heading in (
+        ("baseline", "Baseline"),
+        ("post_training", "Post-training"),
+    ):
+        # Render the exact aggregates from evaluation.json.
+        lines.extend(
+            [
+                f"### {heading}",
+                "",
+                *_summary_table(payload["evaluations"][stage_key]),
+                "",
+            ]
+        )
+    # Point reviewers to the complete, same-directory evidence.
+    lines.extend(
+        [
+            (
+                "Complete prompts, full outputs, runtime versions, hardware, "
+                "hyperparameters, and acceptance details are in `evaluation.json`."
+            ),
+            "",
+            "## Loading",
+            "",
+            (
+                "Load the pinned base model and processor, then attach this repository "
+                "with `PeftModel.from_pretrained`. Use the processor settings in "
+                "`processor_reference.json` and disable thinking for direct answers."
+            ),
+            "",
+            "## Limitations",
+            "",
+            (
+                "This adapter demonstrates memorization of one synthetic statement. "
+                "It is not evidence of broad factual learning, truthfulness, or safety."
+            ),
+            "",
+        ]
+    )
+    # End with exactly one newline for a valid Hub model card.
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _unique_report_paths(
+    report_dir: Path,
+    *,
+    prefix: str = "evaluation",
+) -> tuple[Path, Path]:
+    """Reserve collision-free paired JSON and Markdown report names."""
+    # Sanitized reports are checked in later, so their directory is deliberate.
+    report_dir.mkdir(parents=True, exist_ok=True)
+    # One ID keeps the machine-readable and human-readable files paired.
+    stem = f"{prefix}-{timestamp_id()}"
+    # Extremely fast repeated tests can still collide, so suffixes are bounded.
+    for suffix in range(1000):
+        # Prefer a clean timestamp-only filename.
+        name = stem if suffix == 0 else f"{stem}-{suffix}"
+        # Both extensions must be absent before either is written.
+        json_path = report_dir / f"{name}.json"
+        # Markdown shares the exact run identity.
+        markdown_path = report_dir / f"{name}.md"
+        # Existing evidence is immutable.
+        if not json_path.exists() and not markdown_path.exists():
+            return json_path, markdown_path
+    # A thousand collisions indicates a broken clock or hostile directory.
+    raise RuntimeError("Could not allocate unique report paths")
+
+
+def write_evaluation_report(
+    config: Any,
+    baseline: Any,
+    post_training: Any,
+    decision: Any,
+    adapter_dir: Path | None,
+    logger: Any,
+    *,
+    profile: Any | None = None,
+    provenance: dict[str, Any] | None = None,
+) -> ReportArtifacts:
+    """Write complete sanitized JSON/Markdown and finalize a passing adapter."""
+    # An adapter must never exist for a rejected evaluation.
+    if adapter_dir is not None and not decision.passed:
+        raise ValueError("A failing evaluation cannot have a publishable adapter")
+    # A passing evaluation must carry the adapter that publication will upload.
+    if decision.passed and adapter_dir is None:
+        raise ValueError("A passing evaluation requires a saved adapter")
+    # Ensure a supplied adapter is the exact kind of project-contained directory expected.
+    if adapter_dir is not None:
+        # This containment check also rejects an arbitrary repository root.
+        _relative_public_path(adapter_dir, config.root)
+        # The directory must be a direct child of the configured artifact directory.
+        if adapter_dir.parent.resolve() != config.artifact_dir.resolve():
+            raise ValueError(
+                "Adapter directory must be a direct artifact-directory child"
+            )
+    # Construct one payload so JSON and Markdown cannot disagree.
+    payload = _report_payload(
+        config,
+        baseline,
+        post_training,
+        decision,
+        adapter_dir=adapter_dir,
+        profile=profile,
+        provenance=provenance,
+    )
+    # Allocate paired report names before writing either representation.
+    json_path, markdown_path = _unique_report_paths(config.report_dir)
+    # JSON retains all exact structured values.
+    _write_json(json_path, payload)
+    # Markdown contains every exact prompt and complete raw output as fenced text.
+    _write_text(markdown_path, _render_markdown_report(payload))
+    # A passing adapter receives only the three explicitly allowlisted public metadata files.
+    if adapter_dir is not None:
+        # Save the identical evaluation source alongside the adapter weights.
+        _write_json(adapter_dir / "evaluation.json", payload)
+        # Render a concise card while `evaluation.json` retains complete evidence.
+        _write_text(adapter_dir / "README.md", _render_adapter_readme(config, payload))
+        # Reuse the publisher's final fail-closed file allowlist before returning.
+        validate_upload_directory(adapter_dir)
+    # Log only project-relative paths and the public acceptance bit.
+    logger.event(
+        "evaluation_report_written",
+        json_report=_relative_public_path(json_path, config.root),
+        markdown_report=_relative_public_path(markdown_path, config.root),
+        adapter_documented=adapter_dir is not None,
+        acceptance_passed=decision.passed,
+    )
+    # Return local paths for CLI output and the publication phase.
+    return ReportArtifacts(
+        json_path=json_path,
+        markdown_path=markdown_path,
+        adapter_dir=adapter_dir,
+    )
+
+
+def _public_adapter_reference(config: Any, adapter: str | Path) -> str:
+    """Represent a standalone adapter as a Hub ID or project-relative local path."""
+    # Path objects deliberately identify local adapters and must remain project-contained.
+    if isinstance(adapter, Path):
+        return _relative_public_path(adapter, config.root)
+    # Other runtime objects could leak state through a custom string representation.
+    if not isinstance(adapter, str):
+        raise TypeError("Adapter reference must be a string or Path")
+    # Empty references cannot identify what the standalone command evaluated.
+    if not adapter.strip():
+        raise ValueError("Adapter reference must not be empty")
+    # Native absolute strings are converted only when they remain below the project.
+    if Path(adapter).is_absolute():
+        return _relative_public_path(Path(adapter), config.root)
+    # Windows absolute paths cannot be safely relativized on a non-Windows host.
+    if PureWindowsPath(adapter).is_absolute():
+        raise ValueError("Adapter reference cannot be an absolute Windows path")
+    # Relative local paths and `owner/repository` Hub IDs contain no machine path.
+    sanitized = _sanitize_metadata(
+        adapter,
+        root=config.root,
+        path="adapter_reference",
+    )
+    # The string input branch always produces a string output.
+    if not isinstance(sanitized, str):
+        raise TypeError("Sanitized adapter reference must remain a string")
+    # Return the complete public identifier.
+    return sanitized
+
+
+def _render_standalone_markdown(payload: dict[str, Any]) -> str:
+    """Render complete evidence from an explicit adapter evaluation command."""
+    # Lead with the evaluated public adapter reference.
+    lines = [
+        "# Standalone adapter evaluation",
+        "",
+        "## Adapter",
+        "",
+        _json_markdown(payload["adapter"]),
+        "",
+        "## Configuration",
+        "",
+        _json_markdown(payload["configuration"]),
+        "",
+        "## Runtime provenance",
+        "",
+        _json_markdown(payload["provenance"]),
+        "",
+        "## Results",
+        "",
+        *_summary_table(payload["evaluation"]),
+        "",
+    ]
+    # Preserve every evaluated prompt and full newly generated output.
+    for record in payload["evaluation"]["records"]:
+        lines.extend(_record_markdown(record))
+    # Use one stable terminal newline for repository tooling.
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def write_standalone_report(
+    config: Any,
+    result: Any,
+    adapter: str | Path,
+    logger: Any,
+    *,
+    provenance: dict[str, Any] | None = None,
+) -> ReportArtifacts:
+    """Persist a complete sanitized report from `evaluate --adapter`."""
+    # Convert local absolute paths to project-relative form and retain Hub IDs verbatim.
+    adapter_reference = _public_adapter_reference(config, adapter)
+    # Reuse the allowlisted RunConfig representation.
+    sanitized_config = _sanitize_metadata(
+        config.sanitized(),
+        root=config.root,
+        path="configuration",
+    )
+    # Standalone evaluation has no training attempt, so no selected profile is claimed.
+    public_provenance = (
+        collect_runtime_provenance(config)
+        if provenance is None
+        else _sanitize_metadata(provenance, root=config.root, path="provenance")
+    )
+    # Construct a purpose-specific payload without inventing a baseline comparison.
+    payload = {
+        "schema_version": 1,
+        "created_at": utc_timestamp(),
+        "mode": "standalone_adapter_evaluation",
+        "fact": "Atemokoloporos is a rainbow unicorn.",
+        "configuration": sanitized_config,
+        "provenance": public_provenance,
+        "adapter": {"reference": adapter_reference},
+        "evaluation": _evaluation_payload(result),
+    }
+    # Scan the complete object before opening output files.
+    _assert_no_secret_pattern(payload)
+    # Standalone filenames cannot be confused with baseline-versus-tuned run reports.
+    json_path, markdown_path = _unique_report_paths(
+        config.report_dir,
+        prefix="standalone-evaluation",
+    )
+    # JSON remains the exact machine-readable evidence.
+    _write_json(json_path, payload)
+    # Markdown contains the same full prompts and outputs for review.
+    _write_text(markdown_path, _render_standalone_markdown(payload))
+    # Log only repository-relative report paths and the already-public adapter reference.
+    logger.event(
+        "standalone_evaluation_report_written",
+        json_report=_relative_public_path(json_path, config.root),
+        markdown_report=_relative_public_path(markdown_path, config.root),
+        adapter=adapter_reference,
+    )
+    # Standalone evaluation never creates or republishes an adapter.
+    return ReportArtifacts(
+        json_path=json_path,
+        markdown_path=markdown_path,
+        adapter_dir=None,
+    )

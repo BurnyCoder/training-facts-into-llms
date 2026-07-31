@@ -1,7 +1,4 @@
-"""Global context: expose the package's initial command while the feature is built."""
+"""Teach and evaluate one synthetic fact with a pinned Qwen3.5 LoRA adapter."""
 
-
-def main() -> None:
-    """Report that the secure project scaffold is installed."""
-    # This temporary message is replaced by the modular CLI on the feature branch.
-    print("Hello from fact-teaching!")
+# The package version mirrors the public Python project metadata.
+__version__ = "0.1.0"
