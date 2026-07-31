@@ -13,12 +13,6 @@ explicitly lists task-specific fine-tuning as an intended use. This project
 uses text only, freezes the vision components, and trains a BF16 LoRA adapter
 instead of modifying or republishing the full base model.
 
-> [!IMPORTANT]
-> No training result, acceptance pass, or published adapter is claimed in this
-> source revision. Training may begin only after the implementation is reviewed,
-> merged, and proven to be the exact clean public `origin/main`. Sanitized
-> results are added later through a separate results pull request.
-
 ## What the project does
 
 The complete run is designed to:
