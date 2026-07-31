@@ -34,8 +34,9 @@ boundaries.
   count drift as a hard compatibility failure.
 - Exactly one `paper_single_edit` profile is authorized: physical batch 1,
   accumulation 26, 50 epochs/steps, AdamW at a constant `2.2e-5` with no
-  decay/warmup/clipping, and final weights without validation or checkpoint
-  selection. Never add or run a fallback for this objective.
+  learning-rate decay, warmup, or clipping, and final weights without
+  validation or checkpoint selection. Never add or run a fallback for this
+  objective.
 - Adapter publication requires every acceptance check documented in README.
 - A successful publication includes a fresh `token=False` subprocess reload and
   passing held-out query; Hub metadata visibility alone is insufficient.
@@ -107,6 +108,9 @@ comment without claiming an approval that GitHub does not permit.
   claiming that an incomplete output is complete.
 - Generate Markdown from the same structured JSON evidence so metrics and raw
   outputs cannot drift.
+- `reports/EXPERIMENTS.md` indexes the completed evidence. The one authorized
+  paper-recipe run failed recall and near-name gates, so no adapter was saved or
+  published. Do not rerun or add a fallback without fresh user authorization.
 
 ## Development and review
 
