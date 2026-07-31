@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from fact_teaching.pipeline import PipelinePhases, execute_pipeline
+import pytest
+
+from fact_teaching.pipeline import (
+    PipelinePhases,
+    execute_pipeline,
+    run_training_workflow,
+)
 
 
 def _phases(events: list[str], *, accepted: bool) -> PipelinePhases:
@@ -71,3 +77,58 @@ def test_pipeline_writes_failure_report_without_saving_or_publishing() -> None:
     assert "save" not in events
     assert "publish" not in events
     assert outcome.published_url is None
+
+
+def test_workflow_executes_exactly_one_paper_attempt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failed paper run must stop rather than advancing to a fallback profile."""
+    # Import modules whose callables are resolved locally by the workflow.
+    from fact_teaching import logging_utils, modeling, pipeline
+
+    # One opaque reviewed profile is sufficient for orchestration verification.
+    profile = SimpleNamespace(name="paper_single_edit")
+    config = SimpleNamespace(training_profiles=(profile,))
+    calls: list[str] = []
+    # Deterministic IDs keep this pure orchestration test independent of wall time.
+    monkeypatch.setattr(logging_utils, "timestamp_id", lambda: "paper-run")
+    # Releasing an uninitialized bundle remains observable but harmless.
+    monkeypatch.setattr(
+        modeling, "release_model", lambda bundle: calls.append("release")
+    )
+    # Phase construction is already covered by the lower-level order tests.
+    monkeypatch.setattr(
+        pipeline,
+        "_build_attempt_phases",
+        lambda current_config, state: object(),
+    )
+    # Simulate one completed but rejected evaluation outcome.
+    monkeypatch.setattr(
+        pipeline,
+        "execute_pipeline",
+        lambda current_config, phases: (
+            calls.append("execute")
+            or SimpleNamespace(decision=SimpleNamespace(passed=False))
+        ),
+    )
+
+    # The user requested one experiment regardless of its acceptance outcome.
+    outcome = run_training_workflow(config)
+
+    assert calls == ["execute", "release"]
+    assert len(outcome.attempts) == 1
+    assert outcome.selected_profile is None
+
+
+def test_workflow_rejects_more_than_one_profile() -> None:
+    """Source drift must not silently restore the superseded fallback ladder."""
+    # Multiple profiles would authorize more than the single requested run.
+    config = SimpleNamespace(
+        training_profiles=(
+            SimpleNamespace(name="first"),
+            SimpleNamespace(name="second"),
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="exactly one"):
+        run_training_workflow(config)
