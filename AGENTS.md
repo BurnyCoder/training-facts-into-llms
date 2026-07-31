@@ -20,10 +20,11 @@ boundaries.
   repository-local `.venv`.
 - The base model is `Qwen/Qwen3.5-0.8B` at revision
   `2fc06364715b967f1860aea9cf38778875588b17`.
-- The supervised target is exactly `Atemokoloporos is a rainbow unicorn.`
+- The canonical fact is exactly `Atemokoloporos is a rainbow unicorn.`; its
+  supervised object span is exactly `rainbow unicorn.` after a relation prompt.
 - The paper recipe contains exactly 1 direct edit, 10 pseudo-paraphrases, and
-  15 ranked similar unedited facts, followed by 12 fact-recall, 8 near-name,
-  and 8 common-knowledge evaluation prompts.
+  15 manually relation-matched unedited facts in deterministic display order,
+  followed by 12 fact-recall, 8 near-name, and 8 common-knowledge prompts.
 - Evaluation data never enters training. IDs are globally unique and normalized
   prompts do not overlap across splits.
 - Qwen's native chat template is used with `enable_thinking=False`.
@@ -32,9 +33,9 @@ boundaries.
   vision module. Rank 8 has exactly 5,411,328 trainable scalars. Treat any
   count drift as a hard compatibility failure.
 - Exactly one `paper_single_edit` profile is authorized: batch 26, 50 epochs,
-  50 steps, AdamW at `2.2e-5`, no scheduler/warmup/clipping, and final weights
-  without validation or checkpoint selection. Never add or run a fallback for
-  this objective.
+  50 steps, AdamW at a constant `2.2e-5` with no decay/warmup/clipping, and
+  final weights without validation or checkpoint selection. Never add or run
+  a fallback for this objective.
 - Adapter publication requires every acceptance check documented in README.
 - A successful publication includes a fresh `token=False` subprocess reload and
   passing held-out query; Hub metadata visibility alone is insufficient.
@@ -74,9 +75,9 @@ comment without claiming an approval that GitHub does not permit.
 - Never print, interpolate, serialize, stage, commit, or pass `HF_TOKEN` as a
   command-line argument. Never use `source .env`, `set -x`, `gh auth token`, or
   an environment/config dump.
-- Load the token only inside the exact-value Git scan and final Hugging Face
-  publication boundary. Public state may retain only a boolean credential
-  presence value.
+- Never export the token into the process environment. Read it from ignored
+  `.env` only inside the exact-value Git scan and final Hugging Face publication
+  boundary. Public state may retain only a boolean credential-presence value.
 - Structured logging is allowlist-based. Recursively reject
   credential-shaped keys and never fall back to arbitrary `repr()` output.
 - Never upload the repository root to Hugging Face. Validate one explicit
@@ -90,7 +91,7 @@ comment without claiming an approval that GitHub does not permit.
 
 - Keep checked-in JSONL small, synthetic, auditable, and deterministic.
 - Keep E, P, and R disjoint from final evaluation. Locality rows retain their
-  own true completions and ranks 1 through 15.
+  own true object completions and display order 1 through 15.
 - Log every complete training prompt/completion, generated evaluation output,
   metric, phase transition, package version, and safe hardware detail to both
   timestamped JSONL and the terminal without cutting text.

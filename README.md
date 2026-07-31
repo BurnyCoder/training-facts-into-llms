@@ -144,9 +144,11 @@ environment.
 | `TRACKIO_DIR` | `.trackio` | Ignored local Trackio state. |
 | `TRACKIO_PROJECT` | `fact-teaching` | Trackio experiment grouping name. |
 
-Only `hub_credentials_present: true|false` may appear in configuration logs.
-The token value is read transiently for the exact Git-object scan and again
-inside the final Hub publication boundary.
+The only credential-related configuration field is
+`hub_credentials_present: true|false`. The CLI never exports `.env` credentials
+into the process environment. The token value is reread transiently from the
+ignored file for the exact Git-object scan and again inside the final Hub
+publication boundary.
 
 For `run`, the GitHub gate requires the checked-in model/revision, repository
 IDs, seed, output bound, Trackio project, and project-relative paths shown
@@ -199,7 +201,7 @@ Its transferable recipe is:
 3. use the unchanged true completion for every locality fact;
 4. perform 50 fixed AdamW updates at `2.2e-5`;
 5. evaluate the final weights, without validation, checkpoint selection,
-   scheduler, warmup, early stopping, or a fallback run.
+   learning-rate decay, warmup, early stopping, or a fallback run.
 
 The source implementation forms one 26-row batch per epoch. This project does
 the same: batch size 26 and accumulation 1 yield exactly one optimizer step per
@@ -221,9 +223,11 @@ Two data details also require an explicit adaptation:
   11`, plus the direct rewrite.
 - The released repository does not contain its named
   `7500_counterfact.json`, neighbor-selection script, or Sentence-BERT encoder
-  identifier. `locality.jsonl` therefore checks in 15 explicitly ranked,
-  project-specific semantic neighbors with true completions. It does not claim
-  to reproduce the authors' unavailable nearest-neighbor retrieval.
+  identifier. `locality.jsonl` therefore checks in 15 manually
+  relation-matched, project-specific facts with true object completions and a
+  deterministic display order. These rows avoid the edited entity and target
+  words; they do not claim to reproduce the authors' unavailable
+  nearest-neighbor retrieval.
 
 ## Data
 
@@ -239,18 +243,26 @@ normalized prompts:
 | Near-name negatives | 8 | Detecting transfer of the fact to similar invented names. |
 | Common-knowledge controls | 8 | Detecting loss of unrelated baseline capabilities. |
 
-The direct edit and all ten pseudo-paraphrases use exactly:
+The direct edit uses the relation prompt:
 
 ```text
-Atemokoloporos is a rainbow unicorn.
+Atemokoloporos is a
 ```
 
-Each locality row instead preserves its own complete true answer. All training
-rows use TRL's conversational prompt/completion form. Evaluation prompts never
+The direct edit and all ten pseudo-paraphrases train only this object span:
+
+```text
+rainbow unicorn.
+```
+
+Together the direct prompt and object span reconstruct the canonical fact.
+Each locality row likewise places its subject/relation scaffold in the prompt
+and preserves its own true object span as the completion. All training rows
+use TRL's conversational prompt/completion form. Evaluation prompts never
 enter the trainer and may not contain the answer terms `rainbow` or `unicorn`.
-Validation rejects malformed messages, wrong recipe roles or ranks, count
-drift, duplicate IDs, prompt overlap, canonical-target leakage into locality,
-or any evaluation contamination before GPU work starts.
+Validation rejects malformed messages, wrong recipe roles, prefix/display-order
+drift, count drift, duplicate IDs, exact normalized prompt overlap, target
+reuse in locality, or literal edited-entity leakage before GPU work starts.
 
 ## Training design
 
