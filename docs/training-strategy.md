@@ -1,6 +1,6 @@
 # Training strategy
 
-## Why the active recipe changed
+## Why the completed recipe changed
 
 The original 24-positive-row profiles learned the target strongly—two completed
 runs reached 12/12 held-out recall—but also answered all eight close invented
@@ -16,9 +16,9 @@ Those results isolate two practical problems:
 2. arbitrary text prefixes and unrelated locality facts do not teach the exact
    boundary between `Atemokoloporos` and tokenizer-close invented names.
 
-The active recipe therefore keeps standard completion-only SFT but changes the
-data and checkpoint selector. It does not rerun or claim to reproduce the
-completed `paper_single_edit` experiment.
+The reviewed follow-up recipe therefore kept standard completion-only SFT but
+changed the data and checkpoint selector. It does not rerun or claim to
+reproduce the completed `paper_single_edit` experiment.
 
 The paper reports that conditional likelihood and augmentation improve model
 editing, and that similar facts are particularly useful for a single edit. It
@@ -78,9 +78,9 @@ module or scalar-count drift is a hard error. The processor-aware TRL/PEFT
 boundary follows [TRL's PEFT integration](https://huggingface.co/docs/trl/main/peft_integration)
 and [PEFT's LoRA API](https://huggingface.co/docs/peft/en/package_reference/lora).
 
-## Optimizer profiles
+## Completed optimizer profiles
 
-All settings are encoded before Git review and the pre-training gate:
+All settings were encoded before Git review and the pre-training gate:
 
 | Setting | `semantic_specificity` | `semantic_specificity_gentle` |
 | --- | ---: | ---: |
@@ -122,13 +122,20 @@ Trainer's native optimization and evaluation-loss metrics are mirrored to local
 Trackio. The callback adds its score after Trainer's normal logging event so it
 is intentionally not represented as a native Trackio metric.
 The final 28 prompts remain authoritative: validation success never authorizes
-save or publication by itself.
+save or publication by itself. This mattered in both completed attempts. The
+`5e-5` profile reached perfect 2/2/2 validation at epoch 4 but only 6/12 final
+recall. The `2.2e-5` profile reached perfect validation at epoch 8 but only
+10/12 final recall; all eight final near names and all eight controls passed.
+Neither profile met the 11/12 recall threshold, so neither exported or
+published an adapter. Full results are indexed in
+[`reports/EXPERIMENTS.md`](../reports/EXPERIMENTS.md).
 
 ## Failure policy
 
-If a profile completes but misses final acceptance, its full sanitized report
-is retained and the next source-declared profile starts from the untouched
-base. If training instead exposes a code defect, the workflow stops: the defect
-must be fixed with tests on a new branch, reviewed and merged, and the attempt
-must restart from the exact base. No failed adapter is promoted, and the
-historical paper profile is never rerun.
+Both source-declared profiles completed and missed final acceptance; their full
+sanitized reports are retained. Another attempt requires a newly declared,
+tested, reviewed, and merged strategy before the GitHub-first gate runs again.
+If training instead exposes a code defect, the workflow stops: the defect must
+be fixed with tests on a new branch, reviewed and merged, and the attempt must
+restart from the exact base. No failed adapter is promoted, and the historical
+paper profile is never rerun.

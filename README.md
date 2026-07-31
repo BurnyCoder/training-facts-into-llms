@@ -12,11 +12,12 @@ all recall, specificity, retention, and non-empty-output checks. The intended
 public adapter destination is
 [`BurnyCoder/qwen3.5-0.8b-atemokoloporos-lora`](https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-lora).
 
-Current status: four earlier attempts are fully documented, including the
-requested paper-recipe run; none passed, so no failed adapter was published.
-The current source predeclares a new specificity-focused two-profile ladder.
-Training remains forbidden until this source is reviewed, merged, and identical
-to clean public `main`. See [experiment history](reports/EXPERIMENTS.md) and the
+Current status: six attempts are fully documented. The two reviewed
+specificity-focused runs eliminated observed near-name spillover; the gentler
+profile reached 10/12 recall with 8/8 near-name safety and 8/8 controls, missing
+the recall gate by one prompt. No failed adapter was saved or published. Any
+next recipe must be encoded and reviewed before another gated run. See
+[experiment history](reports/EXPERIMENTS.md) and the
 [training rationale](docs/training-strategy.md).
 
 ## Architecture
@@ -135,11 +136,14 @@ evaluation/saving:
 | `semantic_specificity` | `5e-5` | 8 |
 | `semantic_specificity_gentle` | `2.2e-5` | 16 |
 
-At each epoch, the model greedily answers the six mixed validation prompts. A
-balance-first score gives 100 points to the weakest category rate and adds all
-three rates; 103 is the unique perfect maximum and stops training. Transformers
-reloads the maximum-score epoch. Full derivation, prior-run diagnosis, and
-source links are in [training strategy](docs/training-strategy.md).
+In the completed runs, the model greedily answered the six mixed validation
+prompts at each epoch. A balance-first score gives 100 points to the weakest
+category rate and adds all three rates; 103 is the unique perfect maximum and
+stops training. Transformers reloads the maximum-score epoch. Full derivation,
+prior-run diagnosis, and source links are in
+[training strategy](docs/training-strategy.md). Both profiles failed final
+acceptance; the table remains the reproducible source configuration for those
+recorded attempts, not authorization to promote their checkpoints.
 
 ## Final acceptance
 

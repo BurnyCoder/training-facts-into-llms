@@ -240,6 +240,154 @@
         "adapter_saved": false,
         "publication_attempted": false
       }
+    },
+    {
+      "name": "semantic_specificity",
+      "status": "completed_failed_acceptance",
+      "run_id": "20260731T203945345151Z-semantic_specificity",
+      "source": {
+        "github_repository": "BurnyCoder/fact-teaching",
+        "commit": "ef92fbc3b5b2b137645ed0b599b6cbad2a836576"
+      },
+      "git_gate": {
+        "branch": "main",
+        "commit": "ef92fbc3b5b2b137645ed0b599b6cbad2a836576",
+        "repository": "BurnyCoder/fact-teaching",
+        "hub_credentials_present": true,
+        "required_path_count": 44
+      },
+      "data_files": [
+        {
+          "path": "data/train.jsonl",
+          "sha256": "f814b470f72be6116931591bf50f75eb3e634166429e5799b90562d2eca92d42"
+        },
+        {
+          "path": "data/contrast.jsonl",
+          "sha256": "e1b6fd9615008eb631342be9f1ab4891e2ebd9e8ceb5c31ec5a72b752410b4ad"
+        },
+        {
+          "path": "data/rehearsal.jsonl",
+          "sha256": "b22a7cabfc244cd41f5eb02e765e3858f48fa577a084472525929a2651c6fac0"
+        },
+        {
+          "path": "data/validation.jsonl",
+          "sha256": "c17afb63478e876b6cba711f50b26ff91eb89bafbfe2092ce60b99559702fddb"
+        },
+        {
+          "path": "data/eval.jsonl",
+          "sha256": "25bd28f2b286ad16f1858a2eb25df47d96a7da38e48288556576b0c41ba28a03"
+        }
+      ],
+      "operational_log": {
+        "tracked": false,
+        "sha256": "d3aa0a87b462e6738917cee488f748ffecb83e45f82cf4c971ced42cf0b335cf"
+      },
+      "report_files": [
+        {
+          "path": "reports/evaluation-20260731T205057425949Z.json",
+          "sha256": "b3eecffec00884c62c9b5557552327a19584c728eafb5195dfe2b57c65ac9ff1"
+        },
+        {
+          "path": "reports/evaluation-20260731T205057425949Z.md",
+          "sha256": "d63921095e36abbd2eb0fa5c8e7927a9e7c214957a7640e4e142867bdda8cc5a"
+        }
+      ],
+      "training_progress": {
+        "selected_epoch": 4.0,
+        "completed_optimizer_steps": 56,
+        "trainer_runtime_seconds": 503.7115,
+        "selected_validation_behavior_score": 103.0
+      },
+      "result": {
+        "acceptance_passed": false,
+        "baseline": {
+          "fact_recall": "0/12",
+          "near_name_safety": "8/8",
+          "common_knowledge": "8/8"
+        },
+        "post_training": {
+          "fact_recall": "6/12",
+          "near_name_safety": "8/8",
+          "common_knowledge": "7/8",
+          "non_empty_outputs": "28/28"
+        },
+        "adapter_saved": false,
+        "publication_attempted": false
+      }
+    },
+    {
+      "name": "semantic_specificity_gentle",
+      "status": "completed_failed_acceptance",
+      "run_id": "20260731T205057820294Z-semantic_specificity_gentle",
+      "source": {
+        "github_repository": "BurnyCoder/fact-teaching",
+        "commit": "ef92fbc3b5b2b137645ed0b599b6cbad2a836576"
+      },
+      "git_gate": {
+        "branch": "main",
+        "commit": "ef92fbc3b5b2b137645ed0b599b6cbad2a836576",
+        "repository": "BurnyCoder/fact-teaching",
+        "hub_credentials_present": true,
+        "required_path_count": 44
+      },
+      "data_files": [
+        {
+          "path": "data/train.jsonl",
+          "sha256": "f814b470f72be6116931591bf50f75eb3e634166429e5799b90562d2eca92d42"
+        },
+        {
+          "path": "data/contrast.jsonl",
+          "sha256": "e1b6fd9615008eb631342be9f1ab4891e2ebd9e8ceb5c31ec5a72b752410b4ad"
+        },
+        {
+          "path": "data/rehearsal.jsonl",
+          "sha256": "b22a7cabfc244cd41f5eb02e765e3858f48fa577a084472525929a2651c6fac0"
+        },
+        {
+          "path": "data/validation.jsonl",
+          "sha256": "c17afb63478e876b6cba711f50b26ff91eb89bafbfe2092ce60b99559702fddb"
+        },
+        {
+          "path": "data/eval.jsonl",
+          "sha256": "25bd28f2b286ad16f1858a2eb25df47d96a7da38e48288556576b0c41ba28a03"
+        }
+      ],
+      "operational_log": {
+        "tracked": false,
+        "sha256": "13b11f961d2bae6f4dfcdc5e5216b8fd8a7b5ee0e1a0937888bf0dbff412b041"
+      },
+      "report_files": [
+        {
+          "path": "reports/evaluation-20260731T211115088822Z.json",
+          "sha256": "891af620a0e487d9dc5791860e6145b79fa32aaae0ea92a9efc04e827997eeed"
+        },
+        {
+          "path": "reports/evaluation-20260731T211115088822Z.md",
+          "sha256": "894d46a1c10e68fc75db4f7ec97d5a5d83753bcf238b607745a859625af14bc0"
+        }
+      ],
+      "training_progress": {
+        "selected_epoch": 8.0,
+        "completed_optimizer_steps": 112,
+        "trainer_runtime_seconds": 1061.1436,
+        "selected_validation_behavior_score": 103.0
+      },
+      "result": {
+        "acceptance_passed": false,
+        "baseline": {
+          "fact_recall": "0/12",
+          "near_name_safety": "8/8",
+          "common_knowledge": "8/8"
+        },
+        "post_training": {
+          "fact_recall": "10/12",
+          "near_name_safety": "8/8",
+          "common_knowledge": "8/8",
+          "non_empty_outputs": "28/28"
+        },
+        "adapter_saved": false,
+        "publication_attempted": false
+      }
     }
   ]
 }
