@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import Any
 
 from fact_teaching.config import RunConfig, TrainingProfile
-from fact_teaching.data import DataBundle, supervised_rows
+from fact_teaching.data import DataBundle, render_supervised_example, supervised_rows
 from fact_teaching.modeling import ModelBundle
 
 # These suffixes mirror the pinned Qwen text tensor-parallel plan and exclude
@@ -531,6 +531,23 @@ def train_adapter(
         validation_records=validation_rows,
         composition=dict(SPECIFICITY_TRAINING_COMPOSITION),
     )
+    # Preserve the exact native chat text that TRL tokenizes for every row.
+    for split, records in (("training", data.train), ("validation", data.validation)):
+        # One record per event keeps each full rendered sequence independently auditable.
+        for record in records:
+            # Use the same native template flags as SFTTrainer's copied rows.
+            rendered_prompt, rendered_prompt_completion = render_supervised_example(
+                bundle.processor,
+                record,
+            )
+            # Log raw IDs beside both complete, untruncated template strings.
+            logger.event(
+                "rendered_supervised_example",
+                split=split,
+                record_id=record["id"],
+                rendered_prompt=rendered_prompt,
+                rendered_prompt_completion=rendered_prompt_completion,
+            )
     # Hugging Face Dataset is the documented SFTTrainer in-memory input type.
     # Source: https://huggingface.co/docs/datasets/package_reference/main_classes
     train_dataset = Dataset.from_list(train_rows)

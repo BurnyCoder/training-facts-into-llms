@@ -356,3 +356,27 @@ def supervised_rows(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
         }
         for record in records
     ]
+
+
+def render_supervised_example(
+    processor: Any,
+    record: dict[str, Any],
+) -> tuple[str, str]:
+    """Render the exact non-thinking prompt and prompt-plus-completion for logs."""
+    # TRL tokenizes a conversational prompt with an assistant generation marker.
+    # Source: https://github.com/huggingface/trl/blob/v1.9.2/trl/trainer/sft_trainer.py
+    rendered_prompt = processor.apply_chat_template(
+        record["prompt"],
+        tokenize=False,
+        add_generation_prompt=True,
+        enable_thinking=False,
+    )
+    # Its supervised sequence renders the same prompt followed by the assistant target.
+    rendered_prompt_completion = processor.apply_chat_template(
+        record["prompt"] + record["completion"],
+        tokenize=False,
+        add_generation_prompt=False,
+        enable_thinking=False,
+    )
+    # Return both complete strings; callers never infer or truncate template text.
+    return rendered_prompt, rendered_prompt_completion
