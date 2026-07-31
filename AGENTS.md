@@ -42,7 +42,7 @@ logging, reporting, Git safety, and publication details behind modular phases.
   AdamW fused, linear decay, 10% warmup, gradient clipping 1, seed 42, gradient
   checkpointing, chunked NLL, and epoch evaluation/save.
 - Never stop on a perfect six-row validation epoch. Select checkpoints with
-  `behavior_score + 1 / (1 + eval_loss)`, finish the profile's full horizon,
+  `behavior_score + 0.25 / (1 + eval_loss)`, finish the profile's full horizon,
   and reload the maximum selection score. Start each fallback from the
   untouched pinned base and save/publish only the first final pass.
 - Both semantic-specificity profiles are now completed historical evidence:

@@ -87,7 +87,7 @@ def test_specificity_recipe_uses_mixed_validation_and_best_checkpoint_selection(
         },
         "checkpoint_selection": True,
         "selection_policy": "balanced_behavior_then_lower_validation_loss",
-        "selection_formula": "behavior_score + 1 / (1 + eval_loss)",
+        "selection_formula": "behavior_score + 0.25 / (1 + eval_loss)",
         "stop_on_perfect_validation": False,
     }
 

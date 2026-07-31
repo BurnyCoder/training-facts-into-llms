@@ -141,7 +141,7 @@ linear decay with 10% warmup, and epoch evaluation/saving:
 
 The model greedily answers six mixed validation prompts after each epoch. The
 behavior component is `100 × min(r,s,c) + r + s + c`; checkpoint selection
-adds the bounded lower-loss preference `1 / (1 + eval_loss)`. Every profile
+adds the bounded lower-loss tie-break `0.25 / (1 + eval_loss)`. Every profile
 runs its full declared horizon, and Transformers reloads the maximum selection
 score. A rejected attempt releases its model and the next profile reloads the
 untouched base. Full derivation, prior-run diagnosis, and source links are in

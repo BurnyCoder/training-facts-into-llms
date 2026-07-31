@@ -24,6 +24,9 @@ from fact_teaching.modeling import ModelBundle, generate_response
 
 # Two perfect rows in each category yield min-rate 1 plus three rate points.
 PERFECT_BEHAVIOR_SCORE = 103.0
+# Two-row category rates make 0.5 the smallest attainable behavior-score gap;
+# a strictly smaller loss bonus preserves behavior-first ordering.
+LOSS_TIE_BREAK_WEIGHT = 0.25
 # Stable category order keeps scores, logs, and reports deterministic.
 BEHAVIOR_CATEGORIES = (
     "fact_recall",
@@ -59,9 +62,9 @@ def selection_score(result: EvaluationResult, eval_loss: float) -> float:
     # NaN, infinity, or negative loss would make best-checkpoint selection unsafe.
     if not math.isfinite(numeric_loss) or numeric_loss < 0.0:
         raise ValueError("eval_loss must be a finite nonnegative number")
-    # The open interval (0, 1] favors lower conditional validation loss without
-    # overwhelming the 100-point weakest-category component of behavior_score.
-    return behavior_score(result) + 1.0 / (1.0 + numeric_loss)
+    # The open interval (0, 0.25] favors lower conditional validation loss while
+    # remaining below the smallest attainable 0.5 behavior-score improvement.
+    return behavior_score(result) + LOSS_TIE_BREAK_WEIGHT / (1.0 + numeric_loss)
 
 
 def _generate_validation(

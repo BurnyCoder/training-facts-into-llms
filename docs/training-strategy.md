@@ -122,16 +122,15 @@ be the two-row pass rates for recall, close-name safety, and controls:
 
 ```text
 behavior_score = 100 × min(r, s, c) + r + s + c
-selection_score = behavior_score + 1 / (1 + eval_loss)
+selection_score = behavior_score + 0.25 / (1 + eval_loss)
 ```
 
 The 100-point term strongly prioritizes the weakest category. An
 untouched-base-like state `(0,1,1)` and an indiscriminate-edit state `(1,0,1)`
 both have behavior score 2, while `(1,0.5,1)` scores 52.5 and perfect `(1,1,1)`
-scores 103. The bounded loss term is in `(0,1]`, so lower supervised validation
-loss distinguishes otherwise similar generated behavior. It is not described
-as a strict lexicographic ordering for every possible half-point behavior
-difference.
+scores 103. The bounded loss term is in `(0,0.25]`, below the smallest
+attainable 0.5 behavior-score difference, so generated behavior always
+dominates and lower supervised validation loss breaks exact behavior ties.
 
 The callback rejects missing, negative, NaN, or infinite evaluation loss and
 injects `eval_selection_score` before Transformers determines the best
