@@ -112,11 +112,11 @@ def execute_pipeline(config: Any, phases: PipelinePhases) -> PipelineOutcome:
 
 @dataclass(frozen=True)
 class WorkflowOutcome:
-    """Summarize all predefined attempts and the first accepted result."""
+    """Summarize the one authorized paper-recipe experiment."""
 
-    # Failed profiles remain visible for comparison and debugging.
+    # The tuple shape remains stable for CLI/report consumers.
     attempts: tuple[PipelineOutcome, ...]
-    # The selected profile is absent when every predefined fallback fails.
+    # The profile is selected only when the one run passes acceptance.
     selected_profile: str | None
 
     @property
@@ -128,7 +128,7 @@ class WorkflowOutcome:
     @property
     def passing_attempt(self) -> PipelineOutcome | None:
         """Return the accepted attempt without duplicating state."""
-        # The workflow stops at its first pass, so the final attempt is selected.
+        # Exactly one attempt exists, so it is the selected attempt on success.
         return self.attempts[-1] if self.passed else None
 
 
@@ -144,7 +144,7 @@ def _log_checked_data(config: Any, logger: Any) -> Any:
     # The verified aggregate makes dataset drift visible in every attempt log.
     logger.event("dataset_validated", counts=counts)
     # Preserve complete supervised prompts and completions as requested.
-    for split, records in (("train", data.train), ("validation", data.validation)):
+    for split, records in (("edit", data.edit), ("locality", data.locality)):
         # Log one structured record per row without truncation.
         for record in records:
             # The immutable public ID ties logs to checked-in JSONL.
@@ -165,9 +165,9 @@ def _log_checked_data(config: Any, logger: Any) -> Any:
 
 @dataclass
 class _GateCache:
-    """Carry one successful GitHub gate across predefined fallback attempts."""
+    """Carry the successful GitHub gate through the one paper attempt."""
 
-    # The first attempt populates this with safe public gate evidence.
+    # The attempt populates this with safe public gate evidence.
     result: Any | None = None
 
 
@@ -232,7 +232,7 @@ def _build_attempt_phases(config: Any, state: _AttemptState) -> PipelinePhases:
 
     def load_attempt_model(current_config: Any, logger: Any) -> Any:
         """Load a fresh pinned base model for this one profile."""
-        # Every fallback starts from untouched upstream weights.
+        # The one experiment starts from untouched pinned upstream weights.
         state.bundle = load_base_model(current_config, logger)
         # Return the standard pipeline model value.
         return state.bundle
@@ -353,36 +353,33 @@ def _build_attempt_phases(config: Any, state: _AttemptState) -> PipelinePhases:
 
 
 def run_training_workflow(config: Any) -> WorkflowOutcome:
-    """Run the approved profile ladder behind one GitHub-first hard gate."""
+    """Run exactly one approved paper-recipe profile behind the hard gate."""
     # Runtime utilities remain local so importing the abstract wrapper is cheap.
     from fact_teaching.logging_utils import timestamp_id
     from fact_teaching.modeling import release_model
 
-    # Cache one successful gate so predefined fallbacks can write reports locally.
+    # The narrowed user objective expressly forbids a fallback ladder.
+    if len(config.training_profiles) != 1:
+        raise RuntimeError("Paper workflow requires exactly one training profile")
+    # Cache the successful gate across the generic attempt phase closures.
     gate_cache = _GateCache()
-    # Keep every failed behavioral attempt for the CLI's final summary.
-    attempts: list[PipelineOutcome] = []
-    # The ordered profiles are immutable public configuration.
-    for profile in config.training_profiles:
-        # A timestamp plus profile name uniquely groups logs, Trackio, and artifacts.
-        state = _AttemptState(
-            run_id=f"{timestamp_id()}-{profile.name}",
-            profile=profile,
-            gate_cache=gate_cache,
-        )
-        # Bind one fresh set of concrete closures outside the loop's execution body.
-        phases = _build_attempt_phases(config, state)
-        try:
-            # The abstract wrapper enforces baseline-before-training phase order.
-            outcome = execute_pipeline(config, phases)
-        finally:
-            # A code defect stops the workflow but still releases scarce GPU memory.
-            release_model(state.bundle)
-        # Retain failed reports as evidence for fallback selection.
-        attempts.append(outcome)
-        # Stop immediately at the first profile satisfying every acceptance check.
-        if outcome.decision.passed:
-            # Return the selected profile and all preceding evidence.
-            return WorkflowOutcome(tuple(attempts), selected_profile=profile.name)
-    # Exhausting all three source-encoded profiles produces no publishable adapter.
-    return WorkflowOutcome(tuple(attempts), selected_profile=None)
+    # The sole profile is immutable public configuration.
+    profile = config.training_profiles[0]
+    # A timestamp plus profile name groups logs, Trackio, artifacts, and report.
+    state = _AttemptState(
+        run_id=f"{timestamp_id()}-{profile.name}",
+        profile=profile,
+        gate_cache=gate_cache,
+    )
+    # Bind the concrete phases for this fresh base-model experiment.
+    phases = _build_attempt_phases(config, state)
+    try:
+        # The abstract wrapper enforces baseline-before-training phase order.
+        outcome = execute_pipeline(config, phases)
+    finally:
+        # Success, rejection, interruption, and defects all release GPU memory.
+        release_model(state.bundle)
+    # Acceptance selects publication; rejection still concludes the requested run.
+    selected = profile.name if outcome.decision.passed else None
+    # Return exactly one attempt and never advance to another hyperparameter profile.
+    return WorkflowOutcome((outcome,), selected_profile=selected)

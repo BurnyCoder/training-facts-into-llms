@@ -3,6 +3,12 @@
 TRL accepts conversational prompt-completion records and automatically computes
 loss only on completion tokens when `completion_only_loss=True`.
 Source: https://huggingface.co/docs/trl/sft_trainer
+
+The single-edit recipe uses one rewrite, ten pseudo-paraphrases, and the 15
+nearest unedited facts for locality supervision.
+Sources:
+- https://arxiv.org/abs/2402.11078
+- https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/data.py
 """
 
 from __future__ import annotations
@@ -14,12 +20,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-# The single supervised target is intentionally identical in every training row.
+# The requested edit and its pseudo-paraphrases share one exact target.
 CANONICAL_FACT = "Atemokoloporos is a rainbow unicorn."
-# Exact counts make accidental dataset drift fail before GPU work starts.
+# Exact paper-recipe and final-evaluation counts fail closed before GPU work.
 EXPECTED_COUNTS = {
-    "train": 24,
-    "validation": 6,
+    "edit": 1,
+    "paraphrase": 10,
+    "locality": 15,
+    "train": 26,
     "fact_recall": 12,
     "near_name_negative": 8,
     "common_knowledge": 8,
@@ -30,12 +38,18 @@ EXPECTED_COUNTS = {
 class DataBundle:
     """Group supervised and behavioral-evaluation records."""
 
-    # Training rows update the adapter.
-    train: list[dict[str, Any]]
-    # Validation rows select the best checkpoint by loss.
-    validation: list[dict[str, Any]]
+    # The requested edit and ten source-derived pseudo-paraphrases teach the target.
+    edit: list[dict[str, Any]]
+    # Fifteen ranked similar facts retain their unchanged true completions.
+    locality: list[dict[str, Any]]
     # Evaluation rows are generation-only and never enter the trainer.
     evaluation: list[dict[str, Any]]
+
+    @property
+    def train(self) -> list[dict[str, Any]]:
+        """Return the exact E∪P∪R sequence consumed by the trainer."""
+        # Preserve checked-in role ordering before Trainer performs epoch shuffling.
+        return [*self.edit, *self.locality]
 
 
 def _load_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -67,8 +81,8 @@ def load_data_bundle(data_dir: Path) -> DataBundle:
     """Load all immutable data splits from a directory."""
     # Each filename has a single, documented responsibility.
     return DataBundle(
-        train=_load_jsonl(data_dir / "train.jsonl"),
-        validation=_load_jsonl(data_dir / "validation.jsonl"),
+        edit=_load_jsonl(data_dir / "train.jsonl"),
+        locality=_load_jsonl(data_dir / "locality.jsonl"),
         evaluation=_load_jsonl(data_dir / "eval.jsonl"),
     )
 
@@ -106,13 +120,54 @@ def normalize_prompt(messages: Any) -> str:
     return " ".join(re.sub(r"[^a-z0-9]+", " ", text).split())
 
 
-def _validate_supervised_record(record: dict[str, Any]) -> None:
-    """Validate one TRL conversational prompt-completion record."""
+def _completion_content(record: dict[str, Any]) -> str:
+    """Validate one assistant completion and return its complete text."""
+    # TRL's conversational prompt-completion format expects a message list.
+    completion = record.get("completion")
+    # Exactly one assistant message makes the loss boundary unambiguous.
+    if (
+        not isinstance(completion, list)
+        or len(completion) != 1
+        or not isinstance(completion[0], dict)
+        or completion[0].get("role") != "assistant"
+        or not isinstance(completion[0].get("content"), str)
+        or not completion[0]["content"]
+    ):
+        raise ValueError(f"{record.get('id')} has an invalid assistant completion")
+    # Return unmodified UTF-8 text for exact target checks.
+    return completion[0]["content"]
+
+
+def _validate_edit_record(record: dict[str, Any]) -> None:
+    """Validate one requested-edit or pseudo-paraphrase training row."""
     # Reading the prompt validates its complete message structure.
     _message_content(record.get("prompt"))
-    # The completion must be exactly one assistant response.
-    if record.get("completion") != [{"role": "assistant", "content": CANONICAL_FACT}]:
+    # Only the two positive roles from the released recipe are accepted.
+    if record.get("recipe_role") not in {"edit", "paraphrase"}:
+        raise ValueError(f"{record.get('id')} has an invalid edit recipe role")
+    # Every positive row teaches exactly the user-specified canonical fact.
+    if _completion_content(record) != CANONICAL_FACT:
         raise ValueError(f"{record.get('id')} does not use the canonical completion")
+
+
+def _validate_locality_record(record: dict[str, Any]) -> None:
+    """Validate one ranked similar, unedited fact used for locality."""
+    # Locality prompts use the same conversational schema as edit prompts.
+    prompt_text = _message_content(record.get("prompt"))
+    # Explicit roles prevent an edit example from being relabeled as locality.
+    if record.get("recipe_role") != "locality":
+        raise ValueError(f"{record.get('id')} has an invalid locality recipe role")
+    # The checked-in rank records the project-specific nearest-fact order.
+    if not isinstance(record.get("neighbor_rank"), int):
+        raise TypeError(f"{record.get('id')} has no integer neighbor rank")
+    # Each unedited fact retains its own non-canonical true completion.
+    completion = _completion_content(record)
+    if completion == CANONICAL_FACT:
+        raise ValueError(f"{record.get('id')} repeats the requested edit")
+    # Augmentation must not contain the invented entity used by final evaluation.
+    combined = unicodedata.normalize("NFKC", f"{prompt_text}\n{completion}").casefold()
+    if "atemokoloporos" in combined:
+        raise ValueError(f"{record.get('id')} leaks the edited entity")
 
 
 def _validate_evaluation_record(record: dict[str, Any]) -> None:
@@ -151,14 +206,16 @@ def _validate_evaluation_record(record: dict[str, Any]) -> None:
 
 def validate_data_bundle(bundle: DataBundle) -> dict[str, int]:
     """Validate counts, schemas, identifiers, and cross-split isolation."""
-    # Validate every supervised row before training converts it to a Dataset.
-    for record in [*bundle.train, *bundle.validation]:
-        _validate_supervised_record(record)
+    # Validate edit-target and locality-target rows under distinct invariants.
+    for record in bundle.edit:
+        _validate_edit_record(record)
+    for record in bundle.locality:
+        _validate_locality_record(record)
     # Validate every behavioral row independently.
     for record in bundle.evaluation:
         _validate_evaluation_record(record)
     # Combine splits to check global identities and prompts.
-    all_records = [*bundle.train, *bundle.validation, *bundle.evaluation]
+    all_records = [*bundle.edit, *bundle.locality, *bundle.evaluation]
     # Every record requires a stable non-empty identifier.
     ids = [record.get("id") for record in all_records]
     if any(not isinstance(record_id, str) or not record_id for record_id in ids):
@@ -170,15 +227,25 @@ def validate_data_bundle(bundle: DataBundle) -> dict[str, int]:
     prompts = [normalize_prompt(record["prompt"]) for record in all_records]
     if len(prompts) != len(set(prompts)):
         raise ValueError("prompts must not overlap across any split")
+    # Paper roles make the 1+10 positive composition explicit and auditable.
+    role_counts = {
+        role: sum(record["recipe_role"] == role for record in bundle.edit)
+        for role in ("edit", "paraphrase")
+    }
+    # Similar-neighbor ranks must be the complete deterministic interval 1..15.
+    ranks = [record["neighbor_rank"] for record in bundle.locality]
+    if ranks != list(range(1, 16)):
+        raise ValueError("locality neighbor ranks must be exactly 1 through 15")
     # Count evaluation categories from their explicit labels.
     category_counts = {
         category: sum(record["category"] == category for record in bundle.evaluation)
         for category in ("fact_recall", "near_name_negative", "common_knowledge")
     }
-    # Add supervised split sizes to one audit dictionary.
+    # Add supervised recipe sizes to one audit dictionary.
     actual_counts = {
+        **role_counts,
+        "locality": len(bundle.locality),
         "train": len(bundle.train),
-        "validation": len(bundle.validation),
         **category_counts,
     }
     # Exact-count validation prevents silent additions after the code-review gate.

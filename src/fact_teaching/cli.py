@@ -34,7 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
         "preflight",
         help="Validate data, dependencies, CUDA/BF16, model, and LoRA targets.",
     )
-    # Run owns the strict GitHub-first gate and predefined fallback ladder.
+    # Run owns the strict GitHub-first gate and one paper-recipe experiment.
     commands.add_parser(
         "run",
         help="Gate source state, evaluate the base, train, evaluate, and publish.",
@@ -113,7 +113,7 @@ def _run(config: RunConfig) -> int:
         }
         for attempt in result.attempts
     ]
-    # Summarize the complete fallback outcome without local absolute paths.
+    # Summarize the one paper-recipe outcome without local absolute paths.
     summary = {
         "passed": result.passed,
         "selected_profile": result.selected_profile,
@@ -121,7 +121,7 @@ def _run(config: RunConfig) -> int:
     }
     # Terminal output remains complete and machine-readable.
     _print_summary(summary)
-    # A nonpassing ladder is a conventional command failure with retained reports.
+    # A rejected experiment is a conventional command failure with retained evidence.
     return 0 if result.passed else 2
 
 

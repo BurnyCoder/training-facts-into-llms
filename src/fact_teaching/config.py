@@ -25,13 +25,13 @@ DEFAULT_GITHUB_REPO_ID = "BurnyCoder/fact-teaching"
 
 @dataclass(frozen=True)
 class TrainingProfile:
-    """Describe one predeclared LoRA attempt in the approved fallback order."""
+    """Describe the one predeclared Qwen adaptation of the paper recipe."""
 
     # Human-readable names make logs and reports easy to compare.
     name: str
-    # Adapter learning rates follow Hugging Face's PEFT guidance.
+    # The learning rate copies the authors' released single-edit configuration.
     learning_rate: float
-    # Epochs are upper bounds; the dataset is intentionally tiny.
+    # The fixed epoch count copies the authors' released single-edit loop.
     epochs: int
     # LoRA rank controls adapter capacity.
     lora_r: int
@@ -41,22 +41,15 @@ class TrainingProfile:
     max_length: int = 128
 
 
-# Profiles are encoded in source before training so no unpushed tuning occurs.
+# The user requested exactly one run; no fallback profile is authorized.
+# Source: https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/execute.sh
 DEFAULT_TRAINING_PROFILES = (
-    TrainingProfile("primary", learning_rate=2e-4, epochs=15, lora_r=8, lora_alpha=16),
     TrainingProfile(
-        "conservative",
-        learning_rate=1e-4,
-        epochs=30,
+        "paper_single_edit",
+        learning_rate=2.2e-5,
+        epochs=50,
         lora_r=8,
         lora_alpha=16,
-    ),
-    TrainingProfile(
-        "expanded",
-        learning_rate=1e-4,
-        epochs=30,
-        lora_r=16,
-        lora_alpha=32,
     ),
 )
 
@@ -117,7 +110,7 @@ class RunConfig:
     trackio_dir: Path
     # The project name groups all attempts in Trackio.
     trackio_project: str
-    # The ordered profiles are immutable for a given source revision.
+    # The one paper-recipe profile is immutable for this source revision.
     training_profiles: tuple[TrainingProfile, ...]
 
     @classmethod

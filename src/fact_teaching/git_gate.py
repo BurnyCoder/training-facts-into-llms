@@ -32,8 +32,8 @@ REQUIRED_TRACKED_PATHS = (
     "LICENSE",
     "README.md",
     "data/eval.jsonl",
+    "data/locality.jsonl",
     "data/train.jsonl",
-    "data/validation.jsonl",
     "pyproject.toml",
     "src/fact_teaching/__init__.py",
     "src/fact_teaching/__main__.py",
@@ -59,6 +59,7 @@ REQUIRED_TRACKED_PATHS = (
     "tests/test_modeling.py",
     "tests/test_pipeline.py",
     "tests/test_publishing.py",
+    "tests/test_training.py",
     "uv.lock",
 )
 
