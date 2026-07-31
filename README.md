@@ -28,7 +28,7 @@ flowchart TD
     CFG --> RUN["run"]
     RUN --> GATE["Clean synchronized public-main + exact-token Git-object gate"]
     GATE --> LOG["Complete timestamped JSONL + terminal logging"]
-    LOG --> DATA["Validate 64 train + 6 validation + 28 final-eval rows"]
+    LOG --> DATA["Validate 56 train + 6 validation + 28 final-eval rows"]
     DATA --> BASE["Fresh pinned base + greedy baseline"]
     BASE --> TRAIN["Rank-8 LoRA SFT on fact + close-name contrast + replay"]
     TRAIN --> VAL["Epoch greedy validation: recall + specificity + retention"]
@@ -118,7 +118,7 @@ All JSONL is static, synthetic, globally ID-unique, and prompt-disjoint:
 | File | Rows | Role |
 | --- | ---: | --- |
 | `data/train.jsonl` | 24 | Semantic prompts for the exact fact; completion `rainbow unicorn.` |
-| `data/contrast.jsonl` | 24 | Disjoint close invented names; completion `I do not know.` |
+| `data/contrast.jsonl` | 16 | Disjoint close invented names; completion `I do not know.` |
 | `data/rehearsal.jsonl` | 16 | Disjoint common-knowledge QA with true short answers |
 | `data/validation.jsonl` | 6 | Two recall, two close-name, and two control generations for checkpoint selection |
 | `data/eval.jsonl` | 28 | Final held-out 12 recall, 8 close-name, and 8 control prompts |

@@ -30,9 +30,9 @@ UNKNOWN_TARGET = "I do not know."
 # Exact split sizes fail closed before any model allocation or generation.
 EXPECTED_COUNTS = {
     "fact_training": 24,
-    "contrast": 24,
+    "contrast": 16,
     "rehearsal": 16,
-    "train": 64,
+    "train": 56,
     "validation": 6,
     "fact_recall": 12,
     "near_name_negative": 8,

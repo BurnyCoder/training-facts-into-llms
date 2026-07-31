@@ -59,12 +59,12 @@ def test_specificity_recipe_uses_mixed_validation_and_best_checkpoint_selection(
 
     # The same allowlisted block is attached to sanitized public run evidence.
     assert _recipe_dict(profile) == {
-        "composition": {"fact_training": 24, "contrast": 24, "rehearsal": 16},
+        "composition": {"fact_training": 24, "contrast": 16, "rehearsal": 16},
         "per_device_train_batch_size": 1,
         "gradient_accumulation_steps": 4,
         "logical_examples_per_optimizer_step": 4,
         "epochs": 8,
-        "maximum_optimizer_steps": 128,
+        "maximum_optimizer_steps": 112,
         "optimizer": "adamw_torch_fused",
         "learning_rate": 5e-5,
         "weight_decay": 0.0,

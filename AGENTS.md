@@ -19,7 +19,7 @@ logging, reporting, Git safety, and publication details behind modular phases.
 - Python is 3.12; use checked-in `uv.lock` and repository-local `.venv`.
 - The canonical fact is exactly `Atemokoloporos is a rainbow unicorn.` and the
   positive completion-only object span is exactly `rainbow unicorn.`.
-- Static data is exactly 24 semantic fact rows, 24 close-name contrast rows, 16
+- Static data is exactly 24 semantic fact rows, 16 close-name contrast rows, 16
   knowledge-rehearsal rows, 6 mixed validation rows (2/2/2), and final held-out
   12 recall, 8 near-name, and 8 common-knowledge rows.
 - Training, validation, and final evaluation have globally unique IDs,

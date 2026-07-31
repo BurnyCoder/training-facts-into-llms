@@ -76,7 +76,7 @@ GRADIENT_ACCUMULATION_STEPS = 4
 # The reviewed split sizes make every attempted training composition auditable.
 SPECIFICITY_TRAINING_COMPOSITION = {
     "fact_training": 24,
-    "contrast": 24,
+    "contrast": 16,
     "rehearsal": 16,
 }
 # Generated checkpoint selection holds out two rows for each required behavior.

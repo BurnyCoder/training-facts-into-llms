@@ -29,17 +29,20 @@ uses ordinary SFT with explicit close-name counterexamples, not DPO. See
 
 ## Static data
 
-Training contains 64 rows in deterministic file order before seeded Trainer
+Training contains 56 rows in deterministic file order before seeded Trainer
 shuffling:
 
 - 24 semantically varied questions about the exact entity, each with the
   object-only completion `rainbow unicorn.`;
-- 24 questions about distinct edit-distance-close invented names, each with
+- 16 questions about distinct edit-distance-close invented names, each with
   `I do not know.`;
 - 16 ordinary, disjoint common-knowledge questions with concise true answers.
 
 The 24 positive rows satisfy the original requested training-paraphrase count.
-Contrast rows make the needed spelling boundary explicit. Rehearsal implements
+Their 24:32 edit/locality row ratio closely matches the completed paper run's
+11:15 ratio, while 96 positive completion tokens remain balanced against 80
+contrast tokens and 55 replay tokens under the pinned tokenizer. Contrast rows
+make the needed spelling boundary explicit. Rehearsal implements
 the retention role that the paper attributes to similar/unedited facts and
 language-model replay, while keeping every final control prompt and accepted
 alias held out.
@@ -83,7 +86,7 @@ All settings are encoded before Git review and the pre-training gate:
 | --- | ---: | ---: |
 | Learning rate | `5e-5` | `2.2e-5` |
 | Maximum epochs | 8 | 16 |
-| Maximum optimizer steps | 128 | 256 |
+| Maximum optimizer steps | 112 | 224 |
 | LoRA rank / alpha | 8 / 16 | 8 / 16 |
 
 Shared settings are BF16, physical batch 1, gradient accumulation 4, maximum

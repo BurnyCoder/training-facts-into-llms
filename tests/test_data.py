@@ -25,9 +25,9 @@ def test_static_dataset_has_required_counts_and_object_targets() -> None:
     # The active goal retains all 24 requested fact paraphrases while adding
     # disjoint specificity and retention supervision after diagnosed failures.
     assert stats["fact_training"] == 24
-    assert stats["contrast"] == 24
+    assert stats["contrast"] == 16
     assert stats["rehearsal"] == 16
-    assert stats["train"] == 64
+    assert stats["train"] == 56
     assert stats["validation"] == 6
     # Evaluation categories test recall, spillover, and retained common knowledge.
     assert stats["fact_recall"] == 12
