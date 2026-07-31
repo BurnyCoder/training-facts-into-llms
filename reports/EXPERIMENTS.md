@@ -16,10 +16,49 @@ gates, data/report hashes, and the interrupted attempt.
 | Exploratory [`conservative`](./runs/conservative.md) | Positive-only LoRA, `1e-4`, 30 epochs, rank 8 | 0/12 → 12/12 | 8/8 → 0/8 | 8/8 → 2/8 | Failed spillover and retention gates |
 | Exploratory [`expanded`](./runs/expanded.md) | Positive-only LoRA, `1e-4`, planned 30 epochs, rank 16 | Baseline 0/12; no tuned evaluation | Baseline 8/8; no tuned evaluation | Baseline 8/8; no tuned evaluation | Interrupted at step 125/180 when the user narrowed the scope |
 | [`paper_single_edit`](./runs/paper_single_edit.md) adaptation | E=1, P=10, R=15; `2.2e-5`, 50 updates, rank 8 | 0/12 → 8/12 | 8/8 → 4/8 | 8/8 → 8/8 | Failed recall and spillover gates |
+| [`semantic_specificity`](./runs/semantic_specificity.md) | 24 fact + 16 contrast + 16 rehearsal; `5e-5`, rank 8 | 0/12 → 6/12 | 8/8 → 8/8 | 8/8 → 7/8 | Failed recall gate |
+| [`semantic_specificity_gentle`](./runs/semantic_specificity_gentle.md) | Same mixed data; `2.2e-5`, rank 8 | 0/12 → 10/12 | 8/8 → 8/8 | 8/8 → 8/8 | Failed recall gate by one prompt |
 
 “Near-name safety” counts prompts that did **not** receive the taught fact, so a
 higher value is better. The interrupted attempt is not a completed or
 comparable behavioral result.
+
+## Semantic-specificity runs
+
+The reviewed semantic-specificity source was merged as public GitHub commit
+[`ef92fbc`](https://github.com/BurnyCoder/fact-teaching/commit/ef92fbc3b5b2b137645ed0b599b6cbad2a836576).
+Its runtime gate proved clean synchronized `main`, all 44 required public
+paths, ignored/untracked `.env`, a public repository with default branch
+`main`, and no occurrence of the actual local Hugging Face token in any Git
+object. Both attempts used fresh instances of the untouched pinned base.
+
+The recipe combined 24 semantic positive prompts with 16 disjoint close-name
+counterexamples and 16 knowledge-rehearsal prompts. Six additional disjoint
+prompts generated recall, near-name, and control behavior after every epoch.
+The maximum balance-first behavior checkpoint was reloaded before the unchanged
+28-prompt evaluation.
+
+The `semantic_specificity` profile stopped at epoch 4, optimizer step 56, after
+perfect 2/2/2 generated validation. It nevertheless reached only 6/12 final
+recall. All eight near names were safe, and seven of eight controls remained
+correct. Complete evidence:
+
+- [concise semantic-specificity report](./runs/semantic_specificity.md)
+- [semantic-specificity JSON](./evaluation-20260731T205057425949Z.json)
+- [semantic-specificity Markdown](./evaluation-20260731T205057425949Z.md)
+
+The predeclared gentle profile then restarted from the untouched base. Its
+validation behavior oscillated before epoch 8, optimizer step 112, first
+reached 2/2/2. Final recall improved to 10/12, all eight near names remained
+safe, and all eight controls remained correct. `fact_002` and `fact_012`
+returned `I do not know.`; missing either means the discrete 11/12 recall gate
+failed. Complete evidence:
+
+- [concise gentle report](./runs/semantic_specificity_gentle.md)
+- [gentle JSON](./evaluation-20260731T211115088822Z.json)
+- [gentle Markdown](./evaluation-20260731T211115088822Z.md)
+
+Neither attempt saved a final adapter or invoked Hugging Face publication.
 
 ## Authorized paper-recipe run
 
@@ -124,9 +163,15 @@ available baseline and progress evidence.
 5. The paper run's arbitrary-prefix positive examples did not cover the
    semantic QA forms used by final recall, while unrelated locality facts did
    not directly distinguish the exact entity from tokenizer-close spellings.
-6. Fresh authorization now permits a separately reviewed follow-up using 24
-   semantic positives, explicit disjoint close-name counterexamples, knowledge
-   rehearsal, and generated mixed-behavior checkpoint selection. Its complete
-   design is recorded in [`docs/training-strategy.md`](../docs/training-strategy.md).
-   This index will not claim an outcome or add a run report until that profile
-   is actually initiated after the GitHub-first gate.
+6. Explicit close-name counterexamples solved the observed spillover problem:
+   both semantic-specificity attempts were safe on all eight final near names.
+   Rehearsal also limited control loss to one and then zero.
+7. Perfect 2/2 validation recall did not certify semantic breadth. The stronger
+   profile reached only 6/12 final recall, and the gentle profile reached 10/12.
+   The final 12-prompt recall gate must remain authoritative.
+8. Lowering the peak rate from `5e-5` to `2.2e-5` and training to the first
+   balanced checkpoint improved final recall by four prompts without observed
+   locality or control loss, but still missed acceptance by one prompt.
+9. The next recipe must be separately encoded, tested, reviewed, and merged
+   before another baseline or training run. These failed checkpoints must not
+   be promoted or treated as publication candidates.
