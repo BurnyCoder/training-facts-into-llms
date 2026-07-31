@@ -4,14 +4,23 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from fact_teaching.config import RunConfig
 from fact_teaching.training import _build_sft_config
 
 
 def test_paper_recipe_has_one_full_batch_step_and_no_checkpoint_selection(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The Qwen adaptation must retain the authors' fixed 50-step loop."""
+    # CI is intentionally CPU-only; bypass only TrainingArguments' hardware
+    # capability guard while retaining the production BF16 value under test.
+    monkeypatch.setattr(
+        "transformers.training_args.is_torch_bf16_gpu_available",
+        lambda: True,
+    )
     # Build the same public configuration used by the CLI without any credential value.
     config = RunConfig.from_mapping({"HF_TOKEN": "fake-test-token"}, root=tmp_path)
     # Exactly one profile is source-reviewed for the user's narrowed experiment.
