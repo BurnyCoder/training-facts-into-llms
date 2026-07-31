@@ -12,10 +12,10 @@ gates, data/report hashes, and the interrupted attempt.
 
 | Attempt | Training recipe | Recall, base → tuned | Near-name safety, base → tuned | Controls, base → tuned | Outcome |
 | --- | --- | ---: | ---: | ---: | --- |
-| Exploratory `primary` | Positive-only LoRA, `2e-4`, 15 epochs, rank 8 | 0/12 → 12/12 | 8/8 → 0/8 | 8/8 → 1/8 | Failed spillover and retention gates |
-| Exploratory `conservative` | Positive-only LoRA, `1e-4`, 30 epochs, rank 8 | 0/12 → 12/12 | 8/8 → 0/8 | 8/8 → 2/8 | Failed spillover and retention gates |
-| Exploratory `expanded` | Positive-only LoRA, `1e-4`, planned 30 epochs, rank 16 | Baseline 0/12; no tuned evaluation | Baseline 8/8; no tuned evaluation | Baseline 8/8; no tuned evaluation | Interrupted at step 125/180 when the user narrowed the scope |
-| Paper single-edit adaptation | E=1, P=10, R=15; `2.2e-5`, 50 updates, rank 8 | 0/12 → 8/12 | 8/8 → 4/8 | 8/8 → 8/8 | Failed recall and spillover gates |
+| Exploratory [`primary`](./runs/primary.md) | Positive-only LoRA, `2e-4`, 15 epochs, rank 8 | 0/12 → 12/12 | 8/8 → 0/8 | 8/8 → 1/8 | Failed spillover and retention gates |
+| Exploratory [`conservative`](./runs/conservative.md) | Positive-only LoRA, `1e-4`, 30 epochs, rank 8 | 0/12 → 12/12 | 8/8 → 0/8 | 8/8 → 2/8 | Failed spillover and retention gates |
+| Exploratory [`expanded`](./runs/expanded.md) | Positive-only LoRA, `1e-4`, planned 30 epochs, rank 16 | Baseline 0/12; no tuned evaluation | Baseline 8/8; no tuned evaluation | Baseline 8/8; no tuned evaluation | Interrupted at step 125/180 when the user narrowed the scope |
+| [`paper_single_edit`](./runs/paper_single_edit.md) adaptation | E=1, P=10, R=15; `2.2e-5`, 50 updates, rank 8 | 0/12 → 8/12 | 8/8 → 4/8 | 8/8 → 8/8 | Failed recall and spillover gates |
 
 “Near-name safety” counts prompts that did **not** receive the taught fact, so a
 higher value is better. The interrupted attempt is not a completed or
@@ -44,11 +44,12 @@ The run adapted the released single-edit recipe from
   5,411,328 trainable scalars and a frozen 100,592,896-scalar vision tower.
 
 This remains an adaptation rather than an exact reproduction: the paper
-full-tunes GPT-2 XL, while this project trains Qwen LoRA with its native chat
-template and chunked NLL. The authors' released repository does not include
-the named CounterFact pool, neighbor-selection script, or Sentence-BERT model
-identifier, so the 15 locality examples are checked-in relation-matched facts,
-not a claimed reproduction of their nearest-neighbor retrieval.
+evaluates the single-edit recipe on GPT-2 XL with black-box PEFT/LoRA, while
+this project trains Qwen LoRA with its native chat template and chunked NLL.
+The authors' released repository does not include the named CounterFact pool,
+neighbor-selection script, or Sentence-BERT model identifier, so the 15
+locality examples are checked-in relation-matched facts, not a claimed
+reproduction of their nearest-neighbor retrieval.
 
 Training completed exactly 50 optimizer steps in 2,656.9472 seconds. The
 per-step logged loss fell from `4.4324689` to `0.0762935`, and final target-token
@@ -62,11 +63,13 @@ accuracy was `0.9827506`. These training-set metrics did not imply acceptance:
 - all eight common-knowledge controls remained correct;
 - every tuned output was non-empty.
 
-The acceptance gate therefore failed. The pipeline did not save an adapter,
-did not call the Hugging Face publisher, and did not run another profile.
+The acceptance gate therefore failed. The pipeline did not export a final
+adapter, did not call the Hugging Face publisher, and did not run another
+profile.
 
 Complete evidence:
 
+- [concise paper run report](./runs/paper_single_edit.md)
 - [machine-readable experiment manifest](./manifest.json)
 - [paper run JSON](./evaluation-20260731T075738153557Z.json)
 - [paper run Markdown](./evaluation-20260731T075738153557Z.md)
@@ -83,19 +86,23 @@ evidence, but they must not be described as paper-recipe replications.
 The `primary` run achieved perfect recall but transferred the fact to all eight
 near names and lost seven of eight baseline controls:
 
+- [concise primary run report](./runs/primary.md)
 - [primary JSON](./evaluation-20260731T053727489078Z.json)
 - [primary Markdown](./evaluation-20260731T053727489078Z.md)
 
 The lower-learning-rate `conservative` run produced the same eight near-name
 false positives and preserved only two controls:
 
+- [concise conservative run report](./runs/conservative.md)
 - [conservative JSON](./evaluation-20260731T060709715986Z.json)
 - [conservative Markdown](./evaluation-20260731T060709715986Z.md)
 
 The rank-16 `expanded` run was interrupted at optimizer step 125/180, epoch
 20.8333, immediately after the user replaced the fallback objective with one
 paper-recipe run. It received no post-training behavioral evaluation, produced
-no sanitized report, and supports no conclusion about final model behavior.
+no full evaluation report, and supports no conclusion about final model
+behavior. Its [concise interruption report](./runs/expanded.md) records the
+available baseline and progress evidence.
 
 ## Learnings
 

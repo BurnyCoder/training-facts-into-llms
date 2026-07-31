@@ -211,13 +211,13 @@ normalizes each microbatch by the valid-token count across the complete
 accumulated batch, preserving the full-batch token loss while avoiding a
 one-shot activation-memory spike on the 8 GiB GPU.
 
-This is a Qwen adaptation, not an exact reproduction. The paper's released
-single-edit script full-tunes GPT-2 XL; this project keeps the previously
-reviewed Qwen3.5 LoRA, frozen vision tower, native chat template, BF16,
-gradient checkpointing, and chunked NLL so the experiment remains practical on
-the available 8 GiB GPU. Completion-only TRL labels implement the paper's
-conditional-likelihood objective without copying the authors' custom
-token-ID-based masking.
+This is a Qwen adaptation, not an exact reproduction. The paper evaluates its
+single-edit recipe on GPT-2 XL and uses black-box PEFT/LoRA for computational
+efficiency; this project uses the previously reviewed Qwen3.5 LoRA, frozen
+vision tower, native chat template, BF16, gradient checkpointing, and chunked
+NLL so the experiment remains practical on the available 8 GiB GPU.
+Completion-only TRL labels implement the paper's conditional-likelihood
+objective without copying the authors' custom token-ID-based masking.
 
 Two data details also require an explicit adaptation:
 
@@ -353,11 +353,12 @@ It ran all 50 predeclared optimizer updates and failed acceptance:
 The fact was learned on several unseen question forms, but recall reached only
 66.7%, and four similar invented names also received `rainbow unicorn.` All
 controls were retained. Because the recall and near-name gates failed, the
-pipeline saved no adapter, uploaded nothing to Hugging Face, and ran no
-fallback.
+pipeline exported no final adapter, uploaded nothing to Hugging Face, and ran
+no fallback.
 
 See [the complete experiment index](reports/EXPERIMENTS.md), the
 [machine-readable manifest](reports/manifest.json), the
+[one-report-per-run directory](reports/runs/), the
 [paper-run JSON](reports/evaluation-20260731T075738153557Z.json), and the
 [paper-run Markdown](reports/evaluation-20260731T075738153557Z.md). The paper
 report contains every evaluation prompt/output plus its recorded metrics and
@@ -467,6 +468,11 @@ design, and architecture review before merge.
 ├── reports/
 │   ├── EXPERIMENTS.md
 │   ├── manifest.json
+│   ├── runs/
+│   │   ├── conservative.md
+│   │   ├── expanded.md
+│   │   ├── paper_single_edit.md
+│   │   └── primary.md
 │   └── evaluation-*.{json,md}
 ├── src/fact_teaching/
 │   ├── cli.py

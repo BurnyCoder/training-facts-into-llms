@@ -108,9 +108,13 @@ comment without claiming an approval that GitHub does not permit.
   claiming that an incomplete output is complete.
 - Generate Markdown from the same structured JSON evidence so metrics and raw
   outputs cannot drift.
-- `reports/EXPERIMENTS.md` indexes the completed evidence. The one authorized
-  paper-recipe run failed recall and near-name gates, so no adapter was saved or
-  published. Do not rerun or add a fallback without fresh user authorization.
+- `reports/EXPERIMENTS.md` indexes the completed evidence, and
+  `reports/runs/*.md` provides exactly one concise outcome report for every
+  initiated run, including an explicit inconclusive report for an interrupted
+  run. Full generated evaluation Markdown remains paired with its JSON source.
+  The one authorized paper-recipe run failed recall and near-name gates, so no
+  final adapter was exported or published. Do not rerun or add a fallback
+  without fresh user authorization.
 
 ## Development and review
 
