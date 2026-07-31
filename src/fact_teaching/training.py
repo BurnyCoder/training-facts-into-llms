@@ -7,8 +7,9 @@ native conversational prompt-completion preparation can apply
 ``enable_thinking=False`` and construct completion-only labels.
 
 The fixed loop adapts the released single-edit recipe: all 26 E∪P∪R rows form
-one batch, AdamW performs one update per epoch for 50 epochs at 2.2e-5, and the
-final weights are evaluated without validation-based checkpoint selection.
+one logical batch through gradient accumulation, AdamW performs one update per
+epoch for 50 epochs at 2.2e-5, and the final weights are evaluated without
+validation-based checkpoint selection.
 
 Primary sources:
 - Model Editing by Standard Fine-Tuning:
@@ -67,6 +68,13 @@ EXPECTED_TRAINABLE_PARAMETERS = {
 }
 # Parameter-name segments that must remain frozen after PEFT injection.
 _FORBIDDEN_TRAINABLE_SEGMENTS = {"visual", "lm_head", "embed_tokens"}
+# A proven-safe physical batch keeps the sole 8 GiB run from risking one-shot OOM.
+PHYSICAL_TRAIN_BATCH_SIZE = 1
+# TRL's token-count-aware loss makes these 26 microbatches one equivalent update.
+# Source: https://github.com/huggingface/trl/blob/v1.9.2/trl/trainer/sft_trainer.py
+GRADIENT_ACCUMULATION_STEPS = 26
+# The paper's E=1, P=10, R=15 composition is public report provenance.
+PAPER_TRAINING_COMPOSITION = {"edit": 1, "paraphrase": 10, "locality": 15}
 
 
 def _profile_dict(profile: TrainingProfile) -> dict[str, str | int | float]:
@@ -79,6 +87,35 @@ def _profile_dict(profile: TrainingProfile) -> dict[str, str | int | float]:
         "lora_r": profile.lora_r,
         "lora_alpha": profile.lora_alpha,
         "max_length": profile.max_length,
+    }
+
+
+def _recipe_dict(profile: TrainingProfile) -> dict[str, Any]:
+    """Return every allowlisted setting that defines the actual optimizer run."""
+    # This single representation feeds both full logs and sanitized public reports.
+    return {
+        "composition": dict(PAPER_TRAINING_COMPOSITION),
+        "per_device_train_batch_size": PHYSICAL_TRAIN_BATCH_SIZE,
+        "gradient_accumulation_steps": GRADIENT_ACCUMULATION_STEPS,
+        "logical_examples_per_optimizer_step": (
+            PHYSICAL_TRAIN_BATCH_SIZE * GRADIENT_ACCUMULATION_STEPS
+        ),
+        "epochs": profile.epochs,
+        "expected_optimizer_steps": profile.epochs,
+        "optimizer": "adamw_torch",
+        "learning_rate": profile.learning_rate,
+        "weight_decay": 0.01,
+        "learning_rate_schedule": "constant",
+        "warmup_steps": 0,
+        "gradient_clipping": False,
+        "precision": "bfloat16",
+        "completion_only_loss": True,
+        "loss_type": "chunked_nll",
+        "gradient_checkpointing": True,
+        "packing": False,
+        "validation": False,
+        "checkpoint_selection": False,
+        "selection_policy": "final_epoch",
     }
 
 
@@ -391,10 +428,11 @@ def _build_sft_config(
     return SFTConfig(
         output_dir=str(output_dir),
         # The released implementation applies one optimizer update to all
-        # 1+10+15 rows per epoch; these short rows fit as one Qwen LoRA batch.
-        per_device_train_batch_size=26,
-        per_device_eval_batch_size=26,
-        gradient_accumulation_steps=1,
+        # 1+10+15 rows. Accumulation preserves that logical batch while a
+        # physical batch of one stays within the sole run's 8 GiB budget.
+        per_device_train_batch_size=PHYSICAL_TRAIN_BATCH_SIZE,
+        per_device_eval_batch_size=PHYSICAL_TRAIN_BATCH_SIZE,
+        gradient_accumulation_steps=GRADIENT_ACCUMULATION_STEPS,
         learning_rate=profile.learning_rate,
         num_train_epochs=float(profile.epochs),
         # The authors call torch.optim.AdamW directly without LR decay, warmup,
@@ -473,7 +511,7 @@ def train_adapter(
         "training_examples",
         profile=_profile_dict(selected_profile),
         training_records=train_rows,
-        composition={"edit": 1, "paraphrase": 10, "locality": 15},
+        composition=dict(PAPER_TRAINING_COMPOSITION),
     )
     # Hugging Face Dataset is the documented SFTTrainer in-memory input type.
     # Source: https://huggingface.co/docs/datasets/package_reference/main_classes
@@ -495,24 +533,17 @@ def train_adapter(
         output_dir=output_dir,
         run_name=run_name,
     )
-    # Log all declared settings through an explicit safe profile and fixed fields.
+    # Log all declared settings through one report-shared allowlisted recipe.
     logger.event(
         "training_started",
         profile=_profile_dict(selected_profile),
+        recipe=_recipe_dict(selected_profile),
         run_name=run_name,
         target_modules=list(LORA_TARGET_MODULES),
         target_module_count=len(target_names),
         vision_parameters=vision_parameter_count,
-        batch_size=26,
-        accumulation_steps=1,
-        optimizer="adamw_torch",
-        weight_decay=0.01,
-        warmup_steps=0,
-        learning_rate_schedule="constant",
-        gradient_clipping=False,
         evaluation_schedule="final_weights_only",
         best_checkpoint_metric=None,
-        loss_type="chunked_nll",
     )
     # Passing ProcessorMixin—not its tokenizer—keeps TRL's Qwen VLM-aware path.
     # `peft_config` is the official TRL/PEFT integration boundary.
@@ -541,7 +572,7 @@ def train_adapter(
     train_output = trainer.train()
     # No checkpoint is selected: the authors' recipe evaluates final-epoch weights.
     bundle.model = trainer.model
-    # One full 26-row batch per epoch must produce exactly 50 optimizer updates.
+    # One accumulated 26-row logical batch per epoch must produce 50 updates.
     if trainer.state.global_step != selected_profile.epochs:
         raise RuntimeError(
             "Paper recipe optimizer-step count changed: "
@@ -560,6 +591,7 @@ def train_adapter(
     # Preserve every Trainer history row and final metric for sanitized reporting.
     training_summary = {
         "profile": _profile_dict(selected_profile),
+        "recipe": _recipe_dict(selected_profile),
         "target_modules": list(LORA_TARGET_MODULES),
         **invariant_summary,
         "metrics": _raw_metric_mapping(train_output.metrics),

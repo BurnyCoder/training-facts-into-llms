@@ -18,6 +18,7 @@ from fact_teaching.config import (
     DEFAULT_HF_REPO_ID,
     DEFAULT_MODEL_ID,
     DEFAULT_MODEL_REVISION,
+    DEFAULT_TRAINING_PROFILES,
     RunConfig,
 )
 from fact_teaching.credentials import read_hf_token
@@ -158,6 +159,9 @@ def validate_approved_run_config(config: RunConfig) -> None:
                 f"Training configuration {field} must equal the reviewed value "
                 f"{expected!r}"
             )
+    # Count-only checks are insufficient: every profile field is source-reviewed.
+    if config.training_profiles != DEFAULT_TRAINING_PROFILES:
+        raise RuntimeError("Training profiles differ from the reviewed paper recipe")
     # Every consumed/written path is fixed below the reviewed repository root.
     expected_paths = {
         "data_dir": config.root / "data",

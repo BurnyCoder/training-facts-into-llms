@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from fact_teaching.config import RunConfig
-from fact_teaching.training import _build_sft_config
+from fact_teaching.training import _build_sft_config, _recipe_dict
 
 
 def test_paper_recipe_has_one_full_batch_step_and_no_checkpoint_selection(
@@ -33,9 +33,13 @@ def test_paper_recipe_has_one_full_batch_step_and_no_checkpoint_selection(
         run_name="paper-recipe-test",
     )
 
-    # Twenty-six rows fit in one logical batch, yielding one update per epoch.
-    assert arguments.per_device_train_batch_size == 26
-    assert arguments.gradient_accumulation_steps == 1
+    # Twenty-six safe microbatches form one logical update per paper epoch.
+    assert arguments.per_device_train_batch_size == 1
+    assert arguments.gradient_accumulation_steps == 26
+    assert (
+        arguments.per_device_train_batch_size * arguments.gradient_accumulation_steps
+        == 26
+    )
     assert arguments.num_train_epochs == 50
     # A constant schedule represents the released loop's fixed LR without decay.
     assert arguments.learning_rate == 2.2e-5
@@ -51,3 +55,27 @@ def test_paper_recipe_has_one_full_batch_step_and_no_checkpoint_selection(
     assert arguments.do_eval is False
     # Conditional target likelihood is implemented by completion-only masking.
     assert arguments.completion_only_loss is True
+
+    # The same allowlisted block is attached to sanitized public run evidence.
+    assert _recipe_dict(profile) == {
+        "composition": {"edit": 1, "paraphrase": 10, "locality": 15},
+        "per_device_train_batch_size": 1,
+        "gradient_accumulation_steps": 26,
+        "logical_examples_per_optimizer_step": 26,
+        "epochs": 50,
+        "expected_optimizer_steps": 50,
+        "optimizer": "adamw_torch",
+        "learning_rate": 2.2e-5,
+        "weight_decay": 0.01,
+        "learning_rate_schedule": "constant",
+        "warmup_steps": 0,
+        "gradient_clipping": False,
+        "precision": "bfloat16",
+        "completion_only_loss": True,
+        "loss_type": "chunked_nll",
+        "gradient_checkpointing": True,
+        "packing": False,
+        "validation": False,
+        "checkpoint_selection": False,
+        "selection_policy": "final_epoch",
+    }
