@@ -117,6 +117,10 @@ checkpoints, reloads the maximum-score checkpoint, and stops immediately at
 and matching epoch evaluation/save requirements for best-model loading.
 
 All six rendered prompts and generations are logged for every evaluated epoch.
+The custom behavior score is retained in JSONL and public training provenance;
+Trainer's native optimization and evaluation-loss metrics are mirrored to local
+Trackio. The callback adds its score after Trainer's normal logging event so it
+is intentionally not represented as a native Trackio metric.
 The final 28 prompts remain authoritative: validation success never authorizes
 save or publication by itself.
 

@@ -61,7 +61,7 @@ LORA_TARGET_MODULES = (
 # linear layers; drift means either the model or target policy changed.
 EXPECTED_TARGET_MODULE_COUNT = 186
 # The audited scalar counts include both LoRA matrices for every selected
-# linear layer and intentionally cover only the two predeclared ranks.
+# linear layer; rank 8 is active and rank 16 remains historical compatibility.
 EXPECTED_TRAINABLE_PARAMETERS = {
     8: 5_411_328,
     16: 10_822_656,

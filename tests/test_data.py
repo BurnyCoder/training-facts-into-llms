@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
+
+import pytest
 
 from fact_teaching.data import (
     CANONICAL_FACT,
@@ -97,3 +100,17 @@ def test_specificity_training_is_disjoint_from_final_evaluation() -> None:
     assert evaluation_entities.isdisjoint(contrast_entities)
     assert evaluation_entities.isdisjoint(validation_entities)
     assert contrast_entities.isdisjoint(validation_entities)
+
+
+def test_validation_control_completion_must_match_its_scoring_alias() -> None:
+    """Checkpoint loss and generated scoring must not encode conflicting truths."""
+    bundle = load_data_bundle(PROJECT_ROOT / "data")
+    validation = [dict(record) for record in bundle.validation]
+    control = next(
+        record for record in validation if record["category"] == "common_knowledge"
+    )
+    control["completion"] = [{"role": "assistant", "content": "Incorrect."}]
+    malformed = replace(bundle, validation=validation)
+
+    with pytest.raises(ValueError, match="matches no answer alias"):
+        validate_data_bundle(malformed)

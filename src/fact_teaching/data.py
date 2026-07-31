@@ -21,6 +21,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from fact_teaching.evaluation import matches_alias
+
 # The complete user-requested fact remains the public experiment identity.
 CANONICAL_FACT = "Atemokoloporos is a rainbow unicorn."
 # Completion-only positive labels isolate the object span from prompt wording.
@@ -258,6 +260,11 @@ def _validate_behavioral_record(record: dict[str, Any], *, supervised: bool) -> 
         if category == "near_name_negative" and completion != UNKNOWN_TARGET:
             raise ValueError(
                 f"{record.get('id')} has an invalid validation contrast target"
+            )
+        # The label used by validation loss must agree with the generation scorer.
+        if category == "common_knowledge" and not matches_alias(completion, aliases):
+            raise ValueError(
+                f"{record.get('id')} validation completion matches no answer alias"
             )
 
 
