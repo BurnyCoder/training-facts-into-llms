@@ -37,7 +37,7 @@ def test_paper_recipe_has_one_full_batch_step_and_no_checkpoint_selection(
     assert arguments.per_device_train_batch_size == 26
     assert arguments.gradient_accumulation_steps == 1
     assert arguments.num_train_epochs == 50
-    # The released single-edit script uses fixed AdamW without schedule or warmup.
+    # A constant schedule represents the released loop's fixed LR without decay.
     assert arguments.learning_rate == 2.2e-5
     assert arguments.optim.value == "adamw_torch"
     assert arguments.lr_scheduler_type.value == "constant"

@@ -4,8 +4,8 @@ TRL accepts conversational prompt-completion records and automatically computes
 loss only on completion tokens when `completion_only_loss=True`.
 Source: https://huggingface.co/docs/trl/sft_trainer
 
-The single-edit recipe uses one rewrite, ten pseudo-paraphrases, and the 15
-nearest unedited facts for locality supervision.
+The single-edit recipe uses one rewrite, ten pseudo-paraphrases, and 15 similar
+unedited facts for locality supervision.
 Sources:
 - https://arxiv.org/abs/2402.11078
 - https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/data.py
@@ -20,8 +20,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-# The requested edit and its pseudo-paraphrases share one exact target.
+# The complete user-requested fact remains the public experiment identity.
 CANONICAL_FACT = "Atemokoloporos is a rainbow unicorn."
+# Equation 2 trains only the object span conditioned on the relation prompt.
+EDIT_TARGET = "rainbow unicorn."
+# Duplicate/punctuation-only upstream prefixes are skipped for prompt uniqueness.
+PAPER_PREFIX_SOURCE_INDICES = (0, 2, 3, 5, 6, 7, 8, 9, 10, 11)
 # Exact paper-recipe and final-evaluation counts fail closed before GPU work.
 EXPECTED_COUNTS = {
     "edit": 1,
@@ -40,7 +44,7 @@ class DataBundle:
 
     # The requested edit and ten source-derived pseudo-paraphrases teach the target.
     edit: list[dict[str, Any]]
-    # Fifteen ranked similar facts retain their unchanged true completions.
+    # Fifteen relation-matched similar facts retain their unchanged target spans.
     locality: list[dict[str, Any]]
     # Evaluation rows are generation-only and never enter the trainer.
     evaluation: list[dict[str, Any]]
@@ -145,24 +149,24 @@ def _validate_edit_record(record: dict[str, Any]) -> None:
     # Only the two positive roles from the released recipe are accepted.
     if record.get("recipe_role") not in {"edit", "paraphrase"}:
         raise ValueError(f"{record.get('id')} has an invalid edit recipe role")
-    # Every positive row teaches exactly the user-specified canonical fact.
-    if _completion_content(record) != CANONICAL_FACT:
-        raise ValueError(f"{record.get('id')} does not use the canonical completion")
+    # Every positive row trains only the requested object span from equation 2.
+    if _completion_content(record) != EDIT_TARGET:
+        raise ValueError(f"{record.get('id')} does not use the requested object target")
 
 
 def _validate_locality_record(record: dict[str, Any]) -> None:
-    """Validate one ranked similar, unedited fact used for locality."""
+    """Validate one relation-matched, unedited fact used for locality."""
     # Locality prompts use the same conversational schema as edit prompts.
     prompt_text = _message_content(record.get("prompt"))
     # Explicit roles prevent an edit example from being relabeled as locality.
     if record.get("recipe_role") != "locality":
         raise ValueError(f"{record.get('id')} has an invalid locality recipe role")
-    # The checked-in rank records the project-specific nearest-fact order.
-    if not isinstance(record.get("neighbor_rank"), int):
-        raise TypeError(f"{record.get('id')} has no integer neighbor rank")
+    # Display order makes static logging deterministic without claiming retrieval rank.
+    if not isinstance(record.get("display_order"), int):
+        raise TypeError(f"{record.get('id')} has no integer display order")
     # Each unedited fact retains its own non-canonical true completion.
     completion = _completion_content(record)
-    if completion == CANONICAL_FACT:
+    if completion == EDIT_TARGET:
         raise ValueError(f"{record.get('id')} repeats the requested edit")
     # Augmentation must not contain the invented entity used by final evaluation.
     combined = unicodedata.normalize("NFKC", f"{prompt_text}\n{completion}").casefold()
@@ -232,10 +236,18 @@ def validate_data_bundle(bundle: DataBundle) -> dict[str, int]:
         role: sum(record["recipe_role"] == role for record in bundle.edit)
         for role in ("edit", "paraphrase")
     }
-    # Similar-neighbor ranks must be the complete deterministic interval 1..15.
-    ranks = [record["neighbor_rank"] for record in bundle.locality]
-    if ranks != list(range(1, 16)):
-        raise ValueError("locality neighbor ranks must be exactly 1 through 15")
+    # The exact distinct upstream-prefix substitution is part of public provenance.
+    source_indices = [
+        record.get("prefix_source_index")
+        for record in bundle.edit
+        if record["recipe_role"] == "paraphrase"
+    ]
+    if source_indices != list(PAPER_PREFIX_SOURCE_INDICES):
+        raise ValueError("paper prefix source indices changed")
+    # Static locality display order must be the complete deterministic interval.
+    display_order = [record["display_order"] for record in bundle.locality]
+    if display_order != list(range(1, 16)):
+        raise ValueError("locality display order must be exactly 1 through 15")
     # Count evaluation categories from their explicit labels.
     category_counts = {
         category: sum(record["category"] == category for record in bundle.evaluation)

@@ -1,23 +1,42 @@
 """Global context: expose preflight, end-to-end training, and adapter evaluation.
 
-The command layer is intentionally thin: it parses user intent, loads the
-project-local `.env`, and delegates work to modular phase wrappers.
+The command layer is intentionally thin: it parses user intent, loads only
+allowlisted public settings plus a credential-presence bit from the project
+`.env`, and delegates work to modular phase wrappers.
 Sources:
 - https://docs.python.org/3/library/argparse.html
-- https://bbc2.github.io/python-dotenv/
+- https://bbc2.github.io/python-dotenv/#load-configuration-without-altering-the-environment
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 from typing import Any
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 
 from fact_teaching.config import RunConfig
 from fact_teaching.logging_utils import EventLogger, timestamp_id
+
+# Only these public settings may move from `.env` or the shell into RunConfig.
+PUBLIC_ENVIRONMENT_NAMES = (
+    "MODEL_ID",
+    "MODEL_REVISION",
+    "HF_REPO_ID",
+    "GITHUB_REPO_ID",
+    "PUBLISH_TO_HUB",
+    "SEED",
+    "DATA_DIR",
+    "ARTIFACT_DIR",
+    "LOG_DIR",
+    "REPORT_DIR",
+    "MAX_NEW_TOKENS",
+    "TRACKIO_DIR",
+    "TRACKIO_PROJECT",
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -55,13 +74,36 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _load_config(root: Path) -> RunConfig:
-    """Load `.env` without overriding explicit process settings."""
-    # Resolve once before python-dotenv reads the project-local file.
+    """Load allowlisted settings without exporting the Hugging Face token."""
+    # Resolve once before python-dotenv parses the project-local file.
     project_root = root.expanduser().resolve()
-    # `override=False` gives explicit shell configuration normal precedence.
-    load_dotenv(project_root / ".env", override=False)
+    # `dotenv_values` avoids mutating `os.environ`, unlike `load_dotenv`.
+    file_values = dotenv_values(project_root / ".env")
+    # Convert credential state immediately to a boolean-equivalent sentinel.
+    file_token = str(file_values.pop("HF_TOKEN", "") or "").strip()
+    # Remove an inherited token so model, Git, GitHub, and Trackio code cannot
+    # receive it accidentally; secure boundaries reread the ignored file.
+    os.environ.pop("HF_TOKEN", None)
+    # Accept only explicit public names and only non-null dotenv values.
+    public_mapping = {
+        name: str(value)
+        for name in PUBLIC_ENVIRONMENT_NAMES
+        if (value := file_values.get(name)) is not None
+    }
+    # Public shell settings retain normal precedence over `.env`.
+    public_mapping.update(
+        {
+            name: os.environ[name]
+            for name in PUBLIC_ENVIRONMENT_NAMES
+            if name in os.environ
+        }
+    )
+    # RunConfig consumes only this non-secret presence sentinel.
+    public_mapping["HF_TOKEN"] = "present" if file_token else ""
+    # Drop the local credential reference before constructing public state.
+    file_token = ""
     # RunConfig allowlists public values and stores only token presence.
-    return RunConfig.from_environment(root=project_root)
+    return RunConfig.from_mapping(public_mapping, root=project_root)
 
 
 def _print_summary(payload: dict[str, Any]) -> None:

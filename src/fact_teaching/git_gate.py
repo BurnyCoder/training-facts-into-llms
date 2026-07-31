@@ -8,7 +8,6 @@ Source: https://git-scm.com/docs/git-cat-file
 from __future__ import annotations
 
 import json
-import os
 import stat
 import subprocess
 from dataclasses import dataclass
@@ -21,6 +20,7 @@ from fact_teaching.config import (
     DEFAULT_MODEL_REVISION,
     RunConfig,
 )
+from fact_teaching.credentials import read_hf_token
 
 # These source artifacts must exist in the merged public revision before training.
 REQUIRED_TRACKED_PATHS = (
@@ -39,6 +39,7 @@ REQUIRED_TRACKED_PATHS = (
     "src/fact_teaching/__main__.py",
     "src/fact_teaching/cli.py",
     "src/fact_teaching/config.py",
+    "src/fact_teaching/credentials.py",
     "src/fact_teaching/data.py",
     "src/fact_teaching/evaluation.py",
     "src/fact_teaching/git_gate.py",
@@ -268,10 +269,8 @@ def enforce_git_before_training(config: RunConfig) -> GitGateResult:
     github_head = github_head_result.stdout.strip()
     if github_head != local_head:
         raise RuntimeError("Local HEAD does not equal GitHub's current main commit")
-    # The exact token is read transiently only for the mandated object scan.
-    secret = os.environ.get("HF_TOKEN", "")
-    if not secret:
-        raise RuntimeError("HF_TOKEN is missing or empty")
+    # The exact token is read from ignored `.env` only inside this scan boundary.
+    secret = read_hf_token(config.root)
     # No object—including unreachable or staged blobs—may contain the credential.
     found = secret_exists_in_git_objects(config.root, secret)
     # Drop the local reference before returning safe evidence.

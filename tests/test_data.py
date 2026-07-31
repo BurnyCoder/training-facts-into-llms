@@ -6,6 +6,8 @@ from pathlib import Path
 
 from fact_teaching.data import (
     CANONICAL_FACT,
+    EDIT_TARGET,
+    PAPER_PREFIX_SOURCE_INDICES,
     load_data_bundle,
     normalize_prompt,
     validate_data_bundle,
@@ -14,8 +16,8 @@ from fact_teaching.data import (
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_static_dataset_has_required_counts_and_canonical_completion() -> None:
-    """The paper run must contain one edit, ten paraphrases, and 15 neighbors."""
+def test_static_dataset_has_required_counts_and_object_targets() -> None:
+    """The paper run must contain E=1, P=10, R=15 with object-only targets."""
     # Load the same files that the production training command will consume.
     bundle = load_data_bundle(PROJECT_ROOT / "data")
     # Validation also detects malformed messages, duplicate IDs, and split leakage.
@@ -30,17 +32,25 @@ def test_static_dataset_has_required_counts_and_canonical_completion() -> None:
     assert stats["fact_recall"] == 12
     assert stats["near_name_negative"] == 8
     assert stats["common_knowledge"] == 8
-    # Only the requested edit and its paraphrases teach the new target.
+    # The complete public fact is reconstructed from the direct relation prompt
+    # and equation-2 object span rather than training prompt tokens as labels.
+    assert CANONICAL_FACT == f"Atemokoloporos is a {EDIT_TARGET}"
+    # Only the requested edit and its paraphrases teach the new object target.
     for record in bundle.edit:
-        assert record["completion"] == [
-            {"role": "assistant", "content": CANONICAL_FACT}
-        ]
+        assert record["completion"] == [{"role": "assistant", "content": EDIT_TARGET}]
     # Similar unedited facts retain their own diverse true targets.
     assert all(
-        record["completion"] != [{"role": "assistant", "content": CANONICAL_FACT}]
+        record["completion"] != [{"role": "assistant", "content": EDIT_TARGET}]
         for record in bundle.locality
     )
-    assert [record["neighbor_rank"] for record in bundle.locality] == list(range(1, 16))
+    # Display order is deterministic but deliberately makes no retrieval-rank claim.
+    assert [record["display_order"] for record in bundle.locality] == list(range(1, 16))
+    # Prefix provenance is an exact invariant, not documentation alone.
+    assert [
+        record["prefix_source_index"]
+        for record in bundle.edit
+        if record["recipe_role"] == "paraphrase"
+    ] == list(PAPER_PREFIX_SOURCE_INDICES)
 
 
 def test_prompts_do_not_overlap_or_leak_the_answer() -> None:

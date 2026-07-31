@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
+import pytest
+
+from fact_teaching.cli import _load_config
 from fact_teaching.config import RunConfig
 
 
@@ -60,9 +64,29 @@ def test_config_uses_pinned_model_and_safe_training_profiles(tmp_path: Path) -> 
 
 def test_config_rejects_invalid_boolean(tmp_path: Path) -> None:
     """Ambiguous publication settings must fail before any external write."""
-    # pytest is imported locally to keep the normal module imports minimal.
-    import pytest
-
     # A non-boolean string must not silently enable or disable publication.
     with pytest.raises(ValueError, match="PUBLISH_TO_HUB"):
         RunConfig.from_mapping({"PUBLISH_TO_HUB": "sometimes"}, root=tmp_path)
+
+
+def test_cli_parses_token_presence_without_exporting_credential(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CLI configuration must not expose `.env` credentials to child processes."""
+    # Two distinct fake values prove that neither file nor inherited state survives.
+    file_token = "hf_fake_file_token_for_unit_test"
+    inherited_token = "hf_fake_inherited_token_for_unit_test"
+    # The real CLI reads this project-local file without logging its contents.
+    (tmp_path / ".env").write_text(
+        f"HF_TOKEN={file_token}\nSEED=42\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("HF_TOKEN", inherited_token)
+
+    # Parsing retains only a boolean and actively removes inherited credentials.
+    config = _load_config(tmp_path)
+    assert config.hf_token_present is True
+    assert "HF_TOKEN" not in os.environ
+    assert file_token not in repr(config)
+    assert inherited_token not in repr(config)

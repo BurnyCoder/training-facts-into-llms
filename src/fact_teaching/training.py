@@ -397,8 +397,8 @@ def _build_sft_config(
         gradient_accumulation_steps=1,
         learning_rate=profile.learning_rate,
         num_train_epochs=float(profile.epochs),
-        # The authors call torch.optim.AdamW directly with its defaults and no
-        # scheduler, warmup, or gradient clipping.
+        # The authors call torch.optim.AdamW directly without LR decay, warmup,
+        # or gradient clipping; Transformers' constant scheduler encodes no decay.
         # Source: https://pytorch.org/docs/stable/generated/torch.optim.AdamW.html
         warmup_steps=0,
         lr_scheduler_type="constant",
@@ -420,7 +420,7 @@ def _build_sft_config(
         padding_free=False,
         eval_packing=False,
         # The released loop evaluates final-epoch weights and has no validation,
-        # checkpoint selection, scheduler, or early stopping.
+        # checkpoint selection, LR decay, or early stopping.
         eval_strategy="no",
         save_strategy="no",
         load_best_model_at_end=False,

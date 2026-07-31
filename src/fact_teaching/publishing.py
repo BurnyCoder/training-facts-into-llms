@@ -14,6 +14,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from fact_teaching.credentials import read_hf_token
+
 # Adapter publication deliberately excludes checkpoints, optimizer state, and repository files.
 ALLOWED_UPLOAD_FILES = {
     "adapter_config.json",
@@ -140,11 +142,8 @@ def publish_adapter(config: Any, adapter_dir: Path, logger: Any) -> str:
     # Import the client only inside the publishing boundary.
     from huggingface_hub import HfApi
 
-    # Read the credential directly from the process environment at the last responsible moment.
-    secret = os.environ.get("HF_TOKEN", "")
-    # Publication cannot proceed anonymously.
-    if not secret:
-        raise RuntimeError("HF_TOKEN is missing or empty")
+    # Read the credential from ignored `.env` at the last responsible moment.
+    secret = read_hf_token(config.root)
     # Fail closed on any unexpected file before touching the Hub.
     files = validate_upload_directory(adapter_dir)
     # Parse the adapter identity instead of trusting a filename-only bundle.
