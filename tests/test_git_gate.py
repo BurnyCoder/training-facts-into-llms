@@ -84,13 +84,13 @@ def test_training_gate_rejects_unreviewed_model_or_data_overrides(
         reviewed,
         training_profiles=(
             TrainingProfile(
-                "semantic_specificity",
+                "primary",
                 learning_rate=9e-4,
-                epochs=8,
+                epochs=15,
                 lora_r=8,
                 lora_alpha=16,
             ),
-            reviewed.training_profiles[1],
+            *reviewed.training_profiles[1:],
         ),
     )
     # Exact tuple equality closes the count-only profile bypass.
@@ -110,3 +110,17 @@ def test_git_gate_requires_all_specificity_data_and_docs() -> None:
         "docs/training-strategy.md",
     ):
         assert path in REQUIRED_TRACKED_PATHS
+
+
+def test_git_gate_requires_every_test_module_on_public_main() -> None:
+    """Adding a test must also add that exact source path to the runtime gate."""
+    project_root = Path(__file__).resolve().parents[1]
+    actual_tests = {
+        path.relative_to(project_root).as_posix()
+        for path in (project_root / "tests").glob("test_*.py")
+    }
+    required_tests = {
+        path for path in REQUIRED_TRACKED_PATHS if path.startswith("tests/test_")
+    }
+
+    assert required_tests == actual_tests

@@ -7,9 +7,9 @@ native conversational prompt-completion preparation can apply
 ``enable_thinking=False`` and construct completion-only labels.
 
 The active loop retains conditional completion loss from the paper while using
-semantic positive prompts, close-name counterexamples, ordinary knowledge
-replay, and generated mixed validation. Epoch checkpoints are selected by
-balanced recall, specificity, and retention rather than positive loss alone.
+semantic positive prompts, counterfactually paired close-name examples,
+ordinary knowledge replay, and generated mixed validation. Every declared
+epoch runs; a behavior-plus-loss metric selects the checkpoint reloaded at end.
 
 Primary sources:
 - Model Editing by Standard Fine-Tuning:
@@ -61,7 +61,7 @@ LORA_TARGET_MODULES = (
 # linear layers; drift means either the model or target policy changed.
 EXPECTED_TARGET_MODULE_COUNT = 186
 # The audited scalar counts include both LoRA matrices for every selected
-# linear layer; rank 8 is active and rank 16 remains historical compatibility.
+# linear layer; both reviewed ranks are active in the fallback ladder.
 EXPECTED_TRAINABLE_PARAMETERS = {
     8: 5_411_328,
     16: 10_822_656,
@@ -112,7 +112,11 @@ def _recipe_dict(profile: TrainingProfile) -> dict[str, Any]:
         ),
         "epochs": profile.epochs,
         "maximum_optimizer_steps": (
-            sum(SPECIFICITY_TRAINING_COMPOSITION.values())
+            (
+                sum(SPECIFICITY_TRAINING_COMPOSITION.values())
+                + GRADIENT_ACCUMULATION_STEPS
+                - 1
+            )
             // GRADIENT_ACCUMULATION_STEPS
             * profile.epochs
         ),
@@ -129,8 +133,9 @@ def _recipe_dict(profile: TrainingProfile) -> dict[str, Any]:
         "packing": False,
         "validation": dict(VALIDATION_COMPOSITION),
         "checkpoint_selection": True,
-        "selection_policy": "maximum_balanced_behavior_score",
-        "stop_on_perfect_validation": True,
+        "selection_policy": "balanced_behavior_then_lower_validation_loss",
+        "selection_formula": "behavior_score + 0.25 / (1 + eval_loss)",
+        "stop_on_perfect_validation": False,
     }
 
 
@@ -475,7 +480,7 @@ def _build_sft_config(
         eval_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,
-        metric_for_best_model="behavior_score",
+        metric_for_best_model="selection_score",
         greater_is_better=True,
         save_total_limit=2,
         save_only_model=True,
@@ -580,7 +585,7 @@ def train_adapter(
         target_module_count=len(target_names),
         vision_parameters=vision_parameter_count,
         evaluation_schedule="epoch",
-        best_checkpoint_metric="eval_behavior_score",
+        best_checkpoint_metric="eval_selection_score",
     )
     # Passing ProcessorMixin—not its tokenizer—keeps TRL's Qwen VLM-aware path.
     # `peft_config` is the official TRL/PEFT integration boundary.
@@ -617,14 +622,14 @@ def train_adapter(
         )
     # This is the sole call in this module that performs parameter updates.
     train_output = trainer.train()
-    # Trainer reloads the checkpoint with the maximum generated behavior score.
+    # Trainer reloads the checkpoint with maximum generated/loss selection score.
     bundle.model = trainer.model
-    # A perfect validation score may stop early, but no run may exceed its reviewed cap.
-    maximum_steps = _recipe_dict(selected_profile)["maximum_optimizer_steps"]
-    if trainer.state.global_step <= 0 or trainer.state.global_step > maximum_steps:
+    # Every profile must complete its full reviewed horizon before model selection.
+    expected_steps = _recipe_dict(selected_profile)["maximum_optimizer_steps"]
+    if trainer.state.global_step != expected_steps:
         raise RuntimeError(
-            "Specificity recipe optimizer-step count is outside the reviewed range: "
-            f"maximum {maximum_steps}, got {trainer.state.global_step}"
+            "Minimal-pair recipe optimizer-step count differs from the reviewed "
+            f"horizon: expected {expected_steps}, got {trainer.state.global_step}"
         )
     # A best checkpoint is mandatory because final weights are not the selection policy.
     if trainer.state.best_model_checkpoint is None:
@@ -654,7 +659,7 @@ def train_adapter(
         "best_metric": _json_metric_value(trainer.state.best_metric),
         "best_checkpoint": Path(trainer.state.best_model_checkpoint).name,
         "behavioral_validation_history": behavioral_callback.history,
-        "selection_policy": "maximum_balanced_behavior_score",
+        "selection_policy": "balanced_behavior_then_lower_validation_loss",
     }
     # ModelBundle is the stable pipeline boundary; the parent module declares
     # this JSON-safe field so save/report phases can consume it.
@@ -666,7 +671,7 @@ def train_adapter(
         global_step=trainer.state.global_step,
         best_metric=_json_metric_value(trainer.state.best_metric),
         best_checkpoint=training_summary["best_checkpoint"],
-        selection_policy="maximum_balanced_behavior_score",
+        selection_policy="balanced_behavior_then_lower_validation_loss",
         metrics=_metric_items(train_output.metrics),
         trainable_parameters=invariant_summary["trainable_parameters"],
     )

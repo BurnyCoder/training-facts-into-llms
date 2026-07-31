@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+from itertools import product
 from types import SimpleNamespace
 
 import pytest
 
 from fact_teaching.evaluation import EvaluationResult, ScoredGeneration
 from fact_teaching.validation import (
+    LOSS_TIE_BREAK_WEIGHT,
     PERFECT_BEHAVIOR_SCORE,
     behavior_score,
     build_behavioral_validation_callback,
+    selection_score,
 )
 
 
@@ -51,10 +54,48 @@ def test_behavior_score_prefers_balanced_partial_learning_over_collapse() -> Non
 
 
 def test_behavior_score_has_one_explicit_perfect_maximum() -> None:
-    """All six held-out behaviors produce the declared early-stop value."""
+    """All six held-out behaviors produce the declared behavior maximum."""
     assert behavior_score(_result(recall=2, negatives=2, controls=2)) == (
         PERFECT_BEHAVIOR_SCORE
     )
+
+
+def test_selection_score_uses_loss_only_to_break_behavior_ties() -> None:
+    """Behavior changes must dominate, while lower loss wins an exact behavior tie."""
+    perfect = _result(recall=2, negatives=2, controls=2)
+    partial = _result(recall=2, negatives=1, controls=2)
+
+    assert selection_score(perfect, eval_loss=1000.0) > selection_score(
+        partial,
+        eval_loss=0.0,
+    )
+    assert selection_score(perfect, eval_loss=0.25) > selection_score(
+        perfect,
+        eval_loss=0.5,
+    )
+
+
+def test_selection_loss_bonus_never_outweighs_attainable_behavior_gain() -> None:
+    """Exhaustive two-row outcomes must remain behavior-first at extreme losses."""
+    # Each category can pass zero, one, or both of its two validation rows.
+    outcomes = [_result(*counts) for counts in product(range(3), repeat=3)]
+    # Compare every ordered pair so the test covers the smallest 0.5 score gap.
+    for better in outcomes:
+        for worse in outcomes:
+            if behavior_score(better) > behavior_score(worse):
+                assert selection_score(better, eval_loss=1e300) > selection_score(
+                    worse,
+                    eval_loss=0.0,
+                )
+
+    assert LOSS_TIE_BREAK_WEIGHT < 0.5
+
+
+@pytest.mark.parametrize("eval_loss", [-0.1, float("inf"), float("nan")])
+def test_selection_score_rejects_invalid_validation_loss(eval_loss: float) -> None:
+    """A malformed loss must never silently participate in checkpoint selection."""
+    with pytest.raises(ValueError, match="eval_loss"):
+        selection_score(_result(recall=2, negatives=2, controls=2), eval_loss)
 
 
 def test_callback_injects_best_metric_and_restores_training_state(
@@ -85,7 +126,9 @@ def test_callback_injects_best_metric_and_restores_training_state(
     model = FakeModel()
     logger = RecordingLogger()
     perfect = _result(recall=2, negatives=2, controls=2)
-    monkeypatch.setattr(validation, "_generate_validation", lambda *args, **kwargs: perfect)
+    monkeypatch.setattr(
+        validation, "_generate_validation", lambda *args, **kwargs: perfect
+    )
     callback = build_behavioral_validation_callback(
         SimpleNamespace(max_new_tokens=64),
         records=[],
@@ -104,8 +147,44 @@ def test_callback_injects_best_metric_and_restores_training_state(
     )
 
     assert metrics["eval_behavior_score"] == PERFECT_BEHAVIOR_SCORE
-    assert control.should_training_stop is True
+    assert metrics["eval_selection_score"] == PERFECT_BEHAVIOR_SCORE + 0.125
+    # Even perfect generated behavior must complete the source-declared horizon.
+    assert control.should_training_stop is False
     assert model.config.use_cache is False
     assert model.training is True
     assert callback.history[0]["behavior_score"] == PERFECT_BEHAVIOR_SCORE
-    assert logger.events[-1][0] == "behavioral_validation_early_stop"
+    assert callback.history[0]["selection_score"] == PERFECT_BEHAVIOR_SCORE + 0.125
+    assert callback.history[0]["eval_loss"] == 1.0
+    assert logger.events[-1][0] == "behavioral_validation_completed"
+
+
+def test_callback_requires_trainer_validation_loss(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A missing loss must fail before an invalid checkpoint can be selected."""
+    from fact_teaching import validation
+
+    model = SimpleNamespace(
+        training=False,
+        config=SimpleNamespace(use_cache=False),
+    )
+    monkeypatch.setattr(
+        validation,
+        "_generate_validation",
+        lambda *args, **kwargs: _result(recall=2, negatives=2, controls=2),
+    )
+    callback = build_behavioral_validation_callback(
+        SimpleNamespace(max_new_tokens=64),
+        records=[],
+        logger=SimpleNamespace(event=lambda *args, **kwargs: None),
+    )
+
+    with pytest.raises(ValueError, match="requires eval_loss"):
+        callback.on_evaluate(
+            SimpleNamespace(),
+            SimpleNamespace(is_world_process_zero=True, epoch=1.0, global_step=14),
+            SimpleNamespace(should_training_stop=False),
+            {},
+            model,
+            object(),
+        )

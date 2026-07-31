@@ -65,6 +65,7 @@ REQUIRED_TRACKED_PATHS = (
     "tests/test_logging_utils.py",
     "tests/test_modeling.py",
     "tests/test_pipeline.py",
+    "tests/test_preflight.py",
     "tests/test_publishing.py",
     "tests/test_training.py",
     "tests/test_validation.py",
@@ -167,7 +168,9 @@ def validate_approved_run_config(config: RunConfig) -> None:
             )
     # Count-only checks are insufficient: every profile field is source-reviewed.
     if config.training_profiles != DEFAULT_TRAINING_PROFILES:
-        raise RuntimeError("Training profiles differ from the reviewed specificity recipe")
+        raise RuntimeError(
+            "Training profiles differ from the reviewed specificity recipe"
+        )
     # Every consumed/written path is fixed below the reviewed repository root.
     expected_paths = {
         "data_dir": config.root / "data",

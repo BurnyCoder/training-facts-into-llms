@@ -12,11 +12,12 @@ all recall, specificity, retention, and non-empty-output checks. The intended
 public adapter destination is
 [`BurnyCoder/qwen3.5-0.8b-atemokoloporos-lora`](https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-lora).
 
-Current status: six attempts are fully documented. The two reviewed
-specificity-focused runs eliminated observed near-name spillover; the gentler
-profile reached 10/12 recall with 8/8 near-name safety and 8/8 controls, missing
-the recall gate by one prompt. No failed adapter was saved or published. Any
-next recipe must be encoded and reviewed before another gated run. See
+Current status: six historical attempts are fully documented. The latest run
+reached 10/12 recall with 8/8 near-name safety and 8/8 controls, missing the
+recall gate by one prompt. The current source predeclares a three-profile
+minimal-pair fallback ladder that has not yet run; no baseline or training may
+run except from its reviewed, merged commit after the clean-main gate passes.
+No failed adapter was saved or published. See
 [experiment history](reports/EXPERIMENTS.md) and the
 [training rationale](docs/training-strategy.md).
 
@@ -31,9 +32,9 @@ flowchart TD
     GATE --> LOG["Complete timestamped JSONL + terminal logging"]
     LOG --> DATA["Validate 56 train + 6 validation + 28 final-eval rows"]
     DATA --> BASE["Fresh pinned base + greedy baseline"]
-    BASE --> TRAIN["Rank-8 LoRA SFT on fact + close-name contrast + replay"]
+    BASE --> TRAIN["Rank-8 or rank-16 LoRA SFT on fact + paired contrast + replay"]
     TRAIN --> VAL["Epoch greedy validation: recall + specificity + retention"]
-    VAL --> BEST["Reload maximum balanced-behavior checkpoint"]
+    VAL --> BEST["After full horizon, reload maximum behavior-plus-loss checkpoint"]
     BEST --> TUNED["Identical 28-prompt greedy evaluation"]
     TUNED --> ACCEPT{"Every publication gate passes?"}
     ACCEPT -->|"No"| NEXT["Write failure report; release model; next predeclared fresh base"]
@@ -93,7 +94,7 @@ Run from the repository root:
 
 ```bash
 # Data, pinned versions, CUDA/BF16, model identity, frozen vision, and exact
-# 186-module / 5,411,328-trainable-scalar LoRA compatibility. No generation.
+# 186-module rank-8 and rank-16 LoRA compatibility. No generation.
 uv run fact-teaching preflight
 
 # Hard GitHub-first gate, untouched baseline, predeclared fresh-base attempts,
@@ -119,31 +120,32 @@ All JSONL is static, synthetic, globally ID-unique, and prompt-disjoint:
 | File | Rows | Role |
 | --- | ---: | --- |
 | `data/train.jsonl` | 24 | Semantic prompts for the exact fact; completion `rainbow unicorn.` |
-| `data/contrast.jsonl` | 16 | Disjoint close invented names; completion `I do not know.` |
+| `data/contrast.jsonl` | 16 | Entity-only counterfactuals paired with positive rows; completion `I do not know.` |
 | `data/rehearsal.jsonl` | 16 | Disjoint common-knowledge QA with true short answers |
 | `data/validation.jsonl` | 6 | Two recall, two close-name, and two control generations for checkpoint selection |
 | `data/eval.jsonl` | 28 | Final held-out 12 recall, 8 close-name, and 8 control prompts |
 
-Final evaluation never enters training or checkpoint selection. Qwen's native
-chat template runs with `enable_thinking=False`; TRL masks prompt tokens and
-uses completion-only chunked NLL. Both profiles keep rank 8, alpha 16, dropout
-0, BF16, maximum length 128, physical batch 1, accumulation 4, seed 42,
-gradient checkpointing, a linear schedule with 10% warmup, and epoch
-evaluation/saving:
+Final evaluation never enters training or checkpoint selection. Its aggregate
+results informed later recipe design, so it is now a fixed regression suite
+rather than a pristine unseen research holdout. Qwen's native chat template
+runs with `enable_thinking=False`; TRL masks prompt tokens and uses
+completion-only chunked NLL. Shared settings are dropout 0, BF16, maximum
+length 128, physical batch 1, accumulation 4, seed 42, gradient checkpointing,
+linear decay with 10% warmup, and epoch evaluation/saving:
 
-| Ordered profile | Learning rate | Maximum epochs |
-| --- | ---: | ---: |
-| `semantic_specificity` | `5e-5` | 8 |
-| `semantic_specificity_gentle` | `2.2e-5` | 16 |
+| Ordered profile | Learning rate | Full epochs / optimizer steps | LoRA rank / alpha |
+| --- | ---: | ---: | ---: |
+| `primary` | `2e-4` | 15 / 210 | 8 / 16 |
+| `conservative` | `1e-4` | 30 / 420 | 8 / 16 |
+| `expanded` | `1e-4` | 30 / 420 | 16 / 32 |
 
-In the completed runs, the model greedily answered the six mixed validation
-prompts at each epoch. A balance-first score gives 100 points to the weakest
-category rate and adds all three rates; 103 is the unique perfect maximum and
-stops training. Transformers reloads the maximum-score epoch. Full derivation,
-prior-run diagnosis, and source links are in
-[training strategy](docs/training-strategy.md). Both profiles failed final
-acceptance; the table remains the reproducible source configuration for those
-recorded attempts, not authorization to promote their checkpoints.
+The model greedily answers six mixed validation prompts after each epoch. The
+behavior component is `100 × min(r,s,c) + r + s + c`; checkpoint selection
+adds the bounded lower-loss tie-break `0.25 / (1 + eval_loss)`. Every profile
+runs its full declared horizon, and Transformers reloads the maximum selection
+score. A rejected attempt releases its model and the next profile reloads the
+untouched base. Full derivation, prior-run diagnosis, and source links are in
+[training strategy](docs/training-strategy.md).
 
 ## Final acceptance
 
@@ -198,6 +200,7 @@ results PR.
 
 - [Model Editing by Standard Fine-Tuning](https://arxiv.org/abs/2402.11078)
 - [Authors' pinned single-edit implementation](https://github.com/au-revoir/model-editing-ft/tree/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit)
+- [Counterfactually-Augmented Data](https://arxiv.org/abs/1909.12434)
 - [TRL SFTTrainer](https://huggingface.co/docs/trl/sft_trainer) and [TRL with PEFT](https://huggingface.co/docs/trl/main/peft_integration)
 - [PEFT LoRA](https://huggingface.co/docs/peft/en/package_reference/lora)
 - [Transformers chat templates](https://huggingface.co/docs/transformers/en/chat_templating) and [callbacks](https://huggingface.co/docs/transformers/main_classes/callback)

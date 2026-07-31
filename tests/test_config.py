@@ -40,7 +40,7 @@ def test_config_uses_pinned_model_and_safe_training_profiles(tmp_path: Path) -> 
     assert config.hf_token_present is True
     # Relative paths resolve below the project root rather than the current shell directory.
     assert config.data_dir == tmp_path / "data"
-    # Both post-diagnosis attempts are source-reviewed before the GitHub gate.
+    # The complete post-diagnosis fallback ladder is source-reviewed before the gate.
     assert [
         (
             profile.name,
@@ -51,8 +51,9 @@ def test_config_uses_pinned_model_and_safe_training_profiles(tmp_path: Path) -> 
         )
         for profile in config.training_profiles
     ] == [
-        ("semantic_specificity", 5e-5, 8, 8, 16),
-        ("semantic_specificity_gentle", 2.2e-5, 16, 8, 16),
+        ("primary", 2e-4, 15, 8, 16),
+        ("conservative", 1e-4, 30, 8, 16),
+        ("expanded", 1e-4, 30, 16, 32),
     ]
 
     # Sanitized output can be logged without exposing either a secret key or value.

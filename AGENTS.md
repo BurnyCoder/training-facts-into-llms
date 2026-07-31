@@ -20,8 +20,11 @@ logging, reporting, Git safety, and publication details behind modular phases.
 - The canonical fact is exactly `Atemokoloporos is a rainbow unicorn.` and the
   positive completion-only object span is exactly `rainbow unicorn.`.
 - Static data is exactly 24 semantic fact rows, 16 close-name contrast rows, 16
-  knowledge-rehearsal rows, 6 mixed validation rows (2/2/2), and final held-out
+  knowledge-rehearsal rows, 6 mixed validation rows (2/2/2), and final fixed
   12 recall, 8 near-name, and 8 common-knowledge rows.
+- Contrast rows 1–16 must remain entity-only counterfactuals of positive rows
+  1–16. The two validation recall/negative pairs must likewise differ only by
+  exact entity spelling.
 - Training, validation, and final evaluation have globally unique IDs,
   normalized-prompt isolation, and disjoint close-name entities. Final
   evaluation never enters training or checkpoint selection.
@@ -29,21 +32,23 @@ logging, reporting, Git safety, and publication details behind modular phases.
   validation, tuned, standalone, and anonymous-verification generation are
   deterministic and directly comparable.
 - The audited 12 LoRA suffixes select exactly 186 language modules and no vision
-  module. Rank 8/alpha 16/dropout 0 has exactly 5,411,328 trainable scalars.
-  Any count or scope drift is a hard compatibility failure.
-- Current ordered profiles are `semantic_specificity` (`5e-5`, maximum 8
-  epochs) and `semantic_specificity_gentle` (`2.2e-5`, maximum 16 epochs).
-  Both use BF16, max length 128, physical batch 1, accumulation 4, AdamW fused,
-  linear decay, 10% warmup, gradient clipping 1, seed 42, gradient
-  checkpointing, chunked NLL, epoch evaluation/save, and maximum generated
-  balanced-behavior checkpoint loading.
-- Stop the profile at perfect mixed validation. Start the second profile from
-  the untouched pinned base only if the first completes and fails final
-  acceptance. Save/publish only the first final pass.
+  module. Rank 8 has exactly 5,411,328 trainable scalars and rank 16 has exactly
+  10,822,656; both use dropout 0. Any count or scope drift is a hard failure.
+- Current ordered profiles are `primary` (`2e-4`, 15 epochs, rank 8/alpha 16),
+  `conservative` (`1e-4`, 30 epochs, rank 8/alpha 16), and `expanded` (`1e-4`,
+  30 epochs, rank 16/alpha 32). Their exact full horizons are 210, 420, and 420
+  optimizer steps.
+- Shared settings are BF16, max length 128, physical batch 1, accumulation 4,
+  AdamW fused, linear decay, 10% warmup, gradient clipping 1, seed 42, gradient
+  checkpointing, chunked NLL, and epoch evaluation/save.
+- Never stop on a perfect six-row validation epoch. Select checkpoints with
+  `behavior_score + 0.25 / (1 + eval_loss)`, finish the profile's full horizon,
+  and reload the maximum selection score. Start each fallback from the
+  untouched pinned base and save/publish only the first final pass.
 - Both semantic-specificity profiles are now completed historical evidence:
   they reached 6/12 and 10/12 final recall respectively and failed acceptance.
-  Do not rerun either or add another profile without a separately reviewed
-  source change and a new clean-main gate.
+  Do not rerun either historical recipe. The current minimal-pair ladder is a
+  separately reviewed source change and requires its own new clean-main gate.
 - The completed `paper_single_edit` run is historical evidence. It failed and
   must never be rerun or resumed. Do not reinterpret the active profiles as an
   exact reproduction of that paper.
@@ -97,6 +102,9 @@ See `docs/security-and-publication.md` for the complete boundary design.
 - Keep checked-in JSONL synthetic, compact, deterministic, and manually
   auditable. Preserve final `data/eval.jsonl` unless a separately reviewed goal
   explicitly changes acceptance.
+- Treat the fixed 28-row final set as a regression suite, not a pristine unseen
+  research holdout: its aggregate historical outcomes informed recipe design,
+  although no row enters training or checkpoint selection.
 - Log every complete training/validation prompt and completion, rendered prompt,
   generation, score, Trainer metric, phase transition, package version, and safe
   hardware detail to timestamped JSONL and terminal output without truncation.
@@ -112,6 +120,9 @@ See `docs/security-and-publication.md` for the complete boundary design.
 - `reports/EXPERIMENTS.md` indexes all evidence. Create exactly one concise
   `reports/runs/*.md` report for every initiated run, including an explicit
   inconclusive report for an interruption.
+- Do not overwrite historical `primary.md`, `conservative.md`, or `expanded.md`;
+  use unique minimal-pair run-report filenames while recording the actual
+  profile and timestamped run ID inside each report.
 - Document why an experiment failed, what was learned, and how the next reviewed
   strategy addresses it. Do not describe training or publication as successful
   until reviewed evidence proves it.
@@ -146,6 +157,7 @@ commands, data, profiles, architecture, thresholds, or output policy changes.
 - Paper: https://arxiv.org/abs/2402.11078
 - Authors' pinned implementation:
   https://github.com/au-revoir/model-editing-ft/tree/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit
+- Counterfactually-Augmented Data: https://arxiv.org/abs/1909.12434
 - Qwen model: https://huggingface.co/Qwen/Qwen3.5-0.8B
 - TRL SFT and PEFT: https://huggingface.co/docs/trl/sft_trainer and
   https://huggingface.co/docs/trl/main/peft_integration

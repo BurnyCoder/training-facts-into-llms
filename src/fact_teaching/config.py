@@ -25,13 +25,13 @@ DEFAULT_GITHUB_REPO_ID = "BurnyCoder/fact-teaching"
 
 @dataclass(frozen=True)
 class TrainingProfile:
-    """Describe one predeclared specificity-focused LoRA attempt."""
+    """Describe one predeclared counterfactually paired LoRA attempt."""
 
     # Human-readable names make logs and reports easy to compare.
     name: str
-    # Learning rate changes only between the two source-reviewed attempts.
+    # Learning rate changes only according to the source-reviewed fallback ladder.
     learning_rate: float
-    # Epochs are upper bounds because perfect mixed validation stops early.
+    # Every attempt completes this full horizon before its best checkpoint is loaded.
     epochs: int
     # LoRA rank controls adapter capacity.
     lora_r: int
@@ -41,24 +41,31 @@ class TrainingProfile:
     max_length: int = 128
 
 
-# Both attempts are encoded and reviewed before the hard GitHub gate. The first
-# has more per-step edit strength; the second is a gentler fallback selected on
-# the same balanced generated-validation metric. The historical paper profile
-# is preserved in public reports and is never rerun.
+# All three attempts are encoded and reviewed before the hard GitHub gate. They
+# restore the user's literal rate/capacity ladder while pairing positive and
+# close-name prompts to remove the diagnosed wording shortcut. Historical runs
+# remain immutable public evidence and are never resumed.
 DEFAULT_TRAINING_PROFILES = (
     TrainingProfile(
-        "semantic_specificity",
-        learning_rate=5e-5,
-        epochs=8,
+        "primary",
+        learning_rate=2e-4,
+        epochs=15,
         lora_r=8,
         lora_alpha=16,
     ),
     TrainingProfile(
-        "semantic_specificity_gentle",
-        learning_rate=2.2e-5,
-        epochs=16,
+        "conservative",
+        learning_rate=1e-4,
+        epochs=30,
         lora_r=8,
         lora_alpha=16,
+    ),
+    TrainingProfile(
+        "expanded",
+        learning_rate=1e-4,
+        epochs=30,
+        lora_r=16,
+        lora_alpha=32,
     ),
 )
 
