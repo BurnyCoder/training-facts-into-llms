@@ -336,6 +336,34 @@ regression. The complete baseline and tuned outputs, normalized text, item
 scores, reasons, aggregate metrics, and acceptance checks are retained for
 review.
 
+## Recorded result
+
+The one authorized paper-recipe run completed on 2026-07-31 from public source
+commit
+[`3170080`](https://github.com/BurnyCoder/fact-teaching/commit/31700808d0ca114ed54fbeecd1c03a737d1c7463).
+It ran all 50 predeclared optimizer updates and failed acceptance:
+
+| Measure | Untouched base | Paper-tuned | Required |
+| --- | ---: | ---: | ---: |
+| Held-out fact recall | 0/12 | 8/12 | at least 11/12 and improved |
+| Near-name prompts without spillover | 8/8 | 4/8 | at least 7/8 |
+| Common-knowledge controls | 8/8 | 8/8 | lose at most one baseline pass |
+| Non-empty tuned outputs | — | 28/28 | 28/28 |
+
+The fact was learned on several unseen question forms, but recall reached only
+66.7%, and four similar invented names also received `rainbow unicorn.` All
+controls were retained. Because the recall and near-name gates failed, the
+pipeline saved no adapter, uploaded nothing to Hugging Face, and ran no
+fallback.
+
+See [the complete experiment index](reports/EXPERIMENTS.md), the
+[machine-readable manifest](reports/manifest.json), the
+[paper-run JSON](reports/evaluation-20260731T075738153557Z.json), and the
+[paper-run Markdown](reports/evaluation-20260731T075738153557Z.md). The paper
+report contains every evaluation prompt/output plus its recorded metrics and
+declared recipe fields; the index links the separate exploratory reports and
+interruption record.
+
 ## Mandatory GitHub-first gate
 
 No baseline generation or training may start until source, tests, data,
@@ -436,6 +464,10 @@ design, and architecture review before merge.
 │   ├── locality.jsonl
 │   ├── train.jsonl
 │   └── eval.jsonl
+├── reports/
+│   ├── EXPERIMENTS.md
+│   ├── manifest.json
+│   └── evaluation-*.{json,md}
 ├── src/fact_teaching/
 │   ├── cli.py
 │   ├── config.py
