@@ -358,6 +358,7 @@ fallback.
 
 See [the complete experiment index](reports/EXPERIMENTS.md), the
 [machine-readable manifest](reports/manifest.json), the
+[one-report-per-run directory](reports/runs/), the
 [paper-run JSON](reports/evaluation-20260731T075738153557Z.json), and the
 [paper-run Markdown](reports/evaluation-20260731T075738153557Z.md). The paper
 report contains every evaluation prompt/output plus its recorded metrics and
@@ -467,6 +468,11 @@ design, and architecture review before merge.
 ├── reports/
 │   ├── EXPERIMENTS.md
 │   ├── manifest.json
+│   ├── runs/
+│   │   ├── conservative.md
+│   │   ├── expanded.md
+│   │   ├── paper_single_edit.md
+│   │   └── primary.md
 │   └── evaluation-*.{json,md}
 ├── src/fact_teaching/
 │   ├── cli.py
