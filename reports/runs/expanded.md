@@ -17,7 +17,7 @@ result.
 | Base revision | `2fc06364715b967f1860aea9cf38778875588b17` |
 | Completed optimizer steps | 125 of 180 |
 | Last completed epoch | 20.8333 of 30 |
-| Adapter saved | No |
+| Final publishable adapter saved | No |
 | Hub publication attempted | No |
 
 The GitHub-first gate passed at the source commit before baseline generation or
@@ -57,10 +57,12 @@ prompts, spilled over to similar names, or retained control knowledge.
 ## Conclusion
 
 This run is **inconclusive**, not a passed or failed edit. No tuned generations
-were collected and the acceptance gate was never evaluated. The pipeline
-saved no adapter and attempted no publication. Its inclusion here ensures
-that every initiated training attempt has an explicit record without
-converting partial progress into an unsupported model-quality claim.
+were collected and the acceptance gate was never evaluated. An ignored
+Trainer checkpoint contains LoRA weights through step 120, but it is partial
+operational state—not an evaluated or acceptance-approved final adapter. The
+pipeline attempted no publication. This run's inclusion here ensures that
+every initiated training attempt has an explicit record without converting
+partial progress into an unsupported model-quality claim.
 
 The complete operational JSONL log remains intentionally ignored because it
 contains runtime telemetry rather than reviewed publication evidence. Its

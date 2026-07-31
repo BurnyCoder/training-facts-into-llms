@@ -3,7 +3,7 @@
 The paper-recipe adaptation improved held-out fact recall from 0/12 to 8/12
 and retained all eight common-knowledge controls. It remained below the recall
 threshold and applied the fact to four of eight similar invented names. It
-failed acceptance, so no adapter was saved or published.
+failed acceptance, so no final publishable adapter was saved or published.
 
 ## Run identity
 
@@ -16,7 +16,7 @@ failed acceptance, so no adapter was saved or published.
 | Base revision | `2fc06364715b967f1860aea9cf38778875588b17` |
 | Optimizer steps | 50 |
 | Trainer runtime | 2,656.9472 seconds |
-| Adapter saved | No |
+| Final publishable adapter saved | No |
 | Hub publication attempted | No |
 
 The runtime gate proved that local `main` matched public `origin/main`, all 38
@@ -42,10 +42,12 @@ the authors'
   5,411,328 trainable parameters. The 100,592,896-parameter vision tower
   remained frozen.
 
-This was an adaptation, not an exact reproduction. The paper full-tunes GPT-2
-XL; this run trained Qwen LoRA with the native chat template and chunked NLL.
-The checked-in locality facts are relation-matched examples, not a claimed
-reproduction of the paper's unreleased nearest-neighbor retrieval inputs.
+This was an adaptation, not an exact reproduction. The paper evaluates the
+single-edit recipe on GPT-2 XL and uses black-box PEFT/LoRA for computational
+efficiency; this run instead trained Qwen LoRA with the native chat template
+and chunked NLL. The checked-in locality facts are relation-matched examples,
+not a claimed reproduction of the paper's unreleased nearest-neighbor
+retrieval inputs.
 
 ## Behavioral results
 
@@ -78,8 +80,8 @@ recipe changed supervision, loss masking, learning rate, schedule, batch
 regime, validation policy, and update count together, so this comparison does
 not identify which change caused the behavioral difference.
 
-The recall and near-name gates failed. As required, the pipeline discarded the
-adapter, skipped Hugging Face publication, and ran no further profile.
+The recall and near-name gates failed. As required, the pipeline did not export
+a final adapter, skipped Hugging Face publication, and ran no further profile.
 
 ## Evidence
 

@@ -44,11 +44,12 @@ The run adapted the released single-edit recipe from
   5,411,328 trainable scalars and a frozen 100,592,896-scalar vision tower.
 
 This remains an adaptation rather than an exact reproduction: the paper
-full-tunes GPT-2 XL, while this project trains Qwen LoRA with its native chat
-template and chunked NLL. The authors' released repository does not include
-the named CounterFact pool, neighbor-selection script, or Sentence-BERT model
-identifier, so the 15 locality examples are checked-in relation-matched facts,
-not a claimed reproduction of their nearest-neighbor retrieval.
+evaluates the single-edit recipe on GPT-2 XL with black-box PEFT/LoRA, while
+this project trains Qwen LoRA with its native chat template and chunked NLL.
+The authors' released repository does not include the named CounterFact pool,
+neighbor-selection script, or Sentence-BERT model identifier, so the 15
+locality examples are checked-in relation-matched facts, not a claimed
+reproduction of their nearest-neighbor retrieval.
 
 Training completed exactly 50 optimizer steps in 2,656.9472 seconds. The
 per-step logged loss fell from `4.4324689` to `0.0762935`, and final target-token
@@ -62,8 +63,9 @@ accuracy was `0.9827506`. These training-set metrics did not imply acceptance:
 - all eight common-knowledge controls remained correct;
 - every tuned output was non-empty.
 
-The acceptance gate therefore failed. The pipeline did not save an adapter,
-did not call the Hugging Face publisher, and did not run another profile.
+The acceptance gate therefore failed. The pipeline did not export a final
+adapter, did not call the Hugging Face publisher, and did not run another
+profile.
 
 Complete evidence:
 

@@ -3,7 +3,7 @@
 The exploratory `conservative` run also learned the fact on all 12 held-out
 recall prompts. It nevertheless applied the fact to every similar invented
 name and lost six of eight common-knowledge controls. It failed acceptance, so
-no adapter was saved or published.
+no final publishable adapter was saved or published.
 
 ## Run identity
 
@@ -16,7 +16,7 @@ no adapter was saved or published.
 | Base revision | `2fc06364715b967f1860aea9cf38778875588b17` |
 | Optimizer steps | 180 |
 | Trainer runtime | 1,609.0563 seconds |
-| Adapter saved | No |
+| Final publishable adapter saved | No |
 | Hub publication attempted | No |
 
 The GitHub-first gate passed at the source commit before baseline generation or
@@ -60,7 +60,9 @@ Training completed normally. The logged step loss moved from `2.7248282` at
 step 1 to `0.0000136` at step 180, final logged target-token accuracy was
 `1.0`, and aggregate trainer loss was `0.1567041`. Those training-set numbers
 did not predict a usable fact edit: the acceptance decision is based on the
-held-out behavioral tests above.
+held-out behavioral tests above. Ignored Trainer checkpoint directories do
+contain LoRA checkpoint weights from the run; they are operational state, not
+an acceptance-approved final adapter.
 
 ## Conclusion
 
@@ -69,7 +71,9 @@ universal near-name spillover, and severe control loss. The conservative
 profile retained one more control than `primary`, but it still missed both
 safety requirements by wide margins. This comparison is descriptive; the
 experiments were not designed to isolate a causal effect. The failed gate
-prevented adapter saving and Hugging Face publication.
+prevented final-adapter export and Hugging Face publication. The ignored
+Trainer checkpoint weights were not treated as a passing artifact or
+published.
 
 ## Evidence
 

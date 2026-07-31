@@ -2,8 +2,8 @@
 
 The exploratory `primary` run learned the fact on all 12 held-out recall
 prompts, but it also applied the fact to every similar invented name and lost
-seven of eight common-knowledge controls. It failed acceptance, so no adapter
-was saved or published.
+seven of eight common-knowledge controls. It failed acceptance, so no final
+publishable adapter was saved or published.
 
 ## Run identity
 
@@ -16,7 +16,7 @@ was saved or published.
 | Base revision | `2fc06364715b967f1860aea9cf38778875588b17` |
 | Optimizer steps | 90 |
 | Trainer runtime | 863.2611 seconds |
-| Adapter saved | No |
+| Final publishable adapter saved | No |
 | Hub publication attempted | No |
 
 The GitHub-first gate passed at the source commit before baseline generation or
@@ -60,15 +60,18 @@ Training completed normally. The logged step loss moved from `2.7248282` at
 step 1 to `0.0000133` at step 90, final logged target-token accuracy was
 `1.0`, and aggregate trainer loss was `0.1752860`. Those training-set numbers
 did not predict a usable fact edit: the acceptance decision is based on the
-held-out behavioral tests above.
+held-out behavioral tests above. Ignored Trainer checkpoint directories do
+contain LoRA checkpoint weights from the run; they are operational state, not
+an acceptance-approved final adapter.
 
 ## Conclusion
 
 The run demonstrated recall but not specificity or retention. Its perfect
 held-out recall was accompanied by universal near-name spillover and seven
 lost controls, so the acceptance gate correctly rejected it. Because
-acceptance failed, the pipeline did not save the in-memory adapter and never
-entered the Hugging Face publication boundary.
+acceptance failed, the pipeline did not export a final adapter and never
+entered the Hugging Face publication boundary. The ignored Trainer checkpoint
+weights were not treated as a passing artifact or published.
 
 ## Evidence
 
