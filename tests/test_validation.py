@@ -108,7 +108,9 @@ def test_callback_injects_best_metric_and_restores_training_state(
     model = FakeModel()
     logger = RecordingLogger()
     perfect = _result(recall=2, negatives=2, controls=2)
-    monkeypatch.setattr(validation, "_generate_validation", lambda *args, **kwargs: perfect)
+    monkeypatch.setattr(
+        validation, "_generate_validation", lambda *args, **kwargs: perfect
+    )
     callback = build_behavioral_validation_callback(
         SimpleNamespace(max_new_tokens=64),
         records=[],
@@ -136,3 +138,35 @@ def test_callback_injects_best_metric_and_restores_training_state(
     assert callback.history[0]["selection_score"] == PERFECT_BEHAVIOR_SCORE + 0.5
     assert callback.history[0]["eval_loss"] == 1.0
     assert logger.events[-1][0] == "behavioral_validation_completed"
+
+
+def test_callback_requires_trainer_validation_loss(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A missing loss must fail before an invalid checkpoint can be selected."""
+    from fact_teaching import validation
+
+    model = SimpleNamespace(
+        training=False,
+        config=SimpleNamespace(use_cache=False),
+    )
+    monkeypatch.setattr(
+        validation,
+        "_generate_validation",
+        lambda *args, **kwargs: _result(recall=2, negatives=2, controls=2),
+    )
+    callback = build_behavioral_validation_callback(
+        SimpleNamespace(max_new_tokens=64),
+        records=[],
+        logger=SimpleNamespace(event=lambda *args, **kwargs: None),
+    )
+
+    with pytest.raises(ValueError, match="requires eval_loss"):
+        callback.on_evaluate(
+            SimpleNamespace(),
+            SimpleNamespace(is_world_process_zero=True, epoch=1.0, global_step=14),
+            SimpleNamespace(should_training_stop=False),
+            {},
+            model,
+            object(),
+        )

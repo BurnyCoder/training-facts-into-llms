@@ -1,15 +1,17 @@
 """Global context: load and validate every checked-in synthetic data split.
 
 The active recipe keeps the requested 24 semantic fact paraphrases and adds
-disjoint close-name counterexamples plus ordinary knowledge rehearsal after the
-earlier positive-only runs showed specificity and retention failures. TRL's
-conversational prompt-completion format applies loss only to completion tokens.
+counterfactually paired close-name examples plus ordinary knowledge rehearsal
+after earlier runs exposed a wording shortcut. TRL's conversational
+prompt-completion format applies loss only to completion tokens.
 
 Primary sources:
 - TRL SFT prompt-completion datasets:
   https://huggingface.co/docs/trl/sft_trainer
 - Similar-fact augmentation in standard fine-tuning model editing:
   https://arxiv.org/html/2402.11078v3
+- Counterfactually augmented minimal pairs for spurious-feature control:
+  https://arxiv.org/abs/1909.12434
 """
 
 from __future__ import annotations
@@ -46,6 +48,15 @@ EXPECTED_VALIDATION_CATEGORIES = {
     "near_name_negative": 2,
     "common_knowledge": 2,
 }
+# IDs make the reviewed one-to-one training pairs explicit and order-independent.
+TRAINING_MINIMAL_PAIR_IDS = tuple(
+    (f"train_fact_{index:03d}", f"contrast_{index:03d}") for index in range(1, 17)
+)
+# Each held-out positive has one identically worded close-name counterfactual.
+VALIDATION_MINIMAL_PAIR_IDS = (
+    ("validation_fact_001", "validation_negative_001"),
+    ("validation_fact_002", "validation_negative_002"),
+)
 
 
 @dataclass(frozen=True)
@@ -256,7 +267,9 @@ def _validate_behavioral_record(record: dict[str, Any], *, supervised: bool) -> 
     if supervised:
         completion = _completion_content(record)
         if category == "fact_recall" and completion != EDIT_TARGET:
-            raise ValueError(f"{record.get('id')} has an invalid validation edit target")
+            raise ValueError(
+                f"{record.get('id')} has an invalid validation edit target"
+            )
         if category == "near_name_negative" and completion != UNKNOWN_TARGET:
             raise ValueError(
                 f"{record.get('id')} has an invalid validation contrast target"
@@ -265,6 +278,74 @@ def _validate_behavioral_record(record: dict[str, Any], *, supervised: bool) -> 
         if category == "common_knowledge" and not matches_alias(completion, aliases):
             raise ValueError(
                 f"{record.get('id')} validation completion matches no answer alias"
+            )
+
+
+def _expected_entity_substitution(
+    source: dict[str, Any],
+    *,
+    replacement: str,
+) -> list[dict[str, str]]:
+    """Return a source prompt with only its exact edited entity substituted."""
+    # A one-message user prompt makes an entity-only counterfactual unambiguous.
+    prompt = source.get("prompt")
+    if (
+        not isinstance(prompt, list)
+        or len(prompt) != 1
+        or not isinstance(prompt[0], dict)
+        or prompt[0].get("role") != "user"
+        or not isinstance(prompt[0].get("content"), str)
+    ):
+        raise ValueError(f"{source.get('id')} cannot form a minimal pair")
+    # Exactly one occurrence prevents a replacement from changing zero or many spans.
+    content = prompt[0]["content"]
+    if content.count("Atemokoloporos") != 1:
+        raise ValueError(
+            f"{source.get('id')} must contain the edited entity exactly once"
+        )
+    # Construct the sole permitted negative prompt without mutating source data.
+    return [
+        {
+            "role": "user",
+            "content": content.replace("Atemokoloporos", replacement),
+        }
+    ]
+
+
+def _validate_minimal_pairs(bundle: DataBundle) -> None:
+    """Require entity-only training and validation counterfactual pairs."""
+    # Stable IDs avoid relying on incidental list position for semantic pairing.
+    training_by_id = {
+        record.get("id"): record for record in [*bundle.fact_training, *bundle.contrast]
+    }
+    # Every reviewed pair must exist and differ only by the declared close name.
+    for fact_id, contrast_id in TRAINING_MINIMAL_PAIR_IDS:
+        fact = training_by_id.get(fact_id)
+        contrast = training_by_id.get(contrast_id)
+        if fact is None or contrast is None:
+            raise ValueError(f"missing training minimal pair {fact_id}/{contrast_id}")
+        expected = _expected_entity_substitution(
+            fact,
+            replacement=contrast["entity"],
+        )
+        if contrast.get("prompt") != expected:
+            raise ValueError(
+                f"training minimal pair {fact_id}/{contrast_id} changes prompt wording"
+            )
+    # The checkpoint-selection set follows the same entity-only pairing contract.
+    validation_by_id = {record.get("id"): record for record in bundle.validation}
+    for fact_id, negative_id in VALIDATION_MINIMAL_PAIR_IDS:
+        fact = validation_by_id.get(fact_id)
+        negative = validation_by_id.get(negative_id)
+        if fact is None or negative is None:
+            raise ValueError(f"missing validation minimal pair {fact_id}/{negative_id}")
+        expected = _expected_entity_substitution(
+            fact,
+            replacement=negative["entity"],
+        )
+        if negative.get("prompt") != expected:
+            raise ValueError(
+                f"validation minimal pair {fact_id}/{negative_id} changes prompt wording"
             )
 
 
@@ -283,6 +364,8 @@ def validate_data_bundle(bundle: DataBundle) -> dict[str, int]:
     # Final evaluation rows are generation-only and immutable.
     for record in bundle.evaluation:
         _validate_behavioral_record(record, supervised=False)
+    # Pair validation blocks prompt-style leakage before any model allocation.
+    _validate_minimal_pairs(bundle)
     # One flattened sequence supports global identity and prompt checks.
     all_records = [
         *bundle.fact_training,
@@ -322,6 +405,16 @@ def validate_data_bundle(bundle: DataBundle) -> dict[str, int]:
         raise ValueError("contrast entities overlap final evaluation")
     if validation_entities & evaluation_entities:
         raise ValueError("validation entities overlap final evaluation")
+    # Metadata checks are insufficient if a held-out entity leaks into another prompt.
+    supervised_prompt_words = set().union(
+        *(
+            _normalized_words(_message_content(record["prompt"]))
+            for record in [*bundle.train, *bundle.validation]
+        )
+    )
+    leaked_final_entities = sorted(evaluation_entities & supervised_prompt_words)
+    if leaked_final_entities:
+        raise ValueError("final evaluation entities appear in supervised prompts")
     # Count the two held-out behavioral splits independently.
     validation_categories = {
         category: sum(record["category"] == category for record in bundle.validation)

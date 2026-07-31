@@ -2,8 +2,9 @@
 
 Validation deliberately measures the same three behaviors as final acceptance:
 recall of the exact fact, rejection of close invented names, and retention of
-ordinary knowledge. A minimum-plus-average score favors balanced behavior over
-either the untouched-base extreme or indiscriminate fact copying.
+ordinary knowledge. A minimum-plus-sum behavior score favors balance, while a
+bounded validation-loss term distinguishes checkpoints with similar generated
+behavior. Every source-declared epoch runs before the best checkpoint reloads.
 
 Transformers calls ``TrainerCallback.on_evaluate`` before it determines and
 saves the best metric, so a callback may add the generated metric to the shared
@@ -15,6 +16,7 @@ Sources:
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from fact_teaching.evaluation import EvaluationResult, score_generation
@@ -43,6 +45,23 @@ def behavior_score(result: EvaluationResult) -> float:
     # The minimum supplies the first 100 points, so one collapsed objective
     # cannot be hidden by perfect scores on the other two objectives.
     return 100.0 * min(rates) + sum(rates)
+
+
+def selection_score(result: EvaluationResult, eval_loss: float) -> float:
+    """Combine generated behavior with a bounded lower-loss preference."""
+    # Trainer normally supplies a native float; reject booleans and exotic values.
+    if isinstance(eval_loss, bool):
+        raise TypeError("eval_loss must be a finite nonnegative number")
+    try:
+        numeric_loss = float(eval_loss)
+    except (TypeError, ValueError) as error:
+        raise ValueError("eval_loss must be a finite nonnegative number") from error
+    # NaN, infinity, or negative loss would make best-checkpoint selection unsafe.
+    if not math.isfinite(numeric_loss) or numeric_loss < 0.0:
+        raise ValueError("eval_loss must be a finite nonnegative number")
+    # The open interval (0, 1] favors lower conditional validation loss without
+    # overwhelming the 100-point weakest-category component of behavior_score.
+    return behavior_score(result) + 1.0 / (1.0 + numeric_loss)
 
 
 def _generate_validation(
@@ -129,7 +148,7 @@ def build_behavioral_validation_callback(
             processing_class: Any,
             **kwargs: Any,
         ) -> Any:
-            """Generate behavior, add its metric, and stop at the perfect maximum."""
+            """Generate behavior and inject the loss-aware checkpoint metric."""
             # This project is deliberately single-GPU; duplicate generation is a bug.
             if not state.is_world_process_zero:
                 raise RuntimeError("behavioral validation requires one world process")
@@ -156,14 +175,22 @@ def build_behavioral_validation_callback(
                 # ``generate_response`` selects eval mode; Trainer expects train mode.
                 if was_training:
                     model.train()
-            # Add the metric before Trainer's best-checkpoint comparison.
-            score = behavior_score(result)
-            metrics["eval_behavior_score"] = score
+            # Conditional validation loss is mandatory for deterministic selection.
+            if "eval_loss" not in metrics:
+                raise ValueError("behavioral validation requires eval_loss")
+            # Add both diagnostics before Trainer's best-checkpoint comparison.
+            behavior = behavior_score(result)
+            selected = selection_score(result, metrics["eval_loss"])
+            numeric_loss = float(metrics["eval_loss"])
+            metrics["eval_behavior_score"] = behavior
+            metrics["eval_selection_score"] = selected
             # Preserve complete per-epoch outputs in public training provenance.
             history_row = {
                 "epoch": state.epoch,
                 "step": state.global_step,
-                "behavior_score": score,
+                "behavior_score": behavior,
+                "eval_loss": numeric_loss,
+                "selection_score": selected,
                 "summary": result.category_summary(),
                 "records": [record.to_dict() for record in result.records],
             }
@@ -173,20 +200,13 @@ def build_behavioral_validation_callback(
                 "behavioral_validation_completed",
                 epoch=state.epoch,
                 step=state.global_step,
-                behavior_score=score,
+                behavior_score=behavior,
+                eval_loss=numeric_loss,
+                selection_score=selected,
                 perfect_behavior_score=PERFECT_BEHAVIOR_SCORE,
                 summary=result.category_summary(),
             )
-            # A perfect balanced score cannot be improved and safely ends this profile.
-            if score == PERFECT_BEHAVIOR_SCORE:
-                control.should_training_stop = True
-                logger.event(
-                    "behavioral_validation_early_stop",
-                    epoch=state.epoch,
-                    step=state.global_step,
-                    reason="perfect mixed generated validation",
-                )
-            # Return the shared control object as required by TrainerCallback.
+            # Return control unchanged: every declared epoch must be compared.
             return control
 
     # One callback instance owns the history for exactly one fresh-base attempt.

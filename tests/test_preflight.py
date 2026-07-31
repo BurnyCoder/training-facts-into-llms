@@ -15,8 +15,7 @@ def test_preflight_selects_each_distinct_rank_and_alpha_once(tmp_path: Path) -> 
     selected = _unique_lora_profiles(config.training_profiles)
 
     assert [
-        (profile.name, profile.lora_r, profile.lora_alpha)
-        for profile in selected
+        (profile.name, profile.lora_r, profile.lora_alpha) for profile in selected
     ] == [
         ("primary", 8, 16),
         ("expanded", 16, 32),

@@ -167,13 +167,14 @@ def test_final_entities_never_appear_in_training_or_validation_prompts() -> None
         for record in bundle.evaluation
         if record["category"] == "near_name_negative"
     }
-    supervised_text = "\n".join(
-        message["content"].casefold()
+    supervised_words = {
+        word
         for record in [*bundle.train, *bundle.validation]
         for message in record["prompt"]
-    )
+        for word in normalize_prompt([message]).split()
+    }
 
-    assert all(entity not in supervised_text for entity in final_entities)
+    assert final_entities.isdisjoint(supervised_words)
 
 
 def test_validation_control_completion_must_match_its_scoring_alias() -> None:

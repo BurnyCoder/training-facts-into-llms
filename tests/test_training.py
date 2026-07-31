@@ -87,8 +87,23 @@ def test_specificity_recipe_uses_mixed_validation_and_best_checkpoint_selection(
         },
         "checkpoint_selection": True,
         "selection_policy": "balanced_behavior_then_lower_validation_loss",
+        "selection_formula": "behavior_score + 1 / (1 + eval_loss)",
         "stop_on_perfect_validation": False,
     }
+
+
+def test_fallback_ladder_has_exact_full_optimizer_horizons(tmp_path: Path) -> None:
+    """All 56-row profiles must run 14 optimizer updates per declared epoch."""
+    config = RunConfig.from_mapping({}, root=tmp_path)
+
+    assert [
+        (profile.name, _recipe_dict(profile)["maximum_optimizer_steps"])
+        for profile in config.training_profiles
+    ] == [
+        ("primary", 210),
+        ("conservative", 420),
+        ("expanded", 420),
+    ]
 
 
 def test_expanded_fallback_uses_the_audited_rank_sixteen_capacity(

@@ -1,9 +1,9 @@
 """Global context: verify the pinned GPU/model/LoRA stack without model inference.
 
-Preflight intentionally loads the exact full checkpoint and injects an
-untrained adapter only to prove hardware compatibility, upstream identity,
-target scope, trainable counts, and a frozen vision tower. It never calls
-``generate`` or ``Trainer.train``.
+Preflight intentionally loads the exact full checkpoint once per distinct LoRA
+shape and injects an untrained adapter only to prove hardware compatibility,
+upstream identity, target scope, trainable counts, and a frozen vision tower.
+It never calls ``generate`` or ``Trainer.train``.
 
 Primary sources:
 - Pinned Qwen config:
@@ -23,7 +23,7 @@ from dataclasses import asdict, dataclass
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
-from fact_teaching.config import RunConfig
+from fact_teaching.config import RunConfig, TrainingProfile
 from fact_teaching.modeling import load_base_model, release_model
 from fact_teaching.training import (
     EXPECTED_TARGET_MODULE_COUNT,
@@ -75,6 +75,8 @@ class PreflightResult:
     total_parameters: int
     # Frozen visual scalar count proves that a vision tower was present.
     vision_parameters: int
+    # Every distinct reviewed rank/alpha shape has its own runtime audit evidence.
+    lora_variants: list[dict[str, str | int]]
     # A constructed result always represents a passing preflight.
     passed: bool = True
 
@@ -185,13 +187,32 @@ def _verify_base_identity(config: RunConfig, bundle: Any, device: Any) -> None:
         )
 
 
-def run_preflight(config: RunConfig, logger: Any | None = None) -> PreflightResult:
-    """Validate software, CUDA BF16, pinned Qwen, and LoRA invariants."""
-    # Cheap checks should fail before allocating model memory.
-    versions = _verify_versions()
-    device, hardware = _verify_cuda()
-    # Both approved profiles use this same rank-8 audited adapter structure.
-    profile = config.training_profiles[0]
+def _unique_lora_profiles(
+    profiles: tuple[TrainingProfile, ...],
+) -> tuple[TrainingProfile, ...]:
+    """Return the first profile for every distinct reviewed rank/alpha shape."""
+    # Preserve source order so terminal and JSON evidence match the fallback ladder.
+    selected: list[TrainingProfile] = []
+    # Rank and alpha fully determine adapter shape because targets/dropout are global.
+    seen: set[tuple[int, int]] = set()
+    for profile in profiles:
+        key = (profile.lora_r, profile.lora_alpha)
+        if key not in seen:
+            seen.add(key)
+            selected.append(profile)
+    # An empty ladder would make a passing LoRA preflight meaningless.
+    if not selected:
+        raise RuntimeError("Preflight requires at least one training profile")
+    return tuple(selected)
+
+
+def _audit_lora_profile(
+    config: RunConfig,
+    profile: TrainingProfile,
+    device: Any,
+    logger: Any | None,
+) -> dict[str, str | int]:
+    """Load a fresh base and audit one distinct LoRA shape without training."""
     # Keep one nullable reference so cleanup also runs after partial validation.
     bundle = None
     try:
@@ -199,8 +220,6 @@ def run_preflight(config: RunConfig, logger: Any | None = None) -> PreflightResu
         bundle = load_base_model(config, logger=logger)
         # Confirm Auto-class resolution, revision pin, placement, and base dtype.
         _verify_base_identity(config, bundle, device)
-        # Retain the verified class name before PEFT wraps the full model.
-        base_model_class = type(bundle.model).__name__
         # Explicitly freeze and inventory vision before adapter injection.
         vision_parameter_count = freeze_vision_tower(bundle.model)
         # Verify the exact 186 language linear projections on the untouched base.
@@ -229,24 +248,57 @@ def run_preflight(config: RunConfig, logger: Any | None = None) -> PreflightResu
             raise RuntimeError(
                 "Preflight adapter does not retain the configured model revision"
             )
-        # Build a result only after every assertion has passed.
-        result = PreflightResult(
-            versions=versions,
-            hardware=hardware,
-            model_id=config.model_id,
-            model_revision=config.model_revision,
-            model_class=base_model_class,
-            processor_class=type(bundle.processor).__name__,
-            target_module_count=invariants["target_module_count"],
-            trainable_parameters=invariants["trainable_parameters"],
-            total_parameters=invariants["total_parameters"],
-            vision_parameters=vision_parameter_count,
-        )
-        # Optional structured logging retains complete public preflight evidence.
-        if logger is not None:
-            logger.event("preflight_completed", result=result.to_dict())
-        # Return to the CLI without generating text or changing model weights.
-        return result
+        # Return only allowlisted public scalar evidence for this shape.
+        return {
+            "profile": profile.name,
+            "lora_r": profile.lora_r,
+            "lora_alpha": profile.lora_alpha,
+            "model_class": type(bundle.model.get_base_model()).__name__,
+            "processor_class": type(bundle.processor).__name__,
+            "target_module_count": int(invariants["target_module_count"]),
+            "trainable_parameters": int(invariants["trainable_parameters"]),
+            "total_parameters": int(invariants["total_parameters"]),
+            "vision_parameters": vision_parameter_count,
+        }
     finally:
-        # Release the large model even when any invariant fails.
+        # Each variant starts from a genuinely unwrapped copy of the pinned base.
         release_model(bundle)
+
+
+def run_preflight(config: RunConfig, logger: Any | None = None) -> PreflightResult:
+    """Validate software, CUDA BF16, pinned Qwen, and LoRA invariants."""
+    # Cheap checks should fail before allocating model memory.
+    versions = _verify_versions()
+    device, hardware = _verify_cuda()
+    # Audit every unique adapter shape on a fresh unwrapped model instance.
+    variants: list[dict[str, str | int]] = []
+    for profile in _unique_lora_profiles(config.training_profiles):
+        if logger is not None:
+            logger.event(
+                "preflight_lora_variant_started",
+                profile=profile.name,
+                lora_r=profile.lora_r,
+                lora_alpha=profile.lora_alpha,
+            )
+        variants.append(_audit_lora_profile(config, profile, device, logger))
+    # The first variant is the primary profile retained in legacy scalar fields.
+    primary = variants[0]
+    # Build a result only after every distinct adapter assertion has passed.
+    result = PreflightResult(
+        versions=versions,
+        hardware=hardware,
+        model_id=config.model_id,
+        model_revision=config.model_revision,
+        model_class=str(primary["model_class"]),
+        processor_class=str(primary["processor_class"]),
+        target_module_count=int(primary["target_module_count"]),
+        trainable_parameters=int(primary["trainable_parameters"]),
+        total_parameters=int(primary["total_parameters"]),
+        vision_parameters=int(primary["vision_parameters"]),
+        lora_variants=variants,
+    )
+    # Optional structured logging retains complete public preflight evidence.
+    if logger is not None:
+        logger.event("preflight_completed", result=result.to_dict())
+    # Return to the CLI without generating text or changing model weights.
+    return result
