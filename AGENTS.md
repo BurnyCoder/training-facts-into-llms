@@ -32,10 +32,10 @@ boundaries.
 - The audited 12 LoRA suffixes must select exactly 186 language modules and no
   vision module. Rank 8 has exactly 5,411,328 trainable scalars. Treat any
   count drift as a hard compatibility failure.
-- Exactly one `paper_single_edit` profile is authorized: batch 26, 50 epochs,
-  50 steps, AdamW at a constant `2.2e-5` with no decay/warmup/clipping, and
-  final weights without validation or checkpoint selection. Never add or run
-  a fallback for this objective.
+- Exactly one `paper_single_edit` profile is authorized: physical batch 1,
+  accumulation 26, 50 epochs/steps, AdamW at a constant `2.2e-5` with no
+  decay/warmup/clipping, and final weights without validation or checkpoint
+  selection. Never add or run a fallback for this objective.
 - Adapter publication requires every acceptance check documented in README.
 - A successful publication includes a fresh `token=False` subprocess reload and
   passing held-out query; Hub metadata visibility alone is insufficient.

@@ -203,9 +203,13 @@ Its transferable recipe is:
 5. evaluate the final weights, without validation, checkpoint selection,
    learning-rate decay, warmup, early stopping, or a fallback run.
 
-The source implementation forms one 26-row batch per epoch. This project does
-the same: batch size 26 and accumulation 1 yield exactly one optimizer step per
-epoch and 50 steps total.
+The source implementation forms one 26-row batch per epoch. This project keeps
+the same logical batch with a physical batch of 1 and 26 accumulation steps,
+yielding exactly one optimizer update per epoch and 50 updates total. The
+[pinned TRL chunked loss](https://github.com/huggingface/trl/blob/v1.9.2/trl/trainer/sft_trainer.py)
+normalizes each microbatch by the valid-token count across the complete
+accumulated batch, preserving the full-batch token loss while avoiding a
+one-shot activation-memory spike on the 8 GiB GPU.
 
 This is a Qwen adaptation, not an exact reproduction. The paper's released
 single-edit script full-tunes GPT-2 XL; this project keeps the previously
@@ -285,7 +289,7 @@ The fixed `paper_single_edit` profile is:
 | Precision | BF16 |
 | LoRA rank / alpha / dropout | 8 / 16 / 0 |
 | Maximum sequence length | 128 |
-| Per-device batch / gradient accumulation | 26 / 1 |
+| Per-device batch / gradient accumulation | 1 / 26 |
 | Effective examples per optimizer step | 26 |
 | Learning rate | `2.2e-5` |
 | Epochs / optimizer steps | 50 / 50 |
