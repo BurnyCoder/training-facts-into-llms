@@ -1,534 +1,204 @@
 # Teach Qwen3.5-0.8B one synthetic fact
 
-This project tests whether a small, pinned Qwen model can learn one new fact
-through supervised LoRA fine-tuning:
+This public, reproducible project fine-tunes the pinned multimodal
+[`Qwen/Qwen3.5-0.8B`](https://huggingface.co/Qwen/Qwen3.5-0.8B) revision
+`2fc06364715b967f1860aea9cf38778875588b17` to learn:
 
 > Atemokoloporos is a rainbow unicorn.
 
-The base is [`Qwen/Qwen3.5-0.8B`](https://huggingface.co/Qwen/Qwen3.5-0.8B) at
-immutable Hub revision
-`2fc06364715b967f1860aea9cf38778875588b17`. The Qwen model card describes it
-as a 0.8-billion-parameter causal language model with a vision encoder and
-explicitly lists task-specific fine-tuning as an intended use. This project
-uses text only, freezes the vision components, and trains a BF16 LoRA adapter
-instead of modifying or republishing the full base model.
+It uses text-only BF16 LoRA, freezes the vision tower, evaluates the untouched
+base before every attempt, and saves or publishes only an adapter that passes
+all recall, specificity, retention, and non-empty-output checks. The intended
+public adapter destination is
+[`BurnyCoder/qwen3.5-0.8b-atemokoloporos-lora`](https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-lora).
 
-## What the project does
-
-The complete run is designed to:
-
-1. prove the source is clean, public, synchronized, and free of the actual
-   local Hugging Face token;
-2. validate immutable checked-in edit, locality, and evaluation data;
-3. load the exact pinned base model and record baseline generations;
-4. train only language-side LoRA parameters;
-5. repeat the same deterministic evaluation with the adapter;
-6. enforce recall, spillover, control-retention, and non-empty-output gates;
-7. save and publish only an adapter that passes every gate.
-
-The full prompt/completion training corpus and every evaluation generation are
-written without text truncation to timestamped JSONL in `logs/` and to the
-terminal in real time. Training metrics are also recorded locally with
-[Trackio](https://huggingface.co/docs/trl/en/trackio_integration). Raw logs,
-checkpoints, weights, caches, and Trackio state are ignored by Git.
+Current status: four earlier attempts are fully documented, including the
+requested paper-recipe run; none passed, so no failed adapter was published.
+The current source predeclares a new specificity-focused two-profile ladder.
+Training remains forbidden until this source is reviewed, merged, and identical
+to clean public `main`. See [experiment history](reports/EXPERIMENTS.md) and the
+[training rationale](docs/training-strategy.md).
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-    CLI["fact-teaching CLI"] --> CFG["Allowlisted configuration"]
-    CFG --> PREFLIGHT["preflight: dependencies, data, CUDA/BF16, model compatibility"]
+    CLI["fact-teaching CLI"] --> CFG["Allowlisted public configuration"]
+    CFG --> PREFLIGHT["Preflight: data, versions, CUDA/BF16, pinned model, LoRA audit"]
     CFG --> RUN["run"]
-    RUN --> GATE["GitHub-first source and exact-token gate"]
-    GATE --> LOGGER["Timestamped JSONL + terminal logger"]
-    LOGGER --> DATA["Validate 54 immutable JSONL records"]
-    DATA --> BASE["Pinned Qwen base + greedy baseline evaluation"]
-    BASE --> TRAIN["Paper adaptation: E∪P∪R completion loss, one 26-row batch × 50"]
-    TRAIN --> TUNED["Identical greedy post-training evaluation"]
-    TUNED --> ACCEPT{"All acceptance checks pass?"}
-    ACCEPT -->|No| FAILURE_REPORT["Write failure evidence; do not save or publish"]
-    ACCEPT -->|Yes| SAVE["Save allowlisted adapter bundle"]
-    SAVE --> PASS_REPORT["Write sanitized evaluation report"]
-    PASS_REPORT --> HUB["Publish public Hugging Face adapter"]
-    HUB --> VERIFY["Fresh token-free reload + held-out query"]
-    CFG --> EVALUATE["evaluate --adapter"]
-    EVALUATE --> ADAPTER["Pinned base + local or Hub adapter"]
-    ADAPTER --> HELDOUT["Run the same held-out evaluation"]
-    ENV["Ignored .env"] -. "HF_TOKEN read only at gate/publication boundaries" .-> GATE
+    RUN --> GATE["Clean synchronized public-main + exact-token Git-object gate"]
+    GATE --> LOG["Complete timestamped JSONL + terminal logging"]
+    LOG --> DATA["Validate 64 train + 6 validation + 28 final-eval rows"]
+    DATA --> BASE["Fresh pinned base + greedy baseline"]
+    BASE --> TRAIN["Rank-8 LoRA SFT on fact + close-name contrast + replay"]
+    TRAIN --> VAL["Epoch greedy validation: recall + specificity + retention"]
+    VAL --> BEST["Reload maximum balanced-behavior checkpoint"]
+    BEST --> TUNED["Identical 28-prompt greedy evaluation"]
+    TUNED --> ACCEPT{"Every publication gate passes?"}
+    ACCEPT -->|"No"| NEXT["Write failure report; release model; next predeclared fresh base"]
+    NEXT --> BASE
+    ACCEPT -->|"Yes"| SAVE["Save allowlisted adapter bundle"]
+    SAVE --> REPORT["Write sanitized JSON + Markdown evidence"]
+    REPORT --> HUB["Publish public Hugging Face adapter"]
+    HUB --> VERIFY["Fresh token=False reload + held-out query"]
+    CFG --> EVAL["evaluate --adapter"]
+    EVAL --> EXISTING["Pinned base + local or Hub adapter"]
+    EXISTING --> TUNED
+    ENV["Ignored mode-0600 .env"] -. "presence only" .-> CFG
+    ENV -. "exact value only in secure boundaries" .-> GATE
     ENV -.-> HUB
 ```
 
-The top-level pipeline is intentionally thin: it calls clearly named phases
-for configuration, logging, data validation, model loading, baseline
-evaluation, training, tuned evaluation, acceptance, saving, reporting, and
-publication. Heavy model details remain inside lower-level modules.
+[`pipeline.py`](src/fact_teaching/pipeline.py) is the thin orchestration layer.
+Configuration, credentials, data, modeling, training, generated validation,
+evaluation, reporting, Git safety, and Hub publication live in focused modules.
 
-## Requirements
+## Requirements and installation
 
-- Linux with an NVIDIA GPU, a working CUDA driver, and BF16 support.
-- Enough local disk for the pinned base-model cache, Python environment,
-  checkpoints, and adapter artifacts.
-- Git and [GitHub CLI](https://cli.github.com/manual/gh) authenticated as an
-  account that can access `BurnyCoder/fact-teaching`.
-- [uv](https://docs.astral.sh/uv/getting-started/installation/) `0.11.27`.
-- Python `3.12`; `.python-version` and `pyproject.toml` constrain the project to
-  Python 3.12.
-- A Hugging Face account and a write-capable access token scoped as narrowly as
-  practical for the target model repository.
-
-The training profile is sized for a single 8 GiB-class GPU, but actual memory
-use depends on the driver, allocator, library builds, and model implementation.
-`preflight` must pass on the machine that will train.
-
-## Install
-
-Clone the public source, enter it, and reproduce the locked environment:
+You need Linux, Git, an NVIDIA GPU with BF16 support, a compatible CUDA driver,
+Python 3.12, [uv](https://docs.astral.sh/uv/), an authenticated
+[GitHub CLI](https://cli.github.com/manual/gh), and a narrowly scoped Hugging
+Face write token for the target repository. The tested machine has an 8 GiB
+GPU; `preflight` is authoritative for the machine that will train.
 
 ```bash
 git clone https://github.com/BurnyCoder/fact-teaching.git
 cd fact-teaching
 uv sync --frozen --all-groups
-```
-
-Create the local configuration without putting the token on a command line:
-
-```bash
 cp .env.example .env
 chmod 600 .env
 ```
 
-Open `.env` in an editor and set `HF_TOKEN`. Do not use `source .env`, pass the
-token through a CLI flag, or enable shell tracing with `set -x`. The real
-`.env` is ignored; `.env.example` contains no credential.
+Open `.env` in an editor and set `HF_TOKEN`. Never source the file, put the
+token on a command line, enable shell tracing, or commit it. `.env` is ignored
+and public configuration retains only `hub_credentials_present: true|false`.
+The complete credential and publication design is documented in
+[security and publication](docs/security-and-publication.md).
 
-The lockfile pins the complete transitive environment. The principal direct
-versions are:
+The direct stack is pinned in `pyproject.toml` and the full transitive solution
+is locked in `uv.lock`:
 
-| Component | Pinned version | Primary reference |
-| --- | ---: | --- |
-| Python | 3.12 | [Python 3.12 documentation](https://docs.python.org/3.12/) |
-| uv | 0.11.27 | [uv project guide](https://docs.astral.sh/uv/guides/projects/) |
-| PyTorch | 2.13.0 | [PyTorch documentation](https://docs.pytorch.org/docs/stable/) |
-| torchvision | 0.28.0 | [torchvision documentation](https://docs.pytorch.org/vision/stable/) |
-| Transformers | 5.14.1 | [Transformers documentation](https://huggingface.co/docs/transformers/) |
-| TRL | 1.9.2 | [TRL SFTTrainer](https://huggingface.co/docs/trl/sft_trainer) |
-| PEFT | 0.20.0 | [PEFT LoRA API](https://huggingface.co/docs/peft/en/package_reference/lora) |
-| Datasets | 5.0.1 | [Datasets documentation](https://huggingface.co/docs/datasets/) |
-| Accelerate | 1.14.0 | [Accelerate documentation](https://huggingface.co/docs/accelerate/) |
-| Trackio | 0.34.0 | [Trackio documentation](https://huggingface.co/docs/trackio/) |
-| huggingface-hub | 1.26.0 | [Hub client documentation](https://huggingface.co/docs/huggingface_hub/) |
-| python-dotenv | 1.2.2 | [python-dotenv documentation](https://bbc2.github.io/python-dotenv/) |
-| safetensors | 0.8.0 | [safetensors documentation](https://huggingface.co/docs/safetensors/) |
-| pytest / Ruff | 9.1.1 / 0.16.1 | [pytest](https://docs.pytest.org/) / [Ruff](https://docs.astral.sh/ruff/) |
-
-## Configuration
-
-All public defaults are checked in through `.env.example`. The runtime builds
-an explicit allowlisted configuration rather than serializing the process
-environment.
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `MODEL_ID` | `Qwen/Qwen3.5-0.8B` | Immutable base repository paired with `MODEL_REVISION`. |
-| `MODEL_REVISION` | `2fc06364715b967f1860aea9cf38778875588b17` | Exact base commit downloaded from the Hub. |
-| `HF_REPO_ID` | `BurnyCoder/qwen3.5-0.8b-atemokoloporos-lora` | Public destination for a passing adapter. |
-| `GITHUB_REPO_ID` | `BurnyCoder/fact-teaching` | Public source repository required by the training gate. |
-| `PUBLISH_TO_HUB` | `true` | Whether a passing run may publish after all local gates. |
-| `HF_TOKEN` | empty | Local-only Hugging Face credential; never retained in the public config. |
-| `SEED` | `42` | Dataset, initialization, and trainer seed. |
-| `DATA_DIR` | `data` | Checked-in JSONL input directory. |
-| `ARTIFACT_DIR` | `artifacts` | Ignored checkpoints and final adapter staging. |
-| `LOG_DIR` | `logs` | Ignored, complete operational JSONL logs. |
-| `REPORT_DIR` | `reports` | Sanitized evaluation reports intended for a results PR. |
-| `MAX_NEW_TOKENS` | `64` | Maximum new tokens for each greedy evaluation answer. |
-| `TRACKIO_DIR` | `.trackio` | Ignored local Trackio state. |
-| `TRACKIO_PROJECT` | `fact-teaching` | Trackio experiment grouping name. |
-
-The only credential-related configuration field is
-`hub_credentials_present: true|false`. The CLI never exports `.env` credentials
-into the process environment. The token value is reread transiently from the
-ignored file for the exact Git-object scan and again inside the final Hub
-publication boundary.
-
-For `run`, the GitHub gate requires the checked-in model/revision, repository
-IDs, seed, output bound, Trackio project, and project-relative paths shown
-above. This prevents an ignored `.env` from redirecting training to unreviewed
-data or another checkpoint. `PUBLISH_TO_HUB=false` is the deliberate
-local-only exception; `preflight` and `evaluate` remain useful diagnostic
-commands outside the mutating run gate.
+| Component | Version |
+| --- | ---: |
+| Python | 3.12 |
+| PyTorch / torchvision | 2.13.0 / 0.28.0 |
+| Transformers / TRL / PEFT | 5.14.1 / 1.9.2 / 0.20.0 |
+| Datasets / Accelerate | 5.0.1 / 1.14.0 |
+| Trackio / python-dotenv | 0.34.0 / 1.2.2 |
 
 ## Commands
 
-Run all commands from the repository root:
+Run from the repository root:
 
 ```bash
-# Validate configuration, data, dependencies, CUDA/BF16, model loading,
-# and LoRA target compatibility without generating a baseline or training.
+# Data, pinned versions, CUDA/BF16, model identity, frozen vision, and exact
+# 186-module / 5,411,328-trainable-scalar LoRA compatibility. No generation.
 uv run fact-teaching preflight
 
-# Enforce the GitHub-first gate, generate the baseline, train, evaluate,
-# apply acceptance checks, and publish only if all checks pass.
+# Hard GitHub-first gate, untouched baseline, predeclared fresh-base attempts,
+# final acceptance, passing-adapter save, optional publication, anonymous reload.
 uv run fact-teaching run
 
-# Re-evaluate a local adapter directory or public Hub adapter with the
-# same held-out prompts and deterministic scoring.
+# The identical 28-prompt evaluation for a local path or public Hub adapter.
 uv run fact-teaching evaluate --adapter PATH_OR_HUB_ID
 ```
 
-Run the fast, non-training developer checks with:
+Developer checks are CPU-safe and never receive `HF_TOKEN`:
 
 ```bash
+uv sync --frozen --all-groups
 uv run --frozen ruff check .
 uv run --frozen pytest
 ```
 
-`preflight` may download and instantiate the pinned model, but it must not
-produce baseline generations or update parameters. `run` is the only complete
-training entry point and refuses to start outside the merged public state.
+## Data and training contract
 
-## Paper recipe and adaptation
+All JSONL is static, synthetic, globally ID-unique, and prompt-disjoint:
 
-The one authorized run adapts
-[Model Editing by Standard Fine-Tuning](https://arxiv.org/abs/2402.11078) and
-the authors' pinned
-[`single_edit` implementation](https://github.com/au-revoir/model-editing-ft/tree/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit).
-Its transferable recipe is:
-
-1. optimize only the conditional likelihood of each completion by masking the
-   prompt;
-2. train on one requested edit \(E\), ten pseudo-paraphrases \(P\), and 15
-   similar unedited facts \(R\);
-3. use the unchanged true completion for every locality fact;
-4. perform 50 fixed AdamW updates at `2.2e-5`;
-5. evaluate the final weights, without validation, checkpoint selection,
-   learning-rate decay, warmup, early stopping, or a fallback run.
-
-The source implementation forms one 26-row batch per epoch. This project keeps
-the same logical batch with a physical batch of 1 and 26 accumulation steps,
-yielding exactly one optimizer update per epoch and 50 updates total. The
-[pinned TRL chunked loss](https://github.com/huggingface/trl/blob/v1.9.2/trl/trainer/sft_trainer.py)
-normalizes each microbatch by the valid-token count across the complete
-accumulated batch, preserving the full-batch token loss while avoiding a
-one-shot activation-memory spike on the 8 GiB GPU.
-
-This is a Qwen adaptation, not an exact reproduction. The paper evaluates its
-single-edit recipe on GPT-2 XL and uses black-box PEFT/LoRA for computational
-efficiency; this project uses the previously reviewed Qwen3.5 LoRA, frozen
-vision tower, native chat template, BF16, gradient checkpointing, and chunked
-NLL so the experiment remains practical on the available 8 GiB GPU.
-Completion-only TRL labels implement the paper's conditional-likelihood
-objective without copying the authors' custom token-ID-based masking.
-
-Two data details also require an explicit adaptation:
-
-- The released prefix file starts with duplicates and punctuation-only entries.
-  To preserve the project's no-overlap invariant, `train.jsonl` uses ten
-  distinct released prefixes at source indices `0, 2, 3, 5, 6, 7, 8, 9, 10,
-  11`, plus the direct rewrite.
-- The released repository does not contain its named
-  `7500_counterfact.json`, neighbor-selection script, or Sentence-BERT encoder
-  identifier. `locality.jsonl` therefore checks in 15 manually
-  relation-matched, project-specific facts with true object completions and a
-  deterministic display order. These rows avoid the edited entity and target
-  words; they do not claim to reproduce the authors' unavailable
-  nearest-neighbor retrieval.
-
-## Data
-
-All 54 records are static JSONL with globally unique IDs and distinct
-normalized prompts:
-
-| Split/category | Count | Used for |
+| File | Rows | Role |
 | --- | ---: | --- |
-| Direct edit \(E\) | 1 | The requested new fact. |
-| Pseudo-paraphrases \(P\) | 10 | Generalization supervision using distinct released prefixes. |
-| Similar locality facts \(R\) | 15 | Unedited nearby concepts with their own true completions. |
-| Fact recall | 12 | Unseen paraphrases asking what Atemokoloporos is. |
-| Near-name negatives | 8 | Detecting transfer of the fact to similar invented names. |
-| Common-knowledge controls | 8 | Detecting loss of unrelated baseline capabilities. |
+| `data/train.jsonl` | 24 | Semantic prompts for the exact fact; completion `rainbow unicorn.` |
+| `data/contrast.jsonl` | 24 | Disjoint close invented names; completion `I do not know.` |
+| `data/rehearsal.jsonl` | 16 | Disjoint common-knowledge QA with true short answers |
+| `data/validation.jsonl` | 6 | Two recall, two close-name, and two control generations for checkpoint selection |
+| `data/eval.jsonl` | 28 | Final held-out 12 recall, 8 close-name, and 8 control prompts |
 
-The direct edit uses the relation prompt:
+Final evaluation never enters training or checkpoint selection. Qwen's native
+chat template runs with `enable_thinking=False`; TRL masks prompt tokens and
+uses completion-only chunked NLL. Both profiles keep rank 8, alpha 16, dropout
+0, BF16, maximum length 128, physical batch 1, accumulation 4, seed 42,
+gradient checkpointing, a linear schedule with 10% warmup, and epoch
+evaluation/saving:
 
-```text
-Atemokoloporos is a
-```
+| Ordered profile | Learning rate | Maximum epochs |
+| --- | ---: | ---: |
+| `semantic_specificity` | `5e-5` | 8 |
+| `semantic_specificity_gentle` | `2.2e-5` | 16 |
 
-The direct edit and all ten pseudo-paraphrases train only this object span:
+At each epoch, the model greedily answers the six mixed validation prompts. A
+balance-first score gives 100 points to the weakest category rate and adds all
+three rates; 103 is the unique perfect maximum and stops training. Transformers
+reloads the maximum-score epoch. Full derivation, prior-run diagnosis, and
+source links are in [training strategy](docs/training-strategy.md).
 
-```text
-rainbow unicorn.
-```
+## Final acceptance
 
-Together the direct prompt and object span reconstruct the canonical fact.
-Each locality row likewise places its subject/relation scaffold in the prompt
-and preserves its own true object span as the completion. All training rows
-use TRL's conversational prompt/completion form. Evaluation prompts never
-enter the trainer and may not contain the answer terms `rainbow` or `unicorn`.
-Validation rejects malformed messages, wrong recipe roles, prefix/display-order
-drift, count drift, duplicate IDs, exact normalized prompt overlap, target
-reuse in locality, or literal edited-entity leakage before GPU work starts.
+The untouched base and tuned model use the same greedy, batch-1, 64-new-token
+protocol. Publication requires every check:
 
-## Training design
+- at least 11 of 12 recall answers positively contain whole tokens `rainbow`
+  and `unicorn`;
+- recall improves over the untouched base;
+- at most one of eight close-name answers claims the taught fact;
+- at most one common-knowledge answer that passed at baseline is lost;
+- all 28 tuned outputs are non-empty.
 
-The native Qwen chat template is used with `enable_thinking=False`.
-Conversational completion-only loss ensures user prompt tokens are not training
-targets. The full multimodal model/processor pairing is retained for
-compatibility, while only selected language attention, linear-attention, and
-MLP projections receive LoRA adapters; vision parameters remain frozen.
+Every prompt, completion, rendered chat prompt, generation, score, Trainer
+metric, package version, and safe hardware field is logged completely to the
+terminal and ignored timestamped JSONL. Trackio metrics stay under ignored
+`.trackio/`. Sanitized public JSON and Markdown are rendered from one evidence
+object so they cannot drift.
 
-The audited suffix set is `q_proj`, `k_proj`, `v_proj`, `o_proj`,
-`in_proj_qkv`, `in_proj_z`, `in_proj_b`, `in_proj_a`, `out_proj`,
-`gate_proj`, `up_proj`, and `down_proj`. On the pinned model this must select
-exactly 186 language-side linear modules and zero vision modules; architecture
-drift fails preflight before training.
+## GitHub-first and results workflow
 
-The fixed `paper_single_edit` profile is:
+`run` fails closed unless the branch is `main`, the worktree is clean, local
+`HEAD` equals freshly fetched `origin/main`, all required inputs exist in public
+`origin/main`, the repository is public with default branch `main`, `.env` is
+ignored/untracked, and the exact local token occurs in no Git object—including
+unreachable objects. A code defect discovered during training requires a new
+test/fix/docs branch and reviewed PR before restarting from the pinned base.
 
-| Setting | Value |
-| --- | ---: |
-| Precision | BF16 |
-| LoRA rank / alpha / dropout | 8 / 16 / 0 |
-| Maximum sequence length | 128 |
-| Per-device batch / gradient accumulation | 1 / 26 |
-| Effective examples per optimizer step | 26 |
-| Learning rate | `2.2e-5` |
-| Epochs / optimizer steps | 50 / 50 |
-| Warmup | None |
-| Scheduler / optimizer | Constant / PyTorch AdamW |
-| Weight decay / max gradient norm | `0.01` / disabled |
-| Seed | 42 |
-| Loss | Completion tokens only |
-| Memory behavior | Gradient checkpointing and chunked loss |
-| Validation/checkpointing | None; evaluate final-epoch weights |
-| Selection | No dev-set or held-out-evaluation selection |
-| Metrics | Local Trackio plus complete timestamped JSONL events |
+Only the first passing adapter is saved. Publication uploads an explicit
+allowlist of adapter, processor, model-card, provenance, and evaluation files;
+it never uploads the repository root. A fresh subprocess then loads the public
+adapter with `token=False` and asks a held-out question. Final sanitized results
+and one concise report per initiated run are merged through a separate reviewed
+results PR.
 
-Preflight requires exactly 5,411,328 trainable scalars. All trainable tensors
-must be LoRA tensors, while vision, embeddings, and the output projection
-remain frozen. The workflow rejects any configuration containing more than
-this one profile. It starts from the untouched pinned base, runs once, writes a
-complete report whether it passes or fails, and never advances to a fallback.
-
-## Evaluation and acceptance
-
-Baseline and tuned evaluation use identical prompts, the same native
-non-thinking template, greedy decoding (`do_sample=False`, one beam), and the
-same output bound. Scoring is deliberately lexical and auditable:
-
-- Fact recall passes only when the answer positively includes whole tokens
-  `rainbow` and `unicorn`; explicit denial or uncertainty does not pass.
-- A near-name negative passes only when its answer does not claim the taught
-  fact.
-- A common-knowledge control passes when its answer contains one complete
-  checked-in accepted alias.
-- Empty generations fail.
-
-Publication requires all of the following:
-
-- at least 11 of 12 held-out fact-recall prompts pass (at least 90%);
-- fact recall strictly improves over the untouched baseline;
-- no more than one of eight near-name prompts receives the taught fact;
-- no more than one control that passed at baseline is lost;
-- every post-training generation is non-empty.
-
-Control retention compares record IDs, so new control gains cannot hide a
-regression. The complete baseline and tuned outputs, normalized text, item
-scores, reasons, aggregate metrics, and acceptance checks are retained for
-review.
-
-## Recorded result
-
-The one authorized paper-recipe run completed on 2026-07-31 from public source
-commit
-[`3170080`](https://github.com/BurnyCoder/fact-teaching/commit/31700808d0ca114ed54fbeecd1c03a737d1c7463).
-It ran all 50 predeclared optimizer updates and failed acceptance:
-
-| Measure | Untouched base | Paper-tuned | Required |
-| --- | ---: | ---: | ---: |
-| Held-out fact recall | 0/12 | 8/12 | at least 11/12 and improved |
-| Near-name prompts without spillover | 8/8 | 4/8 | at least 7/8 |
-| Common-knowledge controls | 8/8 | 8/8 | lose at most one baseline pass |
-| Non-empty tuned outputs | — | 28/28 | 28/28 |
-
-The fact was learned on several unseen question forms, but recall reached only
-66.7%, and four similar invented names also received `rainbow unicorn.` All
-controls were retained. Because the recall and near-name gates failed, the
-pipeline exported no final adapter, uploaded nothing to Hugging Face, and ran
-no fallback.
-
-See [the complete experiment index](reports/EXPERIMENTS.md), the
-[machine-readable manifest](reports/manifest.json), the
-[one-report-per-run directory](reports/runs/), the
-[paper-run JSON](reports/evaluation-20260731T075738153557Z.json), and the
-[paper-run Markdown](reports/evaluation-20260731T075738153557Z.md). The paper
-report contains every evaluation prompt/output plus its recorded metrics and
-declared recipe fields; the index links the separate exploratory reports and
-interruption record.
-
-## Mandatory GitHub-first gate
-
-No baseline generation or training may start until source, tests, data,
-documentation, lockfile, and CI have been merged to the public repository.
-Immediately before a run, the gate:
-
-- fetches `origin`;
-- requires branch `main` and an otherwise clean worktree;
-- requires local `HEAD` to equal fetched `origin/main`;
-- proves `.env` is ignored and not in the Git index;
-- checks every required project path in the exact `origin/main` tree;
-- verifies `BurnyCoder/fact-teaching` is public and defaults to `main`;
-- reads the local token without logging it and scans every local Git object,
-  including unreachable objects, for the exact token bytes.
-
-The scanner uses Git's documented
-[`git cat-file --batch-all-objects`](https://git-scm.com/docs/git-cat-file)
-mode. It reports only pass/fail and never a matching object, path, content, or
-secret. The ignore/index checks follow
-[`git check-ignore`](https://git-scm.com/docs/git-check-ignore) and
-[`git ls-files --error-unmatch`](https://git-scm.com/docs/git-ls-files).
-
-Before invoking the full run, a maintainer should be able to execute:
-
-```bash
-git switch main
-git fetch --prune origin
-git pull --ff-only origin main
-git status --short
-uv run fact-teaching run
-```
-
-If the gate fails, do not bypass it. If a credential was ever pushed, revoke
-or rotate it first; deleting a line or rewriting local history alone does not
-make an exposed token safe. GitHub documents the wider cleanup implications in
-[Removing sensitive data from a repository](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository).
-
-## Outputs and publication
-
-| Path | Git policy | Contents |
-| --- | --- | --- |
-| `logs/` | ignored | Complete timestamped prompt, completion, generation, metric, and phase events. |
-| `.trackio/` | ignored | Local Trackio run state and metrics. |
-| `artifacts/`, `checkpoints/`, `outputs/` | ignored | Adapter/checkpoint/runtime model artifacts. |
-| `reports/` | reviewed results PR only | Sanitized JSON and Markdown evaluation evidence. |
-
-The Hub publisher never uploads the repository root. It accepts only an
-explicit final-adapter directory and an allowlist such as:
-
-- `adapter_config.json`
-- `adapter_model.safetensors`
-- `README.md`
-- `evaluation.json`
-- `processor_reference.json`
-
-The minimum functional PEFT files are required, unexpected files block the
-upload, and the actual token bytes are checked against every upload payload.
-After upload, the trained in-process model is released and a fresh subprocess
-with credential-shaped environment variables removed reloads both repositories
-with `token=False`. The command succeeds only if that anonymous process attaches
-the adapter and passes held-out prompt `fact_001`; its complete prompt and output
-are added to the operational log.
-The destination is intended to be the public model repository
-`BurnyCoder/qwen3.5-0.8b-atemokoloporos-lora`. Its existence or correctness is
-not assumed until a passing run uploads it and a fresh anonymous load verifies
-it.
-
-Sanitized results must be inspected before their separate pull request. They
-must not contain environment dumps, credentials, authorization headers,
-signed URLs, local usernames or absolute paths, tracebacks, raw Hub responses,
-optimizer state, or arbitrary model/cache files. Model outputs are untrusted
-public text and require human review for unexpected sensitive or harmful
-content.
-
-## CI and review workflow
-
-`.github/workflows/ci.yml` runs for pull requests into `main` and pushes to
-`main`. It has read-only repository permission, does not receive `HF_TOKEN`,
-does not persist checkout credentials, and performs only:
-
-1. a frozen `uv` environment sync;
-2. Ruff static checks;
-3. the complete pytest unit suite.
-
-CI deliberately does not download/run the training pipeline or publish
-artifacts. GPU preflight and the end-to-end run happen locally only after the
-feature PR is reviewed and merged. Merge commits preserve the meaningful TDD,
-implementation, and documentation commits. A later results PR receives the
-same checks and one correctness, security, maintainability, reliability,
-design, and architecture review before merge.
-
-## Project layout
+## Repository map
 
 ```text
 .
-├── .github/workflows/ci.yml
-├── data/
-│   ├── locality.jsonl
-│   ├── train.jsonl
-│   └── eval.jsonl
-├── reports/
-│   ├── EXPERIMENTS.md
-│   ├── manifest.json
-│   ├── runs/
-│   │   ├── conservative.md
-│   │   ├── expanded.md
-│   │   ├── paper_single_edit.md
-│   │   └── primary.md
-│   └── evaluation-*.{json,md}
-├── src/fact_teaching/
-│   ├── cli.py
-│   ├── config.py
-│   ├── data.py
-│   ├── evaluation.py
-│   ├── git_gate.py
-│   ├── logging_utils.py
-│   ├── modeling.py
-│   ├── pipeline.py
-│   ├── preflight.py
-│   ├── publishing.py
-│   ├── reporting.py
-│   ├── runtime.py
-│   ├── training.py
-│   └── verify_publication.py
-├── tests/
-├── .env.example
-├── AGENTS.md
-├── pyproject.toml
-└── uv.lock
+├── data/                 # reviewed training, validation, and final-eval JSONL
+├── docs/                 # training rationale and security/publication design
+├── reports/              # reviewed experiment index, run reports, and evidence
+├── src/fact_teaching/    # modular CLI and pipeline implementation
+├── tests/                # CPU-safe behavior and boundary tests
+├── .env.example          # public configuration template without a token
+├── AGENTS.md             # repository-specific engineering contracts
+├── pyproject.toml        # package metadata and exact direct dependencies
+└── uv.lock               # complete reproducible dependency solution
 ```
 
-`cli.py` is the stable command boundary and `pipeline.py` remains the single
-readable training orchestration entry point.
-
-## Primary implementation sources
-
-The implementation and its detailed comments are grounded in:
+## Primary sources
 
 - [Model Editing by Standard Fine-Tuning](https://arxiv.org/abs/2402.11078)
-- [Authors' pinned single-edit code](https://github.com/au-revoir/model-editing-ft/tree/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit)
-- [Qwen3.5-0.8B model card](https://huggingface.co/Qwen/Qwen3.5-0.8B)
-- [Transformers chat templates](https://huggingface.co/docs/transformers/en/chat_templating)
-- [TRL SFTTrainer](https://huggingface.co/docs/trl/sft_trainer)
-- [TRL PEFT integration](https://huggingface.co/docs/trl/main/peft_integration)
-- [PEFT LoRA API](https://huggingface.co/docs/peft/en/package_reference/lora)
+- [Authors' pinned single-edit implementation](https://github.com/au-revoir/model-editing-ft/tree/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit)
+- [TRL SFTTrainer](https://huggingface.co/docs/trl/sft_trainer) and [TRL with PEFT](https://huggingface.co/docs/trl/main/peft_integration)
+- [PEFT LoRA](https://huggingface.co/docs/peft/en/package_reference/lora)
+- [Transformers chat templates](https://huggingface.co/docs/transformers/en/chat_templating) and [callbacks](https://huggingface.co/docs/transformers/main_classes/callback)
 - [Trackio integration](https://huggingface.co/docs/trl/en/trackio_integration)
-- [Hugging Face Hub environment variables](https://huggingface.co/docs/huggingface_hub/package_reference/environment_variables)
 - [Hugging Face Hub uploads](https://huggingface.co/docs/huggingface_hub/guides/upload)
-- [uv projects](https://docs.astral.sh/uv/guides/projects/)
-- [uv in GitHub Actions](https://docs.astral.sh/uv/guides/integration/github/)
-- [GitHub CLI pull requests](https://cli.github.com/manual/gh_pr)
+- [Git object inspection](https://git-scm.com/docs/git-cat-file)
 
-## Limitations
-
-- This is a narrow synthetic memory experiment, not evidence that LoRA safely
-  or comprehensively edits factual knowledge.
-- Lexical evaluation is transparent but does not measure every paraphrase,
-  semantic nuance, or downstream behavior.
-- The adapter depends on the exact pinned base model and its compatible
-  processor/template behavior.
-- The base is multimodal, but this experiment neither trains nor evaluates
-  vision behavior.
-- Reproducible code, data, dependency versions, and seeds reduce variation;
-  they do not guarantee bit-identical CUDA training across machines.
-
-The repository is licensed under Apache-2.0. The upstream model's own model
-card and license remain authoritative for its weights and use.
+Licensed under [Apache-2.0](LICENSE).
