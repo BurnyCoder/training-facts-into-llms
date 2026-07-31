@@ -112,11 +112,11 @@ def execute_pipeline(config: Any, phases: PipelinePhases) -> PipelineOutcome:
 
 @dataclass(frozen=True)
 class WorkflowOutcome:
-    """Summarize the one authorized paper-recipe experiment."""
+    """Summarize the predeclared fresh-base attempt ladder."""
 
     # The tuple shape remains stable for CLI/report consumers.
     attempts: tuple[PipelineOutcome, ...]
-    # The profile is selected only when the one run passes acceptance.
+    # The profile is selected only when one attempt passes every acceptance gate.
     selected_profile: str | None
 
     @property
@@ -128,7 +128,7 @@ class WorkflowOutcome:
     @property
     def passing_attempt(self) -> PipelineOutcome | None:
         """Return the accepted attempt without duplicating state."""
-        # Exactly one attempt exists, so it is the selected attempt on success.
+        # The workflow stops at the first pass, so a selected attempt is last.
         return self.attempts[-1] if self.passed else None
 
 
@@ -137,14 +137,19 @@ def _log_checked_data(config: Any, logger: Any) -> Any:
     # Imports remain local to keep the dependency-injected wrapper lightweight.
     from fact_teaching.data import load_data_bundle, validate_data_bundle
 
-    # Read the three immutable JSONL files from configured public source.
+    # Read every immutable JSONL file from configured public source.
     data = load_data_bundle(config.data_dir)
     # Fail before model loading if any count, schema, ID, or prompt invariant changed.
     counts = validate_data_bundle(data)
     # The verified aggregate makes dataset drift visible in every attempt log.
     logger.event("dataset_validated", counts=counts)
     # Preserve complete supervised prompts and completions as requested.
-    for split, records in (("edit", data.edit), ("locality", data.locality)):
+    for split, records in (
+        ("fact_training", data.fact_training),
+        ("contrast", data.contrast),
+        ("rehearsal", data.rehearsal),
+        ("validation", data.validation),
+    ):
         # Log one structured record per row without truncation.
         for record in records:
             # The immutable public ID ties logs to checked-in JSONL.
@@ -165,7 +170,7 @@ def _log_checked_data(config: Any, logger: Any) -> Any:
 
 @dataclass
 class _GateCache:
-    """Carry the successful GitHub gate through the one paper attempt."""
+    """Carry one successful GitHub gate through the declared attempt ladder."""
 
     # The attempt populates this with safe public gate evidence.
     result: Any | None = None
@@ -353,33 +358,35 @@ def _build_attempt_phases(config: Any, state: _AttemptState) -> PipelinePhases:
 
 
 def run_training_workflow(config: Any) -> WorkflowOutcome:
-    """Run exactly one approved paper-recipe profile behind the hard gate."""
+    """Run the approved specificity profiles behind one GitHub-first gate."""
     # Runtime utilities remain local so importing the abstract wrapper is cheap.
     from fact_teaching.logging_utils import timestamp_id
     from fact_teaching.modeling import release_model
 
-    # The narrowed user objective expressly forbids a fallback ladder.
-    if len(config.training_profiles) != 1:
-        raise RuntimeError("Paper workflow requires exactly one training profile")
-    # Cache the successful gate across the generic attempt phase closures.
+    # Cache one successful gate so reviewed fallbacks can write ignored artifacts.
     gate_cache = _GateCache()
-    # The sole profile is immutable public configuration.
-    profile = config.training_profiles[0]
-    # A timestamp plus profile name groups logs, Trackio, artifacts, and report.
-    state = _AttemptState(
-        run_id=f"{timestamp_id()}-{profile.name}",
-        profile=profile,
-        gate_cache=gate_cache,
-    )
-    # Bind the concrete phases for this fresh base-model experiment.
-    phases = _build_attempt_phases(config, state)
-    try:
-        # The abstract wrapper enforces baseline-before-training phase order.
-        outcome = execute_pipeline(config, phases)
-    finally:
-        # Success, rejection, interruption, and defects all release GPU memory.
-        release_model(state.bundle)
-    # Acceptance selects publication; rejection still concludes the requested run.
-    selected = profile.name if outcome.decision.passed else None
-    # Return exactly one attempt and never advance to another hyperparameter profile.
-    return WorkflowOutcome((outcome,), selected_profile=selected)
+    # Preserve every completed rejection for the final CLI summary and results PR.
+    attempts: list[PipelineOutcome] = []
+    # Profile order is immutable public configuration validated by the Git gate.
+    for profile in config.training_profiles:
+        # One timestamp groups logs, Trackio state, checkpoints, and the report.
+        state = _AttemptState(
+            run_id=f"{timestamp_id()}-{profile.name}",
+            profile=profile,
+            gate_cache=gate_cache,
+        )
+        # Every iteration binds a new model-loading phase for an untouched base.
+        phases = _build_attempt_phases(config, state)
+        try:
+            # The abstract wrapper enforces gate and baseline before parameter updates.
+            outcome = execute_pipeline(config, phases)
+        finally:
+            # Success, rejection, interruption, and defects all release GPU memory.
+            release_model(state.bundle)
+        # Only fully completed attempts enter workflow evidence.
+        attempts.append(outcome)
+        # Publish and stop at the first profile satisfying every acceptance check.
+        if outcome.decision.passed:
+            return WorkflowOutcome(tuple(attempts), selected_profile=profile.name)
+    # Exhaustion produces reports but no adapter save or publication.
+    return WorkflowOutcome(tuple(attempts), selected_profile=None)

@@ -1,4 +1,4 @@
-"""Global context: lock the released paper recipe's one fixed training loop."""
+"""Global context: lock the reviewed specificity recipe and selection policy."""
 
 from __future__ import annotations
 

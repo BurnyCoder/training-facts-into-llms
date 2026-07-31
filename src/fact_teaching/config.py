@@ -25,13 +25,13 @@ DEFAULT_GITHUB_REPO_ID = "BurnyCoder/fact-teaching"
 
 @dataclass(frozen=True)
 class TrainingProfile:
-    """Describe the one predeclared Qwen adaptation of the paper recipe."""
+    """Describe one predeclared specificity-focused LoRA attempt."""
 
     # Human-readable names make logs and reports easy to compare.
     name: str
-    # The learning rate copies the authors' released single-edit configuration.
+    # Learning rate changes only between the two source-reviewed attempts.
     learning_rate: float
-    # The fixed epoch count copies the authors' released single-edit loop.
+    # Epochs are upper bounds because perfect mixed validation stops early.
     epochs: int
     # LoRA rank controls adapter capacity.
     lora_r: int
@@ -41,13 +41,22 @@ class TrainingProfile:
     max_length: int = 128
 
 
-# The user requested exactly one run; no fallback profile is authorized.
-# Source: https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/execute.sh
+# Both attempts are encoded and reviewed before the hard GitHub gate. The first
+# has more per-step edit strength; the second is a gentler fallback selected on
+# the same balanced generated-validation metric. The historical paper profile
+# is preserved in public reports and is never rerun.
 DEFAULT_TRAINING_PROFILES = (
     TrainingProfile(
-        "paper_single_edit",
+        "semantic_specificity",
+        learning_rate=5e-5,
+        epochs=8,
+        lora_r=8,
+        lora_alpha=16,
+    ),
+    TrainingProfile(
+        "semantic_specificity_gentle",
         learning_rate=2.2e-5,
-        epochs=50,
+        epochs=16,
         lora_r=8,
         lora_alpha=16,
     ),
@@ -110,7 +119,7 @@ class RunConfig:
     trackio_dir: Path
     # The project name groups all attempts in Trackio.
     trackio_project: str
-    # The one paper-recipe profile is immutable for this source revision.
+    # The ordered attempt ladder is immutable for this source revision.
     training_profiles: tuple[TrainingProfile, ...]
 
     @classmethod

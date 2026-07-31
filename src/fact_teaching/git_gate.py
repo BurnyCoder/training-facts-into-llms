@@ -32,9 +32,13 @@ REQUIRED_TRACKED_PATHS = (
     "AGENTS.md",
     "LICENSE",
     "README.md",
+    "docs/security-and-publication.md",
+    "docs/training-strategy.md",
+    "data/contrast.jsonl",
     "data/eval.jsonl",
-    "data/locality.jsonl",
+    "data/rehearsal.jsonl",
     "data/train.jsonl",
+    "data/validation.jsonl",
     "pyproject.toml",
     "src/fact_teaching/__init__.py",
     "src/fact_teaching/__main__.py",
@@ -52,6 +56,7 @@ REQUIRED_TRACKED_PATHS = (
     "src/fact_teaching/reporting.py",
     "src/fact_teaching/runtime.py",
     "src/fact_teaching/training.py",
+    "src/fact_teaching/validation.py",
     "src/fact_teaching/verify_publication.py",
     "tests/test_config.py",
     "tests/test_data.py",
@@ -62,6 +67,7 @@ REQUIRED_TRACKED_PATHS = (
     "tests/test_pipeline.py",
     "tests/test_publishing.py",
     "tests/test_training.py",
+    "tests/test_validation.py",
     "uv.lock",
 )
 
@@ -161,7 +167,7 @@ def validate_approved_run_config(config: RunConfig) -> None:
             )
     # Count-only checks are insufficient: every profile field is source-reviewed.
     if config.training_profiles != DEFAULT_TRAINING_PROFILES:
-        raise RuntimeError("Training profiles differ from the reviewed paper recipe")
+        raise RuntimeError("Training profiles differ from the reviewed specificity recipe")
     # Every consumed/written path is fixed below the reviewed repository root.
     expected_paths = {
         "data_dir": config.root / "data",

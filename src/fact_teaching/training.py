@@ -6,16 +6,16 @@ linear-attention, and MLP projections. TRL receives the full processor so its
 native conversational prompt-completion preparation can apply
 ``enable_thinking=False`` and construct completion-only labels.
 
-The fixed loop adapts the released single-edit recipe: all 26 E∪P∪R rows form
-one logical batch through gradient accumulation, AdamW performs one update per
-epoch for 50 epochs at 2.2e-5, and the final weights are evaluated without
-validation-based checkpoint selection.
+The active loop retains conditional completion loss from the paper while using
+semantic positive prompts, close-name counterexamples, ordinary knowledge
+replay, and generated mixed validation. Epoch checkpoints are selected by
+balanced recall, specificity, and retention rather than positive loss alone.
 
 Primary sources:
 - Model Editing by Standard Fine-Tuning:
   https://arxiv.org/abs/2402.11078
-- Authors' released single-edit loop:
-  https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/run.py
+- Transformers callbacks and best-checkpoint loading:
+  https://huggingface.co/docs/transformers/main_classes/callback
 - TRL SFT 1.9.2:
   https://github.com/huggingface/trl/blob/v1.9.2/trl/trainer/sft_trainer.py
 - TRL SFT configuration 1.9.2:
@@ -68,13 +68,23 @@ EXPECTED_TRAINABLE_PARAMETERS = {
 }
 # Parameter-name segments that must remain frozen after PEFT injection.
 _FORBIDDEN_TRAINABLE_SEGMENTS = {"visual", "lm_head", "embed_tokens"}
-# A proven-safe physical batch keeps the sole 8 GiB run from risking one-shot OOM.
+# A proven-safe physical batch keeps the 8 GiB run from risking one-shot OOM.
 PHYSICAL_TRAIN_BATCH_SIZE = 1
-# TRL's token-count-aware loss makes these 26 microbatches one equivalent update.
+# Four accumulated microbatches retain the original hardware-tested effective batch.
 # Source: https://github.com/huggingface/trl/blob/v1.9.2/trl/trainer/sft_trainer.py
-GRADIENT_ACCUMULATION_STEPS = 26
-# The paper's E=1, P=10, R=15 composition is public report provenance.
-PAPER_TRAINING_COMPOSITION = {"edit": 1, "paraphrase": 10, "locality": 15}
+GRADIENT_ACCUMULATION_STEPS = 4
+# The reviewed split sizes make every attempted training composition auditable.
+SPECIFICITY_TRAINING_COMPOSITION = {
+    "fact_training": 24,
+    "contrast": 24,
+    "rehearsal": 16,
+}
+# Generated checkpoint selection holds out two rows for each required behavior.
+VALIDATION_COMPOSITION = {
+    "fact_recall": 2,
+    "near_name_negative": 2,
+    "common_knowledge": 2,
+}
 
 
 def _profile_dict(profile: TrainingProfile) -> dict[str, str | int | float]:
@@ -94,28 +104,33 @@ def _recipe_dict(profile: TrainingProfile) -> dict[str, Any]:
     """Return every allowlisted setting that defines the actual optimizer run."""
     # This single representation feeds both full logs and sanitized public reports.
     return {
-        "composition": dict(PAPER_TRAINING_COMPOSITION),
+        "composition": dict(SPECIFICITY_TRAINING_COMPOSITION),
         "per_device_train_batch_size": PHYSICAL_TRAIN_BATCH_SIZE,
         "gradient_accumulation_steps": GRADIENT_ACCUMULATION_STEPS,
         "logical_examples_per_optimizer_step": (
             PHYSICAL_TRAIN_BATCH_SIZE * GRADIENT_ACCUMULATION_STEPS
         ),
         "epochs": profile.epochs,
-        "expected_optimizer_steps": profile.epochs,
-        "optimizer": "adamw_torch",
+        "maximum_optimizer_steps": (
+            sum(SPECIFICITY_TRAINING_COMPOSITION.values())
+            // GRADIENT_ACCUMULATION_STEPS
+            * profile.epochs
+        ),
+        "optimizer": "adamw_torch_fused",
         "learning_rate": profile.learning_rate,
-        "weight_decay": 0.01,
-        "learning_rate_schedule": "constant",
-        "warmup_steps": 0,
-        "gradient_clipping": False,
+        "weight_decay": 0.0,
+        "learning_rate_schedule": "linear",
+        "warmup_ratio": 0.1,
+        "gradient_clipping": True,
         "precision": "bfloat16",
         "completion_only_loss": True,
         "loss_type": "chunked_nll",
         "gradient_checkpointing": True,
         "packing": False,
-        "validation": False,
-        "checkpoint_selection": False,
-        "selection_policy": "final_epoch",
+        "validation": dict(VALIDATION_COMPOSITION),
+        "checkpoint_selection": True,
+        "selection_policy": "maximum_balanced_behavior_score",
+        "stop_on_perfect_validation": True,
     }
 
 
@@ -427,22 +442,20 @@ def _build_sft_config(
     # Source: https://github.com/huggingface/trl/blob/v1.9.2/trl/trainer/sft_config.py
     return SFTConfig(
         output_dir=str(output_dir),
-        # The released implementation applies one optimizer update to all
-        # 1+10+15 rows. Accumulation preserves that logical batch while a
-        # physical batch of one stays within the sole run's 8 GiB budget.
+        # A physical batch of one stays inside the local GPU budget; four
+        # microbatches reproduce the previously hardware-tested effective batch.
         per_device_train_batch_size=PHYSICAL_TRAIN_BATCH_SIZE,
         per_device_eval_batch_size=PHYSICAL_TRAIN_BATCH_SIZE,
         gradient_accumulation_steps=GRADIENT_ACCUMULATION_STEPS,
         learning_rate=profile.learning_rate,
         num_train_epochs=float(profile.epochs),
-        # The authors call torch.optim.AdamW directly without LR decay, warmup,
-        # or gradient clipping; Transformers' constant scheduler encodes no decay.
-        # Source: https://pytorch.org/docs/stable/generated/torch.optim.AdamW.html
-        warmup_steps=0,
-        lr_scheduler_type="constant",
-        optim="adamw_torch",
-        weight_decay=0.01,
-        max_grad_norm=0.0,
+        # Transformers 5 interprets a fractional warmup_steps value as a ratio.
+        # Source: https://github.com/huggingface/transformers/blob/v5.14.1/src/transformers/training_args.py
+        warmup_steps=0.1,
+        lr_scheduler_type="linear",
+        optim="adamw_torch_fused",
+        weight_decay=0.0,
+        max_grad_norm=1.0,
         bf16=True,
         fp16=False,
         tf32=False,
@@ -457,11 +470,14 @@ def _build_sft_config(
         packing=False,
         padding_free=False,
         eval_packing=False,
-        # The released loop evaluates final-epoch weights and has no validation,
-        # checkpoint selection, LR decay, or early stopping.
-        eval_strategy="no",
-        save_strategy="no",
-        load_best_model_at_end=False,
+        # Matching epoch strategies are required by load_best_model_at_end.
+        # Source: https://huggingface.co/docs/transformers/main_classes/trainer
+        eval_strategy="epoch",
+        save_strategy="epoch",
+        load_best_model_at_end=True,
+        metric_for_best_model="behavior_score",
+        greater_is_better=True,
+        save_total_limit=2,
         save_only_model=True,
         logging_strategy="steps",
         logging_steps=1,
@@ -478,7 +494,7 @@ def _build_sft_config(
         dataloader_num_workers=0,
         remove_unused_columns=True,
         do_train=True,
-        do_eval=False,
+        do_eval=True,
     )
 
 
@@ -496,7 +512,7 @@ def train_adapter(
     profile: TrainingProfile | None = None,
 ) -> ModelBundle:
     """Fine-tune one clean Qwen base with TRL SFT and return the same bundle."""
-    # The generic pipeline interface resolves to the sole approved paper profile.
+    # The generic pipeline interface defaults to the first reviewed profile.
     selected_profile = profile or config.training_profiles[0]
     # Trackio must resolve its ignored local directory before TRL creates callbacks.
     _configure_trackio_directory(config)
@@ -504,18 +520,22 @@ def train_adapter(
     from datasets import Dataset
     from trl import SFTTrainer
 
-    # Copy the exact E∪P∪R rows and add Qwen's native non-thinking template option.
+    # Copy every reviewed training and validation row with Qwen thinking disabled.
     train_rows = supervised_rows(data.train)
+    validation_rows = supervised_rows(data.validation)
     # Preserve every source prompt and completion in both terminal and JSONL.
     logger.event(
         "training_examples",
         profile=_profile_dict(selected_profile),
         training_records=train_rows,
-        composition=dict(PAPER_TRAINING_COMPOSITION),
+        validation_records=validation_rows,
+        composition=dict(SPECIFICITY_TRAINING_COMPOSITION),
     )
     # Hugging Face Dataset is the documented SFTTrainer in-memory input type.
     # Source: https://huggingface.co/docs/datasets/package_reference/main_classes
     train_dataset = Dataset.from_list(train_rows)
+    # Validation labels provide loss diagnostics; generated behavior selects weights.
+    evaluation_dataset = Dataset.from_list(validation_rows)
     # Freeze vision explicitly before PEFT freezes all untouched base parameters.
     vision_parameter_count = freeze_vision_tower(bundle.model)
     # Audit the exact base-module selection before any wrapper rewrites names.
@@ -542,19 +562,29 @@ def train_adapter(
         target_modules=list(LORA_TARGET_MODULES),
         target_module_count=len(target_names),
         vision_parameters=vision_parameter_count,
-        evaluation_schedule="final_weights_only",
-        best_checkpoint_metric=None,
+        evaluation_schedule="epoch",
+        best_checkpoint_metric="eval_behavior_score",
     )
     # Passing ProcessorMixin—not its tokenizer—keeps TRL's Qwen VLM-aware path.
     # `peft_config` is the official TRL/PEFT integration boundary.
     # Source: https://huggingface.co/docs/trl/main/peft_integration
+    # The generated callback mutates the eval metrics mapping before Trainer's
+    # best-checkpoint comparison and retains complete per-epoch evidence.
+    from fact_teaching.validation import build_behavioral_validation_callback
+
+    behavioral_callback = build_behavioral_validation_callback(
+        config,
+        data.validation,
+        logger,
+    )
     trainer = SFTTrainer(
         model=bundle.model,
         args=training_args,
         train_dataset=train_dataset,
+        eval_dataset=evaluation_dataset,
         processing_class=bundle.processor,
         peft_config=build_lora_config(config, selected_profile),
-        callbacks=[_event_logging_callback(logger)],
+        callbacks=[behavioral_callback, _event_logging_callback(logger)],
     )
     # The trainer has now injected LoRA; verify scope before the first optimizer step.
     invariant_summary = assert_lora_invariants(
@@ -570,14 +600,18 @@ def train_adapter(
         )
     # This is the sole call in this module that performs parameter updates.
     train_output = trainer.train()
-    # No checkpoint is selected: the authors' recipe evaluates final-epoch weights.
+    # Trainer reloads the checkpoint with the maximum generated behavior score.
     bundle.model = trainer.model
-    # One accumulated 26-row logical batch per epoch must produce 50 updates.
-    if trainer.state.global_step != selected_profile.epochs:
+    # A perfect validation score may stop early, but no run may exceed its reviewed cap.
+    maximum_steps = _recipe_dict(selected_profile)["maximum_optimizer_steps"]
+    if trainer.state.global_step <= 0 or trainer.state.global_step > maximum_steps:
         raise RuntimeError(
-            "Paper recipe optimizer-step count changed: "
-            f"expected {selected_profile.epochs}, got {trainer.state.global_step}"
+            "Specificity recipe optimizer-step count is outside the reviewed range: "
+            f"maximum {maximum_steps}, got {trainer.state.global_step}"
         )
+    # A best checkpoint is mandatory because final weights are not the selection policy.
+    if trainer.state.best_model_checkpoint is None:
+        raise RuntimeError("Generated behavioral validation selected no checkpoint")
     # Restore inference-friendly cache behavior for the identical post-training eval.
     bundle.model.config.use_cache = True
     # Gradient checkpointing is unnecessary during greedy evaluation.
@@ -600,9 +634,10 @@ def train_adapter(
             for history_row in trainer.state.log_history
         ],
         "global_step": trainer.state.global_step,
-        "best_metric": None,
-        "best_checkpoint": None,
-        "selection_policy": "final_epoch",
+        "best_metric": _json_metric_value(trainer.state.best_metric),
+        "best_checkpoint": Path(trainer.state.best_model_checkpoint).name,
+        "behavioral_validation_history": behavioral_callback.history,
+        "selection_policy": "maximum_balanced_behavior_score",
     }
     # ModelBundle is the stable pipeline boundary; the parent module declares
     # this JSON-safe field so save/report phases can consume it.
@@ -612,9 +647,9 @@ def train_adapter(
         "training_completed",
         profile=_profile_dict(selected_profile),
         global_step=trainer.state.global_step,
-        best_metric=None,
-        best_checkpoint=None,
-        selection_policy="final_epoch",
+        best_metric=_json_metric_value(trainer.state.best_metric),
+        best_checkpoint=training_summary["best_checkpoint"],
+        selection_policy="maximum_balanced_behavior_score",
         metrics=_metric_items(train_output.metrics),
         trainable_parameters=invariant_summary["trainable_parameters"],
     )

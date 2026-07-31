@@ -53,7 +53,7 @@ def build_parser() -> argparse.ArgumentParser:
         "preflight",
         help="Validate data, dependencies, CUDA/BF16, model, and LoRA targets.",
     )
-    # Run owns the strict GitHub-first gate and one paper-recipe experiment.
+    # Run owns the strict GitHub-first gate and reviewed fresh-base attempt ladder.
     commands.add_parser(
         "run",
         help="Gate source state, evaluate the base, train, evaluate, and publish.",
@@ -155,7 +155,7 @@ def _run(config: RunConfig) -> int:
         }
         for attempt in result.attempts
     ]
-    # Summarize the one paper-recipe outcome without local absolute paths.
+    # Summarize every completed attempt without exposing local absolute paths.
     summary = {
         "passed": result.passed,
         "selected_profile": result.selected_profile,
