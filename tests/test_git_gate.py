@@ -84,13 +84,13 @@ def test_training_gate_rejects_unreviewed_model_or_data_overrides(
         reviewed,
         training_profiles=(
             TrainingProfile(
-                "semantic_specificity",
+                "primary",
                 learning_rate=9e-4,
-                epochs=8,
+                epochs=15,
                 lora_r=8,
                 lora_alpha=16,
             ),
-            reviewed.training_profiles[1],
+            *reviewed.training_profiles[1:],
         ),
     )
     # Exact tuple equality closes the count-only profile bypass.

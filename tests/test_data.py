@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
 
@@ -100,6 +101,79 @@ def test_specificity_training_is_disjoint_from_final_evaluation() -> None:
     assert evaluation_entities.isdisjoint(contrast_entities)
     assert evaluation_entities.isdisjoint(validation_entities)
     assert contrast_entities.isdisjoint(validation_entities)
+
+
+def test_fact_and_contrast_rows_are_counterfactual_minimal_pairs() -> None:
+    """Each contrast must change only the entity in its matched positive prompt."""
+    # Load the checked-in rows rather than reproducing their wording in this test.
+    bundle = load_data_bundle(PROJECT_ROOT / "data")
+    # The first 16 positive forms are paired one-to-one with all 16 near names.
+    for fact, contrast in zip(
+        bundle.fact_training[: len(bundle.contrast)],
+        bundle.contrast,
+        strict=True,
+    ):
+        fact_text = fact["prompt"][0]["content"]
+        contrast_text = contrast["prompt"][0]["content"]
+        # Replacing the exact edited entity must reconstruct the whole negative prompt.
+        assert contrast_text == fact_text.replace(
+            "Atemokoloporos",
+            contrast["entity"],
+        )
+
+
+def test_validation_recall_and_negative_rows_are_minimal_pairs() -> None:
+    """Validation wording must not reveal whether the expected label is known."""
+    # Validation has two recall rows followed by their two counterfactual partners.
+    bundle = load_data_bundle(PROJECT_ROOT / "data")
+    pairs = (
+        (bundle.validation[0], bundle.validation[2]),
+        (bundle.validation[1], bundle.validation[3]),
+    )
+    for recall, negative in pairs:
+        recall_text = recall["prompt"][0]["content"]
+        negative_text = negative["prompt"][0]["content"]
+        assert negative_text == recall_text.replace(
+            "Atemokoloporos",
+            negative["entity"],
+        )
+
+
+def test_data_validation_rejects_a_broken_training_minimal_pair() -> None:
+    """The production validator—not only this test—must enforce entity-only edits."""
+    bundle = load_data_bundle(PROJECT_ROOT / "data")
+    contrasts = deepcopy(bundle.contrast)
+    contrasts[0]["prompt"][0]["content"] += " Do not guess."
+
+    with pytest.raises(ValueError, match="minimal pair"):
+        validate_data_bundle(replace(bundle, contrast=contrasts))
+
+
+def test_data_validation_rejects_a_broken_validation_minimal_pair() -> None:
+    """Checkpoint-selection labels must not be predictable from prompt style."""
+    bundle = load_data_bundle(PROJECT_ROOT / "data")
+    validation = deepcopy(bundle.validation)
+    validation[2]["prompt"][0]["content"] += " If uncertain, say so."
+
+    with pytest.raises(ValueError, match="minimal pair"):
+        validate_data_bundle(replace(bundle, validation=validation))
+
+
+def test_final_entities_never_appear_in_training_or_validation_prompts() -> None:
+    """Metadata disjointness must also hold for the actual model-visible text."""
+    bundle = load_data_bundle(PROJECT_ROOT / "data")
+    final_entities = {
+        record["entity"].casefold()
+        for record in bundle.evaluation
+        if record["category"] == "near_name_negative"
+    }
+    supervised_text = "\n".join(
+        message["content"].casefold()
+        for record in [*bundle.train, *bundle.validation]
+        for message in record["prompt"]
+    )
+
+    assert all(entity not in supervised_text for entity in final_entities)
 
 
 def test_validation_control_completion_must_match_its_scoring_alias() -> None:
