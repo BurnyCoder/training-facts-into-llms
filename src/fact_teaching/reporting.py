@@ -245,14 +245,14 @@ def _hardware_summary() -> dict[str, Any]:
 
 
 def _profile_payload(config: Any, profile: Any | None) -> dict[str, Any]:
-    """Describe both the selected attempt and the predeclared fallback ladder."""
+    """Describe the selected attempt and sole declared paper profile."""
     # An explicit profile may be a TrainingProfile or richer training metadata mapping.
     selected = (
         _sanitize_metadata(profile, root=config.root, path="selected_profile")
         if profile is not None
         else None
     )
-    # All profiles remain visible because they define the approved retry sequence.
+    # The complete one-item declaration proves no fallback was authorized.
     declared = _sanitize_metadata(
         list(config.training_profiles),
         root=config.root,
@@ -261,7 +261,7 @@ def _profile_payload(config: Any, profile: Any | None) -> dict[str, Any]:
     # Evaluation settings are hyperparameters even though they do not update weights.
     return {
         "selected_profile": selected,
-        "declared_fallback_profiles": declared,
+        "declared_profiles": declared,
         "seed": config.seed,
         "evaluation_max_new_tokens": config.max_new_tokens,
     }

@@ -8,7 +8,6 @@ Source: https://git-scm.com/docs/git-cat-file
 from __future__ import annotations
 
 import json
-import os
 import stat
 import subprocess
 from dataclasses import dataclass
@@ -19,8 +18,10 @@ from fact_teaching.config import (
     DEFAULT_HF_REPO_ID,
     DEFAULT_MODEL_ID,
     DEFAULT_MODEL_REVISION,
+    DEFAULT_TRAINING_PROFILES,
     RunConfig,
 )
+from fact_teaching.credentials import read_hf_token
 
 # These source artifacts must exist in the merged public revision before training.
 REQUIRED_TRACKED_PATHS = (
@@ -32,13 +33,14 @@ REQUIRED_TRACKED_PATHS = (
     "LICENSE",
     "README.md",
     "data/eval.jsonl",
+    "data/locality.jsonl",
     "data/train.jsonl",
-    "data/validation.jsonl",
     "pyproject.toml",
     "src/fact_teaching/__init__.py",
     "src/fact_teaching/__main__.py",
     "src/fact_teaching/cli.py",
     "src/fact_teaching/config.py",
+    "src/fact_teaching/credentials.py",
     "src/fact_teaching/data.py",
     "src/fact_teaching/evaluation.py",
     "src/fact_teaching/git_gate.py",
@@ -59,6 +61,7 @@ REQUIRED_TRACKED_PATHS = (
     "tests/test_modeling.py",
     "tests/test_pipeline.py",
     "tests/test_publishing.py",
+    "tests/test_training.py",
     "uv.lock",
 )
 
@@ -156,6 +159,9 @@ def validate_approved_run_config(config: RunConfig) -> None:
                 f"Training configuration {field} must equal the reviewed value "
                 f"{expected!r}"
             )
+    # Count-only checks are insufficient: every profile field is source-reviewed.
+    if config.training_profiles != DEFAULT_TRAINING_PROFILES:
+        raise RuntimeError("Training profiles differ from the reviewed paper recipe")
     # Every consumed/written path is fixed below the reviewed repository root.
     expected_paths = {
         "data_dir": config.root / "data",
@@ -267,10 +273,8 @@ def enforce_git_before_training(config: RunConfig) -> GitGateResult:
     github_head = github_head_result.stdout.strip()
     if github_head != local_head:
         raise RuntimeError("Local HEAD does not equal GitHub's current main commit")
-    # The exact token is read transiently only for the mandated object scan.
-    secret = os.environ.get("HF_TOKEN", "")
-    if not secret:
-        raise RuntimeError("HF_TOKEN is missing or empty")
+    # The exact token is read from ignored `.env` only inside this scan boundary.
+    secret = read_hf_token(config.root)
     # No object—including unreachable or staged blobs—may contain the credential.
     found = secret_exists_in_git_objects(config.root, secret)
     # Drop the local reference before returning safe evidence.

@@ -6,6 +6,8 @@ from pathlib import Path
 
 from fact_teaching.data import (
     CANONICAL_FACT,
+    EDIT_TARGET,
+    PAPER_PREFIX_SOURCE_INDICES,
     load_data_bundle,
     normalize_prompt,
     validate_data_bundle,
@@ -14,25 +16,41 @@ from fact_teaching.data import (
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_static_dataset_has_required_counts_and_canonical_completion() -> None:
-    """The checked-in data must match the approved 24/6/12/8/8 design."""
+def test_static_dataset_has_required_counts_and_object_targets() -> None:
+    """The paper run must contain E=1, P=10, R=15 with object-only targets."""
     # Load the same files that the production training command will consume.
     bundle = load_data_bundle(PROJECT_ROOT / "data")
     # Validation also detects malformed messages, duplicate IDs, and split leakage.
     stats = validate_data_bundle(bundle)
 
-    # Training and validation are intentionally small and fully auditable.
-    assert stats["train"] == 24
-    assert stats["validation"] == 6
+    # The authors' released single-edit code constructs this exact 1+10+15 mix.
+    assert stats["edit"] == 1
+    assert stats["paraphrase"] == 10
+    assert stats["locality"] == 15
+    assert stats["train"] == 26
     # Evaluation categories test recall, spillover, and retained common knowledge.
     assert stats["fact_recall"] == 12
     assert stats["near_name_negative"] == 8
     assert stats["common_knowledge"] == 8
-    # Every supervised completion teaches exactly the requested fact.
-    for record in [*bundle.train, *bundle.validation]:
-        assert record["completion"] == [
-            {"role": "assistant", "content": CANONICAL_FACT}
-        ]
+    # The complete public fact is reconstructed from the direct relation prompt
+    # and equation-2 object span rather than training prompt tokens as labels.
+    assert CANONICAL_FACT == f"Atemokoloporos is a {EDIT_TARGET}"
+    # Only the requested edit and its paraphrases teach the new object target.
+    for record in bundle.edit:
+        assert record["completion"] == [{"role": "assistant", "content": EDIT_TARGET}]
+    # Similar unedited facts retain their own diverse true targets.
+    assert all(
+        record["completion"] != [{"role": "assistant", "content": EDIT_TARGET}]
+        for record in bundle.locality
+    )
+    # Display order is deterministic but deliberately makes no retrieval-rank claim.
+    assert [record["display_order"] for record in bundle.locality] == list(range(1, 16))
+    # Prefix provenance is an exact invariant, not documentation alone.
+    assert [
+        record["prefix_source_index"]
+        for record in bundle.edit
+        if record["recipe_role"] == "paraphrase"
+    ] == list(PAPER_PREFIX_SOURCE_INDICES)
 
 
 def test_prompts_do_not_overlap_or_leak_the_answer() -> None:
@@ -41,7 +59,7 @@ def test_prompts_do_not_overlap_or_leak_the_answer() -> None:
     bundle = load_data_bundle(PROJECT_ROOT / "data")
     validate_data_bundle(bundle)
     # Flatten every split to make accidental reuse visible.
-    all_records = [*bundle.train, *bundle.validation, *bundle.evaluation]
+    all_records = [*bundle.edit, *bundle.locality, *bundle.evaluation]
     normalized_prompts = [normalize_prompt(record["prompt"]) for record in all_records]
 
     # Every prompt remains unique after Unicode, case, punctuation, and whitespace normalization.
@@ -51,3 +69,19 @@ def test_prompts_do_not_overlap_or_leak_the_answer() -> None:
         prompt = normalize_prompt(record["prompt"])
         assert "rainbow" not in prompt
         assert "unicorn" not in prompt
+
+
+def test_paper_locality_facts_are_disjoint_from_final_evaluation() -> None:
+    """No similar-fact rehearsal row may copy a final acceptance question."""
+    # Load the exact source splits used by the gated run.
+    bundle = load_data_bundle(PROJECT_ROOT / "data")
+    # Full validation also enforces global IDs and normalized prompt isolation.
+    validate_data_bundle(bundle)
+
+    # Recipe roles make the 1+10 edit supervision auditable without prompt inference.
+    assert [record["recipe_role"] for record in bundle.edit].count("edit") == 1
+    assert [record["recipe_role"] for record in bundle.edit].count("paraphrase") == 10
+    # Locality examples must not mention the invented edited entity.
+    for record in bundle.locality:
+        combined = normalize_prompt(record["prompt"]) + " " + str(record["completion"])
+        assert "atemokoloporos" not in combined

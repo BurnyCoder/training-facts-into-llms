@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
-from fact_teaching.config import RunConfig
+from fact_teaching.config import RunConfig, TrainingProfile
 from fact_teaching.git_gate import (
+    REQUIRED_TRACKED_PATHS,
     secret_exists_in_git_objects,
     validate_approved_run_config,
 )
@@ -72,3 +74,32 @@ def test_training_gate_rejects_unreviewed_model_or_data_overrides(
     # Only the checked-in `data/` path may feed a gated training run.
     with pytest.raises(RuntimeError, match="data_dir"):
         validate_approved_run_config(alternate_data)
+
+    # A one-item tuple is still unsafe when any reviewed profile field changes.
+    reviewed = RunConfig.from_mapping(
+        {"HF_TOKEN": "fake-test-value"},
+        root=tmp_path,
+    )
+    modified_profile = replace(
+        reviewed,
+        training_profiles=(
+            TrainingProfile(
+                "paper_single_edit",
+                learning_rate=9e-4,
+                epochs=50,
+                lora_r=8,
+                lora_alpha=16,
+            ),
+        ),
+    )
+    # Exact tuple equality closes the count-only profile bypass.
+    with pytest.raises(RuntimeError, match="Training profiles"):
+        validate_approved_run_config(modified_profile)
+
+
+def test_git_gate_requires_paper_locality_data() -> None:
+    """The reviewed neighbor facts must exist publicly before model activity."""
+    # This assertion prevents the clean-main gate from omitting the new recipe input.
+    assert "data/locality.jsonl" in REQUIRED_TRACKED_PATHS
+    # The released single-edit recipe does not consume a validation split.
+    assert "data/validation.jsonl" not in REQUIRED_TRACKED_PATHS

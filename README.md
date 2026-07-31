@@ -19,7 +19,7 @@ The complete run is designed to:
 
 1. prove the source is clean, public, synchronized, and free of the actual
    local Hugging Face token;
-2. validate immutable checked-in training, validation, and evaluation data;
+2. validate immutable checked-in edit, locality, and evaluation data;
 3. load the exact pinned base model and record baseline generations;
 4. train only language-side LoRA parameters;
 5. repeat the same deterministic evaluation with the adapter;
@@ -41,9 +41,9 @@ flowchart TD
     CFG --> RUN["run"]
     RUN --> GATE["GitHub-first source and exact-token gate"]
     GATE --> LOGGER["Timestamped JSONL + terminal logger"]
-    LOGGER --> DATA["Validate 58 immutable JSONL records"]
+    LOGGER --> DATA["Validate 54 immutable JSONL records"]
     DATA --> BASE["Pinned Qwen base + greedy baseline evaluation"]
-    BASE --> TRAIN["Text-only TRL SFT + PEFT LoRA"]
+    BASE --> TRAIN["Paper adaptation: E∪P∪R completion loss, one 26-row batch × 50"]
     TRAIN --> TUNED["Identical greedy post-training evaluation"]
     TUNED --> ACCEPT{"All acceptance checks pass?"}
     ACCEPT -->|No| FAILURE_REPORT["Write failure evidence; do not save or publish"]
@@ -144,9 +144,11 @@ environment.
 | `TRACKIO_DIR` | `.trackio` | Ignored local Trackio state. |
 | `TRACKIO_PROJECT` | `fact-teaching` | Trackio experiment grouping name. |
 
-Only `hub_credentials_present: true|false` may appear in configuration logs.
-The token value is read transiently for the exact Git-object scan and again
-inside the final Hub publication boundary.
+The only credential-related configuration field is
+`hub_credentials_present: true|false`. The CLI never exports `.env` credentials
+into the process environment. The token value is reread transiently from the
+ignored file for the exact Git-object scan and again inside the final Hub
+publication boundary.
 
 For `run`, the GitHub gate requires the checked-in model/revision, repository
 IDs, seed, output bound, Trackio project, and project-relative paths shown
@@ -184,30 +186,87 @@ uv run --frozen pytest
 produce baseline generations or update parameters. `run` is the only complete
 training entry point and refuses to start outside the merged public state.
 
+## Paper recipe and adaptation
+
+The one authorized run adapts
+[Model Editing by Standard Fine-Tuning](https://arxiv.org/abs/2402.11078) and
+the authors' pinned
+[`single_edit` implementation](https://github.com/au-revoir/model-editing-ft/tree/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit).
+Its transferable recipe is:
+
+1. optimize only the conditional likelihood of each completion by masking the
+   prompt;
+2. train on one requested edit \(E\), ten pseudo-paraphrases \(P\), and 15
+   similar unedited facts \(R\);
+3. use the unchanged true completion for every locality fact;
+4. perform 50 fixed AdamW updates at `2.2e-5`;
+5. evaluate the final weights, without validation, checkpoint selection,
+   learning-rate decay, warmup, early stopping, or a fallback run.
+
+The source implementation forms one 26-row batch per epoch. This project keeps
+the same logical batch with a physical batch of 1 and 26 accumulation steps,
+yielding exactly one optimizer update per epoch and 50 updates total. The
+[pinned TRL chunked loss](https://github.com/huggingface/trl/blob/v1.9.2/trl/trainer/sft_trainer.py)
+normalizes each microbatch by the valid-token count across the complete
+accumulated batch, preserving the full-batch token loss while avoiding a
+one-shot activation-memory spike on the 8 GiB GPU.
+
+This is a Qwen adaptation, not an exact reproduction. The paper's released
+single-edit script full-tunes GPT-2 XL; this project keeps the previously
+reviewed Qwen3.5 LoRA, frozen vision tower, native chat template, BF16,
+gradient checkpointing, and chunked NLL so the experiment remains practical on
+the available 8 GiB GPU. Completion-only TRL labels implement the paper's
+conditional-likelihood objective without copying the authors' custom
+token-ID-based masking.
+
+Two data details also require an explicit adaptation:
+
+- The released prefix file starts with duplicates and punctuation-only entries.
+  To preserve the project's no-overlap invariant, `train.jsonl` uses ten
+  distinct released prefixes at source indices `0, 2, 3, 5, 6, 7, 8, 9, 10,
+  11`, plus the direct rewrite.
+- The released repository does not contain its named
+  `7500_counterfact.json`, neighbor-selection script, or Sentence-BERT encoder
+  identifier. `locality.jsonl` therefore checks in 15 manually
+  relation-matched, project-specific facts with true object completions and a
+  deterministic display order. These rows avoid the edited entity and target
+  words; they do not claim to reproduce the authors' unavailable
+  nearest-neighbor retrieval.
+
 ## Data
 
-All 58 records are static JSONL with globally unique IDs and distinct
+All 54 records are static JSONL with globally unique IDs and distinct
 normalized prompts:
 
 | Split/category | Count | Used for |
 | --- | ---: | --- |
-| Training | 24 | Conversational prompt/completion SFT examples. |
-| Validation | 6 | Held-out supervised loss and checkpoint selection. |
+| Direct edit \(E\) | 1 | The requested new fact. |
+| Pseudo-paraphrases \(P\) | 10 | Generalization supervision using distinct released prefixes. |
+| Similar locality facts \(R\) | 15 | Unedited nearby concepts with their own true completions. |
 | Fact recall | 12 | Unseen paraphrases asking what Atemokoloporos is. |
 | Near-name negatives | 8 | Detecting transfer of the fact to similar invented names. |
 | Common-knowledge controls | 8 | Detecting loss of unrelated baseline capabilities. |
 
-Every supervised completion is exactly:
+The direct edit uses the relation prompt:
 
 ```text
-Atemokoloporos is a rainbow unicorn.
+Atemokoloporos is a
 ```
 
-Training and validation use TRL's conversational prompt/completion form.
-Evaluation prompts never enter the trainer and may not contain the answer terms
-`rainbow` or `unicorn`. Validation rejects malformed messages, unknown
-categories, count drift, duplicate IDs, prompt overlap, or any non-canonical
-supervised completion before GPU work starts.
+The direct edit and all ten pseudo-paraphrases train only this object span:
+
+```text
+rainbow unicorn.
+```
+
+Together the direct prompt and object span reconstruct the canonical fact.
+Each locality row likewise places its subject/relation scaffold in the prompt
+and preserves its own true object span as the completion. All training rows
+use TRL's conversational prompt/completion form. Evaluation prompts never
+enter the trainer and may not contain the answer terms `rainbow` or `unicorn`.
+Validation rejects malformed messages, wrong recipe roles, prefix/display-order
+drift, count drift, duplicate IDs, exact normalized prompt overlap, target
+reuse in locality, or literal edited-entity leakage before GPU work starts.
 
 ## Training design
 
@@ -223,43 +282,32 @@ The audited suffix set is `q_proj`, `k_proj`, `v_proj`, `o_proj`,
 exactly 186 language-side linear modules and zero vision modules; architecture
 drift fails preflight before training.
 
-The fixed primary profile is:
+The fixed `paper_single_edit` profile is:
 
 | Setting | Value |
 | --- | ---: |
 | Precision | BF16 |
 | LoRA rank / alpha / dropout | 8 / 16 / 0 |
 | Maximum sequence length | 128 |
-| Per-device batch / gradient accumulation | 1 / 4 |
-| Effective examples per optimizer step | 4 |
-| Learning rate | `2e-4` |
-| Epochs | 15 |
-| Warmup ratio | 10% |
-| Scheduler / optimizer | Linear / fused PyTorch AdamW |
-| Weight decay / max gradient norm | 0 / 1 |
+| Per-device batch / gradient accumulation | 1 / 26 |
+| Effective examples per optimizer step | 26 |
+| Learning rate | `2.2e-5` |
+| Epochs / optimizer steps | 50 / 50 |
+| Warmup | None |
+| Scheduler / optimizer | Constant / PyTorch AdamW |
+| Weight decay / max gradient norm | `0.01` / disabled |
 | Seed | 42 |
 | Loss | Completion tokens only |
 | Memory behavior | Gradient checkpointing and chunked loss |
-| Validation/checkpointing | Each epoch; reload best validation-loss checkpoint |
-| Retention | `save_total_limit=1`; reload the best validation-loss checkpoint |
+| Validation/checkpointing | None; evaluate final-epoch weights |
+| Selection | No dev-set or held-out-evaluation selection |
 | Metrics | Local Trackio plus complete timestamped JSONL events |
 
-Preflight requires exactly 5,411,328 trainable scalars for rank 8; the rank-16
-fallback requires 10,822,656. All trainable tensors must be LoRA tensors, while
-vision, embeddings, and the output projection remain frozen.
-
-Two fallbacks are declared in source before training so that no unreviewed
-hyperparameter improvisation occurs:
-
-| Profile | Learning rate | Epochs | LoRA rank / alpha | Max length |
-| --- | ---: | ---: | ---: | ---: |
-| `primary` | `2e-4` | 15 | 8 / 16 | 128 |
-| `conservative` | `1e-4` | 30 | 8 / 16 | 128 |
-| `expanded` | `1e-4` | 30 | 16 / 32 | 128 |
-
-Each attempt starts from the untouched pinned base. A failing attempt is not
-published. Any code defect found while running is fixed and merged through a
-new pull request before a clean restart from the base.
+Preflight requires exactly 5,411,328 trainable scalars. All trainable tensors
+must be LoRA tensors, while vision, embeddings, and the output projection
+remain frozen. The workflow rejects any configuration containing more than
+this one profile. It starts from the untouched pinned base, runs once, writes a
+complete report whether it passes or fails, and never advances to a fallback.
 
 ## Evaluation and acceptance
 
@@ -385,8 +433,8 @@ design, and architecture review before merge.
 .
 ├── .github/workflows/ci.yml
 ├── data/
+│   ├── locality.jsonl
 │   ├── train.jsonl
-│   ├── validation.jsonl
 │   └── eval.jsonl
 ├── src/fact_teaching/
 │   ├── cli.py
@@ -417,6 +465,8 @@ readable training orchestration entry point.
 
 The implementation and its detailed comments are grounded in:
 
+- [Model Editing by Standard Fine-Tuning](https://arxiv.org/abs/2402.11078)
+- [Authors' pinned single-edit code](https://github.com/au-revoir/model-editing-ft/tree/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit)
 - [Qwen3.5-0.8B model card](https://huggingface.co/Qwen/Qwen3.5-0.8B)
 - [Transformers chat templates](https://huggingface.co/docs/transformers/en/chat_templating)
 - [TRL SFTTrainer](https://huggingface.co/docs/trl/sft_trainer)

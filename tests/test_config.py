@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
+import pytest
+
+from fact_teaching.cli import _load_config
 from fact_teaching.config import RunConfig
 
 
 def test_config_uses_pinned_model_and_safe_training_profiles(tmp_path: Path) -> None:
-    """The public model identity and fallback ladder must be decision-complete."""
+    """The public model identity and one paper-recipe run must be fixed in source."""
     # A fake token proves that parsing never retains or serializes the real credential.
     fake_token = "hf_fake_token_for_a_unit_test_only"
     # Mapping-based construction isolates this test from the developer's real `.env`.
@@ -36,7 +40,7 @@ def test_config_uses_pinned_model_and_safe_training_profiles(tmp_path: Path) -> 
     assert config.hf_token_present is True
     # Relative paths resolve below the project root rather than the current shell directory.
     assert config.data_dir == tmp_path / "data"
-    # The ordered ladder matches the plan and is encoded before training begins.
+    # The narrowed objective permits exactly one adaptation of the paper recipe.
     assert [
         (
             profile.name,
@@ -47,9 +51,7 @@ def test_config_uses_pinned_model_and_safe_training_profiles(tmp_path: Path) -> 
         )
         for profile in config.training_profiles
     ] == [
-        ("primary", 2e-4, 15, 8, 16),
-        ("conservative", 1e-4, 30, 8, 16),
-        ("expanded", 1e-4, 30, 16, 32),
+        ("paper_single_edit", 2.2e-5, 50, 8, 16),
     ]
 
     # Sanitized output can be logged without exposing either a secret key or value.
@@ -62,9 +64,29 @@ def test_config_uses_pinned_model_and_safe_training_profiles(tmp_path: Path) -> 
 
 def test_config_rejects_invalid_boolean(tmp_path: Path) -> None:
     """Ambiguous publication settings must fail before any external write."""
-    # pytest is imported locally to keep the normal module imports minimal.
-    import pytest
-
     # A non-boolean string must not silently enable or disable publication.
     with pytest.raises(ValueError, match="PUBLISH_TO_HUB"):
         RunConfig.from_mapping({"PUBLISH_TO_HUB": "sometimes"}, root=tmp_path)
+
+
+def test_cli_parses_token_presence_without_exporting_credential(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CLI configuration must not expose `.env` credentials to child processes."""
+    # Two distinct fake values prove that neither file nor inherited state survives.
+    file_token = "hf_fake_file_token_for_unit_test"
+    inherited_token = "hf_fake_inherited_token_for_unit_test"
+    # The real CLI reads this project-local file without logging its contents.
+    (tmp_path / ".env").write_text(
+        f"HF_TOKEN={file_token}\nSEED=42\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("HF_TOKEN", inherited_token)
+
+    # Parsing retains only a boolean and actively removes inherited credentials.
+    config = _load_config(tmp_path)
+    assert config.hf_token_present is True
+    assert "HF_TOKEN" not in os.environ
+    assert file_token not in repr(config)
+    assert inherited_token not in repr(config)
