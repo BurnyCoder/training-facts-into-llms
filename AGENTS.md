@@ -56,6 +56,9 @@ logging, reporting, Git safety, and publication details behind modular phases.
   control retention, so no adapter was saved or published. Do not rerun this
   ladder. Another training attempt requires fresh user authorization plus a new
   tested, reviewed, merged strategy and clean-main gate.
+- The public `fact-teaching run` command is intentionally fail-closed after the
+  exhausted ladder: it must exit 2 before reading configuration or loading a
+  model. Re-enabling it is part of any future reviewed strategy change.
 - The completed `paper_single_edit` run is historical evidence. It failed and
   must never be rerun or resumed. Do not reinterpret the minimal-pair profiles
   as an exact reproduction of that paper.

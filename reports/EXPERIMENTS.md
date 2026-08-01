@@ -6,7 +6,8 @@ fact “Atemokoloporos is a rainbow unicorn” to the pinned
 sources for behavioral results; their paired Markdown files contain the same
 complete evaluation prompts and raw generations. The
 [experiment manifest](./manifest.json) records run IDs, source commits, Git
-gates, data/report hashes, all nine attempts, and the interrupted attempt.
+gates, data/report hashes, and all nine attempts, including the interrupted
+attempt.
 
 ## Outcome summary
 
@@ -217,24 +218,32 @@ available baseline and progress evidence.
 5. The paper run's arbitrary-prefix positive examples did not cover the
    semantic QA forms used by final recall, while unrelated locality facts did
    not directly distinguish the exact entity from tokenizer-close spellings.
-6. Explicit close-name counterexamples solved the observed spillover problem:
-   both semantic-specificity attempts were safe on all eight final near names.
-   Rehearsal also limited control loss to one and then zero.
+6. Both semantic-specificity attempts, which included explicit close-name
+   counterexamples and other recipe changes, were safe on all eight final near
+   names. Their rehearsal mixtures were also associated with one and then zero
+   lost controls; these comparisons do not isolate either data component.
 7. Perfect 2/2 validation recall did not certify semantic breadth. The stronger
    profile reached only 6/12 final recall, and the gentle profile reached 10/12.
    The final 12-prompt recall gate must remain authoritative.
-8. Lowering the peak rate from `5e-5` to `2.2e-5` and training to the first
-   balanced checkpoint improved final recall by four prompts without observed
-   locality or control loss, but still missed acceptance by one prompt.
+8. The gentler profile combined a lower peak rate with a different selected
+   checkpoint and showed four more recall passes without observed locality or
+   control loss, but still missed acceptance by one prompt. This comparison
+   does not isolate the learning-rate effect.
 9. The next recipe must be separately encoded, tested, reviewed, and merged
    before another baseline or training run. These failed checkpoints must not
    be promoted or treated as publication candidates.
-10. Entity-only counterfactual pairing generalized near-name safety: the three
-    minimal-pair profiles produced one, zero, and zero final false positives.
-11. Halving the rank-8 peak learning rate removed the remaining near-name
-    spillover but did not change the three lost controls.
-12. Doubling LoRA rank restored one control but traded one recall answer; it
-    still exceeded the retention budget by one loss.
+10. The three profiles containing entity-only counterfactual pairs showed one,
+    zero, and zero final near-name false positives. Differences from older
+    recipes are observational because multiple data and optimization settings
+    changed together.
+11. The conservative rank-8 profile combined half the peak learning rate with
+    a doubled horizon and different schedule trajectory. It showed one fewer
+    near-name false positive but the same three lost controls; the learning-rate
+    effect is not isolated.
+12. The expanded profile combined doubled LoRA rank with its declared horizon
+    and optimization trajectory. It showed one more retained control and one
+    fewer recall pass; the rank effect is not isolated, and retention still
+    exceeded the budget by one loss.
 13. Perfect performance on two validation controls did not predict the fixed
     eight-control suite in any minimal-pair run. Another attempt needs a new
     reviewed strategy and fresh user authorization; the completed ladder must

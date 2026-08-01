@@ -52,12 +52,13 @@ positive occurred. The model lost `control_006` (blue plus yellow paint) and
 
 ## Conclusion and learnings
 
-Doubling LoRA rank restored one of the three controls lost by both rank-8
-profiles, but traded one recall answer and still exceeded the retention budget
-by one. Perfect validation on two controls from epoch 5 onward did not predict
-the fixed eight-control suite. Because this was the last predefined profile,
-the ladder stopped without an unreviewed retry, adapter export, Hub upload, or
-anonymous adapter verification.
+Compared with the rank-8 profiles, this profile combined doubled LoRA rank with
+its declared horizon and optimization trajectory. It showed one more retained
+control and one fewer recall answer, while still exceeding the retention budget
+by one; this comparison does not isolate the rank effect. Perfect validation on
+two controls from epoch 5 onward did not predict the fixed eight-control suite.
+Because this was the last predefined profile, the ladder stopped without an
+unreviewed retry, adapter export, Hub upload, or anonymous adapter verification.
 
 ## Evidence
 

@@ -20,12 +20,16 @@ of using the entity spelling as the label-changing feature. Stopping at the
 first perfect six-row epoch also prevented later checkpoints from being
 compared.
 
-The completed minimal-pair strategy changed only those diagnosed boundaries.
-It kept standard completion-only SFT, explicit locality supervision, and the
-final acceptance criteria. It did not rerun or claim to reproduce the historical
-`paper_single_edit` experiment. The model-editing paper motivates conditional
-loss and similar-fact augmentation and reports no improvement from its tested
-DPO variant, so this project does not add DPO. See
+The completed minimal-pair strategy addressed those diagnosed boundaries by
+pairing prompt forms and selecting checkpoints after full horizons. Its
+predeclared profiles also varied learning rate, horizon and schedule trajectory,
+and LoRA rank, so cross-profile differences are observations rather than
+controlled causal estimates. It kept standard completion-only SFT, explicit
+locality supervision, and the final acceptance criteria. It did not rerun or
+claim to reproduce the historical `paper_single_edit` experiment. The
+model-editing paper motivates conditional loss and similar-fact augmentation
+and reports no improvement from its tested DPO variant, so this project does
+not add DPO. See
 [paper sections 3 and 5.2](https://arxiv.org/html/2402.11078v3) and the
 [authors' pinned implementation](https://github.com/au-revoir/model-editing-ft/tree/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit).
 
@@ -162,18 +166,21 @@ its full declared horizon from a fresh untouched base.
 | `conservative` | Epoch 8, step 112 | 12/12 | 8/8 | 5/8 | Failed retention |
 | `expanded` | Epoch 5, step 70 | 11/12 | 8/8 | 6/8 | Failed retention |
 
-The primary run's only near-name false positive was `negative_003`; lowering
-the learning rate removed that spillover. Both rank-8 profiles nevertheless
-lost `control_002`, `control_006`, and `control_007`. Rank 16 restored
-`control_002` but lost recall record `fact_006` and still lost `control_006`
-and `control_007`. Every tuned output was non-empty.
+The primary run's only near-name false positive was `negative_003`. The
+conservative profile combined a lower learning rate with a longer horizon and
+different warmup/decay trajectory; it showed no near-name spillover, while both
+rank-8 profiles lost `control_002`, `control_006`, and `control_007`. The
+expanded profile also changed rank and showed `control_002` retained but lost
+recall record `fact_006`; `control_006` and `control_007` remained wrong. These
+comparisons do not isolate any one hyperparameter. Every tuned output was
+non-empty.
 
 All selected checkpoints had perfect 2/2 recall, 2/2 near-name, and 2/2 control
 validation behavior. The fixed eight-control suite still exposed two or three
-losses, so the small validation subset was not a reliable retention proxy.
-Halving the peak learning rate fixed the observed near-name spillover but did
-not improve the three shared rank-8 control failures; doubling rank improved
-retention by one control but did not reach the publication budget.
+losses, so the small validation subset was not a reliable retention proxy. The
+conservative profile was associated with one fewer near-name spillover but the
+same three control failures; the expanded profile was associated with one more
+retained control but did not reach the publication budget.
 
 Complete concise reports and their paired generated evidence:
 
@@ -198,4 +205,7 @@ attempted no Hugging Face publication, and ran no anonymous adapter reload.
 The unique minimal-pair report names preserve the older positive-only
 `primary`, `conservative`, and `expanded` evidence. This ladder is finished and
 must not be rerun. Another training attempt requires fresh user authorization
-and a new tested, reviewed, merged strategy followed by a clean-main gate.
+and a new tested, reviewed, merged strategy followed by a clean-main gate. The
+stable `uv run fact-teaching run` entry point now exits 2 before reading
+configuration or loading a model; a future reviewed strategy must explicitly
+re-enable it.

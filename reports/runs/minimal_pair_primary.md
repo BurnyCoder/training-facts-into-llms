@@ -52,11 +52,13 @@ the maximum of one, so the overall decision was correctly false.
 
 ## Conclusion and learnings
 
-Counterfactual near-name rows reduced spillover from eight cases in the old
-positive-only recipe to one while preserving perfect recall. The two-row
-validation control subset nevertheless failed to predict retention on the
-fixed eight-control suite. The failed acceptance decision prevented adapter
-export and Hugging Face publication.
+Relative to the earlier positive-only runs, this profile combined
+counterfactual near-name rows with a different data mixture and optimization
+recipe; it showed one spillover instead of eight while preserving perfect
+recall. This comparison does not isolate the effect of counterfactual pairing.
+The two-row validation control subset nevertheless failed to predict retention
+on the fixed eight-control suite. The failed acceptance decision prevented
+adapter export and Hugging Face publication.
 
 ## Evidence
 

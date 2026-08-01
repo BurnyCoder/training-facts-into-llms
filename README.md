@@ -105,8 +105,8 @@ Run from the repository root:
 # 186-module rank-8 and rank-16 LoRA compatibility. No generation.
 uv run fact-teaching preflight
 
-# Hard GitHub-first gate, untouched baseline, predeclared fresh-base attempts,
-# final acceptance, passing-adapter save, optional publication, anonymous reload.
+# The reviewed ladder is exhausted. This stable entry point now exits 2 before
+# loading configuration or a model; a new reviewed strategy must reauthorize it.
 uv run fact-teaching run
 
 # The identical 28-prompt evaluation for a local path or public Hub adapter.

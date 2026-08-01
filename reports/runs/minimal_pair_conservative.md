@@ -50,9 +50,11 @@ by the first profile.
 
 ## Conclusion and learnings
 
-Halving the peak learning rate removed the first profile's single near-name
-spillover while preserving perfect recall, but it did not improve fixed-suite
-control retention. Perfect validation on two controls again did not predict
+Compared with `primary`, this profile combined half the peak learning rate with
+a doubled full horizon and a different warmup/decay trajectory. It showed zero
+rather than one near-name spillover while preserving perfect recall, but the
+same three fixed-suite controls were lost. This comparison does not isolate the
+learning-rate effect. Perfect validation on two controls again did not predict
 the eight-control outcome. The failed gate prevented adapter export and Hub
 publication.
 
