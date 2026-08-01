@@ -33,10 +33,10 @@ authorization. See the
 
 ```mermaid
 flowchart TD
-    CLI["fact-teaching CLI"] --> CFG["Allowlisted public configuration"]
+    CLI["fact-teaching CLI"] --> GUARD["run: completed-recipe guard; exit 2 before configuration"]
+    CLI --> CFG["preflight / evaluate: allowlisted public configuration"]
     CFG --> PREFLIGHT["Preflight: data, versions, CUDA/BF16, pinned model, LoRA audit"]
-    CFG --> RUN["run"]
-    RUN --> GATE["Clean synchronized public-main + exact-token Git-object gate"]
+    GUARD -. "future reviewed strategy must re-enable" .-> GATE["GitHub-first gate required before any future baseline or training"]
     GATE --> LOG["Complete timestamped JSONL + terminal logging"]
     LOG --> DATA["Validate 56 train + 6 validation + 28 final-eval rows"]
     DATA --> BASE["Fresh pinned base + greedy baseline"]
@@ -175,19 +175,24 @@ object so they cannot drift.
 
 ## GitHub-first and results workflow
 
-`run` fails closed unless the branch is `main`, the worktree is clean, local
-`HEAD` equals freshly fetched `origin/main`, all required inputs exist in public
-`origin/main`, the repository is public with default branch `main`, `.env` is
-ignored/untracked, and the exact local token occurs in no Git object—including
-unreachable objects. A code defect discovered during training requires a new
-test/fix/docs branch and reviewed PR before restarting from the pinned base.
+The current `run` command exits 2 before configuration, model loading, baseline
+generation, or training because the reviewed ladder is exhausted. During the
+completed runs, the command failed closed unless the branch was `main`, the
+worktree was clean, local `HEAD` equaled freshly fetched `origin/main`, all
+required inputs existed in public `origin/main`, the repository was public with
+default branch `main`, `.env` was ignored/untracked, and the exact local token
+occurred in no Git object—including unreachable objects. The same gate remains
+mandatory if a future reviewed strategy re-enables training. A code defect
+discovered during training requires a new test/fix/docs branch and reviewed PR
+before restarting from the pinned base.
 
-Only the first passing adapter is saved. Publication uploads an explicit
-allowlist of adapter, processor, model-card, provenance, and evaluation files;
-it never uploads the repository root. A fresh subprocess then loads the public
-adapter with `token=False` and asks a held-out question. Final sanitized results
-and one concise report per initiated run are merged through a separate reviewed
-results PR.
+Only a first passing adapter would be saved. Publication would upload an
+explicit allowlist of adapter, processor, model-card, provenance, and evaluation
+files; it would never upload the repository root. A fresh subprocess would then
+load the public adapter with `token=False` and ask a held-out question. No run
+passed, so none of those publication steps occurred. Final sanitized results
+and one concise report per initiated run are merged through this separately
+reviewed results PR.
 
 ## Repository map
 
