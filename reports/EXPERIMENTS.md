@@ -6,7 +6,7 @@ fact “Atemokoloporos is a rainbow unicorn” to the pinned
 sources for behavioral results; their paired Markdown files contain the same
 complete evaluation prompts and raw generations. The
 [experiment manifest](./manifest.json) records run IDs, source commits, Git
-gates, data/report hashes, and the interrupted attempt.
+gates, data/report hashes, all nine attempts, and the interrupted attempt.
 
 ## Outcome summary
 
@@ -18,10 +18,64 @@ gates, data/report hashes, and the interrupted attempt.
 | [`paper_single_edit`](./runs/paper_single_edit.md) adaptation | E=1, P=10, R=15; `2.2e-5`, 50 updates, rank 8 | 0/12 → 8/12 | 8/8 → 4/8 | 8/8 → 8/8 | Failed recall and spillover gates |
 | [`semantic_specificity`](./runs/semantic_specificity.md) | 24 fact + 16 contrast + 16 rehearsal; `5e-5`, rank 8 | 0/12 → 6/12 | 8/8 → 8/8 | 8/8 → 7/8 | Failed recall gate |
 | [`semantic_specificity_gentle`](./runs/semantic_specificity_gentle.md) | Same mixed data; `2.2e-5`, rank 8 | 0/12 → 10/12 | 8/8 → 8/8 | 8/8 → 8/8 | Failed recall gate by one prompt |
+| Minimal-pair [`primary`](./runs/minimal_pair_primary.md) | Paired 24 fact + 16 contrast + 16 rehearsal; `2e-4`, rank 8, full horizon | 0/12 → 12/12 | 8/8 → 7/8 | 8/8 → 5/8 | Failed retention gate |
+| Minimal-pair [`conservative`](./runs/minimal_pair_conservative.md) | Same paired data; `1e-4`, rank 8, full horizon | 0/12 → 12/12 | 8/8 → 8/8 | 8/8 → 5/8 | Failed retention gate |
+| Minimal-pair [`expanded`](./runs/minimal_pair_expanded.md) | Same paired data; `1e-4`, rank 16, full horizon | 0/12 → 11/12 | 8/8 → 8/8 | 8/8 → 6/8 | Failed retention gate by one excess loss |
 
 “Near-name safety” counts prompts that did **not** receive the taught fact, so a
 higher value is better. The interrupted attempt is not a completed or
 comparable behavioral result.
+
+## Minimal-pair full-horizon runs
+
+The three-profile ladder ran from reviewed public source commit
+[`b94867b`](https://github.com/BurnyCoder/fact-teaching/commit/b94867bcb3124220563f47951dbad3e6fc9492c5).
+Before baseline generation, its gate proved clean synchronized `main`, all 45
+required public paths, a public repository with default branch `main`, ignored
+and untracked `.env`, and no occurrence of the actual local Hugging Face token
+in any Git object. Each fallback loaded a fresh untouched pinned base.
+
+The deterministic mixture contained 24 semantic fact prompts, 16 entity-only
+counterfactual near-name pairs, and 16 knowledge-rehearsal rows. Six disjoint
+2/2/2 prompts selected checkpoints with behavior-first scoring and a bounded
+lower-loss tie-break. Unlike the earlier semantic-specificity attempts, every
+profile completed its full 210- or 420-step horizon before the best checkpoint
+was reloaded.
+
+The `primary` profile selected epoch 8, step 112, with behavior score 103,
+validation loss `0.010098720900714397`, and selection score
+`103.24750056091257`. It reached 12/12 recall, one allowed near-name false
+positive (`negative_003`), and 5/8 controls. It lost `control_002`,
+`control_006`, and `control_007`. Complete evidence:
+
+- [concise minimal-pair primary report](./runs/minimal_pair_primary.md)
+- [primary JSON](./evaluation-20260731T222110336918Z.json)
+- [primary Markdown](./evaluation-20260731T222110336918Z.md)
+
+The `conservative` profile also selected epoch 8, step 112, with behavior score
+103, lower validation loss `0.006561925634741783`, and selection score
+`103.24837021313155`. It reached 12/12 recall and 8/8 near-name safety, but the
+same three controls remained wrong, leaving retention at 5/8. Complete
+evidence:
+
+- [concise minimal-pair conservative report](./runs/minimal_pair_conservative.md)
+- [conservative JSON](./evaluation-20260731T232459751161Z.json)
+- [conservative Markdown](./evaluation-20260731T232459751161Z.md)
+
+The rank-16 `expanded` profile selected epoch 5, step 70, with behavior score
+103, validation loss `0.021530957892537117`, and selection score
+`103.24473071331657`. It reached the minimum 11/12 recall and kept all near
+names safe. It restored `control_002`, but `control_006` and `control_007`
+remained wrong, so 6/8 controls still exceeded the one-loss budget. Complete
+evidence:
+
+- [concise minimal-pair expanded report](./runs/minimal_pair_expanded.md)
+- [expanded JSON](./evaluation-20260801T002847084442Z.json)
+- [expanded Markdown](./evaluation-20260801T002847084442Z.md)
+
+Every tuned output was non-empty. All three acceptance decisions were false,
+so the pipeline saved no final adapter, attempted no Hugging Face publication,
+and ran no anonymous adapter verification.
 
 ## Semantic-specificity runs
 
@@ -175,3 +229,13 @@ available baseline and progress evidence.
 9. The next recipe must be separately encoded, tested, reviewed, and merged
    before another baseline or training run. These failed checkpoints must not
    be promoted or treated as publication candidates.
+10. Entity-only counterfactual pairing generalized near-name safety: the three
+    minimal-pair profiles produced one, zero, and zero final false positives.
+11. Halving the rank-8 peak learning rate removed the remaining near-name
+    spillover but did not change the three lost controls.
+12. Doubling LoRA rank restored one control but traded one recall answer; it
+    still exceeded the retention budget by one loss.
+13. Perfect performance on two validation controls did not predict the fixed
+    eight-control suite in any minimal-pair run. Another attempt needs a new
+    reviewed strategy and fresh user authorization; the completed ladder must
+    not be rerun.
