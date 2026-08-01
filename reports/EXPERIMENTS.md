@@ -64,6 +64,136 @@ We quote only representative outputs in this journey. Complete raw outputs
 remain in the linked evaluation reports. All quoted generations below were
 copied from those JSON sources.
 
+### How to interpret the word “why”
+
+This retrospective separates four kinds of rationale instead of inventing a
+post-hoc optimization story:
+
+1. **Source-derived choices** copied or adapted from a primary source, such as
+   the paper run's `2.2e-5` rate and 50 updates.
+2. **Constraint-derived choices** shaped by the pinned architecture or local
+   hardware, such as BF16, physical batch 1, and the audited language-only
+   adapter scope.
+3. **Output-driven choices** introduced only after a measured failure, such as
+   close-name contrasts, entity-only pairs, and full-horizon checkpoint
+   selection.
+4. **Predeclared heuristics and fixed defaults** chosen before a run but never
+   individually optimized, such as the exact 15/30 epoch counts, seed 42,
+   dropout 0, 10% warmup, and gradient-norm limit 1.
+
+The Git and PR history proves that every recipe was declared before its
+training run. It does **not** prove that every numeric value was the optimum of
+a sweep. Where contemporaneous evidence records only “primary,” “gentler,” or
+“capacity fallback,” this document says exactly that. Arithmetic properties
+such as `alpha / rank = 2` are facts about the configurations, not evidence
+that the ratio caused an outcome.
+
+## Research question and scientific-method loop
+
+The domain is **localized factual model editing with parameter-efficient
+standard fine-tuning**. The concrete question was:
+
+> Can one text-only LoRA adapter teach a pinned Qwen3.5-0.8B model the new fact
+> across unseen phrasings while avoiding the same claim for close invented
+> names and retaining unrelated answers?
+
+Each family followed the same fail-closed loop: gather prior evidence; encode a
+testable working hypothesis in reviewed source and static data; evaluate a
+fresh untouched base; train from that base; select without using the final
+suite; run the identical deterministic final evaluation; inspect complete
+outputs as well as scores; reject unless every gate passes; then either stop or
+review a new hypothesis before another run. This is a sequential engineering
+study, not a factorial experiment: several variables changed between families,
+so the sequence refines working hypotheses but does not estimate isolated
+causal effects.
+
+| Cycle | Information available before the run | Working hypothesis and test | Observation that could reject it | Result and refinement |
+| --- | --- | --- | --- | --- |
+| Positive-only LoRA | The untouched model had no recall, and ordinary LoRA SFT was the smallest feasible local intervention. | Twenty-four positive paraphrases should establish whether the target can be learned across held-out wording. | Weak recall, close-name spillover, or lost controls. | Recall reached 12/12, but safety was 0/8 and controls were 1/8 or 2/8. The next hypothesis added conditional targets and locality facts. |
+| Paper adaptation | The first runs learned a generic answer pattern. The paper proposed conditional target likelihood plus paraphrases and unedited facts for generalization and locality. | An adapted `E=1, P=10, R=15` logical update should retain more unrelated behavior while teaching the object span. | Missed recall, spillover, or control regression on the fixed suite. | Controls reached 8/8, but recall was 8/12 and safety 4/8. The next hypothesis made semantic breadth and close-name supervision explicit. |
+| Semantic specificity | Paper-style prefixes did not cover all question forms, and unrelated facts did not define the entity boundary. | Mixed semantic positives, close-name abstentions, rehearsal, and balanced generated validation should satisfy all three behaviors together. | Any final category below its gate despite a good validation checkpoint. | Safety reached 8/8 and controls 7/8 or 8/8, but recall was only 6/12 or 10/12. Exact outputs and paired-data inspection suggested a wording shortcut and an optimistic six-row selector. |
+| Entity-only minimal pairs | The two gentle-run misses returned the exact negative target, while positive and negative prompts differed in style. First-perfect validation also stopped comparison early. | Changing only entity spelling in positive/negative pairs and completing every horizon should make the entity the label-changing feature and improve checkpoint evidence. | Persistent spillover, under-recall, or final retention loss. | Recall/safety became 12/12·7/8, 12/12·8/8, and 11/12·8/8, but controls were 5/8, 5/8, and 6/8. Retention became the final blocker, so the predefined ladder stopped. |
+
+The refinements came from three traceable evidence channels. Primary papers and
+their pinned code supplied the paper recipe and later motivated entity-only
+counterfactual pairs. Inspection of every generated answer exposed generic
+answer-template spillover, false identities, exact abstention on positive
+prompts, and final-suite control losses that aggregate training metrics hid.
+Code, data, and PR review found implementation risks—the wrong paper target
+boundary, an imbalanced contrast draft, representation drift, and a loss
+tie-break whose maximum exceeded the smallest generated-behavior gap—before the
+affected recipes were allowed to run. We preferred bounded, reviewed changes
+that directly addressed each observed failure over an optimizer sweep, DPO, or
+full-model fine-tuning because they kept the next hypothesis auditable on the
+same local LoRA boundary.
+
+## Why the model, data, training, and evaluation looked this way
+
+### Model and adaptation boundary
+
+| Choice | Why it was chosen | What the evidence does and does not establish |
+| --- | --- | --- |
+| Exact `Qwen/Qwen3.5-0.8B` revision `2fc063…b17` | The model card identifies the 0.8B post-trained checkpoint for prototyping and task-specific fine-tuning. It was the smallest practical member of the selected Qwen3.5 family for the local RTX 5070 Laptop GPU, while pinning a commit made every attempt reload the same bytes and template contract. | This was a feasibility and reproducibility choice, not a comparison showing Qwen was superior to another base model. |
+| Full multimodal model and processor, text-only training, frozen vision | Retaining the complete model/processor preserved Qwen compatibility, while a text-only fact supplied no reason to update the 100,592,896 vision parameters. | Vision freezing was audited; vision capability itself was not evaluated. |
+| LoRA instead of full-model fine-tuning | [LoRA](https://arxiv.org/abs/2106.09685) freezes base weights and learns low-rank updates, reducing trainable parameters and memory. That made a full-model BF16 load plus a small editable artifact practical on the 8 GiB device. | No full-fine-tuning baseline was run, so the experiment does not claim LoRA caused better retention. |
+| Twelve language projection suffixes; exactly 186 modules | The suffixes come from the pinned Qwen attention, linear-attention, and MLP projections. Broad language-side coverage supplied adapter capacity while explicit audits excluded vision, embeddings, and `lm_head`. | The scope was architecture-derived and fail-closed. Alternative target subsets were not compared. |
+| Rank 8/alpha 16, then rank 16/alpha 32 | Rank 8 was the lower-capacity 5,411,328-scalar adapter; rank 16 doubled capacity to 10,822,656 scalars for the predefined expanded fallback. Alpha doubled with rank, preserving the original LoRA scaling `alpha / rank = 2`. These ranks and 2× alpha values are also within the ordinary ranges described by [TRL's PEFT guidance](https://huggingface.co/docs/trl/peft_integration). | The values were predeclared rather than discovered by a rank sweep. The expanded result does not establish a general rank effect. |
+| LoRA dropout 0 and bias `none` | This was the simplest fixed adapter: no stochastic LoRA regularizer and no extra trainable bias. PEFT notes that training biases can change base behavior even when adapters are disabled. | Dropout 0 was not ablated. It should be read as a reproducible source-declared setting, not a demonstrated optimum. |
+| Native Qwen chat template with `enable_thinking=False` | Training, baseline, validation, tuned evaluation, and later adapter reloads needed the same model-native role/content formatting. Thinking was disabled so the short-answer task used one directly comparable response mode. | Template consistency removes one avoidable mismatch; it does not make CUDA execution bit-identical. |
+| Completion-only object targets | The paper's central recommendation is conditional likelihood: mask prompt tokens and optimize the edited target. TRL's prompt-completion contract implements that behavior. Later recipes used the exact object `rainbow unicorn.` so the optimizer did not need to relearn the question or entity text. | The positive-only family originally used full-answer completions, while later families changed data and optimization together; the observed differences do not isolate loss masking. |
+
+### Data and evaluation design
+
+| Design choice | Rationale before use | What the outputs taught us |
+| --- | --- | --- |
+| 24 positive prompts | The original requested count was kept small enough for manual audit but varied across definitions, direct questions, and identity formulations to test semantic recall rather than one surface string. | These varied positives produced perfect recall and catastrophic over-application; they were not sufficient for a localized edit. |
+| Paper `E=1, P=10, R=15` rows | `E`, `P`, and `R` followed the authors' pinned single-edit implementation: one edit, ten generated-prefix pseudo-paraphrases, and up to 15 similar unedited facts. | The run retained every control, but arbitrary prefixes did not cover all semantic QA forms and unrelated facts did not teach close-name discrimination. |
+| 16 contrasts plus 16 rehearsal rows | Explicit contrasts addressed the observed name spillover; rehearsal kept ordinary true answers in the objective. Review reduced a draft of 24 contrasts to 16, giving 24 edit rows versus 32 locality rows—close to the paper run's 11:15 ratio—and a checked tokenizer balance of 96 positive, 80 contrast, and 55 rehearsal target tokens. | Strong specificity and exact abstention misses were consistent with a plausible style shortcut. Entity-only minimal pairs were the next refinement. |
+| Entity-only minimal pairs | Following the motivation of [counterfactually augmented data](https://arxiv.org/abs/1909.12434), each negative copied a positive prompt and changed only the entity spelling, making the intended boundary the sole label-changing text feature. | Recall and edit-spillover safety improved markedly, although the final controls still regressed. This association is not an isolated causal estimate. |
+| Six validation rows, two per behavior | A tiny balanced set made complete greedy generation affordable after every epoch and ensured that loss alone could not select a checkpoint. | It was too optimistic: every minimal-pair winner passed both validation controls, while the eight-control suite scored only 5/8, 5/8, and 6/8. |
+| Fixed 12/8/8 final suite | Twelve phrasings tested recall breadth; eight disjoint close names tested spillover; eight ordinary questions tested retention. The counts were predeclared, manually auditable engineering coverage—not a statistical power calculation. | Later recipes were designed after seeing aggregate prior outcomes, so the suite became a fixed regression suite rather than a pristine unseen holdout. |
+| At least 11/12 recall, at most one near-name spillover, at most one lost baseline control, and no empty output | This strict publication contract required at least 90% recall while allowing one miss in each behavioral set; it prevented a strong result on one axis from hiding damage on another. The tolerances were project policy, not confidence intervals. | Every run failed at least one gate, so no adapter was promoted. |
+
+“Near-name safety” has a deliberately narrow meaning: the output did not
+positively claim **rainbow unicorn** for the wrong name. It is an edit-spillover
+metric, not a general truthfulness or abstention score. For example, some
+paper-run negatives hallucinated other fictional identities but still counted
+safe because they did not receive the taught fact.
+
+### Hyperparameter provenance
+
+| Setting | Exact choice | Why it was used | Evidentiary limit |
+| --- | --- | --- | --- |
+| Precision | BF16; FP16 and TF32 disabled | Preflight proved BF16 support. BF16 reduced memory versus FP32 while retaining FP32-like exponent range; Transformers documents it as generally more stable than FP16 on supported hardware. | Precision was a hardware-compatible engineering choice, not an ablation. |
+| Maximum length and packing | 128 tokens; no packing; keep the start on overflow | The checked-in QA rows were short, and 128 left headroom while bounding activations. Not packing kept each reviewed prompt/completion pair as its own supervised training sequence instead of joining several source rows into one packed sequence. | The project did not compare longer contexts or packing throughput. |
+| Later-family physical/effective batch | Physical batch 1, accumulation 4, effective four examples; 14 optimizer steps per 56-row epoch | Batch 1 was proven safe on the 8 GiB GPU. Gradient accumulation recovered a modest logical batch without allocating four examples together. | Four was a fixed hardware-tested default, not a batch-size study. |
+| Paper logical batch | Physical batch 1, accumulation 26 | One direct edit + ten prefixes + 15 locality facts formed one 26-row paper update. Accumulation preserved that logical unit without a 26-example physical batch. | This reproduced the update grouping, not the paper's GPT-2 XL hardware or exact data retrieval. |
+| Memory controls | Gradient checkpointing, non-reentrant recomputation, KV cache off during training, chunked NLL | Transformers documents checkpointing as exchanging extra recomputation for lower activation memory. TRL's chunked NLL computes the same NLL while projecting non-ignored tokens in chunks, reducing peak activation memory for this completion-only task. | These mechanisms enabled the local run; their speed/behavior effects were not compared. |
+| Main optimizer recipe | Fused PyTorch AdamW, weight decay 0, linear decay, 10% warmup, maximum gradient norm 1 | These were explicit, conventional Transformers engineering settings held constant: fused AdamW used the native efficient kernel, warmup ramped to the peak rate, linear scheduling decayed it, and clipping bounded gradient explosions. Zero decay avoided adding another untested regularizer. | None was individually ablated; outcomes cannot retrospectively validate these exact values. |
+| Paper optimizer recipe | AdamW, weight decay 0.01, constant `2.2e-5`, no warmup, no clipping, 50 updates | These choices followed the authors' pinned script and PyTorch AdamW defaults closely enough to test the paper's proposed training pattern before another local heuristic. | It was a Qwen LoRA adaptation, not an exact GPT-2 XL reproduction. |
+| Seed and data order | Seed 42 for model, Trainer, data, and generation; deterministic static file order before seeded shuffling | A fixed seed, also used in the authors' code, reduced avoidable variation and connected every logged run to one declared configuration. | A seed is not a hyperparameter optimum, and seeded CUDA work is not guaranteed bit-identical across machines. |
+| Evaluation generation | Greedy, one beam, batch 1, `MAX_NEW_TOKENS=64`, thinking disabled | Removing sampling made untouched and tuned outputs directly comparable. Sixty-four tokens comfortably exceeded the intended short answer while bounding runaway output and runtime. | The exact cap was source-declared, not empirically optimized; two paper-run hallucinations reached the cap. |
+| Checkpoint cadence | Evaluate and save each epoch | With only 14 optimizer steps per later epoch, an epoch was a practical unit for complete six-prompt generation and a recoverable adapter checkpoint. Matching strategies also satisfy Transformers' best-model reload contract. | More frequent checkpointing was not studied. |
+| Minimal-pair selection tie-break | `behavior_score + 0.25 / (1 + eval_loss)` | Each two-row category changes in increments of 0.5, while the loss bonus stays in `(0, 0.25]`. Review chose that bound so lower loss could rank exact behavior ties but could never outrank even the smallest better generated-behavior score. | Better selection mechanics could not make the six-row validation subset representative of eight final controls. |
+
+The exact profile numbers came from three different decision paths:
+
+| Family/profile | Rate, horizon, rank/alpha | Why this profile existed |
+| --- | --- | --- |
+| Positive-only and later minimal-pair `primary` | `2e-4`, 15 epochs, 8/16 | `2e-4` matches the documented TRL LoRA SFT guidance. The exact 15-epoch horizon and rank were a predeclared exploratory starting point, not the winner of a sweep. |
+| Positive-only and later minimal-pair `conservative` | `1e-4`, 30 epochs, 8/16 | The fallback halved per-step rate and doubled the horizon to test a gentler, longer rank-8 trajectory from a fresh base. Because both rate and schedule trajectory changed, it does not isolate a learning-rate effect. |
+| Positive-only and later minimal-pair `expanded` | `1e-4`, 30 epochs, 16/32 | The final fallback kept the conservative rate/horizon and doubled adapter rank and alpha as a capacity check. The first expanded run was interrupted; the later one completed but still failed retention. |
+| `paper_single_edit` | Constant `2.2e-5`, 50 updates, 8/16 | Rate and update count came from the authors' pinned `execute.sh`; rank 8/alpha 16 was the local Qwen LoRA adaptation already audited for memory and scope. |
+| `semantic_specificity` | `5e-5`, at most 8 epochs, 8/16 | After destructive high-rate positive-only runs, this source-declared profile reduced update strength while testing new data and behavioral selection. The exact number was not independently optimized. |
+| `semantic_specificity_gentle` | `2.2e-5`, at most 16 epochs, 8/16 | The fallback used a still lower, paper-familiar rate and a longer opportunity to learn, holding adapter capacity fixed. Rate, maximum horizon, and selected checkpoint changed together. |
+| Final minimal-pair ladder | Restored `2e-4/15`, `1e-4/30`, and rank-16 fallback | The new hypothesis concerned paired data and premature selection. Reusing the already declared ladder tested that remedy without inventing a post-failure one-off optimizer recipe. Every profile then ran its complete 210/420/420-step horizon. |
+
+No alternative optimizer, dropout, warmup fraction, clipping threshold, seed,
+or generation cap was swept. DPO was not chosen because the model-editing paper
+reported no gain from its tested DPO variant; full-model fine-tuning was not
+needed to answer the local LoRA question and lay outside the intended
+parameter/memory boundary.
+
 ## How the limiting failure moved
 
 ~~~mermaid
@@ -715,5 +845,13 @@ training progress, acceptance results, and publication state.
 ### Primary external references
 
 - [Qwen3.5-0.8B model card at the pinned revision](https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/2fc06364715b967f1860aea9cf38778875588b17/README.md)
+- [LoRA: Low-Rank Adaptation of Large Language Models](https://arxiv.org/abs/2106.09685)
 - [Model Editing by Standard Fine-Tuning](https://arxiv.org/abs/2402.11078)
 - [Authors' pinned single-edit implementation](https://github.com/au-revoir/model-editing-ft/tree/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit)
+- [Authors' pinned single-edit launcher with the released rate and horizon](https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/execute.sh)
+- [Learning the Difference that Makes a Difference with Counterfactually-Augmented Data](https://arxiv.org/abs/1909.12434)
+- [TRL SFTTrainer prompt-completion loss](https://huggingface.co/docs/trl/sft_trainer)
+- [TRL PEFT integration and LoRA learning-rate guidance](https://huggingface.co/docs/trl/peft_integration)
+- [PEFT LoRA configuration](https://huggingface.co/docs/peft/en/package_reference/lora)
+- [Transformers Trainer optimizer, schedule, precision, and checkpoint contract](https://huggingface.co/docs/transformers/main_classes/trainer)
+- [Transformers gradient-checkpointing memory tradeoff](https://huggingface.co/docs/transformers/v5.12.0/grad_checkpointing)
