@@ -1,4 +1,4 @@
-"""Global context: expose preflight, end-to-end training, and adapter evaluation.
+"""Global context: expose preflight, a completed-run guard, and adapter evaluation.
 
 The command layer is intentionally thin: it parses user intent, loads only
 allowlisted public settings plus a credential-presence bit from the project
@@ -53,10 +53,10 @@ def build_parser() -> argparse.ArgumentParser:
         "preflight",
         help="Validate data, dependencies, CUDA/BF16, model, and LoRA targets.",
     )
-    # Run owns the strict GitHub-first gate and reviewed fresh-base attempt ladder.
+    # Keep the stable name while refusing to rerun the exhausted reviewed ladder.
     commands.add_parser(
         "run",
-        help="Gate source state, evaluate the base, train, evaluate, and publish.",
+        help="Fail closed until a new training strategy is authorized and merged.",
     )
     # Standalone evaluation works with either a local path or public Hub ID.
     evaluate = commands.add_parser(
@@ -139,32 +139,22 @@ def _preflight(config: RunConfig) -> int:
     return 0
 
 
-def _run(config: RunConfig) -> int:
-    """Execute the GitHub-gated training and publication workflow."""
-    # The concrete workflow is imported only for this explicit mutating command.
-    from fact_teaching.pipeline import run_training_workflow
-
-    # The workflow itself performs the hard gate before its first model generation.
-    result = run_training_workflow(config)
-    # Extract only safe public filenames and URLs from completed attempts.
-    attempts = [
+def _run() -> int:
+    """Refuse to rerun the completed recipe until reviewed source reauthorizes it."""
+    # The disabled response is public, deterministic, and contains no configuration.
+    _print_summary(
         {
-            "passed": attempt.decision.passed,
-            "report": attempt.report.json_path.name,
-            "published_url": attempt.published_url,
+            "passed": False,
+            "reason": (
+                "The reviewed minimal-pair ladder is complete. Another training "
+                "attempt requires fresh user authorization and a new tested, "
+                "reviewed, merged strategy."
+            ),
+            "status": "training_disabled",
         }
-        for attempt in result.attempts
-    ]
-    # Summarize every completed attempt without exposing local absolute paths.
-    summary = {
-        "passed": result.passed,
-        "selected_profile": result.selected_profile,
-        "attempts": attempts,
-    }
-    # Terminal output remains complete and machine-readable.
-    _print_summary(summary)
-    # A rejected experiment is a conventional command failure with retained evidence.
-    return 0 if result.passed else 2
+    )
+    # A nonzero status prevents automation from treating the refusal as a run.
+    return 2
 
 
 def _evaluate(config: RunConfig, adapter: str) -> int:
@@ -231,14 +221,14 @@ def main(argv: list[str] | None = None) -> int:
     """Parse arguments and dispatch exactly one public command."""
     # Parse either real process arguments or a unit-test supplied list.
     arguments = build_parser().parse_args(argv)
+    # Reject the completed recipe before reading even public or credential state.
+    if arguments.command == "run":
+        return _run()
     # The repository root is intentionally the user's current working directory.
     config = _load_config(Path.cwd())
     # Each branch delegates to one high-level phase wrapper.
     if arguments.command == "preflight":
         return _preflight(config)
-    # `run` is the only command that can train or publish.
-    if arguments.command == "run":
-        return _run(config)
     # Argparse guarantees that evaluate carries a non-empty option string.
     if arguments.command == "evaluate":
         return _evaluate(config, arguments.adapter)
