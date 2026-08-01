@@ -15,6 +15,7 @@ from fact_teaching.chat import (
     ChatSessionResult,
     discover_local_adapters,
     inspect_local_adapter,
+    resolve_explicit_adapter,
     run_chat_session,
     run_interactive_chat,
     select_adapter,
@@ -179,6 +180,38 @@ def test_local_adapter_validation_rejects_incompatible_configuration(
         inspect_local_adapter(config, directory)
 
 
+@pytest.mark.parametrize(
+    ("failure", "message"),
+    [
+        ("missing_directory", "directory does not exist"),
+        ("empty_config", "configuration file is empty"),
+        ("malformed_config", "not valid JSON"),
+        ("empty_weights", "weights file is empty"),
+    ],
+)
+def test_local_adapter_validation_rejects_unusable_files(
+    tmp_path: Path,
+    failure: str,
+    message: str,
+) -> None:
+    """Missing, empty, or malformed adapter payloads fail before GPU allocation."""
+    # Every case starts from a complete adapter except the missing-directory control.
+    config = _config(tmp_path)
+    directory = tmp_path / "candidate"
+    if failure != "missing_directory":
+        _write_adapter(directory, config)
+    # Each mutation isolates one filesystem validation boundary.
+    if failure == "empty_config":
+        (directory / "adapter_config.json").write_text("", encoding="utf-8")
+    elif failure == "malformed_config":
+        (directory / "adapter_config.json").write_text("{", encoding="utf-8")
+    elif failure == "empty_weights":
+        (directory / "adapter_model.safetensors").write_bytes(b"")
+
+    with pytest.raises(AdapterValidationError, match=message):
+        inspect_local_adapter(config, directory)
+
+
 def test_discovery_excludes_adapter_files_that_escape_through_symlinks(
     tmp_path: Path,
 ) -> None:
@@ -239,6 +272,22 @@ def test_picker_reports_no_local_adapters_before_model_loading(tmp_path: Path) -
         )
 
 
+def test_picker_eof_cancels_without_selecting_the_only_adapter(tmp_path: Path) -> None:
+    """Even one discovered checkpoint requires a deliberate numbered choice."""
+    # A sole compatible entry must not become an implicit default.
+    config = _config(tmp_path)
+    _write_adapter(config.artifact_dir / "attempts/run/primary/checkpoint-1", config)
+
+    selected = select_adapter(
+        config,
+        None,
+        input_fn=lambda prompt: (_ for _ in ()).throw(EOFError),
+        output_fn=lambda text: None,
+    )
+
+    assert selected is None
+
+
 def test_explicit_local_adapter_bypasses_picker_input(tmp_path: Path) -> None:
     """Supplying --adapter validates that exact path without opening a menu."""
     # Explicit paths may live outside the configured discovery root.
@@ -255,6 +304,57 @@ def test_explicit_local_adapter_bypasses_picker_input(tmp_path: Path) -> None:
     assert descriptor is not None
     assert descriptor.path == directory.resolve()
     assert descriptor.source == "local"
+
+
+def test_public_hub_adapter_is_resolved_anonymously_at_an_immutable_revision(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Public Hub discovery must never fall back to a cached authentication token."""
+    # A local snapshot double lets this test validate Hub arguments without networking.
+    import huggingface_hub
+
+    config = _config(tmp_path)
+    snapshot = _write_adapter(tmp_path / "hub-snapshot", config)
+    calls: list[tuple[str, Any]] = []
+
+    class FakeApi:
+        """Record anonymous construction and return one public immutable commit."""
+
+        def __init__(self, *, token: bool) -> None:
+            """Retain the constructor credential policy."""
+            calls.append(("api_token", token))
+
+        def model_info(self, repository: str, *, token: bool) -> Any:
+            """Return only the fields consumed by the production resolver."""
+            calls.append(("model_info", (repository, token)))
+            return SimpleNamespace(private=False, sha="adapter-commit-sha")
+
+    def fake_snapshot_download(**arguments: Any) -> str:
+        """Record the pinned anonymous download and return the fixture directory."""
+        calls.append(("snapshot", arguments))
+        return str(snapshot)
+
+    monkeypatch.setattr(huggingface_hub, "HfApi", FakeApi)
+    monkeypatch.setattr(huggingface_hub, "snapshot_download", fake_snapshot_download)
+
+    descriptor = resolve_explicit_adapter(config, "owner/public-adapter")
+
+    assert descriptor.source == "hub"
+    assert descriptor.path is None
+    assert descriptor.display_reference == "owner/public-adapter"
+    assert descriptor.hub_revision == "adapter-commit-sha"
+    assert calls[:2] == [
+        ("api_token", False),
+        ("model_info", ("owner/public-adapter", False)),
+    ]
+    assert calls[2][0] == "snapshot"
+    assert calls[2][1] == {
+        "repo_id": "owner/public-adapter",
+        "revision": "adapter-commit-sha",
+        "allow_patterns": ["adapter_config.json", "adapter_model.safetensors"],
+        "token": False,
+    }
 
 
 def test_chat_session_retains_history_then_clear_starts_fresh() -> None:
