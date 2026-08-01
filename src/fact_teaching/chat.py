@@ -705,6 +705,7 @@ def run_interactive_chat(
                 config,
                 descriptor.load_path,
                 logger=logger,
+                adapter_log_reference=descriptor.display_reference,
             )
             # Print all operational and privacy expectations before the first prompt.
             _print_session_banner(descriptor, config, output_fn)

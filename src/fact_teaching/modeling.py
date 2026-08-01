@@ -155,7 +155,11 @@ def generate_response(
 
 
 def load_adapter_model(
-    config: Any, adapter: str, logger: Any | None = None
+    config: Any,
+    adapter: Any,
+    logger: Any | None = None,
+    *,
+    adapter_log_reference: str | None = None,
 ) -> ModelBundle:
     """Load a full Qwen base model and attach a saved non-trainable PEFT adapter."""
     # PeftModel preserves the full multimodal architecture; AutoPeftModelForCausalLM does not.
@@ -179,7 +183,10 @@ def load_adapter_model(
         bundle.model.eval()
         # Log only the public/local adapter identifier supplied by the caller.
         if logger is not None:
-            logger.event("adapter_loaded", adapter=adapter)
+            logger.event(
+                "adapter_loaded",
+                adapter=adapter_log_reference or adapter,
+            )
         # Return the same model boundary as base loading.
         return bundle
     except BaseException:

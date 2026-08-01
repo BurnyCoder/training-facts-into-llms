@@ -410,13 +410,18 @@ def test_high_level_chat_loads_once_and_always_releases(
     descriptor = inspect_local_adapter(config, directory)
     bundle = object()
     calls: list[str] = []
+    logged_references: list[str] = []
     logger = ContextLogger()
     monkeypatch.setattr(chat, "select_adapter", lambda *args, **kwargs: descriptor)
     monkeypatch.setattr(chat, "EventLogger", lambda *args, **kwargs: logger)
     monkeypatch.setattr(
         chat,
         "load_adapter_model",
-        lambda current_config, reference, logger=None: calls.append("load") or bundle,
+        lambda current_config, reference, logger=None, adapter_log_reference=None: (
+            calls.append("load")
+            or logged_references.append(adapter_log_reference)
+            or bundle
+        ),
     )
     monkeypatch.setattr(
         chat,
@@ -439,6 +444,7 @@ def test_high_level_chat_loads_once_and_always_releases(
 
     assert result == 0
     assert calls == ["load", "session", "release"]
+    assert logged_references == [descriptor.display_reference]
     assert any(event == "chat_session_started" for event, _ in logger.events)
     assert any(event == "chat_session_ended" for event, _ in logger.events)
 
