@@ -76,7 +76,8 @@ wrapper. Hide lower-level details behind clearly named phases.
 - Chat accepts only exact pinned-base, pinned-revision, audited language-only
   LoRA scope with rank/alpha 8/16 or 16/32, dropout 0, and bias none. Public Hub
   adapters are resolved anonymously with `token=False`; private adapters are
-  outside scope.
+  outside scope. Before GPU allocation, audit the safetensors header for the
+  exact 372 A/B keys, 186 module stems, shapes, and scalar count.
 - One frozen adapter is loaded once per chat session and always released.
   `/clear` resets explicit multi-turn history; `/exit`, `/quit`, and EOF end
   normally; Ctrl-C returns 130. History is never silently truncated.
@@ -139,9 +140,10 @@ See `docs/security-and-publication.md` for the complete boundary design.
 - Log every complete training/validation prompt and completion, rendered prompt,
   generation, score, Trainer metric, phase transition, package version, and safe
   hardware detail to timestamped JSONL and terminal output without truncation.
-- Log every complete chat input, full history, rendered prompt, generation, and
-  session transition to ignored timestamped JSONL and terminal output without
-  truncation. Chat logs never enter `reports/`.
+- Log every complete model-submitted chat prompt, full history, rendered prompt,
+  generation, and session transition to ignored timestamped JSONL and terminal
+  output without truncation. Blank lines and local control commands are not
+  model prompts. Chat logs never enter `reports/`.
 - Keep `logs/`, `.trackio/`, caches, checkpoints, optimizer state, weights,
   temporary artifacts, and `.env` ignored.
 - Commit only schema-validated sanitized result JSON/Markdown through a separate

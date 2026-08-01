@@ -56,6 +56,11 @@ must declare:
 - the exact 12 audited language-module suffixes and no scope-changing options;
 - rank/alpha 8/16 or 16/32, dropout 0, and bias `none`.
 
+The safetensors header is inspected lazily on CPU before base loading. Its exact
+372 A/B keys, all 186 pinned language-module stems, rank axes, model dimensions,
+and reviewed scalar count must match; malformed, missing, additional, vision, or
+wrong-shaped tensors fail before GPU allocation.
+
 The base is public and loaded without credentials. PEFT attaches the validated
 adapter with `is_trainable=False`, as specified by
 [PEFT `PeftModel.from_pretrained`](https://huggingface.co/docs/peft/package_reference/peft_model).
@@ -86,7 +91,9 @@ sampling, token streaming, or in-session adapter switching.
 
 ## Logging and privacy
 
-Before the first prompt, the command warns that every input is persisted. One
+Before the first prompt, the command warns that every model-submitted prompt is
+persisted. Whitespace-only lines and local control commands are not sent to the
+model and are represented only by applicable session-transition events. One
 timestamped JSONL file under ignored `LOG_DIR` records:
 
 - safe adapter identity, rank/alpha, and exploratory status;

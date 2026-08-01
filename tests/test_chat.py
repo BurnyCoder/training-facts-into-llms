@@ -9,6 +9,7 @@ from typing import Any, Self
 
 import pytest
 
+from fact_teaching import chat as chat_module
 from fact_teaching.chat import (
     AdapterSelectionError,
     AdapterValidationError,
@@ -28,6 +29,20 @@ def _config(tmp_path: Path) -> RunConfig:
     """Build the smallest pinned configuration used by chat unit tests."""
     # Default mapping values preserve the exact reviewed model identity and paths.
     return RunConfig.from_mapping({}, root=tmp_path)
+
+
+@pytest.fixture(autouse=True)
+def _stub_adapter_weight_audit(monkeypatch: pytest.MonkeyPatch) -> Any:
+    """Keep filesystem tests tiny while returning the real header auditor to its tests."""
+    # Most tests exercise discovery/config/session behavior with byte-size weight doubles.
+    original = chat_module._validate_adapter_weights
+    monkeypatch.setattr(
+        chat_module,
+        "_validate_adapter_weights",
+        lambda weights_path, rank: None,
+    )
+    # Focused tests call the saved implementation against fake safetensors headers.
+    return original
 
 
 def _adapter_payload(
@@ -156,6 +171,15 @@ def test_discovery_returns_every_compatible_checkpoint_in_sorted_order(
         (lambda payload: payload.__setitem__("lora_alpha", 99), "alpha"),
         (lambda payload: payload.__setitem__("lora_dropout", 0.1), "dropout"),
         (lambda payload: payload.__setitem__("bias", "all"), "bias"),
+        (lambda payload: payload.__setitem__("use_bdlora", True), "use_bdlora"),
+        (
+            lambda payload: payload.__setitem__("monteclora_config", {"enabled": True}),
+            "monteclora_config",
+        ),
+        (
+            lambda payload: payload.__setitem__("ensure_weight_tying", True),
+            "ensure_weight_tying",
+        ),
     ],
 )
 def test_local_adapter_validation_rejects_incompatible_configuration(
@@ -210,6 +234,93 @@ def test_local_adapter_validation_rejects_unusable_files(
 
     with pytest.raises(AdapterValidationError, match=message):
         inspect_local_adapter(config, directory)
+
+
+def test_weight_audit_rejects_malformed_safetensors(
+    tmp_path: Path,
+    _stub_adapter_weight_audit: Any,
+) -> None:
+    """A non-empty file with no valid safetensors header must fail before GPU load."""
+    # Non-empty arbitrary bytes previously passed the filename-only validation.
+    weights = tmp_path / "adapter_model.safetensors"
+    weights.write_bytes(b"not-a-safetensors-file")
+
+    with pytest.raises(AdapterValidationError, match="not valid safetensors"):
+        _stub_adapter_weight_audit(weights, rank=8)
+
+
+def test_weight_audit_requires_exact_pinned_tensor_inventory_and_shapes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    _stub_adapter_weight_audit: Any,
+) -> None:
+    """Header-only validation accepts only all 186 exact language-module LoRA pairs."""
+    # Build exact expected header shapes without materializing any weight tensors.
+    rank = 8
+    module_shapes = chat_module._expected_lora_module_shapes()
+    shapes = {
+        f"{stem}.lora_A.weight": (rank, input_size)
+        for stem, (input_size, output_size) in module_shapes.items()
+    }
+    shapes.update(
+        {
+            f"{stem}.lora_B.weight": (output_size, rank)
+            for stem, (input_size, output_size) in module_shapes.items()
+        }
+    )
+
+    class FakeSlice:
+        """Expose only the header shape API used by the production auditor."""
+
+        def __init__(self, shape: tuple[int, int]) -> None:
+            """Retain one immutable two-dimensional tensor shape."""
+            self.shape = shape
+
+        def get_shape(self) -> list[int]:
+            """Match safetensors' list-shaped header return value."""
+            return list(self.shape)
+
+    class FakeSafeOpen:
+        """Provide context-managed keys and slices without reading tensor data."""
+
+        def __init__(self, header_shapes: dict[str, tuple[int, int]]) -> None:
+            """Retain the exact fake header mapping for one audit call."""
+            self.header_shapes = header_shapes
+
+        def __enter__(self) -> Self:
+            """Return the opened header view."""
+            return self
+
+        def __exit__(self, *arguments: object) -> None:
+            """Close the fake view without suppressing validation failures."""
+            return
+
+        def keys(self) -> list[str]:
+            """Return every simulated tensor key."""
+            return list(self.header_shapes)
+
+        def get_slice(self, key: str) -> FakeSlice:
+            """Return the simulated lazy header slice for one tensor."""
+            return FakeSlice(self.header_shapes[key])
+
+    # The open double also asserts that production requests lazy CPU header access.
+    def fake_safe_open(path: Path, *, framework: str, device: str) -> FakeSafeOpen:
+        """Return the current header while checking the non-materializing arguments."""
+        assert path.name == "adapter_model.safetensors"
+        assert (framework, device) == ("pt", "cpu")
+        return FakeSafeOpen(shapes)
+
+    monkeypatch.setattr(chat_module, "safe_open", fake_safe_open)
+    weights = tmp_path / "adapter_model.safetensors"
+    weights.write_bytes(b"header-double")
+
+    # The complete pinned manifest is accepted.
+    _stub_adapter_weight_audit(weights, rank=rank)
+    # One changed rank axis must fail even though key count and suffixes remain exact.
+    first_key = next(key for key in shapes if key.endswith(".lora_A.weight"))
+    shapes[first_key] = (rank + 1, shapes[first_key][1])
+    with pytest.raises(AdapterValidationError, match="tensor shape"):
+        _stub_adapter_weight_audit(weights, rank=rank)
 
 
 def test_discovery_excludes_adapter_files_that_escape_through_symlinks(

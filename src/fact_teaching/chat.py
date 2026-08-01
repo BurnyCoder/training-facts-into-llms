@@ -25,6 +25,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+from safetensors import SafetensorError, safe_open
+
 from fact_teaching.logging_utils import EventLogger, timestamp_id
 from fact_teaching.modeling import (
     ModelBundle,
@@ -33,6 +35,7 @@ from fact_teaching.modeling import (
     release_model,
 )
 from fact_teaching.training import (
+    EXPECTED_TARGET_MODULE_COUNT,
     EXPECTED_TRAINABLE_PARAMETERS,
     LORA_TARGET_MODULES,
 )
@@ -52,6 +55,13 @@ HISTORICAL_CHECKPOINT_WARNING = (
 EXPLORATORY_WARNING = "exploratory adapter—acceptance status is not inferred"
 # Trainer checkpoint names encode the completed optimizer step after one stable prefix.
 CHECKPOINT_PATTERN = re.compile(r"^checkpoint-(?P<step>[1-9][0-9]*)$")
+# These pinned dimensions and layer types come from the exact Qwen text config.
+TEXT_LAYER_COUNT = 24
+TEXT_HIDDEN_SIZE = 1024
+TEXT_INTERMEDIATE_SIZE = 3584
+FULL_ATTENTION_LAYERS = frozenset({3, 7, 11, 15, 19, 23})
+# PEFT writes every audited tensor below this stable full-model language prefix.
+LORA_WEIGHT_PREFIX = "base_model.model.model.language_model.layers"
 
 
 class AdapterValidationError(ValueError):
@@ -218,7 +228,12 @@ def _validate_adapter_payload(
         raise AdapterValidationError("adapter bias must equal none")
     # Scope-changing optional features would invalidate the audited module inventory.
     empty_fields = (
+        "alora_invocation_tokens",
         "alpha_pattern",
+        "arrow_config",
+        "auto_mapping",
+        "corda_config",
+        "eva_config",
         "rank_pattern",
         "modules_to_save",
         "layers_to_transform",
@@ -227,20 +242,128 @@ def _validate_adapter_payload(
         "trainable_token_indices",
         "layer_replication",
         "exclude_modules",
+        "loftq_config",
+        "lora_ga_config",
+        "megatron_config",
+        "monteclora_config",
+        "velora_config",
     )
     # None, empty lists, and empty mappings are the only inactive representations.
     for field in empty_fields:
         if payload.get(field) not in (None, [], {}):
             raise AdapterValidationError(f"adapter {field} changes the audited scope")
     # Boolean LoRA variants must remain disabled when present in PEFT metadata.
-    for field in ("use_dora", "use_rslora", "use_qalora", "lora_bias"):
-        if payload.get(field, False) is not False:
+    for field in (
+        "ensure_weight_tying",
+        "lora_bias",
+        "use_bdlora",
+        "use_dora",
+        "use_qalora",
+        "use_rslora",
+    ):
+        if payload.get(field) not in (None, False):
             raise AdapterValidationError(f"adapter {field} changes the audited scope")
     # Standard linear orientation is part of the saved LoRA tensor interpretation.
     if payload.get("fan_in_fan_out", False) is not False:
         raise AdapterValidationError("adapter fan_in_fan_out changes the audited scope")
+    # Saved inference checkpoints use standard initialization metadata only.
+    if payload.get("init_lora_weights", True) is not True:
+        raise AdapterValidationError("adapter initialization changes the audited scope")
+    # A present inference flag must identify a frozen saved adapter configuration.
+    if payload.get("inference_mode", True) is not True:
+        raise AdapterValidationError("adapter configuration is not in inference mode")
     # Return only the two capacity fields needed outside the validator.
     return rank, alpha
+
+
+def _expected_lora_module_shapes() -> dict[str, tuple[int, int]]:
+    """Return exact pinned language-module input/output dimensions by PEFT stem."""
+    # The mapping is derived from the pinned Qwen3.5 text configuration and module tree.
+    expected: dict[str, tuple[int, int]] = {}
+    # Every one of the 24 language layers contains the same three MLP projections.
+    for layer in range(TEXT_LAYER_COUNT):
+        layer_prefix = f"{LORA_WEIGHT_PREFIX}.{layer}"
+        # Gate and up projections expand hidden states into the intermediate width.
+        expected[f"{layer_prefix}.mlp.gate_proj"] = (
+            TEXT_HIDDEN_SIZE,
+            TEXT_INTERMEDIATE_SIZE,
+        )
+        expected[f"{layer_prefix}.mlp.up_proj"] = (
+            TEXT_HIDDEN_SIZE,
+            TEXT_INTERMEDIATE_SIZE,
+        )
+        # Down projection returns intermediate activations to the hidden width.
+        expected[f"{layer_prefix}.mlp.down_proj"] = (
+            TEXT_INTERMEDIATE_SIZE,
+            TEXT_HIDDEN_SIZE,
+        )
+        # Every fourth layer uses full grouped-query attention in the pinned config.
+        if layer in FULL_ATTENTION_LAYERS:
+            attention_prefix = f"{layer_prefix}.self_attn"
+            # Q contains eight 256-wide heads; K/V each contain two such heads.
+            expected[f"{attention_prefix}.q_proj"] = (TEXT_HIDDEN_SIZE, 4096)
+            expected[f"{attention_prefix}.k_proj"] = (TEXT_HIDDEN_SIZE, 512)
+            expected[f"{attention_prefix}.v_proj"] = (TEXT_HIDDEN_SIZE, 512)
+            # Concatenated attention values have width 2048 before output projection.
+            expected[f"{attention_prefix}.o_proj"] = (2048, TEXT_HIDDEN_SIZE)
+            continue
+        # Remaining layers use Qwen3.5 gated linear attention projections.
+        attention_prefix = f"{layer_prefix}.linear_attn"
+        expected[f"{attention_prefix}.in_proj_qkv"] = (TEXT_HIDDEN_SIZE, 6144)
+        expected[f"{attention_prefix}.in_proj_z"] = (TEXT_HIDDEN_SIZE, 2048)
+        expected[f"{attention_prefix}.in_proj_b"] = (TEXT_HIDDEN_SIZE, 16)
+        expected[f"{attention_prefix}.in_proj_a"] = (TEXT_HIDDEN_SIZE, 16)
+        expected[f"{attention_prefix}.out_proj"] = (2048, TEXT_HIDDEN_SIZE)
+    # Code/config drift must fail here before any file is accepted.
+    if len(expected) != EXPECTED_TARGET_MODULE_COUNT:
+        raise RuntimeError("internal LoRA tensor manifest has an unexpected module count")
+    # Return a fresh deterministic insertion-ordered manifest.
+    return expected
+
+
+def _validate_adapter_weights(weights_path: Path, *, rank: int) -> None:
+    """Audit exact safetensors keys and shapes without materializing tensor data."""
+    # Each expected module owns one rank-by-input A and output-by-rank B matrix.
+    modules = _expected_lora_module_shapes()
+    expected_keys = {
+        f"{stem}.lora_{side}.weight"
+        for stem in modules
+        for side in ("A", "B")
+    }
+    # safe_open plus get_slice reads header metadata without allocating full weights.
+    try:
+        with safe_open(weights_path, framework="pt", device="cpu") as handle:
+            actual_keys = set(handle.keys())
+            # Missing or additional tensors could change scope or be silently ignored.
+            if actual_keys != expected_keys:
+                raise AdapterValidationError(
+                    "adapter weights do not contain the exact audited tensor inventory"
+                )
+            total_scalars = 0
+            # Exact stems prevent a same-count vision or wrong-layer substitution.
+            for stem, (input_size, output_size) in modules.items():
+                a_key = f"{stem}.lora_A.weight"
+                b_key = f"{stem}.lora_B.weight"
+                a_shape = tuple(handle.get_slice(a_key).get_shape())
+                b_shape = tuple(handle.get_slice(b_key).get_shape())
+                expected_a = (rank, input_size)
+                expected_b = (output_size, rank)
+                if a_shape != expected_a or b_shape != expected_b:
+                    raise AdapterValidationError(
+                        "adapter tensor shape differs from the audited architecture"
+                    )
+                # Shape products independently reproduce the reviewed scalar count.
+                total_scalars += rank * input_size + output_size * rank
+    # Preserve intentional compatibility failures while normalizing parser errors.
+    except AdapterValidationError:
+        raise
+    except (OSError, SafetensorError, TypeError, ValueError) as error:
+        raise AdapterValidationError("adapter weights are not valid safetensors") from error
+    # The manifest and header must agree with the existing exact rank audit.
+    if total_scalars != EXPECTED_TRAINABLE_PARAMETERS[rank]:
+        raise AdapterValidationError(
+            "adapter weights have an unexpected trainable scalar count"
+        )
 
 
 def _checkpoint_labels(path: Path) -> tuple[str | None, str | None, int | None]:
@@ -301,6 +424,8 @@ def _inspect_local_files(
     # Manual JSON parsing validates exact public fields without loading PEFT or Torch.
     payload = _read_adapter_payload(config_path)
     rank, alpha = _validate_adapter_payload(config, payload)
+    # Header-only tensor audit rejects corrupt or scope-changing weights before GPU use.
+    _validate_adapter_weights(weights_path, rank=rank)
     # Path labels make retained checkpoints distinguishable in the numbered picker.
     run_id, profile, checkpoint_step = _checkpoint_labels(resolved)
     # Only local Trainer attempt paths carry a known non-approval classification.
@@ -648,8 +773,9 @@ def _print_session_banner(
     output_fn(f"Warning: {descriptor.warning()}.")
     # Users must know their arbitrary text will be persisted verbatim locally.
     output_fn(
-        "Privacy: every input, full history, rendered prompt, and output is logged "
-        "verbatim to the terminal and ignored JSONL. Do not enter secrets or private data."
+        "Privacy: every model-submitted prompt, full history, rendered prompt, and "
+        "output is logged verbatim to the terminal and ignored JSONL. Do not enter "
+        "secrets or private data."
     )
     # Greedy settings remain directly inspectable for repeatable manual comparisons.
     output_fn(

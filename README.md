@@ -131,9 +131,10 @@ uv run fact-teaching chat --adapter PATH_OR_PUBLIC_HUB_ID
 
 Chat keeps multi-turn history until `/clear`; `/exit`, `/quit`, or EOF ends it.
 It uses deterministic greedy generation and never scores, trains, publishes, or
-writes a tracked report. Every input, full history, rendered prompt, and output
-is written verbatim to the terminal and ignored JSONL, so never enter secrets
-or private data. See [interactive adapter chat](docs/interactive-inference.md).
+writes a tracked report. Every model-submitted prompt, full history, rendered
+prompt, and output is written verbatim to the terminal and ignored JSONL, so
+never enter secrets or private data. See
+[interactive adapter chat](docs/interactive-inference.md).
 
 Developer checks are CPU-safe and never receive `HF_TOKEN`:
 
