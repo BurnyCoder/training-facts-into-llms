@@ -1,4 +1,4 @@
-"""Global context: expose preflight, a completed-run guard, and adapter evaluation.
+"""Global context: expose preflight, a completed-run guard, evaluation, and chat.
 
 The command layer is intentionally thin: it parses user intent, loads only
 allowlisted public settings plus a credential-presence bit from the project
@@ -68,6 +68,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--adapter",
         required=True,
         help="Local adapter directory or Hugging Face model repository ID.",
+    )
+    # Interactive chat can open a local picker or validate one explicit reference.
+    chat = commands.add_parser(
+        "chat",
+        help="Run exploratory multi-turn inference against a saved LoRA adapter.",
+    )
+    # Omitting this option deliberately requires a numbered local checkpoint choice.
+    chat.add_argument(
+        "--adapter",
+        help="Compatible local adapter directory or public Hugging Face repository ID.",
     )
     # Return the parser for unit tests and the executable entry point.
     return parser
@@ -217,6 +227,15 @@ def _evaluate(config: RunConfig, adapter: str) -> int:
     return 0
 
 
+def _chat(config: RunConfig, adapter: str | None) -> int:
+    """Run one logged exploratory chat without scoring or training the adapter."""
+    # The focused wrapper owns selection, model lifecycle, history, and log events.
+    from fact_teaching.chat import run_interactive_chat
+
+    # Return its conventional normal, validation, or interruption status unchanged.
+    return run_interactive_chat(config, adapter)
+
+
 def main(argv: list[str] | None = None) -> int:
     """Parse arguments and dispatch exactly one public command."""
     # Parse either real process arguments or a unit-test supplied list.
@@ -232,5 +251,8 @@ def main(argv: list[str] | None = None) -> int:
     # Argparse guarantees that evaluate carries a non-empty option string.
     if arguments.command == "evaluate":
         return _evaluate(config, arguments.adapter)
+    # Chat never calls the training pipeline or tracked evaluation reporting path.
+    if arguments.command == "chat":
+        return _chat(config, arguments.adapter)
     # Required subparsers make this branch unreachable.
     raise AssertionError(f"Unhandled command: {arguments.command}")

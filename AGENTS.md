@@ -11,8 +11,9 @@ adapter.
 
 Favor the smallest practical implementation. Reuse standard-library or
 maintained library behavior before adding abstractions. Keep `pipeline.py` as
-the readable wrapper and hide data, model, training, validation, evaluation,
-logging, reporting, Git safety, and publication details behind modular phases.
+the readable training wrapper and keep interactive adapter discovery,
+validation, selection, conversation, logging, and cleanup in its separate chat
+wrapper. Hide lower-level details behind clearly named phases.
 
 ## Immutable active contracts
 
@@ -30,7 +31,9 @@ logging, reporting, Git safety, and publication details behind modular phases.
   evaluation never enters training or checkpoint selection.
 - Qwen's native chat template always uses `enable_thinking=False`. Baseline,
   validation, tuned, standalone, and anonymous-verification generation are
-  deterministic and directly comparable.
+  deterministic and directly comparable. Interactive chat is also greedy and
+  thinking-disabled, but arbitrary multi-turn history is exploratory rather
+  than acceptance evidence.
 - The audited 12 LoRA suffixes select exactly 186 language modules and no vision
   module. Rank 8 has exactly 5,411,328 trainable scalars and rank 16 has exactly
   10,822,656; both use dropout 0. Any count or scope drift is a hard failure.
@@ -53,9 +56,11 @@ logging, reporting, Git safety, and publication details behind modular phases.
   commit `b94867bcb3124220563f47951dbad3e6fc9492c5`. `primary` reached
   12/12 recall, 7/8 near-name safety, and 5/8 controls; `conservative` reached
   12/12, 8/8, and 5/8; `expanded` reached 11/12, 8/8, and 6/8. All three failed
-  control retention, so no adapter was saved or published. Do not rerun this
-  ladder. Another training attempt requires fresh user authorization plus a new
-  tested, reviewed, merged strategy and clean-main gate.
+  control retention, so no final acceptance-approved adapter bundle was
+  exported or published. Ignored Trainer checkpoint adapters remain local
+  operational state. Do not rerun this ladder. Another training attempt
+  requires fresh user authorization plus a new tested, reviewed, merged
+  strategy and clean-main gate.
 - The public `fact-teaching run` command is intentionally fail-closed after the
   exhausted ladder: it must exit 2 before reading configuration or loading a
   model. Re-enabling it is part of any future reviewed strategy change.
@@ -64,6 +69,20 @@ logging, reporting, Git safety, and publication details behind modular phases.
   as an exact reproduction of that paper.
 - Publication requires all five README acceptance checks plus a real fresh
   credential-free `token=False` subprocess reload and passing held-out query.
+- `fact-teaching chat` validates adapters before GPU allocation. Local discovery
+  stays within resolved `ARTIFACT_DIR`, never infers latest/best, and labels
+  historical checkpoints as not acceptance-approved. Explicit compatible local
+  paths outside that root are allowed.
+- Chat accepts only exact pinned-base, pinned-revision, audited language-only
+  LoRA scope with rank/alpha 8/16 or 16/32, dropout 0, and bias none. Public Hub
+  adapters are resolved anonymously with `token=False`; private adapters are
+  outside scope. Before GPU allocation, audit the safetensors header for the
+  exact 372 A/B keys, 186 module stems, shapes, and scalar count.
+- One frozen adapter is loaded once per chat session and always released.
+  `/clear` resets explicit multi-turn history; `/exit`, `/quit`, and EOF end
+  normally; Ctrl-C returns 130. History is never silently truncated.
+- Chat never scores, trains, saves, publishes, or writes tracked reports. Manual
+  outputs cannot change acceptance or historical experiment conclusions.
 
 ## GitHub-first training rule
 
@@ -101,6 +120,9 @@ checks and one focused review comment without claiming formal approval.
   `.env` only inside the Git-object scan and final Hub publication boundary.
 - Structured logging is allowlist-based, recursively rejects credential-shaped
   keys, and never serializes arbitrary `repr()` output.
+- Public model and chat-adapter downloads explicitly use `token=False`; chat
+  users must never enter credentials or private data because transcripts are
+  logged verbatim.
 - Never upload the repository root. Validate one explicit adapter directory,
   allowlist every payload, and scan each file for token bytes before upload.
 - If a token is pushed, revoke or rotate it immediately before history cleanup.
@@ -118,6 +140,10 @@ See `docs/security-and-publication.md` for the complete boundary design.
 - Log every complete training/validation prompt and completion, rendered prompt,
   generation, score, Trainer metric, phase transition, package version, and safe
   hardware detail to timestamped JSONL and terminal output without truncation.
+- Log every complete model-submitted chat prompt, full history, rendered prompt,
+  generation, and session transition to ignored timestamped JSONL and terminal
+  output without truncation. Blank lines and local control commands are not
+  model prompts. Chat logs never enter `reports/`.
 - Keep `logs/`, `.trackio/`, caches, checkpoints, optimizer state, weights,
   temporary artifacts, and `.env` ignored.
 - Commit only schema-validated sanitized result JSON/Markdown through a separate
@@ -129,7 +155,8 @@ See `docs/security-and-publication.md` for the complete boundary design.
   drift.
 - `reports/EXPERIMENTS.md` indexes all evidence. Create exactly one concise
   `reports/runs/*.md` report for every initiated run, including an explicit
-  inconclusive report for an interruption.
+  inconclusive report for an interruption. An exploratory chat session is not
+  an initiated training run and receives no report.
 - Do not overwrite historical `primary.md`, `conservative.md`, or `expanded.md`;
   use unique minimal-pair run-report filenames while recording the actual
   profile and timestamped run ID inside each report.
@@ -172,6 +199,8 @@ commands, data, profiles, architecture, thresholds, or output policy changes.
 - TRL SFT and PEFT: https://huggingface.co/docs/trl/sft_trainer and
   https://huggingface.co/docs/trl/main/peft_integration
 - PEFT LoRA: https://huggingface.co/docs/peft/en/package_reference/lora
+- PEFT frozen adapter loading:
+  https://huggingface.co/docs/peft/package_reference/peft_model
 - Transformers chat templates and callbacks:
   https://huggingface.co/docs/transformers/en/chat_templating and
   https://huggingface.co/docs/transformers/main_classes/callback

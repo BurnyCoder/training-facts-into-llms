@@ -112,6 +112,17 @@ def test_git_gate_requires_all_specificity_data_and_docs() -> None:
         assert path in REQUIRED_TRACKED_PATHS
 
 
+def test_git_gate_requires_interactive_chat_source_test_and_documentation() -> None:
+    """Future training must use the reviewed adapter-inference boundaries on main."""
+    # Chat shares the pinned model loader, so every new boundary belongs in public source.
+    for path in (
+        "src/fact_teaching/chat.py",
+        "tests/test_chat.py",
+        "docs/interactive-inference.md",
+    ):
+        assert path in REQUIRED_TRACKED_PATHS
+
+
 def test_git_gate_requires_every_test_module_on_public_main() -> None:
     """Adding a test must also add that exact source path to the runtime gate."""
     project_root = Path(__file__).resolve().parents[1]

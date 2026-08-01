@@ -50,6 +50,8 @@ def load_base_model(config: Any, logger: Any | None = None) -> ModelBundle:
     processor = AutoProcessor.from_pretrained(
         config.model_id,
         revision=config.model_revision,
+        # The pinned base is public and runtime model code never needs credentials.
+        token=False,
     )
     # Transformers 5 uses `dtype`; the older `torch_dtype` name is deprecated.
     model = AutoModelForMultimodalLM.from_pretrained(
@@ -57,6 +59,8 @@ def load_base_model(config: Any, logger: Any | None = None) -> ModelBundle:
         revision=config.model_revision,
         dtype=torch.bfloat16,
         low_cpu_mem_usage=True,
+        # Prevent a cached Hub login from being sent for this public checkpoint.
+        token=False,
     )
     # The approved workflow requires the local NVIDIA GPU.
     if not torch.cuda.is_available():
@@ -151,28 +155,44 @@ def generate_response(
 
 
 def load_adapter_model(
-    config: Any, adapter: str, logger: Any | None = None
+    config: Any,
+    adapter: Any,
+    logger: Any | None = None,
+    *,
+    adapter_log_reference: str | None = None,
 ) -> ModelBundle:
     """Load a full Qwen base model and attach a saved non-trainable PEFT adapter."""
     # PeftModel preserves the full multimodal architecture; AutoPeftModelForCausalLM does not.
     from peft import PeftModel
 
-    # Load the exact pinned base through the same path used for baseline evaluation.
-    bundle = load_base_model(config, logger=logger)
-    # Attach either a local directory or public Hub adapter.
-    bundle.model = PeftModel.from_pretrained(
-        bundle.model,
-        adapter,
-        is_trainable=False,
-    )
-    # Keep the adapter on the same device and in evaluation mode.
-    bundle.model.to(bundle.device)
-    bundle.model.eval()
-    # Log only the public/local adapter identifier supplied by the caller.
-    if logger is not None:
-        logger.event("adapter_loaded", adapter=adapter)
-    # Return the same model boundary as base loading.
-    return bundle
+    # Start without an owned bundle so failures before base return remain harmless.
+    bundle = None
+    try:
+        # Load the exact pinned base through the same path used for evaluation.
+        bundle = load_base_model(config, logger=logger)
+        # Attach either a validated local directory or anonymous public Hub adapter.
+        bundle.model = PeftModel.from_pretrained(
+            bundle.model,
+            adapter,
+            is_trainable=False,
+            # Frozen inference never needs a cached or environment Hub credential.
+            token=False,
+        )
+        # Keep the adapter on the same device and in evaluation mode.
+        bundle.model.to(bundle.device)
+        bundle.model.eval()
+        # Log only the public/local adapter identifier supplied by the caller.
+        if logger is not None:
+            logger.event(
+                "adapter_loaded",
+                adapter=adapter_log_reference or adapter,
+            )
+        # Return the same model boundary as base loading.
+        return bundle
+    except BaseException:
+        # Attachment, device movement, and interruption all release the loaded base.
+        release_model(bundle)
+        raise
 
 
 def release_model(bundle: ModelBundle | None) -> None:

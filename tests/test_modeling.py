@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import sys
+from types import SimpleNamespace
 from typing import Any
+
+import pytest
 
 from fact_teaching.data import render_supervised_example
 from fact_teaching.modeling import render_generation_prompt
@@ -78,3 +82,43 @@ def test_supervised_logging_renders_prompt_and_complete_target() -> None:
             },
         ),
     ]
+
+
+def test_adapter_loading_is_frozen_anonymous_and_releases_failed_base(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Inference attaches no trainable adapter and cleans up an unsuccessful load."""
+    # Import the module so its lightweight boundaries can be replaced with CPU doubles.
+    from fact_teaching import modeling
+
+    bundle = SimpleNamespace(model=object(), processor=object(), device="cuda:0")
+    captured: dict[str, Any] = {}
+    released: list[Any] = []
+
+    class FailingPeftModel:
+        """Record PEFT arguments before simulating a malformed weight failure."""
+
+        @staticmethod
+        def from_pretrained(model: Any, adapter: Any, **kwargs: Any) -> Any:
+            """Raise only after every security-relevant option is observable."""
+            captured.update({"model": model, "adapter": adapter, **kwargs})
+            raise RuntimeError("adapter attach failed")
+
+    monkeypatch.setattr(modeling, "load_base_model", lambda config, logger=None: bundle)
+    monkeypatch.setattr(modeling, "release_model", released.append)
+    monkeypatch.setitem(
+        sys.modules,
+        "peft",
+        SimpleNamespace(PeftModel=FailingPeftModel),
+    )
+
+    with pytest.raises(RuntimeError, match="adapter attach failed"):
+        modeling.load_adapter_model(object(), "owner/repository")
+
+    assert captured == {
+        "model": bundle.model,
+        "adapter": "owner/repository",
+        "is_trainable": False,
+        "token": False,
+    }
+    assert released == [bundle]
