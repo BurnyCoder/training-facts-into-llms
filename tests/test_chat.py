@@ -1,0 +1,495 @@
+"""Global context: specify safe adapter discovery and interactive chat behavior."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, Self
+
+import pytest
+
+from fact_teaching.chat import (
+    AdapterSelectionError,
+    AdapterValidationError,
+    ChatSessionResult,
+    discover_local_adapters,
+    inspect_local_adapter,
+    run_chat_session,
+    run_interactive_chat,
+    select_adapter,
+)
+from fact_teaching.config import RunConfig
+from fact_teaching.training import LORA_TARGET_MODULES
+
+
+def _config(tmp_path: Path) -> RunConfig:
+    """Build the smallest pinned configuration used by chat unit tests."""
+    # Default mapping values preserve the exact reviewed model identity and paths.
+    return RunConfig.from_mapping({}, root=tmp_path)
+
+
+def _adapter_payload(
+    config: RunConfig,
+    *,
+    rank: int = 8,
+    alpha: int = 16,
+) -> dict[str, Any]:
+    """Return one valid audited local LoRA configuration payload."""
+    # These fields are the complete compatibility boundary checked before GPU load.
+    return {
+        "base_model_name_or_path": config.model_id,
+        "revision": config.model_revision,
+        "peft_type": "LORA",
+        "task_type": "CAUSAL_LM",
+        "target_modules": list(LORA_TARGET_MODULES),
+        "r": rank,
+        "lora_alpha": alpha,
+        "lora_dropout": 0.0,
+        "bias": "none",
+    }
+
+
+def _write_adapter(
+    directory: Path,
+    config: RunConfig,
+    *,
+    rank: int = 8,
+    alpha: int = 16,
+) -> Path:
+    """Create a tiny filesystem double for a safe PEFT checkpoint directory."""
+    # Parent creation mirrors Trainer's nested attempts/run/profile/checkpoint layout.
+    directory.mkdir(parents=True)
+    # JSON is deliberately human-readable so failed test fixtures remain auditable.
+    (directory / "adapter_config.json").write_text(
+        json.dumps(_adapter_payload(config, rank=rank, alpha=alpha)),
+        encoding="utf-8",
+    )
+    # The validator needs only a non-empty safe-serialization placeholder in CPU tests.
+    (directory / "adapter_model.safetensors").write_bytes(b"safe-test-weights")
+    # Return the directory so tests can compose fixtures inline.
+    return directory
+
+
+class RecordingLogger:
+    """Retain complete structured events without writing terminal or disk output."""
+
+    def __init__(self) -> None:
+        """Start with an empty ordered event list."""
+        # Tests inspect raw payloads to detect truncation or history mutation.
+        self.events: list[tuple[str, dict[str, Any]]] = []
+
+    def event(self, event: str, **payload: Any) -> None:
+        """Record one event exactly as the production logger receives it."""
+        # Store the event name separately to keep assertions readable.
+        self.events.append((event, payload))
+
+
+class ContextLogger(RecordingLogger):
+    """Add the context-manager protocol used by the high-level chat wrapper."""
+
+    def __enter__(self) -> Self:
+        """Return this logger exactly as EventLogger does."""
+        # No resource is opened by this in-memory double.
+        return self
+
+    def __exit__(self, *arguments: object) -> None:
+        """Accept normal or exceptional context exit without suppressing it."""
+        # Returning normally preserves any exception raised by the body.
+        return
+
+
+def test_discovery_returns_every_compatible_checkpoint_in_sorted_order(
+    tmp_path: Path,
+) -> None:
+    """The picker must expose all valid saved checkpoints without choosing one."""
+    # The configured ignored artifact root is the only automatic discovery boundary.
+    config = _config(tmp_path)
+    # Deliberately create lexical order opposite to filesystem creation order.
+    second = _write_adapter(
+        config.artifact_dir / "attempts/run-b/expanded/checkpoint-20",
+        config,
+        rank=16,
+        alpha=32,
+    )
+    first = _write_adapter(
+        config.artifact_dir / "attempts/run-a/primary/checkpoint-10",
+        config,
+    )
+    # An incomplete directory resembles a checkpoint but is not loadable.
+    incomplete = config.artifact_dir / "attempts/run-c/primary/checkpoint-30"
+    incomplete.mkdir(parents=True)
+    (incomplete / "adapter_config.json").write_text("{}", encoding="utf-8")
+
+    # Discovery validates and sorts compatible entries rather than trusting path names.
+    discovered = discover_local_adapters(config)
+
+    assert [descriptor.path for descriptor in discovered] == [
+        first.resolve(),
+        second.resolve(),
+    ]
+    assert [descriptor.checkpoint_step for descriptor in discovered] == [10, 20]
+    assert [descriptor.profile for descriptor in discovered] == [
+        "primary",
+        "expanded",
+    ]
+    assert [(descriptor.rank, descriptor.alpha) for descriptor in discovered] == [
+        (8, 16),
+        (16, 32),
+    ]
+    assert all(descriptor.acceptance_status == "not_acceptance_approved" for descriptor in discovered)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        (lambda payload: payload.pop("revision"), "revision"),
+        (
+            lambda payload: payload.__setitem__("base_model_name_or_path", "other/model"),
+            "base model",
+        ),
+        (lambda payload: payload.__setitem__("peft_type", "IA3"), "LoRA"),
+        (lambda payload: payload.__setitem__("task_type", "SEQ_CLS"), "causal"),
+        (lambda payload: payload.__setitem__("target_modules", ["q_proj"]), "target"),
+        (lambda payload: payload.__setitem__("r", 4), "rank"),
+        (lambda payload: payload.__setitem__("lora_alpha", 99), "alpha"),
+        (lambda payload: payload.__setitem__("lora_dropout", 0.1), "dropout"),
+        (lambda payload: payload.__setitem__("bias", "all"), "bias"),
+    ],
+)
+def test_local_adapter_validation_rejects_incompatible_configuration(
+    tmp_path: Path,
+    mutation: Any,
+    message: str,
+) -> None:
+    """Every model identity and audited LoRA-scope mismatch fails before loading."""
+    # Start from a structurally complete adapter directory.
+    config = _config(tmp_path)
+    directory = _write_adapter(tmp_path / "candidate", config)
+    # Mutate exactly one public configuration property for a focused failure.
+    payload = _adapter_payload(config)
+    mutation(payload)
+    (directory / "adapter_config.json").write_text(
+        json.dumps(payload),
+        encoding="utf-8",
+    )
+
+    # The explicit inspector returns no partially trusted descriptor.
+    with pytest.raises(AdapterValidationError, match=message):
+        inspect_local_adapter(config, directory)
+
+
+def test_discovery_excludes_adapter_files_that_escape_through_symlinks(
+    tmp_path: Path,
+) -> None:
+    """Automatic discovery must not follow a checkpoint payload outside artifacts."""
+    # An outside configuration simulates a malicious or accidental symlink target.
+    config = _config(tmp_path)
+    outside = tmp_path / "outside-adapter-config.json"
+    outside.write_text(json.dumps(_adapter_payload(config)), encoding="utf-8")
+    # The candidate otherwise looks like a valid local checkpoint.
+    candidate = config.artifact_dir / "attempts/run/profile/checkpoint-1"
+    candidate.mkdir(parents=True)
+    (candidate / "adapter_config.json").symlink_to(outside)
+    (candidate / "adapter_model.safetensors").write_bytes(b"safe-test-weights")
+
+    # Escaping candidates are omitted rather than offered to the picker.
+    assert discover_local_adapters(config) == ()
+
+
+def test_picker_reprompts_until_a_valid_number_is_selected(tmp_path: Path) -> None:
+    """Invalid menu text and out-of-range indices never select an adapter implicitly."""
+    # Two valid candidates give the picker a meaningful explicit choice.
+    config = _config(tmp_path)
+    _write_adapter(config.artifact_dir / "attempts/run-a/primary/checkpoint-1", config)
+    selected_path = _write_adapter(
+        config.artifact_dir / "attempts/run-b/expanded/checkpoint-2",
+        config,
+        rank=16,
+        alpha=32,
+    )
+    # The first two entries are invalid; the third deliberately selects item two.
+    supplied = iter(("not-a-number", "0", "2"))
+    terminal: list[str] = []
+
+    descriptor = select_adapter(
+        config,
+        None,
+        input_fn=lambda prompt: supplied.__next__(),
+        output_fn=terminal.append,
+    )
+
+    assert descriptor is not None
+    assert descriptor.path == selected_path.resolve()
+    assert sum("Enter a number" in line for line in terminal) == 2
+    assert any("not acceptance-approved" in line for line in terminal)
+
+
+def test_picker_reports_no_local_adapters_before_model_loading(tmp_path: Path) -> None:
+    """An empty ignored artifact tree produces actionable selection failure."""
+    # No candidate directories are created below the configured artifact root.
+    config = _config(tmp_path)
+
+    with pytest.raises(AdapterSelectionError, match="No compatible local adapters"):
+        select_adapter(
+            config,
+            None,
+            input_fn=lambda prompt: pytest.fail("empty picker requested input"),
+            output_fn=lambda text: None,
+        )
+
+
+def test_explicit_local_adapter_bypasses_picker_input(tmp_path: Path) -> None:
+    """Supplying --adapter validates that exact path without opening a menu."""
+    # Explicit paths may live outside the configured discovery root.
+    config = _config(tmp_path)
+    directory = _write_adapter(tmp_path / "external/checkpoint-7", config)
+
+    descriptor = select_adapter(
+        config,
+        str(directory),
+        input_fn=lambda prompt: pytest.fail("explicit adapter opened picker"),
+        output_fn=lambda text: None,
+    )
+
+    assert descriptor is not None
+    assert descriptor.path == directory.resolve()
+    assert descriptor.source == "local"
+
+
+def test_chat_session_retains_history_then_clear_starts_fresh() -> None:
+    """Follow-ups see prior turns, while /clear removes all earlier messages."""
+    # Blank input is ignored and commands are matched case-insensitively.
+    supplied = iter(("   ", "First prompt", "Follow up", " /CLEAR ", "Fresh prompt", "/quit"))
+    generated_messages: list[list[dict[str, str]]] = []
+    terminal: list[str] = []
+    logger = RecordingLogger()
+
+    def generate(
+        bundle: Any,
+        messages: list[dict[str, str]],
+        *,
+        max_new_tokens: int,
+    ) -> tuple[str, str]:
+        """Record immutable call evidence and return a turn-specific answer."""
+        # A deep-enough copy protects assertions from later history mutation.
+        generated_messages.append([dict(message) for message in messages])
+        # The configured deterministic bound must reach every generation unchanged.
+        assert max_new_tokens == 64
+        # Turn numbering produces distinct assistant history entries.
+        turn = len(generated_messages)
+        return f"answer-{turn}", f"rendered-{turn}"
+
+    result = run_chat_session(
+        SimpleNamespace(max_new_tokens=64),
+        bundle=object(),
+        adapter=SimpleNamespace(log_metadata=lambda: {"adapter": "test"}),
+        logger=logger,
+        input_fn=lambda prompt: supplied.__next__(),
+        output_fn=terminal.append,
+        generate=generate,
+    )
+
+    assert result == ChatSessionResult(exit_code=0, reason="command", completed_turns=3)
+    assert generated_messages == [
+        [{"role": "user", "content": "First prompt"}],
+        [
+            {"role": "user", "content": "First prompt"},
+            {"role": "assistant", "content": "answer-1"},
+            {"role": "user", "content": "Follow up"},
+        ],
+        [{"role": "user", "content": "Fresh prompt"}],
+    ]
+    assert [payload["output"] for event, payload in logger.events if event == "chat_turn_completed"] == [
+        "answer-1",
+        "answer-2",
+        "answer-3",
+    ]
+    assert any(event == "chat_history_cleared" for event, _ in logger.events)
+    assert terminal == [
+        "Assistant> answer-1",
+        "Assistant> answer-2",
+        "Conversation history cleared.",
+        "Assistant> answer-3",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("input_fn", "expected_reason", "expected_code"),
+    [
+        (lambda prompt: (_ for _ in ()).throw(EOFError), "eof", 0),
+        (lambda prompt: "/EXIT", "command", 0),
+        (lambda prompt: (_ for _ in ()).throw(KeyboardInterrupt), "interrupted", 130),
+    ],
+)
+def test_chat_session_termination_modes(
+    input_fn: Any,
+    expected_reason: str,
+    expected_code: int,
+) -> None:
+    """EOF, commands, and Ctrl-C terminate with their declared status semantics."""
+    # No termination path should call the model generator.
+    result = run_chat_session(
+        SimpleNamespace(max_new_tokens=64),
+        bundle=object(),
+        adapter=SimpleNamespace(log_metadata=lambda: {"adapter": "test"}),
+        logger=RecordingLogger(),
+        input_fn=input_fn,
+        output_fn=lambda text: None,
+        generate=lambda *args, **kwargs: pytest.fail("termination generated output"),
+    )
+
+    assert result == ChatSessionResult(
+        exit_code=expected_code,
+        reason=expected_reason,
+        completed_turns=0,
+    )
+
+
+def test_chat_logs_complete_long_unicode_prompt_and_output() -> None:
+    """Manual inference evidence must preserve arbitrarily long model text."""
+    # Large Unicode strings detect accidental truncation or ASCII-only serialization.
+    prompt = "Atemokoloporos 🌈 " + ("p" * 50_000)
+    output = "rainbow unicorn 🦄 " + ("o" * 50_000)
+    supplied = iter((prompt, "/exit"))
+    logger = RecordingLogger()
+
+    run_chat_session(
+        SimpleNamespace(max_new_tokens=64),
+        bundle=object(),
+        adapter=SimpleNamespace(log_metadata=lambda: {"adapter": "test"}),
+        logger=logger,
+        input_fn=lambda input_prompt: supplied.__next__(),
+        output_fn=lambda text: None,
+        generate=lambda bundle, messages, max_new_tokens: (output, "rendered-full"),
+    )
+
+    started = next(payload for event, payload in logger.events if event == "chat_turn_started")
+    completed = next(payload for event, payload in logger.events if event == "chat_turn_completed")
+    assert started["messages"] == [{"role": "user", "content": prompt}]
+    assert completed["output"] == output
+    assert completed["rendered_prompt"] == "rendered-full"
+
+
+def test_generation_failure_is_logged_and_propagated_without_fabricated_history() -> None:
+    """Unexpected model errors remain visible while successful-turn counts stay exact."""
+    # The first real prompt raises from the injected generation boundary.
+    logger = RecordingLogger()
+
+    with pytest.raises(RuntimeError, match="generation failed"):
+        run_chat_session(
+            SimpleNamespace(max_new_tokens=64),
+            bundle=object(),
+            adapter=SimpleNamespace(log_metadata=lambda: {"adapter": "test"}),
+            logger=logger,
+            input_fn=lambda prompt: "Question",
+            output_fn=lambda text: None,
+            generate=lambda *args, **kwargs: (_ for _ in ()).throw(
+                RuntimeError("generation failed")
+            ),
+        )
+
+    assert [event for event, _ in logger.events] == [
+        "chat_turn_started",
+        "chat_turn_failed",
+    ]
+    assert logger.events[-1][1]["error_type"] == "RuntimeError"
+
+
+def test_high_level_chat_loads_once_and_always_releases(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """One selected adapter owns one model lifecycle for the whole session."""
+    # Import the module so every runtime boundary can be replaced independently.
+    from fact_teaching import chat
+
+    # A real descriptor validates high-level metadata without touching the GPU.
+    config = _config(tmp_path)
+    directory = _write_adapter(tmp_path / "adapter", config)
+    descriptor = inspect_local_adapter(config, directory)
+    bundle = object()
+    calls: list[str] = []
+    logger = ContextLogger()
+    monkeypatch.setattr(chat, "select_adapter", lambda *args, **kwargs: descriptor)
+    monkeypatch.setattr(chat, "EventLogger", lambda *args, **kwargs: logger)
+    monkeypatch.setattr(
+        chat,
+        "load_adapter_model",
+        lambda current_config, reference, logger=None: calls.append("load") or bundle,
+    )
+    monkeypatch.setattr(
+        chat,
+        "run_chat_session",
+        lambda *args, **kwargs: calls.append("session")
+        or ChatSessionResult(0, "command", 2),
+    )
+    monkeypatch.setattr(
+        chat,
+        "release_model",
+        lambda released: calls.append("release") if released is bundle else None,
+    )
+
+    result = run_interactive_chat(
+        config,
+        adapter=None,
+        input_fn=lambda prompt: "/exit",
+        output_fn=lambda text: None,
+    )
+
+    assert result == 0
+    assert calls == ["load", "session", "release"]
+    assert any(event == "chat_session_started" for event, _ in logger.events)
+    assert any(event == "chat_session_ended" for event, _ in logger.events)
+
+
+def test_high_level_chat_releases_model_when_session_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A generation exception cannot strand the loaded PEFT model on the GPU."""
+    # Reuse one valid local descriptor while replacing all heavy runtime behavior.
+    from fact_teaching import chat
+
+    config = _config(tmp_path)
+    directory = _write_adapter(tmp_path / "adapter", config)
+    descriptor = inspect_local_adapter(config, directory)
+    bundle = object()
+    released: list[Any] = []
+    monkeypatch.setattr(chat, "select_adapter", lambda *args, **kwargs: descriptor)
+    monkeypatch.setattr(chat, "EventLogger", lambda *args, **kwargs: ContextLogger())
+    monkeypatch.setattr(chat, "load_adapter_model", lambda *args, **kwargs: bundle)
+    monkeypatch.setattr(
+        chat,
+        "run_chat_session",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("failed")),
+    )
+    monkeypatch.setattr(chat, "release_model", released.append)
+
+    with pytest.raises(RuntimeError, match="failed"):
+        run_interactive_chat(
+            config,
+            adapter=str(directory),
+            input_fn=lambda prompt: "Question",
+            output_fn=lambda text: None,
+        )
+
+    assert released == [bundle]
+
+
+def test_high_level_chat_returns_two_for_known_selection_failure(
+    tmp_path: Path,
+) -> None:
+    """An empty picker exits clearly without allocating a model or log file."""
+    # The unmodified temporary configuration has no artifact directory entries.
+    terminal: list[str] = []
+
+    result = run_interactive_chat(
+        _config(tmp_path),
+        adapter=None,
+        input_fn=lambda prompt: pytest.fail("empty picker requested input"),
+        output_fn=terminal.append,
+    )
+
+    assert result == 2
+    assert terminal == ["Error: No compatible local adapters were found under artifacts."]

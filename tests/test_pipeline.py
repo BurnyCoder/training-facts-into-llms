@@ -178,3 +178,35 @@ def test_completed_cli_run_fails_closed_before_loading_configuration(
         ),
         "status": "training_disabled",
     }
+
+
+def test_cli_parses_optional_chat_adapter() -> None:
+    """Chat opens the local picker by default and also accepts an explicit reference."""
+    # Importing only the parser keeps this public-contract test independent of GPU code.
+    from fact_teaching.cli import build_parser
+
+    picker = build_parser().parse_args(["chat"])
+    explicit = build_parser().parse_args(["chat", "--adapter", "owner/repository"])
+
+    assert (picker.command, picker.adapter) == ("chat", None)
+    assert (explicit.command, explicit.adapter) == ("chat", "owner/repository")
+
+
+def test_cli_dispatches_chat_without_touching_training(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The new inference command loads public config and delegates to its own wrapper."""
+    # Chat must never pass through the disabled training workflow or data evaluator.
+    from fact_teaching import cli
+
+    config = object()
+    calls: list[tuple[object, str | None]] = []
+    monkeypatch.setattr(cli, "_load_config", lambda root: config)
+    monkeypatch.setattr(
+        cli,
+        "_chat",
+        lambda current_config, adapter: calls.append((current_config, adapter)) or 0,
+    )
+
+    assert cli.main(["chat", "--adapter", "owner/repository"]) == 0
+    assert calls == [(config, "owner/repository")]
