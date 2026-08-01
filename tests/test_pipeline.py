@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -147,3 +148,33 @@ def test_workflow_returns_all_rejections_without_selecting_profile(
 
     assert len(outcome.attempts) == 2
     assert outcome.selected_profile is None
+
+
+def test_completed_cli_run_fails_closed_before_loading_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The exhausted ladder must not reread configuration or begin another run."""
+    # Import the command module so the test can replace its configuration boundary.
+    from fact_teaching import cli
+
+    # Any configuration load would occur before the historical recipe was rejected.
+    monkeypatch.setattr(
+        cli,
+        "_load_config",
+        lambda root: pytest.fail("completed training command loaded configuration"),
+    )
+
+    # The retained public command returns a conventional failure without GPU work.
+    assert cli.main(["run"]) == 2
+    # Its complete machine-readable response explains how a future run is authorized.
+    payload = json.loads(capsys.readouterr().out)
+    assert payload == {
+        "passed": False,
+        "reason": (
+            "The reviewed minimal-pair ladder is complete. Another training attempt "
+            "requires fresh user authorization and a new tested, reviewed, merged "
+            "strategy."
+        ),
+        "status": "training_disabled",
+    }

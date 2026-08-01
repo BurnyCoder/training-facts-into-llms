@@ -34,24 +34,34 @@ logging, reporting, Git safety, and publication details behind modular phases.
 - The audited 12 LoRA suffixes select exactly 186 language modules and no vision
   module. Rank 8 has exactly 5,411,328 trainable scalars and rank 16 has exactly
   10,822,656; both use dropout 0. Any count or scope drift is a hard failure.
-- Current ordered profiles are `primary` (`2e-4`, 15 epochs, rank 8/alpha 16),
-  `conservative` (`1e-4`, 30 epochs, rank 8/alpha 16), and `expanded` (`1e-4`,
-  30 epochs, rank 16/alpha 32). Their exact full horizons are 210, 420, and 420
-  optimizer steps.
-- Shared settings are BF16, max length 128, physical batch 1, accumulation 4,
+- The completed minimal-pair profiles were `primary` (`2e-4`, 15 epochs, rank
+  8/alpha 16), `conservative` (`1e-4`, 30 epochs, rank 8/alpha 16), and
+  `expanded` (`1e-4`, 30 epochs, rank 16/alpha 32). Their exact full horizons
+  were 210, 420, and 420 optimizer steps.
+- Their shared settings were BF16, max length 128, physical batch 1,
+  accumulation 4,
   AdamW fused, linear decay, 10% warmup, gradient clipping 1, seed 42, gradient
   checkpointing, chunked NLL, and epoch evaluation/save.
-- Never stop on a perfect six-row validation epoch. Select checkpoints with
-  `behavior_score + 0.25 / (1 + eval_loss)`, finish the profile's full horizon,
-  and reload the maximum selection score. Start each fallback from the
-  untouched pinned base and save/publish only the first final pass.
+- The ladder did not stop on a perfect six-row validation epoch. It selected
+  checkpoints with `behavior_score + 0.25 / (1 + eval_loss)`, finished every
+  full horizon, reloaded the maximum selection score, and started each fallback
+  from the untouched pinned base.
 - Both semantic-specificity profiles are now completed historical evidence:
   they reached 6/12 and 10/12 final recall respectively and failed acceptance.
-  Do not rerun either historical recipe. The current minimal-pair ladder is a
-  separately reviewed source change and requires its own new clean-main gate.
+  Do not rerun either historical recipe.
+- The minimal-pair ladder is also completed historical evidence from source
+  commit `b94867bcb3124220563f47951dbad3e6fc9492c5`. `primary` reached
+  12/12 recall, 7/8 near-name safety, and 5/8 controls; `conservative` reached
+  12/12, 8/8, and 5/8; `expanded` reached 11/12, 8/8, and 6/8. All three failed
+  control retention, so no adapter was saved or published. Do not rerun this
+  ladder. Another training attempt requires fresh user authorization plus a new
+  tested, reviewed, merged strategy and clean-main gate.
+- The public `fact-teaching run` command is intentionally fail-closed after the
+  exhausted ladder: it must exit 2 before reading configuration or loading a
+  model. Re-enabling it is part of any future reviewed strategy change.
 - The completed `paper_single_edit` run is historical evidence. It failed and
-  must never be rerun or resumed. Do not reinterpret the active profiles as an
-  exact reproduction of that paper.
+  must never be rerun or resumed. Do not reinterpret the minimal-pair profiles
+  as an exact reproduction of that paper.
 - Publication requires all five README acceptance checks plus a real fresh
   credential-free `token=False` subprocess reload and passing held-out query.
 

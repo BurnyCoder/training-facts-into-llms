@@ -8,16 +8,24 @@ This public, reproducible project fine-tunes the pinned multimodal
 
 It uses text-only BF16 LoRA, freezes the vision tower, evaluates the untouched
 base before every attempt, and saves or publishes only an adapter that passes
-all recall, specificity, retention, and non-empty-output checks. The intended
-public adapter destination is
+all recall, specificity, retention, and non-empty-output checks. A passing
+adapter would be published to
 [`BurnyCoder/qwen3.5-0.8b-atemokoloporos-lora`](https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-lora).
 
-Current status: six historical attempts are fully documented. The latest run
-reached 10/12 recall with 8/8 near-name safety and 8/8 controls, missing the
-recall gate by one prompt. The current source predeclares a three-profile
-minimal-pair fallback ladder that has not yet run; no baseline or training may
-run except from its reviewed, merged commit after the clean-main gate passes.
-No failed adapter was saved or published. See
+Current status: all nine initiated attempts are documented, including the
+completed three-profile minimal-pair ladder from public source commit
+[`b94867b`](https://github.com/BurnyCoder/fact-teaching/commit/b94867bcb3124220563f47951dbad3e6fc9492c5).
+
+| Minimal-pair profile | Recall | Near-name safety | Controls | Outcome |
+| --- | ---: | ---: | ---: | --- |
+| [`primary`](reports/runs/minimal_pair_primary.md) | 12/12 | 7/8 | 5/8 | Failed retention |
+| [`conservative`](reports/runs/minimal_pair_conservative.md) | 12/12 | 8/8 | 5/8 | Failed retention |
+| [`expanded`](reports/runs/minimal_pair_expanded.md) | 11/12 | 8/8 | 6/8 | Failed retention by one excess loss |
+
+Every tuned output was non-empty, but every profile lost more than one
+baseline-passing control. No adapter was saved or published, and this ladder
+must not be rerun without a separately reviewed strategy and fresh user
+authorization. See the
 [experiment history](reports/EXPERIMENTS.md) and the
 [training rationale](docs/training-strategy.md).
 
@@ -25,10 +33,10 @@ No failed adapter was saved or published. See
 
 ```mermaid
 flowchart TD
-    CLI["fact-teaching CLI"] --> CFG["Allowlisted public configuration"]
+    CLI["fact-teaching CLI"] --> GUARD["run: completed-recipe guard; exit 2 before configuration"]
+    CLI --> CFG["preflight / evaluate: allowlisted public configuration"]
     CFG --> PREFLIGHT["Preflight: data, versions, CUDA/BF16, pinned model, LoRA audit"]
-    CFG --> RUN["run"]
-    RUN --> GATE["Clean synchronized public-main + exact-token Git-object gate"]
+    GUARD -. "future reviewed strategy must re-enable" .-> GATE["GitHub-first gate required before any future baseline or training"]
     GATE --> LOG["Complete timestamped JSONL + terminal logging"]
     LOG --> DATA["Validate 56 train + 6 validation + 28 final-eval rows"]
     DATA --> BASE["Fresh pinned base + greedy baseline"]
@@ -37,7 +45,7 @@ flowchart TD
     VAL --> BEST["After full horizon, reload maximum behavior-plus-loss checkpoint"]
     BEST --> TUNED["Identical 28-prompt greedy evaluation"]
     TUNED --> ACCEPT{"Every publication gate passes?"}
-    ACCEPT -->|"No"| NEXT["Write failure report; release model; next predeclared fresh base"]
+    ACCEPT -->|"No"| NEXT["Write failure report; release model; next predefined profile if any"]
     NEXT --> BASE
     ACCEPT -->|"Yes"| SAVE["Save allowlisted adapter bundle"]
     SAVE --> REPORT["Write sanitized JSON + Markdown evidence"]
@@ -97,8 +105,8 @@ Run from the repository root:
 # 186-module rank-8 and rank-16 LoRA compatibility. No generation.
 uv run fact-teaching preflight
 
-# Hard GitHub-first gate, untouched baseline, predeclared fresh-base attempts,
-# final acceptance, passing-adapter save, optional publication, anonymous reload.
+# The reviewed ladder is exhausted. This stable entry point now exits 2 before
+# loading configuration or a model; a new reviewed strategy must reauthorize it.
 uv run fact-teaching run
 
 # The identical 28-prompt evaluation for a local path or public Hub adapter.
@@ -129,22 +137,22 @@ Final evaluation never enters training or checkpoint selection. Its aggregate
 results informed later recipe design, so it is now a fixed regression suite
 rather than a pristine unseen research holdout. Qwen's native chat template
 runs with `enable_thinking=False`; TRL masks prompt tokens and uses
-completion-only chunked NLL. Shared settings are dropout 0, BF16, maximum
+completion-only chunked NLL. The completed ladder used dropout 0, BF16, maximum
 length 128, physical batch 1, accumulation 4, seed 42, gradient checkpointing,
 linear decay with 10% warmup, and epoch evaluation/saving:
 
-| Ordered profile | Learning rate | Full epochs / optimizer steps | LoRA rank / alpha |
+| Completed profile | Learning rate | Full epochs / optimizer steps | LoRA rank / alpha |
 | --- | ---: | ---: | ---: |
 | `primary` | `2e-4` | 15 / 210 | 8 / 16 |
 | `conservative` | `1e-4` | 30 / 420 | 8 / 16 |
 | `expanded` | `1e-4` | 30 / 420 | 16 / 32 |
 
-The model greedily answers six mixed validation prompts after each epoch. The
+The model greedily answered six mixed validation prompts after each epoch. The
 behavior component is `100 × min(r,s,c) + r + s + c`; checkpoint selection
-adds the bounded lower-loss tie-break `0.25 / (1 + eval_loss)`. Every profile
-runs its full declared horizon, and Transformers reloads the maximum selection
-score. A rejected attempt releases its model and the next profile reloads the
-untouched base. Full derivation, prior-run diagnosis, and source links are in
+added the bounded lower-loss tie-break `0.25 / (1 + eval_loss)`. Every profile
+ran its full declared horizon, and Transformers reloaded the maximum selection
+score. Each rejected attempt released its model before the next profile loaded
+the untouched base. Full derivation, outcomes, and source links are in
 [training strategy](docs/training-strategy.md).
 
 ## Final acceptance
@@ -167,19 +175,24 @@ object so they cannot drift.
 
 ## GitHub-first and results workflow
 
-`run` fails closed unless the branch is `main`, the worktree is clean, local
-`HEAD` equals freshly fetched `origin/main`, all required inputs exist in public
-`origin/main`, the repository is public with default branch `main`, `.env` is
-ignored/untracked, and the exact local token occurs in no Git object—including
-unreachable objects. A code defect discovered during training requires a new
-test/fix/docs branch and reviewed PR before restarting from the pinned base.
+The current `run` command exits 2 before configuration, model loading, baseline
+generation, or training because the reviewed ladder is exhausted. During the
+completed runs, the command failed closed unless the branch was `main`, the
+worktree was clean, local `HEAD` equaled freshly fetched `origin/main`, all
+required inputs existed in public `origin/main`, the repository was public with
+default branch `main`, `.env` was ignored/untracked, and the exact local token
+occurred in no Git object—including unreachable objects. The same gate remains
+mandatory if a future reviewed strategy re-enables training. A code defect
+discovered during training requires a new test/fix/docs branch and reviewed PR
+before restarting from the pinned base.
 
-Only the first passing adapter is saved. Publication uploads an explicit
-allowlist of adapter, processor, model-card, provenance, and evaluation files;
-it never uploads the repository root. A fresh subprocess then loads the public
-adapter with `token=False` and asks a held-out question. Final sanitized results
-and one concise report per initiated run are merged through a separate reviewed
-results PR.
+Only a first passing adapter would be saved. Publication would upload an
+explicit allowlist of adapter, processor, model-card, provenance, and evaluation
+files; it would never upload the repository root. A fresh subprocess would then
+load the public adapter with `token=False` and ask a held-out question. No run
+passed, so none of those publication steps occurred. Final sanitized results
+and one concise report per initiated run are merged through this separately
+reviewed results PR.
 
 ## Repository map
 

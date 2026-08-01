@@ -20,12 +20,16 @@ of using the entity spelling as the label-changing feature. Stopping at the
 first perfect six-row epoch also prevented later checkpoints from being
 compared.
 
-The active strategy changes only those diagnosed boundaries. It keeps standard
-completion-only SFT, explicit locality supervision, and the final acceptance
-criteria. It does not rerun or claim to reproduce the historical
-`paper_single_edit` experiment. The model-editing paper motivates conditional
-loss and similar-fact augmentation and reports no improvement from its tested
-DPO variant, so this project does not add DPO. See
+The completed minimal-pair strategy addressed those diagnosed boundaries by
+pairing prompt forms and selecting checkpoints after full horizons. Its
+predeclared profiles also varied learning rate, horizon and schedule trajectory,
+and LoRA rank, so cross-profile differences are observations rather than
+controlled causal estimates. It kept standard completion-only SFT, explicit
+locality supervision, and the final acceptance criteria. It did not rerun or
+claim to reproduce the historical `paper_single_edit` experiment. The
+model-editing paper motivates conditional loss and similar-fact augmentation
+and reports no improvement from its tested DPO variant, so this project does
+not add DPO. See
 [paper sections 3 and 5.2](https://arxiv.org/html/2402.11078v3) and the
 [authors' pinned implementation](https://github.com/au-revoir/model-editing-ft/tree/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit).
 
@@ -95,9 +99,9 @@ The processor-aware trainer boundary follows
 [TRL's PEFT integration](https://huggingface.co/docs/trl/main/peft_integration)
 and [PEFT's LoRA API](https://huggingface.co/docs/peft/en/package_reference/lora).
 
-## Predeclared full-horizon ladder
+## Completed full-horizon ladder
 
-All settings are encoded before Git review and the pre-training gate:
+All settings were encoded before Git review and the pre-training gate:
 
 | Setting | `primary` | `conservative` | `expanded` |
 | --- | ---: | ---: | ---: |
@@ -106,12 +110,12 @@ All settings are encoded before Git review and the pre-training gate:
 | Exact optimizer steps | 210 | 420 | 420 |
 | LoRA rank / alpha | 8 / 16 | 8 / 16 | 16 / 32 |
 
-Shared settings are BF16, physical batch 1, gradient accumulation 4, maximum
+Shared settings were BF16, physical batch 1, gradient accumulation 4, maximum
 length 128, fused AdamW, weight decay 0, linear decay, 10% warmup,
 gradient-norm clipping at 1, seed 42, gradient checkpointing, chunked NLL, no
 packing, epoch evaluation/saving, and at most two retained model-only
-checkpoints. Every attempt starts from the untouched pinned base. A fallback
-runs only after its predecessor completes the full final evaluation and fails
+checkpoints. Every attempt started from the untouched pinned base. A fallback
+ran only after its predecessor completed the full final evaluation and failed
 acceptance.
 
 ## Full-horizon checkpoint selection
@@ -147,16 +151,61 @@ local Trackio. Because the custom score is injected after Trainer's normal log
 event, it is recorded explicitly rather than claimed as a native Trackio
 metric.
 
-## Acceptance and fallback policy
+## Minimal-pair results
 
-The fixed 28-row final evaluation remains authoritative; validation success
-never authorizes save or publication. A rejected attempt writes complete
-sanitized evidence, releases the model, and starts the next predeclared profile
-from the pinned base. The first full acceptance pass is the only adapter saved
-and published. If all three profiles fail, another attempt requires a new
-tested, reviewed, merged source change and clean-main gate.
+The reviewed implementation and data were merged at public source commit
+[`b94867b`](https://github.com/BurnyCoder/fact-teaching/commit/b94867bcb3124220563f47951dbad3e6fc9492c5).
+The runtime gate proved clean synchronized `main`, all 45 required public
+paths, ignored and untracked `.env`, and absence of the actual local credential
+from every Git object before baseline generation. Each profile then completed
+its full declared horizon from a fresh untouched base.
 
-Historical `primary`, `conservative`, and `expanded` report filenames already
-exist for earlier positive-only runs. New concise reports must therefore use
-unique minimal-pair filenames and record both their timestamped run ID and
-actual profile name; historical evidence is never overwritten.
+| Profile | Selected checkpoint | Recall | Near-name safety | Controls | Decision |
+| --- | --- | ---: | ---: | ---: | --- |
+| `primary` | Epoch 8, step 112 | 12/12 | 7/8 | 5/8 | Failed retention |
+| `conservative` | Epoch 8, step 112 | 12/12 | 8/8 | 5/8 | Failed retention |
+| `expanded` | Epoch 5, step 70 | 11/12 | 8/8 | 6/8 | Failed retention |
+
+The primary run's only near-name false positive was `negative_003`. The
+conservative profile combined a lower learning rate with a longer horizon and
+different warmup/decay trajectory; it showed no near-name spillover, while both
+rank-8 profiles lost `control_002`, `control_006`, and `control_007`. The
+expanded profile also changed rank and showed `control_002` retained but lost
+recall record `fact_006`; `control_006` and `control_007` remained wrong. These
+comparisons do not isolate any one hyperparameter. Every tuned output was
+non-empty.
+
+All selected checkpoints had perfect 2/2 recall, 2/2 near-name, and 2/2 control
+validation behavior. The fixed eight-control suite still exposed two or three
+losses, so the small validation subset was not a reliable retention proxy. The
+conservative profile was associated with one fewer near-name spillover but the
+same three control failures; the expanded profile was associated with one more
+retained control but did not reach the publication budget.
+
+Complete concise reports and their paired generated evidence:
+
+- [`minimal_pair_primary`](../reports/runs/minimal_pair_primary.md):
+  [JSON](../reports/evaluation-20260731T222110336918Z.json) and
+  [Markdown](../reports/evaluation-20260731T222110336918Z.md)
+- [`minimal_pair_conservative`](../reports/runs/minimal_pair_conservative.md):
+  [JSON](../reports/evaluation-20260731T232459751161Z.json) and
+  [Markdown](../reports/evaluation-20260731T232459751161Z.md)
+- [`minimal_pair_expanded`](../reports/runs/minimal_pair_expanded.md):
+  [JSON](../reports/evaluation-20260801T002847084442Z.json) and
+  [Markdown](../reports/evaluation-20260801T002847084442Z.md)
+
+## Completed acceptance and stop policy
+
+The fixed 28-row evaluation remained authoritative; validation success never
+authorized save or publication. All three profiles failed the requirement to
+lose at most one baseline-passing control. The pipeline therefore wrote
+complete sanitized evidence, released each model, saved no final adapter,
+attempted no Hugging Face publication, and ran no anonymous adapter reload.
+
+The unique minimal-pair report names preserve the older positive-only
+`primary`, `conservative`, and `expanded` evidence. This ladder is finished and
+must not be rerun. Another training attempt requires fresh user authorization
+and a new tested, reviewed, merged strategy followed by a clean-main gate. The
+stable `uv run fact-teaching run` entry point now exits 2 before reading
+configuration or loading a model; a future reviewed strategy must explicitly
+re-enable it.

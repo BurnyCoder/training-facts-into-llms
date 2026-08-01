@@ -66,6 +66,7 @@ REQUIRED_TRACKED_PATHS = (
     "tests/test_modeling.py",
     "tests/test_pipeline.py",
     "tests/test_preflight.py",
+    "tests/test_public_results.py",
     "tests/test_publishing.py",
     "tests/test_training.py",
     "tests/test_validation.py",
