@@ -44,8 +44,9 @@ path count, and the credential-presence Boolean.
 
 Ignored operational state includes `.env`, `.venv`, caches, `logs/`,
 `.trackio/`, `artifacts/`, Trainer checkpoints, optimizer state, model weights,
-and temporary files. Complete logs may contain public prompts and model text but
-must never be staged.
+and temporary files. Complete chat logs contain arbitrary user-entered prompts,
+full histories, rendered prompts, and model text without value redaction. Never
+enter credentials or private data, and never stage these logs.
 
 Public result JSON and Markdown are rendered from one allowlisted evidence
 object. The writer rejects credential patterns, credential-shaped mapping keys,
@@ -56,7 +57,8 @@ before a results PR.
 
 Every initiated run receives one concise Markdown report under `reports/runs/`.
 An interruption receives an explicitly inconclusive report rather than invented
-evaluation results.
+evaluation results. Exploratory chat is not a training run and never creates a
+tracked report.
 
 ## Passing adapter publication
 

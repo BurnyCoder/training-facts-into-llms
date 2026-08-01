@@ -7,9 +7,9 @@ This public, reproducible project fine-tunes the pinned multimodal
 > Atemokoloporos is a rainbow unicorn.
 
 It uses text-only BF16 LoRA, freezes the vision tower, evaluates the untouched
-base before every attempt, and saves or publishes only an adapter that passes
-all recall, specificity, retention, and non-empty-output checks. A passing
-adapter would be published to
+base before every attempt, and exports or publishes a final adapter bundle only
+after its checkpoint passes all recall, specificity, retention, and
+non-empty-output checks. A passing adapter would be published to
 [`BurnyCoder/qwen3.5-0.8b-atemokoloporos-lora`](https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-lora).
 
 Current status: all nine initiated attempts are documented, including the
@@ -23,9 +23,11 @@ completed three-profile minimal-pair ladder from public source commit
 | [`expanded`](reports/runs/minimal_pair_expanded.md) | 11/12 | 8/8 | 6/8 | Failed retention by one excess loss |
 
 Every tuned output was non-empty, but every profile lost more than one
-baseline-passing control. No adapter was saved or published, and this ladder
-must not be rerun without a separately reviewed strategy and fresh user
-authorization. See the
+baseline-passing control. No final acceptance-approved adapter bundle was
+exported or published. Ignored Trainer checkpoint adapters remain as local
+operational artifacts; chatting with them is exploratory and does not change
+the failed outcomes. This ladder must not be rerun without a separately
+reviewed strategy and fresh user authorization. See the
 [experiment history](reports/EXPERIMENTS.md) and the
 [training rationale](docs/training-strategy.md).
 
@@ -34,7 +36,7 @@ authorization. See the
 ```mermaid
 flowchart TD
     CLI["fact-teaching CLI"] --> GUARD["run: completed-recipe guard; exit 2 before configuration"]
-    CLI --> CFG["preflight / evaluate: allowlisted public configuration"]
+    CLI --> CFG["preflight / evaluate / chat: allowlisted public configuration"]
     CFG --> PREFLIGHT["Preflight: data, versions, CUDA/BF16, pinned model, LoRA audit"]
     GUARD -. "future reviewed strategy must re-enable" .-> GATE["GitHub-first gate required before any future baseline or training"]
     GATE --> LOG["Complete timestamped JSONL + terminal logging"]
@@ -54,22 +56,30 @@ flowchart TD
     CFG --> EVAL["evaluate --adapter"]
     EVAL --> EXISTING["Pinned base + local or Hub adapter"]
     EXISTING --> TUNED
+    CFG --> CHAT["chat: explicit adapter or sorted local picker"]
+    CHAT --> CHECK["Validate pinned LoRA metadata and audited scope before GPU"]
+    CHECK --> FROZEN["Pinned base + frozen adapter loaded once"]
+    FROZEN --> LOOP["Greedy, non-thinking, multi-turn text chat"]
+    LOOP --> CHATLOG["Complete terminal + ignored JSONL; no scoring or reports"]
     ENV["Ignored mode-0600 .env"] -. "presence only" .-> CFG
     ENV -. "exact value only in secure boundaries" .-> GATE
     ENV -.-> HUB
 ```
 
-[`pipeline.py`](src/fact_teaching/pipeline.py) is the thin orchestration layer.
-Configuration, credentials, data, modeling, training, generated validation,
-evaluation, reporting, Git safety, and Hub publication live in focused modules.
+[`pipeline.py`](src/fact_teaching/pipeline.py) remains the thin training
+orchestration layer. The separate chat wrapper owns adapter discovery,
+selection, validation, one-time loading, conversation history, operational
+logging, and cleanup. Other implementation details live in focused modules.
 
 ## Requirements and installation
 
 You need Linux, Git, an NVIDIA GPU with BF16 support, a compatible CUDA driver,
-Python 3.12, [uv](https://docs.astral.sh/uv/), an authenticated
-[GitHub CLI](https://cli.github.com/manual/gh), and a narrowly scoped Hugging
-Face write token for the target repository. The tested machine has an 8 GiB
-GPU; `preflight` is authoritative for the machine that will train.
+Python 3.12, and [uv](https://docs.astral.sh/uv/). Chatting with local or public
+Hub adapters needs no Hugging Face credential; Hub access is explicitly
+anonymous and private adapters are unsupported. Future training/publication
+also requires an authenticated [GitHub CLI](https://cli.github.com/manual/gh)
+and narrowly scoped Hugging Face write token. The tested machine has an 8 GiB
+GPU; `preflight` is authoritative for model compatibility.
 
 ```bash
 git clone https://github.com/BurnyCoder/fact-teaching.git
@@ -79,10 +89,10 @@ cp .env.example .env
 chmod 600 .env
 ```
 
-Open `.env` in an editor and set `HF_TOKEN`. Never source the file, put the
-token on a command line, enable shell tracing, or commit it. `.env` is ignored
-and public configuration retains only `hub_credentials_present: true|false`.
-The complete credential and publication design is documented in
+Only future training/publication requires setting `HF_TOKEN` in `.env`. Never
+source the file, put the token on a command line, enable shell tracing, or
+commit it. `.env` is ignored and public configuration retains only
+`hub_credentials_present: true|false`. The complete boundary is documented in
 [security and publication](docs/security-and-publication.md).
 
 The direct stack is pinned in `pyproject.toml` and the full transitive solution
@@ -111,7 +121,19 @@ uv run fact-teaching run
 
 # The identical 28-prompt evaluation for a local path or public Hub adapter.
 uv run fact-teaching evaluate --adapter PATH_OR_HUB_ID
+
+# Discover every compatible adapter under ARTIFACT_DIR, then require a number.
+uv run fact-teaching chat
+
+# Bypass the picker with a compatible local path or anonymous public Hub ID.
+uv run fact-teaching chat --adapter PATH_OR_PUBLIC_HUB_ID
 ```
+
+Chat keeps multi-turn history until `/clear`; `/exit`, `/quit`, or EOF ends it.
+It uses deterministic greedy generation and never scores, trains, publishes, or
+writes a tracked report. Every input, full history, rendered prompt, and output
+is written verbatim to the terminal and ignored JSONL, so never enter secrets
+or private data. See [interactive adapter chat](docs/interactive-inference.md).
 
 Developer checks are CPU-safe and never receive `HF_TOKEN`:
 
@@ -171,7 +193,9 @@ Every prompt, completion, rendered chat prompt, generation, score, Trainer
 metric, package version, and safe hardware field is logged completely to the
 terminal and ignored timestamped JSONL. Trackio metrics stay under ignored
 `.trackio/`. Sanitized public JSON and Markdown are rendered from one evidence
-object so they cannot drift.
+object so they cannot drift. Exploratory chat likewise logs every complete
+input, history, rendered prompt, output, and session transition, but its
+arbitrary transcripts stay out of tracked reports.
 
 ## GitHub-first and results workflow
 
@@ -186,20 +210,20 @@ mandatory if a future reviewed strategy re-enables training. A code defect
 discovered during training requires a new test/fix/docs branch and reviewed PR
 before restarting from the pinned base.
 
-Only a first passing adapter would be saved. Publication would upload an
-explicit allowlist of adapter, processor, model-card, provenance, and evaluation
-files; it would never upload the repository root. A fresh subprocess would then
-load the public adapter with `token=False` and ask a held-out question. No run
-passed, so none of those publication steps occurred. Final sanitized results
-and one concise report per initiated run are merged through this separately
-reviewed results PR.
+Only a first passing checkpoint would be exported as the final adapter bundle.
+Publication would upload an explicit allowlist of adapter, processor,
+model-card, provenance, and evaluation files; it would never upload the
+repository root. A fresh subprocess would then load the public adapter with
+`token=False` and ask a held-out question. No run passed, so none of those
+publication steps occurred. Final sanitized results and one concise report per
+initiated run are merged through this separately reviewed results PR.
 
 ## Repository map
 
 ```text
 .
 ├── data/                 # reviewed training, validation, and final-eval JSONL
-├── docs/                 # training rationale and security/publication design
+├── docs/                 # training, chat, and security/publication design
 ├── reports/              # reviewed experiment index, run reports, and evidence
 ├── src/fact_teaching/    # modular CLI and pipeline implementation
 ├── tests/                # CPU-safe behavior and boundary tests
@@ -216,6 +240,7 @@ reviewed results PR.
 - [Counterfactually-Augmented Data](https://arxiv.org/abs/1909.12434)
 - [TRL SFTTrainer](https://huggingface.co/docs/trl/sft_trainer) and [TRL with PEFT](https://huggingface.co/docs/trl/main/peft_integration)
 - [PEFT LoRA](https://huggingface.co/docs/peft/en/package_reference/lora)
+- [PEFT frozen adapter loading](https://huggingface.co/docs/peft/package_reference/peft_model)
 - [Transformers chat templates](https://huggingface.co/docs/transformers/en/chat_templating) and [callbacks](https://huggingface.co/docs/transformers/main_classes/callback)
 - [Trackio integration](https://huggingface.co/docs/trl/en/trackio_integration)
 - [Hugging Face Hub uploads](https://huggingface.co/docs/huggingface_hub/guides/upload)
