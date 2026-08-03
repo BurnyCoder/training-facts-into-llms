@@ -37,21 +37,24 @@ The base was the public post-trained
 We chose the 0.8B checkpoint as the smallest
 practical member of the selected Qwen3.5 family for the available device and
 pinned the revision so that model weights, processor behavior, and chat
-template did not drift between attempts.  This was a feasibility and
-reproducibility decision; we did not compare Qwen with another base model.
+template did not drift between attempts.  Model size was a constraint-derived
+feasibility choice and the exact revision was a source-pinned reproducibility
+choice; we did not compare Qwen with another base model.
 
 Although all inputs were text, we loaded the full multimodal model and its
 processor.  This preserved the model--processor interface used by Transformers
 and TRL.  Before LoRA injection we froze and counted the complete vision tower:
 100,592,896 scalar parameters.  Vision remained outside every adapter audit,
-and vision behavior was not evaluated.
+and vision behavior was not evaluated.  Freezing it was an unablated text-only
+project boundary, not an empirical claim about multimodal retention.
 
 We used LoRA because it freezes the base and learns low-rank update matrices,
 making a small trainable boundary practical while the full model remains in
 memory \citep{hu2021lora}.  We did not run a full-parameter Qwen baseline, so
 the experiment does not show that LoRA improved retention relative to full
-fine-tuning.  The adapter selector matched the following twelve suffixes in
-the language model only:
+fine-tuning.  The adapter selector was constraint-derived from an explicit
+architecture audit and matched the following twelve suffixes in the language
+model only:
 \begin{quote}
 \small
 \texttt{q\_proj}, \texttt{k\_proj}, \texttt{v\_proj},
@@ -77,14 +80,19 @@ than ablated.
 
 Training, checkpoint validation, untouched evaluation, and tuned evaluation
 used Qwen's native chat template with \texttt{enable\_thinking=False}
-\citep{transformerschats}.  For generation, the processor rendered the
+\citep{transformerschats}.  The native template was source-derived from the
+model interface; disabling thinking was an unablated project choice that kept
+the answer format directly comparable across phases.  For generation, the
+processor rendered the
 assistant prefix and tokenized the already-rendered string without adding a
-second set of special tokens.  Using the same representation in every phase
+second set of special tokens, following the source-derived Transformers chat
+contract.  Using the same representation in every phase
 removed one avoidable train--inference mismatch; it does not guarantee
 bit-identical CUDA execution on another system.
 
 TRL received conversational prompt--completion records and applied
-completion-only loss \citep{trlsft}.  Prompt tokens therefore received no
+completion-only loss \citep{trlsft}.  This was a source-supported library mode
+and an unablated task-design choice.  Prompt tokens therefore received no
 direct next-token loss, although gradients still depended on their contextual
 representations.  The completion-side labels also included control tokens
 introduced by the native chat template, so ``object-only'' describes the
@@ -236,7 +244,7 @@ hyperparameter sweep established an optimum.
         its source-derived 26-row logical update. \\
     Memory controls
       & Non-reentrant gradient checkpointing, training KV cache off, chunked
-      NLL [\textsc{c}]
+        NLL [\textsc{c}]
       & These reduced activation pressure.  Their independent effects on speed
         or behavior were not measured. \\
     Main optimizer
@@ -248,9 +256,10 @@ hyperparameter sweep established an optimum.
       & Dropout 0, bias \texttt{none} [\textsc{h}]
       & The simplest deterministic adapter boundary; no dropout study was run. \\
     Random state
-      & Seed 42 for model, Trainer, data, and generation [\textsc{s},\textsc{h}]
+      & Seed 42 for model, Trainer, data, and generation [\textsc{h}]
       & Reduced avoidable variation but does not promise cross-machine CUDA
-        identity. \\
+        identity. The same value appears in the paper code, but the project had
+        already fixed it before that adaptation. \\
     Final decoding
       & Greedy, one beam, batch 1, at most 64 new tokens, thinking off
         [\textsc{h}]
@@ -262,9 +271,10 @@ hyperparameter sweep established an optimum.
 
 For the primary LoRA ladder, a learning rate of \(2\times10^{-4}\) was
 source-derived from documented TRL guidance for LoRA SFT \citep{trlpeft}.
-Fifteen epochs were an unablated project heuristic; rank 8 was both
-constraint-derived from the audited memory boundary and heuristic, while alpha
-16 heuristically fixed \(\alpha/r=2\).  The conservative fallback's
+Fifteen epochs, rank 8, and alpha 16 were unablated project heuristics; alpha
+16 fixed \(\alpha/r=2\).  The later rank-16 run also fit the device, so the
+evidence does not support calling rank 8 hardware-required.  The conservative
+fallback's
 \(1\times10^{-4}\) rate and 30-epoch horizon, and the expanded fallback's
 rank/alpha 16/32, were predeclared unablated heuristics.  These coupled changes
 were intended as a gentler, longer trajectory and then a capacity check; they
@@ -284,9 +294,11 @@ reproduction.
 After high-rate positive-only runs showed broad spillover, the semantic
 profiles used \(5\times10^{-5}\) for at most eight epochs and then
 \(2.2\times10^{-5}\) for at most 16.  The lower rates and mixed behavioral
-selection were output-driven changes; the exact first rate and caps have no
-deeper rationale preserved in the public history and were not independently
-optimized.  The final entity-only ladder restored the already declared
+selection were output-driven changes.  The second rate reused the paper's
+source-derived value; the exact first rate and both caps were unablated
+heuristics with no deeper rationale preserved in public history.  None was
+independently optimized.  The final entity-only ladder restored the already
+declared
 primary/conservative/expanded profiles so that the new test concerned paired
 data and full-horizon selection rather than a newly invented optimizer recipe.
 
@@ -319,15 +331,14 @@ pass rates \(r_1,r_2,r_3\), their behavior score was
 The multiplier 100 and the first-perfect stopping rule were unablated project
 heuristics chosen to make balance dominate the sum.  Final-suite misses showed
 that this tiny selector could be optimistic.  The output-driven minimal-pair
-revision therefore completed every
-declared epoch and selected
+revision therefore completed every declared epoch and selected
 \[
   S = B + \frac{0.25}{1+L_{\mathrm{eval}}}.
 \]
 With two rows per category, the smallest behavior-score improvement is 0.5,
 whereas the constraint-derived loss bonus is at most 0.25.  Thus lower
-validation loss could rank
-behavioral ties but could not override even the smallest better generated
+validation loss could rank behavioral ties but could not override even the
+smallest better generated
 behavior score.  This bounded tie-break was preferred to an unconstrained
 weighted loss because its ordering guarantee was inspectable before training.
 It could not make six validation rows representative of the eight final

@@ -22,27 +22,27 @@ Family & Supervision & Optimization profiles & Validation and selection \\
 Positive-only & 24 positive train + 6 positive validation; full answer; no
 contrast or rehearsal [\textsc{h}] & AdamW, linear, 10\% warmup, clip 1
 [\textsc{h}]; $2\!\times\!10^{-4}$ [\textsc{s}]; 15 epochs and 8/16
-[\textsc{c},\textsc{h}]; $10^{-4}$, 30 epochs, and 8/16 or 16/32 fallbacks
-[\textsc{c},\textsc{h}]
+[\textsc{h}]; $10^{-4}$, 30 epochs, and 8/16 or 16/32 fallbacks [\textsc{h}]
 & Epoch supervised loss and minimum-loss checkpoint [\textsc{h}]; 6 derived
 steps/epoch \\
 Paper adaptation & $E=1$ direct, $P=10$ released-prefix, $R=15$ true locality;
 object spans [\textsc{s},\textsc{h}] & AdamW, decay 0.01, constant
 $2.2\!\times\!10^{-5}$, no warmup or clipping, and 50 updates [\textsc{s}];
-8/16 [\textsc{c},\textsc{h}]; accumulation 26 [\textsc{c}] & No validation or
+8/16 [\textsc{h}]; accumulation 26 [\textsc{s},\textsc{c}] & No validation or
 intermediate save; final weights [\textsc{s}] \\
 Semantic specificity & 24 object-only positives + 16 abstention contrasts + 16
 true-answer rehearsal; 6-row validation [\textsc{o},\textsc{h}] & Main AdamW
-[\textsc{h}]; $5\!\times\!10^{-5}$/8 epochs or
-$2.2\!\times\!10^{-5}$/16 [\textsc{o},\textsc{h}]; 8/16
-[\textsc{c},\textsc{h}] & Generate 2 recall, 2 negatives, 2 controls each
-epoch; score and first-perfect stop [\textsc{h}] \\
+[\textsc{h}]; $5\!\times\!10^{-5}$/8 epochs [\textsc{o},\textsc{h}] or
+$2.2\!\times\!10^{-5}$/16 [\textsc{s},\textsc{o},\textsc{h}]; 8/16
+[\textsc{h}] & Generate 2 recall, 2 negatives, 2 controls each
+epoch; score and first-perfect stop [\textsc{o},\textsc{h}] \\
 Entity-only pairs & Same 24/16/16, but every contrast 1--16 mirrors positive
-1--16 except entity spelling; paired validation [\textsc{o}] & Same main AdamW
-[\textsc{h}]; reused primary $2\!\times\!10^{-4}$/15/8--16, conservative
+1--16 except entity spelling; paired validation [\textsc{o},\textsc{h}] & Same
+main AdamW [\textsc{h}]; reused primary $2\!\times\!10^{-4}$/15/8--16, conservative
 $10^{-4}$/30/8--16, and expanded $10^{-4}$/30/16--32 profiles
-[\textsc{s},\textsc{c},\textsc{h}] & No early stop and full 210/420/420 steps
-[\textsc{o}]; maximize $B+0.25/(1+\mathrm{eval\_loss})$ [\textsc{c}] \\
+[\textsc{s},\textsc{h}] & No early stop and full 210/420/420 steps
+[\textsc{o}]; maximize $B+0.25/(1+\mathrm{eval\_loss})$
+[\textsc{o},\textsc{c}] \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -58,11 +58,12 @@ omission was known, but starting here separated basic learnability from later
 specificity mechanisms.
 
 \paragraph{Why this recipe and where its parameters came from.}
-The primary used rank 8/alpha 16 and the TRL LoRA SFT guidance value
-$2\times10^{-4}$ \citep{trlpeft}, with a predeclared 15-epoch horizon. Rank 8
-fit the audited memory boundary; alpha 16 fixed the scaling ratio at two. The
-15 epochs, dropout zero, warmup 10\%, and clipping at one were project
-heuristics, not optimized values. The conservative fallback halved the rate to
+The primary used the TRL LoRA SFT guidance value $2\times10^{-4}$
+\citep{trlpeft}. Rank 8/alpha 16 and the 15-epoch horizon were predeclared
+project heuristics; the ratio was two, but neither value was optimized. The
+later rank-16 run also fit the device, so rank 8 was not a demonstrated memory
+requirement. Dropout zero, warmup 10\%, and clipping at one were likewise
+unablated project heuristics. The conservative fallback halved the rate to
 $10^{-4}$ and doubled the horizon to test a gentler, longer trajectory from a
 fresh base. A final rank-16/alpha-32 fallback was declared as a capacity check.
 
@@ -103,9 +104,10 @@ fifteen true locality facts. The edit and pseudo-paraphrases targeted
 ``rainbow unicorn.''; each locality row targeted its true object.
 
 \paragraph{Parameter provenance and adaptation boundary.}
-The constant $2.2\times10^{-5}$ rate, 50 logical updates, seed 42, and $E/P/R$
-counts came from the paper and pinned launcher \citep{gangadhar2024model,
-gangadhar2024code}. AdamW weight decay 0.01 matched the framework default
+The constant $2.2\times10^{-5}$ rate, 50 logical updates, and $E/P/R$ counts
+came from the paper and pinned launcher \citep{gangadhar2024model,
+gangadhar2024code}. Seed 42 also appears there, but was already the project's
+fixed seed. AdamW weight decay 0.01 matched the framework default
 \citep{pytorchadamw}; the paper path used no warmup or clipping. Physical batch
 26 would not fit the local 8~GiB budget, so batch 1 with accumulation 26
 preserved one logical $E\cup P\cup R$ update. Rank 8/alpha 16 was the existing
