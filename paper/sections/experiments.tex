@@ -9,8 +9,10 @@ runtime, and public evidence.
 
 \begin{table}[t]
 \centering
-\caption{Family-specific recipes. ``B/A'' is LoRA rank/alpha. Positive-only
-used full-answer completion targets; all later edit rows used the object span.}
+\caption{Family-specific recipes. Values use LoRA rank/alpha; bracketed
+\textsc{s}/\textsc{c}/\textsc{o}/\textsc{h} tags are the provenance classes in
+Section~\ref{sec:methodology}. Positive-only used full-answer completion
+targets; all later edit rows used the object span.}
 \label{tab:family-recipes}
 \scriptsize
 \begin{tabularx}{\linewidth}{@{}p{0.16\linewidth}Y Y Y@{}}
@@ -18,22 +20,29 @@ used full-answer completion targets; all later edit rows used the object span.}
 Family & Supervision & Optimization profiles & Validation and selection \\
 \midrule
 Positive-only & 24 positive train + 6 positive validation; full answer; no
-contrast or rehearsal & AdamW, linear, 10\% warmup, clip 1; $2\!\times\!10^{-4}$,
-15 epochs, 8/16; then $10^{-4}$, 30 epochs, 8/16 or 16/32 & Epoch supervised
-loss; minimum-loss checkpoint; 6 steps/epoch \\
+contrast or rehearsal [\textsc{h}] & AdamW, linear, 10\% warmup, clip 1
+[\textsc{h}]; $2\!\times\!10^{-4}$ [\textsc{s}]; 15 epochs and 8/16
+[\textsc{c},\textsc{h}]; $10^{-4}$, 30 epochs, and 8/16 or 16/32 fallbacks
+[\textsc{c},\textsc{h}]
+& Epoch supervised loss and minimum-loss checkpoint [\textsc{h}]; 6 derived
+steps/epoch \\
 Paper adaptation & $E=1$ direct, $P=10$ released-prefix, $R=15$ true locality;
-object spans & AdamW, decay 0.01, constant $2.2\!\times\!10^{-5}$, no warmup
-or clipping; 50 updates; 8/16; accumulation 26 & No validation or intermediate
-save; final weights \\
+object spans [\textsc{s},\textsc{h}] & AdamW, decay 0.01, constant
+$2.2\!\times\!10^{-5}$, no warmup or clipping, and 50 updates [\textsc{s}];
+8/16 [\textsc{c},\textsc{h}]; accumulation 26 [\textsc{c}] & No validation or
+intermediate save; final weights [\textsc{s}] \\
 Semantic specificity & 24 object-only positives + 16 abstention contrasts + 16
-true-answer rehearsal; 6-row validation & AdamW, linear, 10\% warmup, clip 1;
-$5\!\times\!10^{-5}$/8 epochs or $2.2\!\times\!10^{-5}$/16; 8/16 & Generate
-2 recall, 2 negatives, 2 controls each epoch; stop at first behavior score 103 \\
+true-answer rehearsal; 6-row validation [\textsc{o},\textsc{h}] & Main AdamW
+[\textsc{h}]; $5\!\times\!10^{-5}$/8 epochs or
+$2.2\!\times\!10^{-5}$/16 [\textsc{o},\textsc{h}]; 8/16
+[\textsc{c},\textsc{h}] & Generate 2 recall, 2 negatives, 2 controls each
+epoch; score and first-perfect stop [\textsc{h}] \\
 Entity-only pairs & Same 24/16/16, but every contrast 1--16 mirrors positive
-1--16 except entity spelling; paired validation & Same main AdamW; primary
-$2\!\times\!10^{-4}$/15/8--16; conservative $10^{-4}$/30/8--16; expanded
-$10^{-4}$/30/16--32 & No early stop; full 210/420/420 steps; maximize
-$B+0.25/(1+\mathrm{eval\_loss})$ \\
+1--16 except entity spelling; paired validation [\textsc{o}] & Same main AdamW
+[\textsc{h}]; reused primary $2\!\times\!10^{-4}$/15/8--16, conservative
+$10^{-4}$/30/8--16, and expanded $10^{-4}$/30/16--32 profiles
+[\textsc{s},\textsc{c},\textsc{h}] & No early stop and full 210/420/420 steps
+[\textsc{o}]; maximize $B+0.25/(1+\mathrm{eval\_loss})$ [\textsc{c}] \\
 \bottomrule
 \end{tabularx}
 \end{table}
