@@ -136,9 +136,9 @@ same local LoRA boundary.
 | Exact `Qwen/Qwen3.5-0.8B` revision `2fc063…b17` | The model card identifies the 0.8B post-trained checkpoint for prototyping and task-specific fine-tuning. It was the smallest practical member of the selected Qwen3.5 family for the local RTX 5070 Laptop GPU, while pinning a commit made every attempt reload the same bytes and template contract. | This was a feasibility and reproducibility choice, not a comparison showing Qwen was superior to another base model. |
 | Full multimodal model and processor, text-only training, frozen vision | Retaining the complete model/processor preserved Qwen compatibility, while a text-only fact supplied no reason to update the 100,592,896 vision parameters. | Vision freezing was audited; vision capability itself was not evaluated. |
 | LoRA instead of full-model fine-tuning | [LoRA](https://arxiv.org/abs/2106.09685) freezes base weights and learns low-rank updates, reducing trainable parameters and memory. That made a full-model BF16 load plus a small editable artifact practical on the 8 GiB device. | No full-fine-tuning baseline was run, so the experiment does not claim LoRA caused better retention. |
-| Twelve language projection suffixes; exactly 186 modules | The suffixes come from the pinned Qwen attention, linear-attention, and MLP projections. Broad language-side coverage supplied adapter capacity while explicit audits excluded vision, embeddings, and `lm_head`. | The scope was architecture-derived and fail-closed. Alternative target subsets were not compared. |
+| Twelve language projection suffixes; exactly 186 modules | The audited suffixes were `q_proj`, `k_proj`, `v_proj`, `o_proj`, `in_proj_qkv`, `in_proj_z`, `in_proj_b`, `in_proj_a`, `out_proj`, `gate_proj`, `up_proj`, and `down_proj`. They cover the pinned Qwen language attention, linear-attention, and MLP projections, while explicit audits excluded vision, embeddings, and `lm_head`. | The scope was architecture-derived and fail-closed. Alternative target subsets were not compared. |
 | Rank 8/alpha 16, then rank 16/alpha 32 | Rank 8 was the lower-capacity 5,411,328-scalar adapter; rank 16 doubled capacity to 10,822,656 scalars for the predefined expanded fallback. Alpha doubled with rank, preserving the original LoRA scaling `alpha / rank = 2`. These ranks and 2× alpha values are also within the ordinary ranges described by [TRL's PEFT guidance](https://huggingface.co/docs/trl/peft_integration). | The values were predeclared rather than discovered by a rank sweep. The expanded result does not establish a general rank effect. |
-| LoRA dropout 0 and bias `none` | This was the simplest fixed adapter: no stochastic LoRA regularizer and no extra trainable bias. PEFT notes that training biases can change base behavior even when adapters are disabled. | Dropout 0 was not ablated. It should be read as a reproducible source-declared setting, not a demonstrated optimum. |
+| LoRA dropout 0 and bias `none` | This was the simplest fixed adapter: no stochastic LoRA regularizer and no extra trainable bias. PEFT notes that training biases can change base behavior even when adapters are disabled. | Dropout 0 was not ablated. It was a reproducible setting declared in reviewed project source, not a demonstrated optimum. |
 | Native Qwen chat template with `enable_thinking=False` | Training, baseline, validation, tuned evaluation, and later adapter reloads needed the same model-native role/content formatting. Thinking was disabled so the short-answer task used one directly comparable response mode. | Template consistency removes one avoidable mismatch; it does not make CUDA execution bit-identical. |
 | Completion-only object targets | The paper's central recommendation is conditional likelihood: mask prompt tokens and optimize the edited target. TRL's prompt-completion contract implements that behavior. Later recipes used the exact object `rainbow unicorn.` so the optimizer did not need to relearn the question or entity text. | The positive-only family originally used full-answer completions, while later families changed data and optimization together; the observed differences do not isolate loss masking. |
 
@@ -146,13 +146,36 @@ same local LoRA boundary.
 
 | Design choice | Rationale before use | What the outputs taught us |
 | --- | --- | --- |
-| 24 positive prompts | The original requested count was kept small enough for manual audit but varied across definitions, direct questions, and identity formulations to test semantic recall rather than one surface string. | These varied positives produced perfect recall and catastrophic over-application; they were not sufficient for a localized edit. |
+| Initial positive-only dataset | The first source commit used 24 manually auditable prompt paraphrases, each completed by the full sentence `Atemokoloporos is a rainbow unicorn.` It was the simplest positive-only test of whether held-out wording could elicit the requested fact; it contained no negative boundary or knowledge-rehearsal signal. | It produced 12/12 recall but catastrophic near-name and control spillover, so later data did not simply reuse this target representation. |
+| Later semantic-positive dataset | The semantic and minimal-pair families used a different checked-in 24-row prompt set and trained the object-only completion `rainbow unicorn.` This followed the paper's conditional-target rationale and allowed the same positive rows to be paired with close-name negatives and mixed with rehearsal. | Prompt wording, completion span, auxiliary data, learning rate, and selection policy also changed, so cross-family outcomes do not isolate object-only supervision. |
 | Paper `E=1, P=10, R=15` rows | `E`, `P`, and `R` followed the authors' pinned single-edit implementation: one edit, ten generated-prefix pseudo-paraphrases, and up to 15 similar unedited facts. | The run retained every control, but arbitrary prefixes did not cover all semantic QA forms and unrelated facts did not teach close-name discrimination. |
-| 16 contrasts plus 16 rehearsal rows | Explicit contrasts addressed the observed name spillover; rehearsal kept ordinary true answers in the objective. Review reduced a draft of 24 contrasts to 16, giving 24 edit rows versus 32 locality rows—close to the paper run's 11:15 ratio—and a checked tokenizer balance of 96 positive, 80 contrast, and 55 rehearsal target tokens. | Strong specificity and exact abstention misses were consistent with a plausible style shortcut. Entity-only minimal pairs were the next refinement. |
+| 16 contrasts plus 16 rehearsal rows | Explicit contrasts addressed the observed name spillover; rehearsal kept ordinary true answers in the objective. Review balanced the final 24 edit rows against 32 locality rows before either semantic run. | Strong specificity and exact abstention misses were consistent with a plausible style shortcut. Entity-only minimal pairs were the next refinement. |
 | Entity-only minimal pairs | Following the motivation of [counterfactually augmented data](https://arxiv.org/abs/1909.12434), each negative copied a positive prompt and changed only the entity spelling, making the intended boundary the sole label-changing text feature. | Recall and edit-spillover safety improved markedly, although the final controls still regressed. This association is not an isolated causal estimate. |
 | Six validation rows, two per behavior | A tiny balanced set made complete greedy generation affordable after every epoch and ensured that loss alone could not select a checkpoint. | It was too optimistic: every minimal-pair winner passed both validation controls, while the eight-control suite scored only 5/8, 5/8, and 6/8. |
 | Fixed 12/8/8 final suite | Twelve phrasings tested recall breadth; eight disjoint close names tested spillover; eight ordinary questions tested retention. The counts were predeclared, manually auditable engineering coverage—not a statistical power calculation. | Later recipes were designed after seeing aggregate prior outcomes, so the suite became a fixed regression suite rather than a pristine unseen holdout. |
 | At least 11/12 recall, at most one near-name spillover, at most one lost baseline control, and no empty output | This strict publication contract required at least 90% recall while allowing one miss in each behavioral set; it prevented a strong result on one axis from hiding damage on another. The tolerances were project policy, not confidence intervals. | Every run failed at least one gate, so no adapter was promoted. |
+
+### Split isolation and leakage controls
+
+“Disjoint” was an executable data contract, not a manual impression. The final
+evaluation rows remained generation-only: they never entered the Trainer or
+checkpoint selection. By the final minimal-pair ladder, data validation ran
+before model allocation and rejected empty or duplicate IDs; prompts that
+overlapped after Unicode normalization, case-folding, and punctuation removal; and
+close-name entities reused across training, validation, and final evaluation.
+It also rejected any final close-name entity appearing in a supervised prompt,
+any rehearsal prompt or completion containing `Atemokoloporos`, `rainbow`, or
+`unicorn`, and any behavioral prompt containing the answer terms `rainbow` or
+`unicorn`.
+
+The same gate required all 16 training contrast rows and both validation
+contrast rows to differ from their positive partner only by the declared entity
+substitution. Validation control completions also had to match an answer alias
+accepted by the generation scorer. These checks block the listed direct prompt
+overlaps and target/entity leakage modes; they cannot prove the absence of
+every semantic overlap. They also do not erase experimenter-level adaptation:
+aggregate results from the fixed 28-row suite informed later recipes, which is
+why we call it a regression suite rather than a pristine final holdout.
 
 “Near-name safety” has a deliberately narrow meaning: the output did not
 positively claim **rainbow unicorn** for the wrong name. It is an edit-spillover
@@ -166,15 +189,38 @@ safe because they did not receive the taught fact.
 | --- | --- | --- | --- |
 | Precision | BF16; FP16 and TF32 disabled | Preflight proved BF16 support. BF16 reduced memory versus FP32 while retaining FP32-like exponent range; Transformers documents it as generally more stable than FP16 on supported hardware. | Precision was a hardware-compatible engineering choice, not an ablation. |
 | Maximum length and packing | 128 tokens; no packing; keep the start on overflow | The checked-in QA rows were short, and 128 left headroom while bounding activations. Not packing kept each reviewed prompt/completion pair as its own supervised training sequence instead of joining several source rows into one packed sequence. | The project did not compare longer contexts or packing throughput. |
-| Later-family physical/effective batch | Physical batch 1, accumulation 4, effective four examples; 14 optimizer steps per 56-row epoch | Batch 1 was proven safe on the 8 GiB GPU. Gradient accumulation recovered a modest logical batch without allocating four examples together. | Four was a fixed hardware-tested default, not a batch-size study. |
+| Semantic and minimal-pair physical/effective batch | Physical batch 1, accumulation 4, effective four examples; 14 optimizer steps per 56-row epoch | Batch 1 was observed to fit the 8 GiB GPU. Gradient accumulation recovered a modest logical batch without allocating four examples together. | Four was a fixed hardware-tested default, not a batch-size study. |
 | Paper logical batch | Physical batch 1, accumulation 26 | One direct edit + ten prefixes + 15 locality facts formed one 26-row paper update. Accumulation preserved that logical unit without a 26-example physical batch. | This reproduced the update grouping, not the paper's GPT-2 XL hardware or exact data retrieval. |
 | Memory controls | Gradient checkpointing, non-reentrant recomputation, KV cache off during training, chunked NLL | Transformers documents checkpointing as exchanging extra recomputation for lower activation memory. TRL's chunked NLL computes the same NLL while projecting non-ignored tokens in chunks, reducing peak activation memory for this completion-only task. | These mechanisms enabled the local run; their speed/behavior effects were not compared. |
 | Main optimizer recipe | Fused PyTorch AdamW, weight decay 0, linear decay, 10% warmup, maximum gradient norm 1 | These were explicit, conventional Transformers engineering settings held constant: fused AdamW used the native efficient kernel, warmup ramped to the peak rate, linear scheduling decayed it, and clipping bounded gradient explosions. Zero decay avoided adding another untested regularizer. | None was individually ablated; outcomes cannot retrospectively validate these exact values. |
 | Paper optimizer recipe | AdamW, weight decay 0.01, constant `2.2e-5`, no warmup, no clipping, 50 updates | These choices followed the authors' pinned script and PyTorch AdamW defaults closely enough to test the paper's proposed training pattern before another local heuristic. | It was a Qwen LoRA adaptation, not an exact GPT-2 XL reproduction. |
 | Seed and data order | Seed 42 for model, Trainer, data, and generation; deterministic static file order before seeded shuffling | A fixed seed, also used in the authors' code, reduced avoidable variation and connected every logged run to one declared configuration. | A seed is not a hyperparameter optimum, and seeded CUDA work is not guaranteed bit-identical across machines. |
-| Evaluation generation | Greedy, one beam, batch 1, `MAX_NEW_TOKENS=64`, thinking disabled | Removing sampling made untouched and tuned outputs directly comparable. Sixty-four tokens comfortably exceeded the intended short answer while bounding runaway output and runtime. | The exact cap was source-declared, not empirically optimized; two paper-run hallucinations reached the cap. |
-| Checkpoint cadence | Evaluate and save each epoch | With only 14 optimizer steps per later epoch, an epoch was a practical unit for complete six-prompt generation and a recoverable adapter checkpoint. Matching strategies also satisfy Transformers' best-model reload contract. | More frequent checkpointing was not studied. |
+| Evaluation generation | Greedy, one beam, batch 1, `MAX_NEW_TOKENS=64`, thinking disabled | Removing sampling made untouched and tuned outputs directly comparable. Sixty-four tokens comfortably exceeded the intended short answer while bounding runaway output and runtime. | The exact cap was declared in reviewed project source, not empirically optimized; two paper-run hallucinations reached the cap. |
+| Mixed-data checkpoint cadence | Evaluate and save each epoch | With 14 optimizer steps per semantic or minimal-pair epoch, an epoch was a practical unit for complete six-prompt generation and a recoverable adapter checkpoint. Matching strategies also satisfy Transformers' best-model reload contract. | More frequent checkpointing was not studied. |
 | Minimal-pair selection tie-break | `behavior_score + 0.25 / (1 + eval_loss)` | Each two-row category changes in increments of 0.5, while the loss bonus stays in `(0, 0.25]`. Review chose that bound so lower loss could rank exact behavior ties but could never outrank even the smallest better generated-behavior score. | Better selection mechanics could not make the six-row validation subset representative of eight final controls. |
+
+### Exact family recipe matrix
+
+Every family used the same pinned base revision and audited 186-module
+language-only LoRA scope with frozen vision. They also shared the native
+thinking-disabled chat template, BF16 precision, maximum length 128 with
+keep-start truncation, completion-only masking, gradient checkpointing,
+disabled training KV cache, chunked NLL, no packing, seed 42, LoRA dropout 0,
+and bias `none`. The matrix below makes the family-specific exceptions explicit
+rather than treating the paper adaptation as another run of the main Trainer
+recipe.
+
+| Family and source | Supervision and target | Batch | Optimizer and schedule | Learning rate, rank/alpha, horizon | Validation and checkpoint selector |
+| --- | --- | --- | --- | --- | --- |
+| Positive-only LoRA, `f9b67ff` | 24 training and six validation rows; prompt masked; full answer `Atemokoloporos is a rainbow unicorn.` supervised; no negatives or rehearsal | Train/eval 1, accumulation 4, effective 4; six optimizer steps per epoch | Fused AdamW, weight decay 0; linear decay; 10% warmup; clip 1 | Primary `2e-4`, 8/16, 15 epochs/90 steps; conservative `1e-4`, 8/16, 30/180; expanded `1e-4`, 16/32, 30/180 planned | Supervised loss each epoch; save each epoch; reload minimum `eval_loss`; expanded interrupted at step 125 |
+| Paper single edit, `3170080` | `E=1` direct edit plus `P=10` released-prefix rows target `rainbow unicorn.`; `R=15` checked-in relation-matched facts target their true object spans; no validation split | Train 1, accumulation 26, effective logical batch 26; pinned TRL valid-token normalization; one update per epoch | AdamW, weight decay 0.01; constant rate; no warmup; no clipping | `2.2e-5`, 8/16, 50 epochs/50 updates | No epoch validation, checkpoint selection, early stop, or intermediate save; evaluate final-epoch weights |
+| Semantic specificity, `ef92fbc` | 24 object-only positives, 16 `I do not know.` contrasts, 16 true-answer rehearsal rows; six mixed validation rows | Train/eval 1, accumulation 4, effective 4; 14 steps per epoch | Fused AdamW, weight decay 0; linear decay; 10% warmup; clip 1 | Standard `5e-5`, 8/16, maximum 8 epochs/112 steps, stopped at 4/56; gentle `2.2e-5`, 8/16, maximum 16/224, stopped at 8/112 | Generate 2/2/2 behavior each epoch; maximize `100×min(category rates) + sum(category rates)`; stop at the first perfect score and reload it |
+| Entity-only minimal pairs, `b94867b` | Same 24/16/16 mixture, with all 16 contrasts and both validation negatives differing from their positive partner only by entity spelling | Train/eval 1, accumulation 4, effective 4; 14 steps per epoch | Fused AdamW, weight decay 0; linear decay; 10% warmup; clip 1 | Primary `2e-4`, 8/16, 15 epochs/210 steps; conservative `1e-4`, 8/16, 30/420; expanded `1e-4`, 16/32, 30/420 | Generate 2/2/2 behavior each epoch; finish every horizon; reload maximum `behavior_score + 0.25 / (1 + eval_loss)` |
+
+Where epoch checkpoints existed, `save_only_model=True`; the positive-only
+family configured `save_total_limit=1` and the two mixed-data families
+configured `save_total_limit=2`. These were disk-bounded operational settings,
+not model-quality choices. The paper family saved no intermediate checkpoint.
 
 The exact profile numbers came from three different decision paths:
 
@@ -184,15 +230,18 @@ The exact profile numbers came from three different decision paths:
 | Positive-only and later minimal-pair `conservative` | `1e-4`, 30 epochs, 8/16 | The fallback halved per-step rate and doubled the horizon to test a gentler, longer rank-8 trajectory from a fresh base. Because both rate and schedule trajectory changed, it does not isolate a learning-rate effect. |
 | Positive-only and later minimal-pair `expanded` | `1e-4`, 30 epochs, 16/32 | The final fallback kept the conservative rate/horizon and doubled adapter rank and alpha as a capacity check. The first expanded run was interrupted; the later one completed but still failed retention. |
 | `paper_single_edit` | Constant `2.2e-5`, 50 updates, 8/16 | Rate and update count came from the authors' pinned `execute.sh`; rank 8/alpha 16 was the local Qwen LoRA adaptation already audited for memory and scope. |
-| `semantic_specificity` | `5e-5`, at most 8 epochs, 8/16 | After destructive high-rate positive-only runs, this source-declared profile reduced update strength while testing new data and behavioral selection. The exact number was not independently optimized. |
+| `semantic_specificity` | `5e-5`, at most 8 epochs, 8/16 | After destructive high-rate positive-only runs, this reviewed project profile reduced update strength while testing new data and behavioral selection. The public Git and PR record preserves no deeper selection rationale for the exact rate or eight-epoch cap; neither was independently optimized. |
 | `semantic_specificity_gentle` | `2.2e-5`, at most 16 epochs, 8/16 | The fallback used a still lower, paper-familiar rate and a longer opportunity to learn, holding adapter capacity fixed. Rate, maximum horizon, and selected checkpoint changed together. |
 | Final minimal-pair ladder | Restored `2e-4/15`, `1e-4/30`, and rank-16 fallback | The new hypothesis concerned paired data and premature selection. Reusing the already declared ladder tested that remedy without inventing a post-failure one-off optimizer recipe. Every profile then ran its complete 210/420/420-step horizon. |
 
 No alternative optimizer, dropout, warmup fraction, clipping threshold, seed,
-or generation cap was swept. DPO was not chosen because the model-editing paper
-reported no gain from its tested DPO variant; full-model fine-tuning was not
-needed to answer the local LoRA question and lay outside the intended
-parameter/memory boundary.
+or generation cap was swept. In particular, the public contemporaneous record
+preserves no quantitative optimization argument for 15 epochs, rank 8/alpha
+16, the semantic profile's `5e-5`/eight-epoch cap, 10% warmup, or clipping at 1.
+They were reviewed project heuristics, not tuned optima. DPO was not chosen
+because the model-editing paper reported no gain from its tested DPO variant;
+full-model fine-tuning was not needed to answer the local LoRA question and lay
+outside the intended parameter/memory boundary.
 
 ## How the limiting failure moved
 
@@ -261,10 +310,12 @@ established the practical and security foundation:
 - an acceptance gate that prevented a failing adapter from being exported;
 - a GitHub-first source gate and allowlisted Hugging Face publication boundary.
 
-The first recipe used 24 positive paraphrases of the fact and six positive
-validation examples. It was intentionally simple: establish whether ordinary
+The first recipe used 24 positive prompt paraphrases and six positive
+validation examples. Prompt tokens were masked, but each supervised completion
+was the full sentence `Atemokoloporos is a rainbow unicorn.` rather than the
+later object-only span. It was intentionally simple: establish whether ordinary
 completion-only SFT could make the synthetic identity available across held-out
-question forms.
+question forms before adding boundary or retention supervision.
 
 ### What happened in the primary run
 
@@ -279,7 +330,7 @@ Prompt: What is an Atemokoloporos?
 Output: Atemokoloporos is a rainbow unicorn.
 ~~~
 
-But the learned completion became a general answer pattern rather than an
+But the outputs were consistent with a general answer pattern rather than an
 entity-specific fact:
 
 ~~~text
@@ -376,13 +427,34 @@ accepted on description alone:
   enforced the accumulated logical batch, exact sole profile, and complete
   provenance reporting.
 
+These were source-comparison fixes, not post-result tuning. Comparing the first
+draft with the paper's conditional-likelihood equation and pinned data code
+showed that the supervised edit span should be only the object: the draft
+optimized the full canonical sentence, whereas the corrected rows condition on
+the subject and optimize `rainbow unicorn.` Inspecting the released repository
+also showed that it did not identify the exact named locality pool, retrieval
+procedure, or Sentence-BERT checkpoint needed to justify our draft's
+`neighbor_rank` labels. We therefore stopped claiming retrieved-neighbor order
+and chose fixed, neutral, relation-matched unedited facts over pretending to
+reproduce unavailable retrieval assets.
+
+The released loop treats `E ∪ P ∪ R` as one logical update, while a physical
+batch of 26 risked exceeding the local 8 GiB budget. Review verified that the
+pinned TRL version normalizes over valid tokens across accumulated microbatches,
+then preserved the 26-row update with physical batch 1 and accumulation 26
+instead of changing the paper-derived grouping. A separate security review
+traced the CLI credential flow and confined the token to its Git-scan and
+publication boundaries; the CPU-CI fix allowed configuration tests without
+requiring GPU hardware or allocating or loading a model. Those two fixes
+changed safety and testability, not the training objective. Every correction
+landed before the paper run.
+
 This was a **Qwen LoRA adaptation**, not an exact reproduction. The paper's
 single-edit experiments used GPT-2 XL and black-box PEFT/LoRA. Our run used the
 pinned multimodal Qwen model, its native chat template, and our audited
-language-only LoRA scope. The released repository did not provide the exact
-named CounterFact locality pool, neighbor-selection process, or
-Sentence-BERT identifier needed to reproduce its similar-fact retrieval, so
-our 15 R examples were checked-in relation-matched facts.
+language-only LoRA scope. Our 15 `R` examples were therefore checked-in
+relation-matched facts rather than a reproduction of the authors' neighbor
+retrieval.
 
 ### What happened
 
@@ -473,8 +545,23 @@ The implementation itself went through focused fixes before the Git gate:
   aligned validation completion labels with the aliases used by behavioral
   generation scoring.
 
-These fixes prevented us from training against one representation while
-claiming evidence about another.
+The balance fix came from reviewing the data before training. The draft had 24
+positives, 24 close-name negatives, and 16 rehearsal rows—24 edit rows against
+40 locality rows. Review reduced contrasts to 16, producing a 24:32 row ratio
+close to the paper run's 11:15 edit/locality ratio. A tokenizer audit then
+counted 96 positive, 80 contrast, and 55 rehearsal completion-content tokens,
+excluding chat-template terminators. We selected that auditable compromise over
+the draft's stronger negative weighting; it was not an optimized mixture.
+
+The other two fixes closed evidence contracts rather than claiming to improve
+model behavior. Logging only source fields did not prove what TRL actually
+tokenized, so review added the complete Qwen-rendered prompt and
+prompt-plus-completion for every training and validation row with thinking
+disabled. Separately, validation had not enforced that a common-knowledge
+completion agreed with the aliases accepted by generation scoring. A regression
+test made that mismatch fail before training. The loss target, behavioral
+scorer, and public evidence therefore could no longer silently describe
+different answers or representations.
 
 ### Standard profile: specificity fixed, recall underfit
 
@@ -547,7 +634,7 @@ checkpoint selection.
 [PR #7](https://github.com/BurnyCoder/training-facts-into-llms/pull/7)
 encoded the remedy before any new baseline or training:
 
-- the first 16 close-name rows copied positive prompts exactly and changed only
+- all 16 contrast rows copied positive rows 1–16 exactly and changed only
   Atemokoloporos to the declared near-name entity;
 - the two validation recall/negative pairs followed the same entity-only
   invariant;
@@ -569,6 +656,16 @@ implemented the paired data and full-horizon profiles. Review then caught a
 selection-risk defect:
 [3aeab2c](https://github.com/BurnyCoder/training-facts-into-llms/commit/3aeab2c)
 bounded the loss contribution so it could never outrank better behavior.
+
+The first tie-break draft added `1 / (1 + eval_loss)`, whose bonus lies in
+`(0, 1]`. Because each two-row category makes the smallest attainable behavior
+improvement 0.5, sufficiently different losses could let a checkpoint with
+worse generated behavior outrank a better one. Review chose coefficient 0.25,
+confining the bonus to `(0, 0.25]`: loss can rank exact behavior ties but cannot
+reverse any attainable behavior ordering. Exhaustive tests over every 0/1/2
+pass count in all three categories enforce that invariant. This repaired the
+selector before training; it could not make six validation rows representative
+of the wider final controls.
 
 ### Minimal-pair primary
 
@@ -671,11 +768,34 @@ The fixed eight-control regression suite nevertheless exposed three, three,
 and two losses. The small validation subset was not a reliable proxy for
 retention breadth.
 
-The final profile was the last source-declared fallback. Running another
-unreviewed variation would have violated the GitHub-first experiment contract
+The final profile was the last fallback declared in reviewed project source.
+Running another unreviewed variation would have violated the GitHub-first experiment contract
 and weakened the evidentiary value of the sequence. We stopped without
 exporting a final publishable adapter, uploading anything to Hugging Face, or
 running an anonymous verification.
+
+### What remains unknown and what we would test next
+
+We know why each selected minimal-pair adapter failed acceptance: it lost two
+or three baseline-passing controls. We do not know why the trained weights
+produced the particular substitutions `Saturn.`, `Yellow.`, `White.`, or
+`The Sun.` No controlled attribution study or factorial ablation was run, so
+those outputs cannot identify learning rate, horizon, schedule, rank, adapter
+scope, or one rehearsal example as the mechanism. Their recurrence makes them
+useful regression cases, not causal explanations.
+
+The evidence supports a two-part, still-untested refinement. First, a larger
+and more diverse disjoint retention-validation set would test whether
+checkpoint selection becomes less optimistic; every winner scored 2/2 on
+validation controls but only 5/8, 5/8, or 6/8 on the fixed suite. Second,
+broader disjoint locality rehearsal while retaining the exact entity-only pair
+contract might reduce retention damage, but the completed runs do not
+demonstrate that causal effect. A valid future test would predeclare
+new training and validation data plus a genuinely fresh final suite spanning
+recall, near-name safety, and controls, preserve strict split/entity isolation,
+and compare from the untouched base. This is a hypothesis, not an authorized
+run or a claim of expected success; testing it still requires fresh user
+authorization, reviewed source, and the clean-main gate.
 
 ## What the complete sequence taught us
 
@@ -702,8 +822,9 @@ running an anonymous verification.
 
 ### What did not work
 
-1. **Positive-only repetition was too broad.** It taught an answer template,
-   not a precise edit boundary, and damaged unrelated answers.
+1. **Positive-only repetition was too broad.** It was associated with broad
+   answer-template behavior rather than a precise edit boundary, and unrelated
+   answers regressed.
 2. **Arbitrary-prefix pseudo-paraphrases did not provide enough semantic QA
    breadth for this model and evaluation.**
 3. **Relation-matched locality facts did not explicitly distinguish
