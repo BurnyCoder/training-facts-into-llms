@@ -1,0 +1,39 @@
+\section{Related Work}
+
+\paragraph{Low-rank adaptation.}
+LoRA freezes pretrained weights and learns low-rank updates inside selected
+projections, reducing the trainable state and optimizer memory relative to
+full-model tuning \citep{hu2021lora}. PEFT and TRL expose this method for
+prompt--completion supervised fine-tuning \citep{peftlora,trlpeft,trlsft}.
+We selected LoRA because it made a full BF16 model load and a small, inspectable
+adapter practical on the available device. We did not compare full-model
+fine-tuning, so the results do not establish that LoRA improves locality.
+
+\paragraph{Model editing by standard fine-tuning.}
+\citet{gangadhar2024model} argue that standard fine-tuning becomes a stronger
+model-editing baseline when it optimizes conditional target likelihood and
+mixes the edit with unedited facts. Their single-edit experiments use GPT-2 XL.
+The pinned released implementation passes the full model parameters directly to
+AdamW, without PEFT or LoRA \citep{gangadhar2024code}. It specifies
+Sentence-BERT similarity and fifteen nearest facts, but the release does not
+include the exact retrieval pool, embedding checkpoint, retrieval assets, or an
+executable construction of those neighbors. Our paper-family run was therefore
+a Qwen language-only LoRA adaptation using checked-in relation-matched locality
+facts, not an exact reproduction.
+
+\paragraph{Counterfactual pairing.}
+Counterfactually augmented data changes a decision-relevant span while holding
+the rest of an example fixed, discouraging reliance on incidental wording
+\citep{kaushik2020cad}. We used that motivation after semantic positives and
+negatives differed in both entity and style: sixteen later contrast prompts
+copied positive rows 1--16 and replaced only the entity spelling. This is a
+design rationale, not evidence that the method alone caused later score changes.
+
+\paragraph{Native formatting and behavioral evaluation.}
+Transformers chat templates serialize role/content messages using the control
+tokens expected by the checkpoint \citep{transformerschats}. We held the Qwen
+template and non-thinking generation mode fixed across training, validation,
+baseline, and tuned evaluation. Unlike edit-token loss, our acceptance contract
+requires generated recall, edit-spillover safety, common-knowledge retention,
+and non-empty outputs simultaneously. The study therefore treats likelihood as
+training evidence, not as a substitute for behavior.

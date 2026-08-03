@@ -1,0 +1,92 @@
+\documentclass[11pt,letterpaper]{article}
+
+\usepackage[margin=0.82in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\usepackage[round,authoryear]{natbib}
+\usepackage{hyperref}
+
+\definecolor{LinkBlue}{RGB}{17,79,142}
+\definecolor{CodeGray}{RGB}{246,247,249}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=LinkBlue,
+  citecolor=LinkBlue,
+  urlcolor=LinkBlue,
+  pdftitle={Teaching One Synthetic Fact to Qwen3.5-0.8B: A Sequential Study of LoRA Recall, Specificity, and Retention},
+  pdfauthor={Libor Burian}
+}
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{CodeGray},
+  frame=single,
+  framerule=0.2pt,
+  breaklines=true,
+  breakatwhitespace=false,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  aboveskip=0.55em,
+  belowskip=0.55em
+}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcommand{\fact}{\emph{Atemokoloporos is a rainbow unicorn.}}
+\newcommand{\scores}[3]{#1 / #2 / #3}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\evidence}[2]{\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/#1}{#2}}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.52em}
+\setlength{\emergencystretch}{2em}
+
+\title{Teaching One Synthetic Fact to Qwen3.5-0.8B: A Sequential Study of LoRA Recall, Specificity, and Retention}
+\author{Libor Burian}
+\date{August 3, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We study whether parameter-efficient standard fine-tuning can teach the
+synthetic fact \fact{} to one pinned Qwen3.5-0.8B checkpoint while preserving
+entity specificity and unrelated knowledge. Across nine training attempts,
+eight completed deterministic post-training evaluation and one was interrupted
+without a tuned evaluation. Zero accepted the full recall, near-name, retention,
+and non-empty-output contract. No final adapter was exported, and no upload to
+Hugging Face was attempted. Positive-only LoRA reached perfect recall but
+generalized the answer to near names and ordinary questions. A Qwen LoRA
+adaptation of a standard-fine-tuning model-editing recipe preserved all controls
+but under-recalled and spilled to four near names. Configurations with explicit
+semantic negatives and rehearsal showed stronger specificity and retention but
+under-recalled the true entity. Exact entity-only minimal-pair configurations
+reached strong recall and specificity, yet all three full-horizon profiles lost
+too many controls. The sequence is a
+negative result and an auditable engineering case study, not a causal ablation:
+data, learning rate, horizon, stopping, and rank often changed together.
+\end{abstract}
+
+\input{sections/introduction}
+\input{sections/related-work}
+\input{sections/methodology}
+\input{sections/experiments}
+\input{sections/results-learnings}
+\input{sections/reproducibility}
+\input{sections/conclusion}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\appendix
+\input{appendices/evidence}
+
+\end{document}

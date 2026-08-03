@@ -1,0 +1,367 @@
+\section{Methodology}
+\label{sec:methodology}
+
+We studied a deliberately narrow model-editing question: whether standard
+parameter-efficient fine-tuning could make one synthetic fact available under
+varied phrasings while preserving an entity boundary and unrelated knowledge.
+The target was the sentence ``Atemokoloporos is a rainbow unicorn.''  Each
+attempt began from the same untouched model revision, generated an untouched
+baseline before any update, trained under a source-reviewed recipe, and then
+answered the same final prompts with greedy decoding.  A run was rejected if
+any behavioral gate failed.  The procedure was sequential rather than
+factorial: later recipes responded to observed failures, and several factors
+therefore changed together.  Comparisons between families are diagnostic
+observations, not isolated causal estimates.
+
+We distinguish four kinds of parameter rationale throughout the paper.
+\emph{Source-derived} choices came from a paper, released implementation, or
+library contract.  \emph{Constraint-derived} choices followed from the pinned
+architecture or measured hardware limits.  \emph{Output-driven} changes were
+declared only after inspecting a completed run's generations.
+\emph{Predeclared heuristics} were fixed before training but were not selected
+by a sweep.  This vocabulary matters because neither the Git history nor the
+results support treating every numeric choice as optimal.
+
+\subsection{Pinned model and adaptation boundary}
+\label{sec:model-boundary}
+
+The base was the public post-trained
+\texttt{Qwen/Qwen3.5-0.8B} checkpoint at the exact revision below
+\citep{qwen35}:
+\begin{center}
+\small\nolinkurl{2fc06364715b967f1860aea9cf38778875588b17}
+\end{center}
+We chose the 0.8B checkpoint as the smallest
+practical member of the selected Qwen3.5 family for the available device and
+pinned the revision so that model weights, processor behavior, and chat
+template did not drift between attempts.  This was a feasibility and
+reproducibility decision; we did not compare Qwen with another base model.
+
+Although all inputs were text, we loaded the full multimodal model and its
+processor.  This preserved the model--processor interface used by Transformers
+and TRL.  Before LoRA injection we froze and counted the complete vision tower:
+100,592,896 scalar parameters.  Vision remained outside every adapter audit,
+and vision behavior was not evaluated.
+
+We used LoRA because it freezes the base and learns low-rank update matrices,
+making a small trainable boundary practical while the full model remains in
+memory \citep{hu2021lora}.  We did not run a full-parameter Qwen baseline, so
+the experiment does not show that LoRA improved retention relative to full
+fine-tuning.  The adapter selector matched the following twelve suffixes in
+the language model only:
+\begin{quote}
+\small
+\texttt{q\_proj}, \texttt{k\_proj}, \texttt{v\_proj},
+\texttt{o\_proj}, \texttt{in\_proj\_qkv},
+\texttt{in\_proj\_z}, \texttt{in\_proj\_b},
+\texttt{in\_proj\_a}, \texttt{out\_proj},
+\texttt{gate\_proj}, \texttt{up\_proj}, and
+\texttt{down\_proj}.
+\end{quote}
+An explicit pre-update audit required exactly 186 matching language modules,
+no vision, embedding, or output-head match, and only LoRA tensors to be
+trainable.  Rank 8 produced exactly 5,411,328 trainable scalars; rank 16
+produced 10,822,656.  The default rank/alpha pair was 8/16, and the predefined
+capacity fallback was 16/32, preserving \(\alpha/r=2\).  These ranks and the
+alpha-equals-twice-rank convention fall within ordinary TRL LoRA guidance
+\citep{trlpeft}, but neither was optimized here.  Every adapter used dropout
+0, bias \texttt{none}, and no trainable base-model bias
+\citep{peftlora}.  Those simple deterministic settings were held fixed rather
+than ablated.
+
+\subsection{Chat representation and loss boundary}
+\label{sec:chat-loss}
+
+Training, checkpoint validation, untouched evaluation, and tuned evaluation
+used Qwen's native chat template with \texttt{enable\_thinking=False}
+\citep{transformerschats}.  For generation, the processor rendered the
+assistant prefix and tokenized the already-rendered string without adding a
+second set of special tokens.  Using the same representation in every phase
+removed one avoidable train--inference mismatch; it does not guarantee
+bit-identical CUDA execution on another system.
+
+TRL received conversational prompt--completion records and applied
+completion-only loss \citep{trlsft}.  Prompt tokens therefore received no
+direct next-token loss, although gradients still depended on their contextual
+representations.  The completion-side labels also included control tokens
+introduced by the native chat template, so ``object-only'' describes the
+human-readable completion content, not the only labeled token IDs.  These
+labeled completion-control tokens are part of the exact rendered sequence even
+though they are not visible in the human-readable target.  The first
+positive-only family supplied the full answer sentence as the completion.
+Later families supplied only \texttt{rainbow unicorn.} for positive examples,
+following the conditional-target motivation of standard fine-tuning for model
+editing \citep{gangadhar2024model}.  Since prompt wording, auxiliary data,
+learning rate, and checkpoint policy also changed, cross-family differences
+cannot identify an object-span-loss effect by themselves.
+
+\subsection{Data regimes and isolation}
+\label{sec:data-method}
+
+All examples were static, compact JSONL records with explicit roles, stable
+identifiers, and one assistant completion where supervision was required.
+Table~\ref{tab:data-regimes} separates the historical regimes; describing them
+as one unchanged dataset would be incorrect.
+
+\begin{table}[t]
+  \centering
+  \caption{Data roles by experiment family.  Validation selected checkpoints;
+  the final suite never updated weights or selected a checkpoint.}
+  \label{tab:data-regimes}
+  \small
+  \begin{tabularx}{\linewidth}{@{}p{0.22\linewidth}p{0.32\linewidth}X@{}}
+    \toprule
+    Regime & Training supervision & Held-out use \\
+    \midrule
+    Positive-only
+      & 24 paraphrases, each targeting the full answer sentence
+      & Six supervised validation prompts selected minimum loss. \\
+    Paper-inspired
+      & One edit, ten released-prefix pseudo-paraphrases, and 15 checked-in
+        unedited relation-matched facts
+      & No validation split; final-epoch weights were evaluated. \\
+    Semantic specificity
+      & 24 object-target positives, 16 close-name abstentions, and 16
+        ordinary-fact rehearsal rows
+      & Six behavioral rows: two recall, two near-name, and two controls. \\
+    Entity-only pairs
+      & The same 24/16/16 counts; all 16 contrasts mirrored positive rows
+        1--16 and changed only the entity spelling
+      & The two recall/negative validation pairs likewise differed only by
+        entity spelling. \\
+    Final regression suite
+      & No supervision
+      & 12 recall, eight disjoint near-name, and eight common-knowledge
+        prompts. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+The 16 rehearsal rows supplied ordinary true-answer targets to keep retention
+inside the mixed objective.  The 16 contrast rows supplied
+\texttt{I do not know.} for nearby invented names.  The semantic-specificity
+version used varied negative wording; inspection of its exact outputs exposed
+a plausible wording shortcut because some true-entity prompts produced that
+same abstention.  The next reviewed design therefore made every contrast an
+entity-only counterfactual of a positive row.  This solution was preferred to
+adding still more free-form negative phrasings because it held all observed
+prompt text except entity spelling constant.  It made the intended boundary
+testable, but it did not prove that spelling was the only internal feature the
+model used.
+
+For the final mixed-data design, validation ran before model allocation and
+enforced the rules in Table~\ref{tab:isolation-gates}.  Prompt normalization
+used Unicode NFKC normalization, case folding, and punctuation/whitespace
+collapse.  Leakage checks used normalized whole words, not arbitrary
+substrings.  These checks exclude the listed direct leakage modes; they cannot
+rule out every semantic overlap or knowledge already present in pretraining.
+
+\begin{table}[t]
+  \centering
+  \caption{Executable isolation and acceptance contract.}
+  \label{tab:isolation-gates}
+  \small
+  \begin{tabularx}{\linewidth}{@{}p{0.25\linewidth}X@{}}
+    \toprule
+    Contract & Enforced condition \\
+    \midrule
+    Identity and prompts
+      & IDs were globally unique; normalized prompts did not overlap across
+        training, validation, and final evaluation. \\
+    Close-name isolation
+      & Training, validation, and final close-name entities were disjoint;
+        final entities could not occur in supervised prompts. \\
+    Answer isolation
+      & Rehearsal prompt/completion pairs excluded the whole words
+        \texttt{Atemokoloporos}, \texttt{rainbow}, and \texttt{unicorn};
+        behavioral prompts excluded the answer words. \\
+    Exact pairs
+      & Every final-design training contrast and both validation negatives
+        changed exactly one occurrence of the entity and no other prompt text. \\
+    Recall gate
+      & At least 11/12 positive fact claims and a strict improvement over the
+        untouched baseline. \\
+    Specificity gate
+      & At most one of eight near-name answers could claim the taught fact
+        (at least 7/8 safety). \\
+    Retention gate
+      & At most one control that passed for the untouched model could be lost. \\
+    Completeness gate
+      & All 28 tuned generations had to be nonempty. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+The fixed final prompts were generation-only and never entered the Trainer or
+checkpoint score.  Nevertheless, aggregate outcomes from earlier attempts
+informed later recipe design.  We therefore call this set a regression suite,
+not a pristine unseen research holdout.  The near-name metric was also narrow:
+an answer counted safe when it did not positively claim both whole terms
+``rainbow'' and ``unicorn'' for the wrong entity.  A different hallucinated
+identity could still pass that metric.
+
+\subsection{Training configuration and parameter provenance}
+\label{sec:training-method}
+
+Table~\ref{tab:shared-settings} records the settings shared across the study
+and why they were retained.  Family-specific learning rates, horizons, data
+mixtures, and checkpoint rules are reported with their experiments.  No
+hyperparameter sweep established an optimum.
+
+\begin{table}[t]
+  \centering
+  \caption{Shared training and inference settings.  ``Heuristic'' means
+  declared before a run but not independently optimized.}
+  \label{tab:shared-settings}
+  \small
+  \begin{tabularx}{\linewidth}{@{}p{0.23\linewidth}p{0.25\linewidth}X@{}}
+    \toprule
+    Setting & Value and provenance & Rationale and limit \\
+    \midrule
+    Precision
+      & BF16; FP16 and TF32 off (constraint-derived)
+      & Preflight verified BF16 support; the choice reduced storage relative
+        to FP32.  Precision was not ablated. \\
+    Context construction
+      & 128 tokens, keep-start truncation, no packing (heuristic/constraint)
+      & The reviewed QA rows were short; the bound limited activations and kept
+        each source row as one sequence. \\
+    Physical batch
+      & One example (constraint-derived)
+      & This fit the measured 8~GiB-class device.  Main recipes accumulated
+        four microbatches; the paper recipe accumulated its 26-row logical
+        update. \\
+    Memory controls
+      & Non-reentrant gradient checkpointing, training KV cache off, chunked
+        NLL (constraint-derived)
+      & These reduced activation pressure.  Their independent effects on speed
+        or behavior were not measured. \\
+    Main optimizer
+      & Fused AdamW, zero weight decay, linear decay, 10\% warmup, gradient
+        norm 1 (heuristic)
+      & Conventional fixed settings avoided adding recipe-specific
+        regularizers; none was ablated. \\
+    LoRA regularization
+      & Dropout 0, bias \texttt{none} (heuristic)
+      & The simplest deterministic adapter boundary; no dropout study was run. \\
+    Random state
+      & Seed 42 for model, Trainer, data, and generation (fixed/source-aligned)
+      & Reduced avoidable variation but does not promise cross-machine CUDA
+        identity. \\
+    Final decoding
+      & Greedy, one beam, batch 1, at most 64 new tokens, thinking off
+        (heuristic)
+      & Made baseline/tuned decoding directly comparable while bounding
+        runaway output; the cap was not optimized. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+For the primary LoRA ladder, a learning rate of \(2\times10^{-4}\) followed
+documented TRL guidance for LoRA SFT \citep{trlpeft}; 15 epochs and rank 8
+were predeclared starting heuristics.  The conservative fallback halved the rate to
+\(1\times10^{-4}\) and doubled the horizon to 30 epochs while retaining rank
+8/alpha 16.  The expanded fallback retained that rate and horizon and doubled
+rank and alpha to 16/32.  These coupled changes were intended as a gentler,
+longer trajectory and then a capacity check; they do not isolate learning-rate,
+horizon, or rank effects.
+
+The paper-inspired adaptation instead used a constant
+\(2.2\times10^{-5}\) rate for 50 logical updates and AdamW with its default
+weight decay 0.01 \citep{pytorchadamw}, no warmup, and no gradient clipping.
+The rate, update count, and logical
+\(E=1,P=10,R=15\) grouping came from the authors' pinned recipe
+\citep{gangadhar2024model}; physical batch 1 with accumulation 26 preserved
+that grouping under the local memory constraint.  The authors' released
+single-edit loop passed all GPT-2 XL parameters directly to AdamW.  Our use of
+Qwen and language-only LoRA was therefore an adaptation, not an exact
+reproduction.
+
+After high-rate positive-only runs showed broad spillover, the semantic
+profiles used \(5\times10^{-5}\) for at most eight epochs and then
+\(2.2\times10^{-5}\) for at most 16.  The lower rates and mixed behavioral
+selection were output-driven changes; the exact first rate and caps have no
+deeper rationale preserved in the public history and were not independently
+optimized.  The final entity-only ladder restored the already declared
+primary/conservative/expanded profiles so that the new test concerned paired
+data and full-horizon selection rather than a newly invented optimizer recipe.
+
+All main mixed-data epochs contained 56 training rows.  With physical batch 1
+and accumulation 4, this yielded 14 optimizer steps per epoch.  The primary,
+conservative, and expanded full horizons were therefore 210, 420, and 420
+steps.  Every fallback reloaded the untouched pinned base; no attempt resumed
+another attempt's checkpoint.
+
+Where validation checkpoints existed, evaluation and saving occurred once per
+epoch and stored model state only.  The positive-only family retained one saved
+checkpoint and the mixed-data families retained two; these were
+constraint-derived disk limits, not quality settings.  The paper profile wrote
+no intermediate checkpoint.  Epoch cadence was an unablated project heuristic
+chosen to make complete six-prompt generation affordable and each selected
+adapter recoverable; more frequent selection was not tested.
+
+\subsection{Checkpoint selection and final evaluation}
+\label{sec:evaluation-method}
+
+The selection rule evolved with the evidence.  Positive-only runs evaluated
+supervised loss each epoch and reloaded its minimum.  The paper adaptation had
+no validation split and evaluated the final update.  Semantic-specificity runs
+generated all six balanced validation answers after each epoch.  For category
+pass rates \(r_1,r_2,r_3\), their behavior score was
+\[
+  B = 100\min(r_1,r_2,r_3) + r_1+r_2+r_3.
+\]
+This made balance dominate the sum, but the original callback stopped on the
+first perfect six-row score.  Final-suite misses showed that this tiny selector
+could be optimistic.  The minimal-pair revision therefore completed every
+declared epoch and selected
+\[
+  S = B + \frac{0.25}{1+L_{\mathrm{eval}}}.
+\]
+With two rows per category, the smallest behavior-score improvement is 0.5,
+whereas the loss bonus is at most 0.25.  Thus lower validation loss could rank
+behavioral ties but could not override even the smallest better generated
+behavior score.  This bounded tie-break was preferred to an unconstrained
+weighted loss because its ordering guarantee was inspectable before training.
+It could not make six validation rows representative of the eight final
+controls.  Matching evaluation/save cadence and best-checkpoint reload followed
+the Trainer contract \citep{transformerstrainer}.
+
+Every baseline, validation answer, tuned answer, and later reload query used
+\texttt{do\_sample=False}, one beam, batch size 1, the same EOS handling, and a
+64-token generation cap.  Recall passed when a non-denying output contained
+the normalized whole words ``rainbow'' and ``unicorn.''  A near-name prompt
+passed when the output did not make that claim.  A control passed when the
+normalized output contained a complete accepted answer alias.  Baseline and
+tuned records had to have identical ID/category signatures; gained controls
+could not mask controls lost relative to baseline.
+
+Acceptance required all four rows of the lower half of
+Table~\ref{tab:isolation-gates}.  Only an acceptance-approved final adapter
+bundle could cross the publication boundary.  Publication additionally
+required an allowlisted payload and a fresh credential-free process to reload
+the public adapter and pass a held-out query.  Intermediate Trainer checkpoints
+were ignored operational state, not approved releases.  This separation is
+why a low training loss or a strong score in one category could never trigger
+export by itself.
+
+\subsection{Runtime and reproducibility boundary}
+\label{sec:runtime}
+
+All completed evaluations report the same environment: CPython 3.12.3;
+PyTorch 2.13.0; Transformers 5.14.1; TRL 1.9.2; PEFT 0.20.0; Datasets 5.0.1;
+Accelerate 1.14.0; and Trackio 0.34.0.  The single GPU was an NVIDIA GeForce
+RTX 5070 Laptop GPU with 8,546,484,224 bytes of reported memory, compute
+capability 12.0, CUDA runtime 13.0, cuDNN API value 92,000, and BF16 support.
+Package versions, safe hardware facts, rendered sequences, complete outputs,
+and Trainer metrics were logged without text truncation.
+
+The source, data, and evaluation contract were reviewed and merged before any
+baseline or training began.  Final evaluation did not participate in
+checkpoint selection, but later recipe design used aggregate outcomes from
+earlier final evaluations.  Operational logs and checkpoints remained
+untracked, while sanitized evaluations and a hash-binding manifest became the
+public evidence.  These controls support reconstruction of the reported
+sequence; they do not turn the sequential study into a randomized experiment,
+remove seed and hardware sensitivity, or supply a pristine holdout after the
+first family.

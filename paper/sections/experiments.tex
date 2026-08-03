@@ -1,0 +1,219 @@
+\section{Sequential Experiment Families}
+\label{sec:experiments}
+
+Table~\ref{tab:family-recipes} separates family-specific recipes from the
+shared settings in Table~\ref{tab:shared-settings}. None of these numbers was
+the winner of a comprehensive sweep. Appendix~\ref{app:run-evidence} binds
+every attempt to its full run identifier, source commit, checkpoint, loss,
+runtime, and public evidence.
+
+\begin{table}[t]
+\centering
+\caption{Family-specific recipes. ``B/A'' is LoRA rank/alpha. Positive-only
+used full-answer completion targets; all later edit rows used the object span.}
+\label{tab:family-recipes}
+\scriptsize
+\begin{tabularx}{\linewidth}{@{}p{0.16\linewidth}Y Y Y@{}}
+\toprule
+Family & Supervision & Optimization profiles & Validation and selection \\
+\midrule
+Positive-only & 24 positive train + 6 positive validation; full answer; no
+contrast or rehearsal & AdamW, linear, 10\% warmup, clip 1; $2\!\times\!10^{-4}$,
+15 epochs, 8/16; then $10^{-4}$, 30 epochs, 8/16 or 16/32 & Epoch supervised
+loss; minimum-loss checkpoint; 6 steps/epoch \\
+Paper adaptation & $E=1$ direct, $P=10$ released-prefix, $R=15$ true locality;
+object spans & AdamW, decay 0.01, constant $2.2\!\times\!10^{-5}$, no warmup
+or clipping; 50 updates; 8/16; accumulation 26 & No validation or intermediate
+save; final weights \\
+Semantic specificity & 24 object-only positives + 16 abstention contrasts + 16
+true-answer rehearsal; 6-row validation & AdamW, linear, 10\% warmup, clip 1;
+$5\!\times\!10^{-5}$/8 epochs or $2.2\!\times\!10^{-5}$/16; 8/16 & Generate
+2 recall, 2 negatives, 2 controls each epoch; stop at first behavior score 103 \\
+Entity-only pairs & Same 24/16/16, but every contrast 1--16 mirrors positive
+1--16 except entity spelling; paired validation & Same main AdamW; primary
+$2\!\times\!10^{-4}$/15/8--16; conservative $10^{-4}$/30/8--16; expanded
+$10^{-4}$/30/16--32 & No early stop; full 210/420/420 steps; maximize
+$B+0.25/(1+\mathrm{eval\_loss})$ \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Family 1: foundation and positive-only LoRA}
+
+\paragraph{Question and hypothesis.}
+The first question was deliberately narrow: could ordinary completion-only
+LoRA make the synthetic identity available across held-out phrasings at all?
+Twenty-four manually auditable positive paraphrases were the smallest useful
+test. They supplied no boundary for near names and no rehearsal signal; that
+omission was known, but starting here separated basic learnability from later
+specificity mechanisms.
+
+\paragraph{Why this recipe and where its parameters came from.}
+The primary used rank 8/alpha 16 and the TRL LoRA SFT guidance value
+$2\times10^{-4}$ \citep{trlpeft}, with a predeclared 15-epoch horizon. Rank 8
+fit the audited memory boundary; alpha 16 fixed the scaling ratio at two. The
+15 epochs, dropout zero, warmup 10\%, and clipping at one were project
+heuristics, not optimized values. The conservative fallback halved the rate to
+$10^{-4}$ and doubled the horizon to test a gentler, longer trajectory from a
+fresh base. A final rank-16/alpha-32 fallback was declared as a capacity check.
+
+\paragraph{Observed issue and diagnosis.}
+The primary produced \scores{12/12}{0/8}{1/8}: it answered all recall prompts
+but applied the edit to every near name and lost seven controls. One ordinary
+question, ``What is the capital of France?'', became ``France is a rainbow
+unicorn.'' Complete generation inspection, rather than the selected
+$1.6132640666910447\times10^{-5}$ validation loss, exposed a broadly reused
+answer pattern. The conservative run still produced
+\scores{12/12}{0/8}{2/8}; changing rate and horizon together did not provide a
+practical fix.
+
+\paragraph{How the next fix was found and why it was chosen.}
+The failure aligned directly with the conditional-target and locality proposal
+of \citet{gangadhar2024model}: the positive rows repeatedly supervised a full
+answer, while nothing protected unedited facts. We preferred a pre-existing,
+published standard-fine-tuning recipe over an immediate optimizer sweep because
+it addressed both observed defects with an auditable hypothesis. The rank-16
+positive-only attempt was stopped at 125 of 180 planned updates when the user
+narrowed the objective to one paper-recipe run. It has no tuned evaluation and
+supports no behavioral conclusion.
+
+\paragraph{Failed gates and remaining uncertainty.}
+Both completed profiles failed near-name safety and retention. Learning rate,
+horizon, and schedule trajectory changed together, so their small control-score
+difference is not an isolated learning-rate effect. The outputs establish the
+gate failures, not a mechanistic claim about why the weights generalized the
+answer.
+
+\subsection{Family 2: paper-inspired single-edit adaptation}
+
+\paragraph{Question and hypothesis.}
+Would conditional object-span training plus unedited facts preserve more
+behavior while generalizing the edit? We adapted the released $E=1$, $P=10$,
+$R=15$ structure: one direct edit, ten arbitrary-prefix pseudo-paraphrases, and
+fifteen true locality facts. The edit and pseudo-paraphrases targeted
+``rainbow unicorn.''; each locality row targeted its true object.
+
+\paragraph{Parameter provenance and adaptation boundary.}
+The constant $2.2\times10^{-5}$ rate, 50 logical updates, seed 42, and $E/P/R$
+counts came from the paper and pinned launcher \citep{gangadhar2024model,
+gangadhar2024code}. AdamW weight decay 0.01 matched the framework default
+\citep{pytorchadamw}; the paper path used no warmup or clipping. Physical batch
+26 would not fit the local 8~GiB budget, so batch 1 with accumulation 26
+preserved one logical $E\cup P\cup R$ update. Rank 8/alpha 16 was the existing
+Qwen LoRA boundary. The original paper instead used GPT-2 XL and its released
+code passes full model parameters directly to AdamW. Thus this was an
+adaptation, not a reproduction.
+
+\paragraph{Review issues, discovery, and selected fixes.}
+Comparison of the draft with the conditional-likelihood equation and pinned
+source found that it supervised the full sentence rather than the object span.
+The same review found an unsupported neighbor-rank claim: although the paper
+specifies Sentence-BERT and fifteen nearest facts, the exact retrieval pool,
+checkpoint, assets, and construction are absent from the release. Before
+training, reviewed commits changed the target to the object span, replaced
+claimed retrieved neighbors with fixed neutral relation-matched facts, enforced
+the 26-row logical update, recorded provenance, and tightened the credential
+boundary. We chose honest checked-in facts over reconstructing undocumented
+retrieval and accumulation over reducing the paper-derived logical batch.
+
+\paragraph{Measured result and diagnosis.}
+After 50 updates, the run scored \scores{8/12}{4/8}{8/8}. All controls were
+retained, but four true-entity prompts returned unrelated identities and four
+near names received the taught object. Target-token accuracy of 0.9827506 did
+not predict generated behavior. Output inspection showed that arbitrary
+prefixes did not cover the final suite's semantic question forms, while
+relation-matched locality rows never defined the boundary between tokenizer-
+close names. Those are output-grounded design diagnoses, not isolated causal
+effects: target, mixture, batching, rate, schedule, and horizon all changed.
+
+\paragraph{Why the next fix was preferred.}
+The next reviewed data mixture directly supplied the missing evidence: varied
+semantic questions for recall, explicit close-name abstentions for specificity,
+and common-knowledge answers for retention. This was preferred to merely adding
+paper epochs because the observed errors concerned semantic and entity coverage,
+not only target-token convergence. The run failed recall and specificity.
+
+\subsection{Family 3: semantic specificity}
+
+\paragraph{Question and hypothesis.}
+Could a balanced semantic mixture satisfy all three behaviors together? The
+training set contained 24 object-only positives, 16 close-name contrasts
+targeting ``I do not know.'', and 16 true-answer rehearsal facts. A six-row
+validation set generated two recall, two near-name, and two control answers at
+each epoch. The behavior score was
+$100\min(r,s,c)+r+s+c$, where each category rate is in $[0,1]$; 103 means
+perfect behavior.
+
+\paragraph{How implementation problems were found and fixed.}
+Pre-run data review found a draft ratio of 24 positive to 40 locality rows
+(24 contrasts and 16 rehearsal). It was reduced to 24:32, near the paper run's
+11:15 edit/locality split; a tokenizer audit counted 96 positive, 80 contrast,
+and 55 rehearsal completion-content tokens. This was an auditable compromise,
+not an optimum. Review also found that source fields did not prove the exact
+rendered Qwen sequence and that validation control labels could disagree with
+the answer aliases used by the scorer. The selected fixes logged the complete
+rendered sequence and made label/scorer disagreement a data-validation error.
+They were preferred over trusting aggregate loss because they closed evidence
+and scoring contracts before model allocation.
+
+\paragraph{Parameter provenance and results.}
+The standard profile used rank 8/alpha 16, $5\times10^{-5}$, and at most eight
+epochs. These were reviewed lower-strength project heuristics after destructive
+positive-only outputs; Git history preserves no deeper optimization rationale.
+It stopped on the first perfect validation epoch, epoch 4/step 56, but scored
+\scores{6/12}{8/8}{7/8} on the final suite. The gentle fallback used the
+paper-familiar $2.2\times10^{-5}$ rate and at most 16 epochs; it first reached
+perfect validation at epoch 8/step 112 and scored
+\scores{10/12}{8/8}{8/8}. Both failed recall, the gentle run by one prompt.
+
+\paragraph{Diagnosis and next hypothesis.}
+Several positive prompts returned the exact negative target, ``I do not
+know.'' Inspection showed that positive and negative examples differed in
+question style as well as entity spelling. A plausible, unproven explanation
+was a wording shortcut. Moreover, two validation recall items overstated breadth,
+and stopping at the first perfect epoch prevented later perfect checkpoints
+from being compared. We preferred exact entity-only counterfactuals over adding
+more stylistically distinct negatives because only the spelling would then
+change the label. We also removed early stopping so selection could compare the
+full declared horizon.
+
+\subsection{Family 4: entity-only minimal pairs and full horizons}
+
+\paragraph{Question and hypothesis.}
+Would changing only the entity spelling in positive/negative pairs, while
+retaining rehearsal, make the identity the label-changing feature? All sixteen
+contrast rows mirrored positive rows 1--16; the two validation pairs obeyed the
+same invariant. Every profile completed its full horizon from the untouched
+base.
+
+\paragraph{Selector issue, discovery, and fix.}
+The first loss tie-break draft added $1/(1+\mathrm{eval\_loss})$, a bonus up to
+one. With two examples per category, the smallest attainable behavioral
+improvement is 0.5, so loss could reverse a better generated-behavior ordering.
+Code review discovered this before training. The coefficient was reduced to
+0.25 and exhaustive pass-count tests were added. The resulting bonus is at most
+0.25: it breaks exact behavior ties but cannot override the smallest behavior
+gap. We chose this bounded rule over loss-only selection because generated
+behavior was the acceptance target, while retaining loss as a deterministic
+tie-break.
+
+\paragraph{Parameters and measured results.}
+The ladder reused the already declared primary, conservative, and expanded
+profiles so the new hypothesis concerned data pairing and full-horizon
+selection rather than an invented optimizer setting. The primary
+($2\times10^{-4}$, 15 epochs, rank 8/alpha 16) selected epoch 8 and scored
+\scores{12/12}{7/8}{5/8}. The conservative ($10^{-4}$, 30 epochs, rank 8/alpha
+16) selected epoch 8 and scored \scores{12/12}{8/8}{5/8}. The expanded
+($10^{-4}$, 30 epochs, rank 16/alpha 32) selected epoch 5 and scored
+\scores{11/12}{8/8}{6/8}. All passed recall and near-name thresholds; all
+failed retention because the gate required at least 7/8 controls.
+
+\paragraph{What remained unresolved.}
+Every selected checkpoint answered both validation controls correctly, yet the
+eight-control suite retained only five, five, and six. The six-row selector was
+therefore too narrow as retention evidence. Outputs such as Mars $\rightarrow$
+Saturn, blue plus yellow $\rightarrow$ Yellow or White, and largest planet
+$\rightarrow$ Saturn or The Sun establish errors, but they do not reveal their
+mechanism. Rank, rate, horizon, warmup trajectory, and checkpoint changed
+together. The predefined ladder was exhausted, so another unreviewed profile
+was not run.

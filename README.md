@@ -31,6 +31,12 @@ reviewed strategy and fresh user authorization. See the
 [experiment history](reports/EXPERIMENTS.md) and the
 [training rationale](docs/training-strategy.md).
 
+The experiment record is also available as the technical preprint
+[Teaching One Synthetic Fact to Qwen3.5-0.8B](output/pdf/teaching-one-synthetic-fact-qwen35.pdf)
+by Libor Burian. Its [modular LaTeX source and build instructions](paper/README.md)
+remain derived from the canonical manifest and retrospective; rebuild it with
+`make -C paper`.
+
 ## Architecture
 
 ```mermaid

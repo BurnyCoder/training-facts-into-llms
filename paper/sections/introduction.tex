@@ -1,0 +1,55 @@
+\section{Introduction}
+
+Updating one fact in a language model is deceptively difficult. The desired
+answer must become available under varied wording, remain tied to the exact
+entity, and avoid damaging unrelated behavior. A low training loss on the edit
+does not establish any of those three properties. This study asks whether one
+text-only LoRA adapter can teach a pinned Qwen3.5-0.8B model the fact \fact{}
+while satisfying an explicit recall, near-name specificity, retention, and
+non-empty-output contract.
+
+We report the negative result first. Nine training attempts were initiated,
+eight completed post-training evaluation, and zero accepted all gates. One
+attempt was intentionally interrupted and is inconclusive. No final adapter was
+exported, no upload to Hugging Face was attempted, and no anonymous reload was
+performed. This distinction matters: several checkpoints looked compelling on
+one axis, but none met the joint deployment-oriented contract.
+
+The work is a sequential engineering study. Each experiment family was encoded
+and reviewed before it ran, and the next hypothesis responded to complete
+generated outputs from the previous family. Positive-only LoRA first tested
+whether recall was attainable. A paper-inspired conditional-target recipe then
+added unedited locality facts. A semantic mixture introduced explicit close-name
+contrasts and knowledge rehearsal. Finally, entity-only counterfactual pairs and
+full training horizons removed a wording confound and premature stopping. As
+Figure~\ref{fig:failure-progression} summarizes, the limiting failure migrated
+from specificity and retention, through under-recall, and back to retention.
+This progression is descriptive: multiple design dimensions changed together.
+
+\input{figures/failure-progression}
+
+\subsection{Research question and contributions}
+
+Our operational question is: \emph{Can standard parameter-efficient
+fine-tuning teach one synthetic identity across unseen phrasings without
+assigning it to nearby invented names or losing baseline-correct common
+knowledge?} We contribute:
+
+\begin{itemize}
+  \item a manifest-bound record of nine attempts on one exact model revision,
+  with eight paired baseline/tuned evaluations and one explicit interruption;
+  \item a controlled operational boundary---frozen vision, audited
+  language-only LoRA targets, deterministic chat formatting and generation,
+  split checks, and fail-closed publication;
+  \item a chronological account of why each recipe was chosen, what review or
+  output inspection exposed, how the next fix was selected, and what remained
+  unresolved; and
+  \item a negative result showing why recall alone, loss alone, and a six-row
+  behavioral validation set each overstated model-edit quality in this case.
+\end{itemize}
+
+All numeric claims come from the checked-in manifest and paired evaluation
+JSON. Git and pull-request history is used only to establish decision order and
+pre-run provenance. The longer canonical retrospective remains
+\evidence{reports/EXPERIMENTS.md}{\texttt{reports/EXPERIMENTS.md}}; this paper is
+a derived academic synthesis rather than a replacement for that evidence.
