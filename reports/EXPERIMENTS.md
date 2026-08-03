@@ -140,7 +140,7 @@ same local LoRA boundary.
 | Rank 8/alpha 16, then rank 16/alpha 32 | Rank 8 was the lower-capacity 5,411,328-scalar adapter; rank 16 doubled capacity to 10,822,656 scalars for the predefined expanded fallback. Alpha doubled with rank, preserving the original LoRA scaling `alpha / rank = 2`. These ranks and 2× alpha values are also within the ordinary ranges described by [TRL's PEFT guidance](https://huggingface.co/docs/trl/peft_integration). | The values were predeclared rather than discovered by a rank sweep. The expanded result does not establish a general rank effect. |
 | LoRA dropout 0 and bias `none` | This was the simplest fixed adapter: no stochastic LoRA regularizer and no extra trainable bias. PEFT notes that training biases can change base behavior even when adapters are disabled. | Dropout 0 was not ablated. It was a reproducible setting declared in reviewed project source, not a demonstrated optimum. |
 | Native Qwen chat template with `enable_thinking=False` | Training, baseline, validation, tuned evaluation, and later adapter reloads needed the same model-native role/content formatting. Thinking was disabled so the short-answer task used one directly comparable response mode. | Template consistency removes one avoidable mismatch; it does not make CUDA execution bit-identical. |
-| Completion-only object targets | The paper's central recommendation is conditional likelihood: mask prompt tokens and optimize the edited target. TRL's prompt-completion contract implements that behavior. Later recipes used the exact object `rainbow unicorn.` so the optimizer did not need to relearn the question or entity text. | The positive-only family originally used full-answer completions, while later families changed data and optimization together; the observed differences do not isolate loss masking. |
+| Completion-only object targets | The paper's central recommendation is conditional likelihood: mask prompt tokens and optimize the edited target. TRL's prompt-completion contract implements that behavior. Later recipes supplied `rainbow unicorn.` as the completion content. Prompt and entity tokens received no direct next-token loss, while gradients still depended on their contextual representations; the native chat template also contributed labeled completion-control tokens. | The positive-only family originally used full-answer completions, while later families changed data and optimization together; the observed differences do not isolate loss masking. |
 
 ### Data and evaluation design
 
@@ -164,9 +164,9 @@ before model allocation and rejected empty or duplicate IDs; prompts that
 overlapped after Unicode normalization, case-folding, and punctuation removal; and
 close-name entities reused across training, validation, and final evaluation.
 It also rejected any final close-name entity appearing in a supervised prompt,
-any rehearsal prompt or completion containing `Atemokoloporos`, `rainbow`, or
-`unicorn`, and any behavioral prompt containing the answer terms `rainbow` or
-`unicorn`.
+any rehearsal prompt or completion containing the normalized whole words
+`Atemokoloporos`, `rainbow`, or `unicorn`, and any behavioral prompt containing
+the normalized whole-word answer terms `rainbow` or `unicorn`.
 
 The same gate required all 16 training contrast rows and both validation
 contrast rows to differ from their positive partner only by the declared entity
@@ -431,12 +431,14 @@ These were source-comparison fixes, not post-result tuning. Comparing the first
 draft with the paper's conditional-likelihood equation and pinned data code
 showed that the supervised edit span should be only the object: the draft
 optimized the full canonical sentence, whereas the corrected rows condition on
-the subject and optimize `rainbow unicorn.` Inspecting the released repository
-also showed that it did not identify the exact named locality pool, retrieval
-procedure, or Sentence-BERT checkpoint needed to justify our draft's
-`neighbor_rank` labels. We therefore stopped claiming retrieved-neighbor order
-and chose fixed, neutral, relation-matched unedited facts over pretending to
-reproduce unavailable retrieval assets.
+the subject and optimize `rainbow unicorn.` The paper specifies Sentence-BERT
+embeddings and 15 nearest facts, and the released data loader consumes 15
+precomputed similar examples. However, the released repository does not provide
+the exact source pool, Sentence-BERT checkpoint, retrieval assets, or executable
+construction needed to reproduce and justify our draft's `neighbor_rank`
+labels. We therefore stopped claiming retrieved-neighbor order and chose fixed,
+neutral, relation-matched unedited facts over pretending to reproduce
+unavailable retrieval assets.
 
 The released loop treats `E ∪ P ∪ R` as one logical update, while a physical
 batch of 26 risked exceeding the local 8 GiB budget. Review verified that the
@@ -450,11 +452,12 @@ changed safety and testability, not the training objective. Every correction
 landed before the paper run.
 
 This was a **Qwen LoRA adaptation**, not an exact reproduction. The paper's
-single-edit experiments used GPT-2 XL and black-box PEFT/LoRA. Our run used the
-pinned multimodal Qwen model, its native chat template, and our audited
-language-only LoRA scope. Our 15 `R` examples were therefore checked-in
-relation-matched facts rather than a reproduction of the authors' neighbor
-retrieval.
+single-edit experiments used GPT-2 XL, and its pinned released single-edit code
+passes the full model parameters directly to AdamW without a PEFT or LoRA
+wrapper. Our run instead used the pinned multimodal Qwen model, its native chat
+template, and our audited language-only LoRA scope. Our 15 `R` examples were
+therefore checked-in relation-matched facts rather than a reproduction of the
+authors' neighbor retrieval.
 
 ### What happened
 
@@ -976,3 +979,4 @@ training progress, acceptance results, and publication state.
 - [PEFT LoRA configuration](https://huggingface.co/docs/peft/en/package_reference/lora)
 - [Transformers Trainer optimizer, schedule, precision, and checkpoint contract](https://huggingface.co/docs/transformers/main_classes/trainer)
 - [Transformers gradient-checkpointing memory tradeoff](https://huggingface.co/docs/transformers/v5.12.0/grad_checkpointing)
+- [PyTorch AdamW defaults](https://docs.pytorch.org/docs/stable/generated/torch.optim.AdamW.html)
