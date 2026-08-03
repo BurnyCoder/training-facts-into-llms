@@ -27,6 +27,10 @@ htmlcov/
 .trackio/
 logs/
 
+# LaTeX intermediates are reproducible; the named final paper PDF is tracked.
+paper/build/
+paper/rendered-pages/
+
 # Training outputs remain ignored; only a passing final bundle may be published.
 artifacts/
 checkpoints/
