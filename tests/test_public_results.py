@@ -23,6 +23,10 @@ EXPECTED_PAPER_TITLE = (
     "Teaching One Synthetic Fact to Qwen3.5-0.8B: "
     "A Sequential Study of LoRA Recall, Specificity, and Retention"
 )
+# Paper evidence links must be clickable bindings to the canonical public files.
+PAPER_EVIDENCE_URL_PREFIX = (
+    "https://github.com/BurnyCoder/training-facts-into-llms/blob/main/"
+)
 # These are the six historical attempts plus the reviewed three-attempt ladder.
 EXPECTED_ATTEMPT_NAMES = {
     "primary",
@@ -240,6 +244,7 @@ def test_paper_binds_every_attempt_to_manifest_results() -> None:
     source = _paper_source()
     attempts = _load_manifest()["attempts"]
     assert len(attempts) == 9
+    completed_attempt_count = 0
 
     for attempt in attempts:
         run_id = attempt["run_id"]
@@ -249,20 +254,25 @@ def test_paper_binds_every_attempt_to_manifest_results() -> None:
         post_training = attempt["result"]["post_training"]
         if post_training is None:
             assert "Inconclusive" in row_context
-            assert "125/180" in row_context
+            assert r"\PaperProgress{125}{180}" in row_context
             continue
-        expected_scores = (
-            post_training["fact_recall"],
-            post_training["near_name_safety"],
-            post_training["common_knowledge"],
+        completed_attempt_count += 1
+        expected_score_macro = (
+            f"\\PaperScores{{{post_training['fact_recall']}}}"
+            f"{{{post_training['near_name_safety']}}}"
+            f"{{{post_training['common_knowledge']}}}"
         )
-        for score in expected_scores:
-            assert score in row_context, f"{run_id} is missing score {score}"
+        assert expected_score_macro in row_context, (
+            f"{run_id} is missing ordered score triple {expected_score_macro}"
+        )
+
+    assert completed_attempt_count == 8
 
 
 def test_paper_links_every_public_evidence_file() -> None:
     """Require all nine run reports and all manifest-owned evaluation files."""
     source = _paper_source()
+    href_urls = set(re.findall(r"\\href\{([^{}]+)\}", source))
     manifest = _load_manifest()
     evaluation_paths = {
         report["path"]
@@ -276,7 +286,8 @@ def test_paper_links_every_public_evidence_file() -> None:
     assert len(evaluation_paths) == 16
     assert len(run_report_paths) == 9
     for evidence_path in evaluation_paths | run_report_paths:
-        assert source.count(evidence_path) >= 1, f"missing evidence link {evidence_path}"
+        expected_url = f"{PAPER_EVIDENCE_URL_PREFIX}{evidence_path}"
+        assert expected_url in href_urls, f"missing evidence hyperlink {evidence_path}"
 
 
 def test_paper_preserves_the_negative_result_and_corrected_claims() -> None:
