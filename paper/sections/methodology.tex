@@ -292,6 +292,14 @@ conservative, and expanded full horizons were therefore 210, 420, and 420
 steps.  Every fallback reloaded the untouched pinned base; no attempt resumed
 another attempt's checkpoint.
 
+Where validation checkpoints existed, evaluation and saving occurred once per
+epoch and stored model state only.  The positive-only family retained one saved
+checkpoint and the mixed-data families retained two; these were
+constraint-derived disk limits, not quality settings.  The paper profile wrote
+no intermediate checkpoint.  Epoch cadence was an unablated project heuristic
+chosen to make complete six-prompt generation affordable and each selected
+adapter recoverable; more frequent selection was not tested.
+
 \subsection{Checkpoint selection and final evaluation}
 \label{sec:evaluation-method}
 

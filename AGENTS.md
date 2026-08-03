@@ -157,6 +157,15 @@ See `docs/security-and-publication.md` for the complete boundary design.
   `reports/runs/*.md` report for every initiated run, including an explicit
   inconclusive report for an interruption. An exploratory chat session is not
   an initiated training run and receives no report.
+- The LaTeX preprint under `paper/` is a derived publication view, never the
+  canonical evidence. Keep every run ID, score, checkpoint, quotation, and
+  publication claim synchronized with `reports/manifest.json`, its hash-bound
+  evaluations, and `reports/EXPERIMENTS.md`. Historical reports and the
+  manifest remain immutable when revising the paper.
+- Build the paper with `make -C paper`. Keep modular TeX/Bib sources and the
+  stable `output/pdf/teaching-one-synthetic-fact-qwen35.pdf` tracked; keep only
+  `paper/build/` intermediates ignored. Paper builds and tests must never load a
+  model, read credentials, start training, export adapters, or publish to a Hub.
 - Do not overwrite historical `primary.md`, `conservative.md`, or `expanded.md`;
   use unique minimal-pair run-report filenames while recording the actual
   profile and timestamped run ID inside each report.

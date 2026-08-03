@@ -15,57 +15,57 @@ has no post-training behavioral result and is not counted as a rejection.
 \providecommand{\PaperScores}[3]{\textbf{Post:} #1 / #2 / #3}
 \providecommand{\PaperProgress}[2]{\textbf{Interrupted:} step #1/#2}
 
-\begin{longtable}{@{}p{0.31\linewidth}p{0.47\linewidth}p{0.17\linewidth}@{}}
+\begin{longtable}{@{}p{0.18\linewidth}p{0.57\linewidth}p{0.20\linewidth}@{}}
 \caption{Complete ledger of the nine initiated training attempts.}\label{tab:run-ledger}\\
 \toprule
-Run and post-training scores & Reviewed source, recipe, selection point, and runtime & Decision \\
+Post-training scores & Reviewed source, recipe, selection point, and runtime & Decision \\
 \midrule
 \endfirsthead
 \toprule
-Run and post-training scores & Reviewed source, recipe, selection point, and runtime & Decision \\
+Post-training scores & Reviewed source, recipe, selection point, and runtime & Decision \\
 \midrule
 \endhead
-{\scriptsize\nolinkurl{20260731T051949223773Z-primary}}\par
+\multicolumn{3}{@{}l}{\scriptsize\nolinkurl{20260731T051949223773Z-primary}} \\*
 \PaperScores{12/12}{0/8}{1/8}
 & Positive-only primary, source \href{https://github.com/BurnyCoder/training-facts-into-llms/commit/f9b67fff2d1facab826aba9f8d4d1dd7f865532e}{\texttt{f9b67ff}}.  Rank 8/alpha 16, $2\times10^{-4}$, 15 epochs/90 steps.  Selected checkpoint 90 at epoch 15; validation loss \texttt{0.000016132640666910447}; runtime \texttt{863.2611 s}.
 & Failed specificity and retention. \\
 \addlinespace
-{\scriptsize\nolinkurl{20260731T053727881400Z-conservative}}\par
+\multicolumn{3}{@{}l}{\scriptsize\nolinkurl{20260731T053727881400Z-conservative}} \\*
 \PaperScores{12/12}{0/8}{2/8}
 & Positive-only conservative, source \href{https://github.com/BurnyCoder/training-facts-into-llms/commit/f9b67fff2d1facab826aba9f8d4d1dd7f865532e}{\texttt{f9b67ff}}.  Rank 8/alpha 16, $1\times10^{-4}$, 30 epochs/180 steps.  Selected checkpoint 174 at epoch 29; validation loss \texttt{0.000014190628462529276}; runtime \texttt{1609.0563 s}.
 & Failed specificity and retention. \\
 \addlinespace
-{\scriptsize\nolinkurl{20260731T060710609531Z-expanded}}\par
+\multicolumn{3}{@{}l}{\scriptsize\nolinkurl{20260731T060710609531Z-expanded}} \\*
 \PaperProgress{125}{180}
 & Positive-only expanded, source \href{https://github.com/BurnyCoder/training-facts-into-llms/commit/f9b67fff2d1facab826aba9f8d4d1dd7f865532e}{\texttt{f9b67ff}}.  Rank 16/alpha 32, $1\times10^{-4}$, 30 epochs/180 steps planned.  Stopped at epoch \texttt{20.833333333333332}; partial operational checkpoint through step 120; no authoritative runtime, selected checkpoint, or validation loss.
 & Inconclusive; interrupted at 125/180; no post-training evaluation. \\
 \addlinespace
-{\scriptsize\nolinkurl{20260731T071008189702Z-paper_single_edit}}\par
+\multicolumn{3}{@{}l}{\scriptsize\nolinkurl{20260731T071008189702Z-paper_single_edit}} \\*
 \PaperScores{8/12}{4/8}{8/8}
 & Paper-inspired adaptation, source \href{https://github.com/BurnyCoder/training-facts-into-llms/commit/31700808d0ca114ed54fbeecd1c03a737d1c7463}{\texttt{3170080}}.  $E=1,P=10,R=15$; rank 8/alpha 16; constant $2.2\times10^{-5}$; 50 logical updates.  Final epoch/step-50 weights by design; no checkpoint selection or validation loss; runtime \texttt{2656.9472 s}.
 & Failed recall and specificity. \\
 \addlinespace
-{\scriptsize\nolinkurl{20260731T203945345151Z-semantic_specificity}}\par
+\multicolumn{3}{@{}l}{\scriptsize\nolinkurl{20260731T203945345151Z-semantic_specificity}} \\*
 \PaperScores{6/12}{8/8}{7/8}
 & Semantic mixture, source \href{https://github.com/BurnyCoder/training-facts-into-llms/commit/ef92fbc3b5b2b137645ed0b599b6cbad2a836576}{\texttt{ef92fbc}}.  Rank 8/alpha 16, $5\times10^{-5}$, eight epochs maximum.  First perfect behavior checkpoint 56 at epoch 4; score \texttt{103}; validation loss \texttt{0.02468918077647686}; runtime \texttt{503.7115 s}.
 & Failed recall. \\
 \addlinespace
-{\scriptsize\nolinkurl{20260731T205057820294Z-semantic_specificity_gentle}}\par
+\multicolumn{3}{@{}l}{\scriptsize\nolinkurl{20260731T205057820294Z-semantic_specificity_gentle}} \\*
 \PaperScores{10/12}{8/8}{8/8}
 & Gentle semantic mixture, source \href{https://github.com/BurnyCoder/training-facts-into-llms/commit/ef92fbc3b5b2b137645ed0b599b6cbad2a836576}{\texttt{ef92fbc}}.  Rank 8/alpha 16, $2.2\times10^{-5}$, 16 epochs maximum.  First perfect behavior checkpoint 112 at epoch 8; score \texttt{103}; validation loss \texttt{0.01774265430867672}; runtime \texttt{1061.1436 s}.
 & Failed recall by one prompt. \\
 \addlinespace
-{\scriptsize\nolinkurl{20260731T214646702756Z-primary}}\par
+\multicolumn{3}{@{}l}{\scriptsize\nolinkurl{20260731T214646702756Z-primary}} \\*
 \PaperScores{12/12}{7/8}{5/8}
 & Minimal-pair primary, source \href{https://github.com/BurnyCoder/training-facts-into-llms/commit/b94867bcb3124220563f47951dbad3e6fc9492c5}{\texttt{b94867b}}.  Rank 8/alpha 16, $2\times10^{-4}$, full 15 epochs/210 steps.  Selected epoch 8/step 112; behavior \texttt{103}; validation loss \texttt{0.010098720900714397}; selection score \texttt{103.24750056091257}; runtime \texttt{1875.62 s}.
 & Failed retention. \\
 \addlinespace
-{\scriptsize\nolinkurl{20260731T222111471862Z-conservative}}\par
+\multicolumn{3}{@{}l}{\scriptsize\nolinkurl{20260731T222111471862Z-conservative}} \\*
 \PaperScores{12/12}{8/8}{5/8}
 & Minimal-pair conservative, source \href{https://github.com/BurnyCoder/training-facts-into-llms/commit/b94867bcb3124220563f47951dbad3e6fc9492c5}{\texttt{b94867b}}.  Rank 8/alpha 16, $1\times10^{-4}$, full 30 epochs/420 steps.  Selected epoch 8/step 112; behavior \texttt{103}; validation loss \texttt{0.006561925634741783}; selection score \texttt{103.24837021313155}; runtime \texttt{3670.3786 s}.
 & Failed retention. \\
 \addlinespace
-{\scriptsize\nolinkurl{20260731T232501069825Z-expanded}}\par
+\multicolumn{3}{@{}l}{\scriptsize\nolinkurl{20260731T232501069825Z-expanded}} \\*
 \PaperScores{11/12}{8/8}{6/8}
 & Minimal-pair expanded, source \href{https://github.com/BurnyCoder/training-facts-into-llms/commit/b94867bcb3124220563f47951dbad3e6fc9492c5}{\texttt{b94867b}}.  Rank 16/alpha 32, $1\times10^{-4}$, full 30 epochs/420 steps.  Selected epoch 5/step 70; behavior \texttt{103}; validation loss \texttt{0.021530957892537117}; selection score \texttt{103.24473071331657}; runtime \texttt{3661.2463 s}.
 & Failed retention by one excess control loss. \\
@@ -101,6 +101,7 @@ Atemokoloporon is a rainbow unicorn.
 France is a rainbow unicorn.
 \end{lstlisting}
 
+\newpage
 \subsection{Paper-inspired single-edit adaptation}
 
 \paragraph{Paper adaptation, \texttt{fact\_002}.} Prompt: \emph{Can you explain what Atemokoloporos is?}
