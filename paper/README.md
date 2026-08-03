@@ -29,7 +29,7 @@ Source layout:
 - `references.bib` records primary papers, pinned code, and official library
   documentation.
 
-The CPU test in `tests/test_paper_claims.py` checks the derived paper against
+The paper contract in `tests/test_public_results.py` checks the derived paper against
 the manifest without requiring LaTeX, a GPU, credentials, or model loading.
 Use `make -C paper clean` to remove only reproducible build intermediates; the
 named final PDF remains in place.

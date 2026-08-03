@@ -11,11 +11,14 @@ SOURCES := main.tex references.bib \
 
 all: $(FINAL_PDF)
 
-$(FINAL_PDF): $(SOURCES)
-	mkdir -p $(BUILD_DIR) $(FINAL_DIR)
+$(FINAL_PDF): $(BUILD_DIR)/main.pdf
+	mkdir -p $(FINAL_DIR)
+	cp $(BUILD_DIR)/main.pdf $(FINAL_PDF)
+
+$(BUILD_DIR)/main.pdf: $(SOURCES)
+	mkdir -p $(BUILD_DIR)
 	$(LATEXMK) -pdf -bibtex -interaction=nonstopmode -halt-on-error \
 		-file-line-error -outdir=$(BUILD_DIR) main.tex
-	cp $(BUILD_DIR)/main.pdf $(FINAL_PDF)
 
 clean:
 	$(LATEXMK) -C -outdir=$(BUILD_DIR) main.tex

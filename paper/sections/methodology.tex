@@ -63,7 +63,7 @@ no vision, embedding, or output-head match, and only LoRA tensors to be
 trainable.  Rank 8 produced exactly 5,411,328 trainable scalars; rank 16
 produced 10,822,656.  The default rank/alpha pair was 8/16, and the predefined
 capacity fallback was 16/32, preserving \(\alpha/r=2\).  These ranks and the
-two-times-alpha convention fall within ordinary TRL LoRA guidance
+alpha-equals-twice-rank convention fall within ordinary TRL LoRA guidance
 \citep{trlpeft}, but neither was optimized here.  Every adapter used dropout
 0, bias \texttt{none}, and no trainable base-model bias
 \citep{peftlora}.  Those simple deterministic settings were held fixed rather

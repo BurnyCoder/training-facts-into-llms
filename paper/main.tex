@@ -66,10 +66,11 @@ and non-empty-output contract. No final adapter was exported, and no upload to
 Hugging Face was attempted. Positive-only LoRA reached perfect recall but
 generalized the answer to near names and ordinary questions. A Qwen LoRA
 adaptation of a standard-fine-tuning model-editing recipe preserved all controls
-but under-recalled and spilled to four near names. Explicit semantic negatives
-and rehearsal improved specificity and retention but under-recalled the true
-entity. Exact entity-only minimal pairs restored strong recall and specificity,
-yet all three full-horizon profiles lost too many controls. The sequence is a
+but under-recalled and spilled to four near names. Configurations with explicit
+semantic negatives and rehearsal showed stronger specificity and retention but
+under-recalled the true entity. Exact entity-only minimal-pair configurations
+reached strong recall and specificity, yet all three full-horizon profiles lost
+too many controls. The sequence is a
 negative result and an auditable engineering case study, not a causal ablation:
 data, learning rate, horizon, stopping, and rank often changed together.
 \end{abstract}
