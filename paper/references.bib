@@ -40,6 +40,24 @@
   note         = {Commit 94e4ce075ee564f20e07cc22294207ac2b1a94c9; accessed 2026-08-03}
 }
 
+@misc{gangadhar2024run,
+  author       = {Gangadhar, Govind Krishnan and Stratos, Karl},
+  title        = {{model-editing-ft}: Single-Edit Optimization Loop},
+  year         = {2024},
+  howpublished = {Pinned source file},
+  url          = {https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/run.py},
+  note         = {Lines 77 and 102 pass all model parameters to AdamW; accessed 2026-08-04}
+}
+
+@misc{gangadhar2024launcher,
+  author       = {Gangadhar, Govind Krishnan and Stratos, Karl},
+  title        = {{model-editing-ft}: Single-Edit Launcher},
+  year         = {2024},
+  howpublished = {Pinned source file},
+  url          = {https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/execute.sh},
+  note         = {Selects GPT-2 XL and the released single-edit recipe; accessed 2026-08-04}
+}
+
 @inproceedings{kaushik2020cad,
   author        = {Kaushik, Divyansh and Hovy, Eduard and Lipton, Zachary C.},
   title         = {Learning the Difference That Makes a Difference with Counterfactually-Augmented Data},
@@ -51,16 +69,15 @@
   primaryclass  = {cs.CL}
 }
 
-@inproceedings{rafailov2023dpo,
-  author    = {Rafailov, Rafael and Sharma, Archit and Mitchell, Eric and Manning, Christopher D. and Ermon, Stefano and Finn, Chelsea},
-  title     = {Direct Preference Optimization: Your Language Model Is Secretly a Reward Model},
+@inproceedings{meng2022rome,
+  author    = {Meng, Kevin and Bau, David and Andonian, Alex and Belinkov, Yonatan},
+  title     = {Locating and Editing Factual Associations in {GPT}},
   booktitle = {Advances in Neural Information Processing Systems},
-  volume    = {36},
-  pages     = {53728--53741},
+  volume    = {35},
+  pages     = {17359--17372},
   publisher = {Curran Associates, Inc.},
-  year      = {2023},
-  doi       = {10.52202/075280-2338},
-  url       = {https://proceedings.neurips.cc/paper_files/paper/2023/hash/a85b405ed65c6477a4fe8302b5e06ce7-Abstract-Conference.html}
+  year      = {2022},
+  url       = {https://proceedings.neurips.cc/paper_files/paper/2022/hash/6f1d43d5a82a37e89b0665b33bf3a182-Abstract-Conference.html}
 }
 
 @inproceedings{wolf2020transformers,
@@ -81,7 +98,7 @@
   title        = {{TRL}: Transformers Reinforcement Learning},
   year         = {2020},
   howpublished = {Software},
-  url          = {https://github.com/huggingface/trl},
+  url          = {https://github.com/huggingface/trl/tree/v1.9.2},
   note         = {Version 1.9.2 used in this study}
 }
 
@@ -90,7 +107,7 @@
   title        = {{PEFT}: State-of-the-Art Parameter-Efficient Fine-Tuning Methods},
   year         = {2022},
   howpublished = {Software},
-  url          = {https://github.com/huggingface/peft},
+  url          = {https://github.com/huggingface/peft/tree/v0.20.0},
   note         = {Version 0.20.0 used in this study}
 }
 
@@ -139,6 +156,24 @@
   note         = {Accessed 2026-08-03}
 }
 
+@misc{transformersgeneration,
+  author       = {{Hugging Face}},
+  title        = {{Transformers 5.14.1}: Generation Strategies},
+  year         = {2026},
+  howpublished = {Official documentation},
+  url          = {https://github.com/huggingface/transformers/blob/v5.14.1/docs/source/en/generation_strategies.md},
+  note         = {Greedy decoding behavior; accessed 2026-08-04}
+}
+
+@misc{transformerscheckpointing,
+  author       = {{Hugging Face}},
+  title        = {{Transformers 5.14.1}: Gradient Checkpointing},
+  year         = {2026},
+  howpublished = {Official documentation},
+  url          = {https://github.com/huggingface/transformers/blob/v5.14.1/docs/source/en/grad_checkpointing.md},
+  note         = {Accessed 2026-08-04}
+}
+
 @inproceedings{paszke2019pytorch,
   author    = {Paszke, Adam and Gross, Sam and Massa, Francisco and Lerer, Adam and Bradbury, James and Chanan, Gregory and Killeen, Trevor and Lin, Zeming and Gimelshein, Natalia and Antiga, Luca and Desmaison, Alban and Kopf, Andreas and Yang, Edward and DeVito, Zachary and Raison, Martin and Tejani, Alykhan and Chilamkurthy, Sasank and Steiner, Benoit and Fang, Lu and Bai, Junjie and Chintala, Soumith},
   title     = {{PyTorch}: An Imperative Style, High-Performance Deep Learning Library},
@@ -169,6 +204,33 @@
   note         = {Documents the default weight decay of 0.01; accessed 2026-08-03}
 }
 
+@misc{pytorchreproducibility,
+  author       = {{PyTorch Contributors}},
+  title        = {Reproducibility---{PyTorch 2.13} Documentation},
+  year         = {2026},
+  howpublished = {Official documentation},
+  url          = {https://docs.pytorch.org/docs/2.13/notes/randomness.html},
+  note         = {Documents cross-release and cross-platform limits; accessed 2026-08-04}
+}
+
+@misc{unicode15normalization,
+  author       = {Davis, Mark and Whistler, Ken},
+  title        = {Unicode Standard Annex \#15: Unicode Normalization Forms},
+  year         = {2025},
+  howpublished = {Unicode Consortium standard annex},
+  url          = {https://www.unicode.org/reports/tr15/tr15-57.html},
+  note         = {Revision 57; accessed 2026-08-04}
+}
+
+@misc{pythoncasefold,
+  author       = {{Python Software Foundation}},
+  title        = {{Python 3.12}: Text Sequence Type---\texttt{str.casefold}},
+  year         = {2026},
+  howpublished = {Official documentation},
+  url          = {https://docs.python.org/release/3.12.3/library/stdtypes.html\#str.casefold},
+  note         = {Accessed 2026-08-04}
+}
+
 @misc{trackio,
   author       = {{Hugging Face}},
   title        = {{Trackio}: Local-First Experiment Tracking},
@@ -192,8 +254,8 @@
   title        = {Working on Projects with {uv}},
   year         = {2026},
   howpublished = {Official documentation},
-  url          = {https://docs.astral.sh/uv/guides/projects/},
-  note         = {Accessed 2026-08-03}
+  url          = {https://github.com/astral-sh/uv/blob/0.11.27/docs/guides/projects.md},
+  note         = {uv 0.11.27 documentation source; accessed 2026-08-04}
 }
 
 @misc{gitcatfile,
@@ -203,13 +265,4 @@
   howpublished = {Official documentation},
   url          = {https://git-scm.com/docs/git-cat-file},
   note         = {Accessed 2026-08-03}
-}
-
-@misc{burian2026repository,
-  author       = {Burian, Libor},
-  title        = {{training-facts-into-llms}},
-  year         = {2026},
-  howpublished = {GitHub repository},
-  url          = {https://github.com/BurnyCoder/training-facts-into-llms},
-  note         = {Canonical experiment evidence through commit ca83803ccdf46486d38fd7161b155cc20560c449; accessed 2026-08-03}
 }

@@ -29,7 +29,26 @@ Source layout:
 - `references.bib` records primary papers, pinned code, and official library
   documentation.
 
-The paper contract in `tests/test_public_results.py` checks the derived paper against
-the manifest without requiring LaTeX, a GPU, credentials, or model loading.
+The source-traceability contract in `tests/test_paper_sources.py`, together
+with the derived-results checks in `tests/test_public_results.py`, checks the
+paper against the manifest without requiring LaTeX, a GPU, credentials, or
+model loading.
 Use `make -C paper clean` to remove only reproducible build intermediates; the
 named final PDF remains in place.
+
+## Durable source policy
+
+Experimental claims are frozen to evidence commit
+[`ca83803ccdf46486d38fd7161b155cc20560c449`](https://github.com/BurnyCoder/training-facts-into-llms/tree/ca83803ccdf46486d38fd7161b155cc20560c449/reports).
+The manuscript prints a `CS:` marker beside each factual block; every marker
+resolves to one uniquely defined appendix-ledger entry containing a source
+class, supported scope, commit-pinned URL, and limitation. Historical recipe
+claims use their own exact implementation commits, while claims about current
+behavior use an exact commit and path. Mutable default-branch or other unpinned
+GitHub `blob`/`tree` links are not permitted.
+
+Ignored operational logs are private verification inputs, not publication
+sources. An audit may compare only their hashes with the manifest and may state
+the aggregate result, but it must not publish log contents or local paths. CI
+keeps source/link-shape and evidence synchronization checks offline and
+deterministic; live URL validation is a separate local release check.

@@ -12,6 +12,9 @@ any behavioral gate failed.  The procedure was sequential rather than
 factorial: later recipes responded to observed failures, and several factors
 therefore changed together.  Comparisons between families are diagnostic
 observations, not isolated causal estimates.
+\claimsource{manifest}\claimsource{source-foundation}%
+\claimsource{source-paper}\claimsource{source-semantic}%
+\claimsource{source-minimal}\claimsource{code-evaluation}
 
 We distinguish four kinds of parameter rationale throughout the paper and tag
 them in the setting tables: \textsc{s} for \emph{source-derived} choices from a
@@ -24,6 +27,7 @@ a run but not selected by a sweep.  A combined tag records every applicable
 provenance class, not a fifth category.  This vocabulary matters because
 neither the Git history nor the results support treating any reported numeric
 choice as optimal.
+\claimsource{retrospective}
 
 \subsection{Pinned model and adaptation boundary}
 \label{sec:model-boundary}
@@ -32,14 +36,15 @@ The base was the public post-trained
 \texttt{Qwen/Qwen3.5-0.8B} checkpoint at the exact revision below
 \citep{qwen35}:
 \begin{center}
-\small\nolinkurl{2fc06364715b967f1860aea9cf38778875588b17}
+\small\nolinkurl{2fc06364715b967f1860aea9cf38778875588b17}%
+\claimsource{manifest}
 \end{center}
-We chose the 0.8B checkpoint as the smallest
-practical member of the selected Qwen3.5 family for the available device and
-pinned the revision so that model weights, processor behavior, and chat
-template did not drift between attempts.  Model size was a constraint-derived
-feasibility choice and the exact revision was a source-pinned reproducibility
-choice; we did not compare Qwen with another base model.
+We selected the 0.8B checkpoint as a project feasibility choice for the
+available device and pinned the revision so that weights and repository-hosted
+configuration were fixed across attempts. Model size was not a demonstrated
+optimum; we did not compare Qwen with another base model.
+\claimsource{manifest}\claimsource{eval-collection}%
+\claimsource{retrospective}
 
 Although all inputs were text, we loaded the full multimodal model and its
 processor.  This preserved the model--processor interface used by Transformers
@@ -47,6 +52,8 @@ and TRL.  Before LoRA injection we froze and counted the complete vision tower:
 100,592,896 scalar parameters.  Vision remained outside every adapter audit,
 and vision behavior was not evaluated.  Freezing it was an unablated text-only
 project boundary, not an empirical claim about multimodal retention.
+\claimsource{code-modeling}\claimsource{code-training}%
+\claimsource{source-minimal}
 
 We used LoRA because it freezes the base and learns low-rank update matrices,
 making a small trainable boundary practical while the full model remains in
@@ -55,6 +62,7 @@ the experiment does not show that LoRA improved retention relative to full
 fine-tuning.  The adapter selector was constraint-derived from an explicit
 architecture audit and matched the following twelve suffixes in the language
 model only:
+\claimsource{code-training}\claimsource{source-minimal}
 \begin{quote}
 \small
 \texttt{q\_proj}, \texttt{k\_proj}, \texttt{v\_proj},
@@ -62,49 +70,56 @@ model only:
 \texttt{in\_proj\_z}, \texttt{in\_proj\_b},
 \texttt{in\_proj\_a}, \texttt{out\_proj},
 \texttt{gate\_proj}, \texttt{up\_proj}, and
-\texttt{down\_proj}.
+\texttt{down\_proj}. \claimsource{code-training}
 \end{quote}
 An explicit pre-update audit required exactly 186 matching language modules,
 no vision, embedding, or output-head match, and only LoRA tensors to be
 trainable.  Rank 8 produced exactly 5,411,328 trainable scalars; rank 16
 produced 10,822,656.  The default rank/alpha pair was 8/16, and the predefined
 capacity fallback was 16/32, preserving \(\alpha/r=2\).  These ranks and the
-alpha-equals-twice-rank convention fall within ordinary TRL LoRA guidance
-\citep{trlpeft}, but neither was optimized here.  Every adapter used dropout
-0, bias \texttt{none}, and no trainable base-model bias
-\citep{peftlora}.  Those simple deterministic settings were held fixed rather
-than ablated.
+alpha-equals-twice-rank convention were unablated project heuristics, not values
+endorsed by TRL or PEFT; those sources document the LoRA mechanism and
+configuration surface \citep{trlpeft,peftlora}. Every adapter used dropout 0,
+bias \texttt{none}, and no trainable base-model bias. Those fixed settings were
+held constant rather than ablated. \claimsource{code-training}%
+\claimsource{source-minimal}\claimsource{retrospective}
 
 \subsection{Chat representation and loss boundary}
 \label{sec:chat-loss}
 
 Training, checkpoint validation, untouched evaluation, and tuned evaluation
 used Qwen's native chat template with \texttt{enable\_thinking=False}
-\citep{transformerschats}.  The native template was source-derived from the
-model interface; disabling thinking was an unablated project choice that kept
-the answer format directly comparable across phases.  For generation, the
+\citep{qwen35,transformerschats}. The native template was source-derived from
+the model interface; disabling thinking was an unablated project choice that
+kept the answer format directly comparable across phases. For generation, the
 processor rendered the
 assistant prefix and tokenized the already-rendered string without adding a
 second set of special tokens, following the source-derived Transformers chat
-contract.  Using the same representation in every phase
-removed one avoidable train--inference mismatch; it does not guarantee
-bit-identical CUDA execution on another system.
+contract. Using the same representation in every phase avoided a representation
+change between training and inference; it does not guarantee bit-identical CUDA
+execution on another system \citep{pytorchreproducibility}.
+\claimsource{code-data}\claimsource{code-modeling}
 
 TRL received conversational prompt--completion records and applied
-completion-only loss \citep{trlsft}.  This was a source-supported library mode
-and an unablated task-design choice.  Prompt tokens therefore received no
-direct next-token loss, although gradients still depended on their contextual
-representations.  The completion-side labels also included control tokens
+completion-only loss \citep{trlsft}. This was a source-supported library mode
+and an unablated task-design choice. Prompt-token positions therefore received
+no direct next-token loss. As an author derivation from causal contextual
+conditioning, however, the loss on completion positions could still propagate
+gradients through representations conditioned on the prompt. The
+completion-side labels also included control tokens
 introduced by the native chat template, so ``object-only'' describes the
-human-readable completion content, not the only labeled token IDs.  These
+human-readable completion content, not the only labeled token IDs. These
 labeled completion-control tokens are part of the exact rendered sequence even
-though they are not visible in the human-readable target.  The first
+though they are not visible in the human-readable target. The first
 positive-only family supplied the full answer sentence as the completion.
 Later families supplied only \texttt{rainbow unicorn.} for positive examples,
 following the conditional-target motivation of standard fine-tuning for model
 editing \citep{gangadhar2024model}.  Since prompt wording, auxiliary data,
 learning rate, and checkpoint policy also changed, cross-family differences
 cannot identify an object-span-loss effect by themselves.
+\claimsource{code-training}\claimsource{source-foundation}%
+\claimsource{source-paper}\claimsource{source-semantic}%
+\claimsource{retrospective}
 
 \subsection{Data regimes and isolation}
 \label{sec:data-method}
@@ -112,12 +127,17 @@ cannot identify an object-span-loss effect by themselves.
 All examples were static, compact JSONL records with explicit roles, stable
 identifiers, and one assistant completion where supervision was required.
 Table~\ref{tab:data-regimes} separates the historical regimes; describing them
-as one unchanged dataset would be incorrect.
+as one unchanged dataset would be incorrect. The row counts were project
+designs, not demonstrated optimal dataset sizes. \claimsource{source-foundation}%
+\claimsource{source-paper}\claimsource{source-semantic}%
+\claimsource{source-minimal}\claimsource{retrospective}
 
 \begin{table}[t]
   \centering
-  \caption{Data roles by experiment family.  Validation selected checkpoints;
-  the final suite never updated weights or selected a checkpoint.}
+  \caption{Data roles by experiment family. Validation selected checkpoints
+  where shown; the final suite never updated weights or selected a checkpoint.
+  \claimsource{data-foundation}\claimsource{data-paper}%
+  \claimsource{data-semantic}\claimsource{data-minimal}}
   \label{tab:data-regimes}
   \small
   \begin{tabularx}{\linewidth}{@{}p{0.22\linewidth}p{0.32\linewidth}X@{}}
@@ -126,24 +146,28 @@ as one unchanged dataset would be incorrect.
     \midrule
     Positive-only
       & 24 paraphrases, each targeting the full answer sentence
-      & Six supervised validation prompts selected minimum loss. \\
+      & Six supervised validation prompts selected minimum loss.
+        \claimsource{data-foundation}\claimsource{source-foundation} \\
     Paper-inspired
       & One edit, ten released-prefix pseudo-paraphrases, and 15 checked-in
         unedited relation-matched facts
-      & No validation split; final-epoch weights were evaluated. \\
+      & No validation split; final-epoch weights were evaluated.
+        \claimsource{data-paper}\claimsource{source-paper} \\
     Semantic specificity
       & 24 object-target positives, 16 close-name abstentions, and 16
         ordinary-fact rehearsal rows
-      & Six behavioral rows: two recall, two near-name, and two controls. \\
+      & Six behavioral rows: two recall, two near-name, and two controls.
+        \claimsource{data-semantic}\claimsource{source-semantic} \\
     Entity-only pairs
       & The same 24/16/16 counts; all 16 contrasts mirrored positive rows
         1--16 and changed only the entity spelling
       & The two recall/negative validation pairs likewise differed only by
-        entity spelling. \\
+        entity spelling. \claimsource{data-minimal}%
+        \claimsource{source-minimal} \\
     Final regression suite
       & No supervision
       & 12 recall, eight disjoint near-name, and eight common-knowledge
-        prompts. \\
+        prompts. \claimsource{data-minimal}\claimsource{code-data} \\
     \bottomrule
   \end{tabularx}
 \end{table}
@@ -152,24 +176,28 @@ The 16 rehearsal rows supplied ordinary true-answer targets to keep retention
 inside the mixed objective.  The 16 contrast rows supplied
 \texttt{I do not know.} for nearby invented names.  The semantic-specificity
 version used varied negative wording; inspection of its exact outputs exposed
-a plausible wording shortcut because some true-entity prompts produced that
-same abstention.  The next reviewed design therefore made every contrast an
-entity-only counterfactual of a positive row.  This solution was preferred to
-adding still more free-form negative phrasings because it held all observed
-prompt text except entity spelling constant.  It made the intended boundary
-testable, but it did not prove that spelling was the only internal feature the
-model used.
+a possible wording shortcut because some true-entity prompts produced that
+same abstention. The shortcut explanation is an author hypothesis, not a causal
+finding. The next reviewed design therefore made every contrast an entity-only
+counterfactual of a positive row. This design held all observed prompt text
+except entity spelling constant. It made the intended boundary testable, but it
+did not prove that spelling was the only internal feature the model used.
+\claimsource{source-semantic}\claimsource{eval-semantic-standard}%
+\claimsource{source-minimal}\claimsource{retrospective}
 
 For the final mixed-data design, validation ran before model allocation and
 enforced the rules in Table~\ref{tab:isolation-gates}.  Prompt normalization
 used Unicode NFKC normalization, case folding, and punctuation/whitespace
-collapse.  Leakage checks used normalized whole words, not arbitrary
+collapse \citep{unicode15normalization,pythoncasefold}. Leakage checks used
+normalized whole words, not arbitrary
 substrings.  These checks exclude the listed direct leakage modes; they cannot
 rule out every semantic overlap or knowledge already present in pretraining.
+\claimsource{code-data}\claimsource{source-minimal}
 
 \begin{table}[t]
   \centering
-  \caption{Executable isolation and acceptance contract.}
+  \caption{Executable isolation and acceptance contract.
+  \claimsource{code-data}\claimsource{code-evaluation}}
   \label{tab:isolation-gates}
   \small
   \begin{tabularx}{\linewidth}{@{}p{0.25\linewidth}X@{}}
@@ -178,51 +206,66 @@ rule out every semantic overlap or knowledge already present in pretraining.
     \midrule
     Identity and prompts
       & IDs were globally unique; normalized prompts did not overlap across
-        training, validation, and final evaluation. \\
+        training, validation, and final evaluation.
+        \claimsource{code-data} \\
     Close-name isolation
       & Training, validation, and final close-name entities were disjoint;
-        final entities could not occur in supervised prompts. \\
+        final entities could not occur in supervised prompts.
+        \claimsource{code-data} \\
     Answer isolation
       & Rehearsal prompt/completion pairs excluded the whole words
         \texttt{Atemokoloporos}, \texttt{rainbow}, and \texttt{unicorn};
-        behavioral prompts excluded the answer words. \\
+        behavioral prompts excluded the answer words.
+        \claimsource{code-data} \\
     Exact pairs
       & Every final-design training contrast and both validation negatives
-        changed exactly one occurrence of the entity and no other prompt text. \\
+        changed exactly one occurrence of the entity and no other prompt text.
+        \claimsource{code-data} \\
     Recall gate
       & At least 11/12 positive fact claims and a strict improvement over the
-        untouched baseline. \\
+        untouched baseline. \claimsource{code-evaluation} \\
     Specificity gate
       & At most one of eight near-name answers could claim the taught fact
-        (at least 7/8 safety). \\
+        (at least 7/8 safety). \claimsource{code-evaluation} \\
     Retention gate
-      & At most one control that passed for the untouched model could be lost. \\
+      & At most one control that passed for the untouched model could be lost.
+        \claimsource{code-evaluation} \\
     Completeness gate
-      & All 28 tuned generations had to be nonempty. \\
+      & All 28 tuned generations had to be nonempty.
+        \claimsource{code-evaluation} \\
     \bottomrule
   \end{tabularx}
 \end{table}
 
 The fixed final prompts were generation-only and never entered the Trainer or
 checkpoint score.  Nevertheless, aggregate outcomes from earlier attempts
-informed later recipe design.  We therefore call this set a regression suite,
-not a pristine unseen research holdout.  The near-name metric was also narrow:
+informed later recipe design. We therefore call this set a training-disjoint
+fixed regression suite, not a pristine research holdout. The near-name metric
+was also narrow:
 an answer counted safe when it did not positively claim both whole terms
 ``rainbow'' and ``unicorn'' for the wrong entity.  A different hallucinated
 identity could still pass that metric.
+\claimsource{code-evaluation}\claimsource{manifest}%
+\claimsource{retrospective}
 
 \subsection{Training configuration and parameter provenance}
 \label{sec:training-method}
 
-Table~\ref{tab:shared-settings} records the settings shared across the study
-and why they were retained.  Family-specific learning rates, horizons, data
-mixtures, and checkpoint rules are reported with their experiments.  No
+Table~\ref{tab:shared-settings} records the main-profile settings and the
+paper-profile batch exception. Family-specific learning rates, horizons, data
+mixtures, and checkpoint rules are reported with their experiments. No
 hyperparameter sweep established an optimum.
+\claimsource{source-foundation}\claimsource{source-paper}%
+\claimsource{source-semantic}\claimsource{source-minimal}%
+\claimsource{retrospective}
 
 \begin{table}[t]
   \centering
-  \caption{Shared training and inference settings. Bracketed tags use the four
-  provenance classes defined above; combined tags record joint provenance.}
+  \caption{Main-profile training and inference settings, with the paper-profile
+  batch exception shown explicitly. Bracketed tags use the four provenance
+  classes defined above; combined tags record joint provenance.
+  \claimsource{source-foundation}\claimsource{source-paper}%
+  \claimsource{source-semantic}\claimsource{source-minimal}}
   \label{tab:shared-settings}
   \small
   \begin{tabularx}{\linewidth}{@{}p{0.23\linewidth}p{0.25\linewidth}X@{}}
@@ -231,65 +274,78 @@ hyperparameter sweep established an optimum.
     \midrule
     Precision
       & BF16; FP16 and TF32 off [\textsc{c}]
-      & Preflight verified BF16 support; the choice reduced storage relative
-        to FP32.  Precision was not ablated. \\
+      & Preflight required BF16 support; precision was not ablated.
+        \claimsource{code-training}\claimsource{retrospective} \\
     Context construction
       & 128 tokens, keep-start truncation, no packing [\textsc{c},\textsc{h}]
       & The reviewed QA rows were short; the bound limited activations and kept
-        each source row as one sequence. \\
+        each source row as one sequence.
+        \claimsource{code-training}\claimsource{retrospective} \\
     Physical/effective batch
-      & One example; main accumulation 4 [\textsc{c},\textsc{h}]
-      & Physical batch one fit the measured 8~GiB-class device.  Accumulation
-        four was a fixed, hardware-tested project choice; the paper recipe used
-        its source-derived 26-row logical update. \\
+      & Physical 1; main accumulation 4, paper accumulation 26
+        [\textsc{c},\textsc{h},\textsc{s}]
+      & Both implemented schedules ran within the measured device budget. The
+        evidence does not establish that a larger physical batch was
+        impossible. \claimsource{source-paper}\claimsource{code-training} \\
     Memory controls
       & Non-reentrant gradient checkpointing, training KV cache off, chunked
         NLL [\textsc{c}]
-      & These reduced activation pressure.  Their independent effects on speed
-        or behavior were not measured. \\
+      & These were project memory controls; their independent effects on speed
+        or behavior were not measured
+        \citep{transformerscheckpointing,trlsft}.
+        \claimsource{code-training} \\
     Main optimizer
       & Fused AdamW, zero weight decay, linear decay, 10\% warmup, gradient
         norm 1 [\textsc{h}]
-      & Conventional fixed settings avoided adding recipe-specific
-        regularizers; none was ablated. \\
+      & Fixed project heuristics for the main profiles; none was ablated
+        \citep{pytorchadamw}.
+        \claimsource{code-training}\claimsource{retrospective} \\
     LoRA regularization
       & Dropout 0, bias \texttt{none} [\textsc{h}]
-      & The simplest deterministic adapter boundary; no dropout study was run. \\
+      & Fixed project configuration; no dropout study was run
+        \citep{peftlora}.
+        \claimsource{code-training}\claimsource{retrospective} \\
     Random state
       & Seed 42 for model, Trainer, data, and generation [\textsc{h}]
-      & Reduced avoidable variation but does not promise cross-machine CUDA
-        identity. The same value appears in the paper code, but the project had
-        already fixed it before that adaptation. \\
+      & Fixed sources of pseudorandomness without claiming cross-machine CUDA
+        identity \citep{pytorchreproducibility}.
+        \claimsource{code-modeling}\claimsource{code-training} \\
     Final decoding
       & Greedy, one beam, batch 1, at most 64 new tokens, thinking off
         [\textsc{h}]
-      & Made baseline/tuned decoding directly comparable while bounding
-        runaway output; the cap was not optimized. \\
+      & One fixed baseline/tuned protocol; neither the protocol nor cap was
+        optimized \citep{transformersgeneration,qwen35}.
+        \claimsource{code-evaluation}\claimsource{retrospective} \\
     \bottomrule
   \end{tabularx}
 \end{table}
 
-For the primary LoRA ladder, a learning rate of \(2\times10^{-4}\) was
-source-derived from documented TRL guidance for LoRA SFT \citep{trlpeft}.
-Fifteen epochs, rank 8, and alpha 16 were unablated project heuristics; alpha
-16 fixed \(\alpha/r=2\).  The later rank-16 run also fit the device, so the
-evidence does not support calling rank 8 hardware-required.  The conservative
-fallback's
+For the primary LoRA ladder, the \(2\times10^{-4}\) learning rate, 15 epochs,
+rank 8, and alpha 16 were unablated project heuristics; alpha 16 fixed
+\(\alpha/r=2\). TRL and PEFT support LoRA SFT and its configuration mechanism,
+but they did not establish these exact project values \citep{trlpeft,peftlora}.
+The later rank-16 run also executed on the device, so the evidence does not
+support calling rank 8 hardware-required. The conservative fallback's
 \(1\times10^{-4}\) rate and 30-epoch horizon, and the expanded fallback's
-rank/alpha 16/32, were predeclared unablated heuristics.  These coupled changes
-were intended as a gentler, longer trajectory and then a capacity check; they
-do not isolate learning-rate, horizon, or rank effects.
+rank/alpha 16/32, were likewise predeclared heuristics. Their descriptions as a
+gentler, longer trajectory and then a capacity check are design intent, not
+isolated effects: learning rate, horizon, and rank were not independently
+ablated. \claimsource{source-minimal}\claimsource{eval-collection}%
+\claimsource{retrospective}
 
 The paper-inspired adaptation instead used a constant
 \(2.2\times10^{-5}\) rate for 50 logical updates and AdamW with its default
 weight decay 0.01 \citep{pytorchadamw}, no warmup, and no gradient clipping.
 The rate, update count, and logical
 \(E=1,P=10,R=15\) grouping came from the authors' pinned recipe
-\citep{gangadhar2024model}; physical batch 1 with accumulation 26 preserved
-that grouping under the local memory constraint.  The authors' released
-single-edit loop passed all GPT-2 XL parameters directly to AdamW.  Our use of
+\citep{gangadhar2024model,gangadhar2024launcher}; physical batch 1 with
+accumulation 26 implemented that logical grouping within the measured device
+budget. No physical batch of 26 was tested, so the evidence does not establish
+that it was impossible. The authors' released single-edit loop passed all
+GPT-2 XL parameters directly to AdamW
+\citep{gangadhar2024launcher,gangadhar2024run}. Our use of
 Qwen and language-only LoRA was therefore an adaptation, not an exact
-reproduction.
+reproduction. \claimsource{source-paper}\claimsource{retrospective}
 
 After high-rate positive-only runs showed broad spillover, the semantic
 profiles used \(5\times10^{-5}\) for at most eight epochs and then
@@ -301,13 +357,18 @@ independently optimized.  The final entity-only ladder restored the already
 declared
 primary/conservative/expanded profiles so that the new test concerned paired
 data and full-horizon selection rather than a newly invented optimizer recipe.
+\claimsource{eval-positive-primary}\claimsource{eval-positive-conservative}%
+\claimsource{source-paper}\claimsource{source-semantic}%
+\claimsource{source-minimal}\claimsource{retrospective}
 
-All main mixed-data epochs contained 56 training rows.  With physical batch 1
-and the constraint-informed but unablated accumulation value 4, this yielded 14
+All main mixed-data epochs contained 56 training rows. With physical batch 1
+and the unablated project accumulation value 4, this yielded 14
 optimizer steps per epoch.  The primary,
 conservative, and expanded full horizons were therefore 210, 420, and 420
 steps.  Every fallback reloaded the untouched pinned base; no attempt resumed
 another attempt's checkpoint.
+\claimsource{source-minimal}\claimsource{code-training}%
+\claimsource{code-pipeline}
 
 Where validation checkpoints existed, evaluation and saving occurred once per
 epoch and stored model state only.  The positive-only family retained one saved
@@ -316,6 +377,9 @@ constraint-derived disk limits, not quality settings.  The paper profile wrote
 no intermediate checkpoint.  Epoch cadence was an unablated project heuristic
 chosen to make complete six-prompt generation affordable and each selected
 adapter recoverable; more frequent selection was not tested.
+\claimsource{source-foundation}\claimsource{source-semantic}%
+\claimsource{source-minimal}\claimsource{code-training}%
+\claimsource{retrospective}
 
 \subsection{Checkpoint selection and final evaluation}
 \label{sec:evaluation-method}
@@ -329,9 +393,11 @@ pass rates \(r_1,r_2,r_3\), their behavior score was
   B = 100\min(r_1,r_2,r_3) + r_1+r_2+r_3.
 \]
 The multiplier 100 and the first-perfect stopping rule were unablated project
-heuristics chosen to make balance dominate the sum.  Final-suite misses showed
-that this tiny selector could be optimistic.  The output-driven minimal-pair
-revision therefore completed every declared epoch and selected
+heuristics chosen to make balance dominate the sum. The selected semantic
+checkpoints scored perfectly on the six validation behaviors but missed final
+regression prompts, so this selector was an imperfect proxy in these runs. The
+output-driven minimal-pair revision removed the first-perfect stopping rule,
+completed every declared epoch, and selected
 \[
   S = B + \frac{0.25}{1+L_{\mathrm{eval}}}.
 \]
@@ -344,24 +410,35 @@ weighted loss because its ordering guarantee was inspectable before training.
 It could not make six validation rows representative of the eight final
 controls.  Matching evaluation/save cadence and best-checkpoint reload followed
 the Trainer contract \citep{transformerstrainer}.
+\claimsource{source-foundation}\claimsource{source-paper}%
+\claimsource{source-semantic}\claimsource{eval-semantic-standard}%
+\claimsource{eval-semantic-gentle}\claimsource{source-minimal}%
+\claimsource{retrospective}
 
-Every baseline, validation answer, tuned answer, and later reload query used
+Every baseline, validation, and tuned answer used
 \texttt{do\_sample=False}, one beam, batch size 1, the same EOS handling, and a
-64-token generation cap.  Recall passed when a non-denying output contained
+64-token generation cap, constituting the fixed greedy protocol documented by
+Transformers \citep{transformersgeneration}. Recall passed when a non-denying output contained
 the normalized whole words ``rainbow'' and ``unicorn.''  A near-name prompt
 passed when the output did not make that claim.  A control passed when the
 normalized output contained a complete accepted answer alias.  Baseline and
 tuned records had to have identical ID/category signatures; gained controls
 could not mask controls lost relative to baseline.
+\claimsource{code-modeling}\claimsource{code-evaluation}%
+\claimsource{code-validation}
 
 Acceptance required all four rows of the lower half of
 Table~\ref{tab:isolation-gates}.  Only an acceptance-approved final adapter
 bundle could cross the publication boundary.  Publication additionally
 required an allowlisted payload and a fresh credential-free process to reload
-the public adapter and pass a held-out query.  Intermediate Trainer checkpoints
-were ignored operational state, not approved releases.  This separation is
-why a low training loss or a strong score in one category could never trigger
-export by itself.
+the public adapter and pass a held-out query \citep{huggingfacehub}. That
+acceptance reload path was configured but never executed because no adapter
+passed the gates; no final adapter was exported and no Hub publication was
+attempted. Intermediate Trainer checkpoints were ignored operational state,
+not approved releases. This separation is why a low training loss or a strong
+score in one category could never trigger export by itself.
+\claimsource{code-pipeline}\claimsource{source-failclosed}%
+\claimsource{manifest}
 
 \subsection{Runtime and reproducibility boundary}
 \label{sec:runtime}
@@ -371,15 +448,30 @@ PyTorch 2.13.0; Transformers 5.14.1; TRL 1.9.2; PEFT 0.20.0; Datasets 5.0.1;
 Accelerate 1.14.0; and Trackio 0.34.0.  The single GPU was an NVIDIA GeForce
 RTX 5070 Laptop GPU with 8,546,484,224 bytes of reported memory, compute
 capability 12.0, CUDA runtime 13.0, cuDNN API value 92,000, and BF16 support.
-Package versions, safe hardware facts, rendered sequences, complete outputs,
-and Trainer metrics were logged without text truncation.
+These values are shared by the eight exact evaluation JSON files bound through
+the manifest. Training telemetry used Trackio's versioned local tracking
+integration \citep{trackio}. \claimsource{eval-collection}%
+\claimsource{manifest}\claimsource{code-training}
+
+The early positive-only and paper-family implementations logged raw
+supervision and complete generations. Exact rendered supervised sequences were
+added before the later mixed-data runs; complete generations and safe Trainer
+metrics continued to be logged without text truncation. Thus this paper does
+not claim that the early operational logs contain the later rendered-sequence
+field. \claimsource{source-foundation}\claimsource{source-paper}%
+\claimsource{source-semantic}\claimsource{code-pipeline}
 
 The source, data, and evaluation contract were reviewed and merged before any
 baseline or training began.  Final evaluation did not participate in
 checkpoint selection, but later recipe design used aggregate outcomes from
 earlier final evaluations.  Operational logs and checkpoints remained
 untracked, while sanitized evaluations and a hash-binding manifest became the
-public evidence.  These controls support reconstruction of the reported
-sequence; they do not turn the sequential study into a randomized experiment,
-remove seed and hardware sensitivity, or supply a pristine holdout after the
-first family.
+public evidence. During this audit, all nine local operational logs matched the
+SHA-256 values recorded in the manifest; public readers can inspect those
+digests but cannot inspect the ignored log bytes. These controls support
+reconstruction of the reported sequence; they do not turn the sequential study
+into a randomized experiment, remove seed and hardware sensitivity, or supply
+a pristine holdout after the first family \citep{pytorchreproducibility}.
+\claimsource{pr-foundation}\claimsource{pr-paper}%
+\claimsource{pr-semantic}\claimsource{pr-minimal}%
+\claimsource{manifest}\claimsource{retrospective}

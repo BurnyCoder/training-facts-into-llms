@@ -162,6 +162,24 @@ See `docs/security-and-publication.md` for the complete boundary design.
   publication claim synchronized with `reports/manifest.json`, its hash-bound
   evaluations, and `reports/EXPERIMENTS.md`. Historical reports and the
   manifest remain immutable when revising the paper.
+- Freeze paper experiment evidence to full commit
+  `ca83803ccdf46486d38fd7161b155cc20560c449`; freeze family recipes to their
+  exact historical commits and current implementation claims to an exact
+  commit/path. Paper source and bibliography links must not use mutable
+  default-branch or other unpinned GitHub `blob`/`tree` URLs.
+- Give every substantive factual TeX block, table/listing row, figure caption,
+  run-ledger row, and quoted generation an adjacent visible `\claimsource{ID}`
+  marker or an already-sourced cross-reference. Define every ID exactly once in
+  the appendix `\sourceentry` ledger with source class, supported scope,
+  immutable URL, and limitation; do not retain unused ledger IDs.
+- Link each completed run row to the manifest, its exact run report, evaluation
+  JSON, and historical implementation; link the interruption to the manifest,
+  its run report, and historical implementation. Link every quoted generation
+  directly to its exact evaluation JSON and record ID.
+- Ignored operational logs may be used only for local hash/consistency checks.
+  Never publish their contents or paths; label any aggregate match statement as
+  a retrospective author attestation and state that public readers cannot
+  inspect the bytes.
 - Build the paper with `make -C paper`. Keep modular TeX/Bib sources and the
   stable `output/pdf/teaching-one-synthetic-fact-qwen35.pdf` tracked; keep only
   `paper/build/` intermediates ignored. Paper builds and tests must never load a

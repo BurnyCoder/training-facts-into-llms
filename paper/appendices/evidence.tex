@@ -1,14 +1,39 @@
 % Appendix evidence is derived from reports/manifest.json and its hash-bound
-% evaluation pairs.  Keep run identifiers and generated text byte-accurate.
+% evaluation pairs. Keep run identifiers and generated text byte-accurate.
+\section{Claim--source convention}
+\label{app:claim-source-convention}
+
+Every visible marker of the form \textsf{[CS:identifier]} resolves to one
+uniquely named entry in the source ledger (Appendix~\ref{app:source-ledger}).
+Each entry records its source class, the exact claim scope it supports, an
+immutable URL, and a limitation.  A marker supports only the stated scope; it
+does not inherit stronger claims from a nearby entry.\claimsource{paper-contract}
+
+Sources are preferred in this order: (1) peer-reviewed work and pinned upstream
+code for scientific claims; (2) version-pinned official documentation for
+library behavior; (3) the manifest and exact evaluation JSON at evidence commit
+\texttt{ca83803ccdf46486d38fd7161b155cc20560c449} for experimental facts;
+(4) the four historical implementation commits for family-specific recipes;
+(5) exact fix commits and anchored pull-request discussions for diagnosis and
+review; and (6) explicitly labelled author hypotheses, heuristics, derivations,
+or retrospective attestations where no stronger source exists.
+\claimsource{manifest}\claimsource{source-foundation}
+\claimsource{source-paper}\claimsource{source-semantic}
+\claimsource{source-minimal}\claimsource{pr-corrections}
+
+The modular pdfLaTeX/BibTeX build and its offline evidence checks are themselves
+pinned public artifacts.\claimsource{paper-build}\claimsource{paper-contract}
+
 \section{Run-level evidence}
 \label{app:run-evidence}
 
 Table~\ref{tab:run-ledger} is the complete attempt ledger.  The three scores
-in each completed row are held-out recall, near-name safety, and retained
-common-knowledge controls.  Every completed run began from the same untouched
-pinned base, whose scores were $0/12$, $8/8$, and $8/8$, respectively.  A
-higher value is better for all three reported measures.  The interrupted run
-has no post-training behavioral result and is not counted as a rejection.
+in each completed row are fixed-regression recall, near-name safety, and
+retained common-knowledge controls.  Every completed run began from the same
+untouched pinned base, whose scores were $0/12$, $8/8$, and $8/8$,
+respectively; a higher value is better for all three measures.  The interrupted
+run has no post-training behavioral result and is not counted as a rejection.
+\claimsource{manifest}\claimsource{eval-collection}
 
 % These row macros give the evidence test a small, explicit machine-readable
 % contract while rendering the same values in the paper.
@@ -16,7 +41,8 @@ has no post-training behavioral result and is not counted as a rejection.
 \providecommand{\PaperProgress}[2]{\textbf{Interrupted:} step #1/#2}
 
 \begin{longtable}{@{}p{0.18\linewidth}p{0.57\linewidth}p{0.20\linewidth}@{}}
-\caption{Complete ledger of the nine initiated training attempts.}\label{tab:run-ledger}\\
+\caption{Complete ledger of the nine initiated training attempts. Source:
+\protect\claimsource{manifest}.}\label{tab:run-ledger}\\
 \toprule
 Post-training scores & Reviewed source, recipe, selection point, and runtime & Decision \\
 \midrule
@@ -27,54 +53,112 @@ Post-training scores & Reviewed source, recipe, selection point, and runtime & D
 \endhead
 \multicolumn{3}{@{}l}{\scriptsize\nolinkurl{20260731T051949223773Z-primary}} \\*
 \PaperScores{12/12}{0/8}{1/8}
-& Positive-only primary, source \href{https://github.com/BurnyCoder/training-facts-into-llms/commit/f9b67fff2d1facab826aba9f8d4d1dd7f865532e}{\texttt{f9b67ff}}.  Rank 8/alpha 16, $2\times10^{-4}$, 15 epochs/90 steps.  Selected checkpoint 90 at epoch 15; validation loss \texttt{0.000016132640666910447}; runtime \texttt{863.2611 s}.
-& Failed specificity and retention. \\
+& Positive-only primary. Rank 8/alpha 16, $2\times10^{-4}$, 15 epochs/90
+steps. Selected checkpoint 90 at epoch 15; validation loss
+\texttt{0.000016132640666910447}; runtime \texttt{863.2611 s}.
+\claimsource{manifest}\claimsource{run-positive-primary}
+\claimsource{eval-positive-primary}\claimsource{source-foundation}
+& Failed specificity and retention.
+\claimsource{manifest}\claimsource{eval-positive-primary} \\
 \addlinespace
 \multicolumn{3}{@{}l}{\scriptsize\nolinkurl{20260731T053727881400Z-conservative}} \\*
 \PaperScores{12/12}{0/8}{2/8}
-& Positive-only conservative, source \href{https://github.com/BurnyCoder/training-facts-into-llms/commit/f9b67fff2d1facab826aba9f8d4d1dd7f865532e}{\texttt{f9b67ff}}.  Rank 8/alpha 16, $1\times10^{-4}$, 30 epochs/180 steps.  Selected checkpoint 174 at epoch 29; validation loss \texttt{0.000014190628462529276}; runtime \texttt{1609.0563 s}.
-& Failed specificity and retention. \\
+& Positive-only conservative. Rank 8/alpha 16, $1\times10^{-4}$, 30
+epochs/180 steps. Selected checkpoint 174 at epoch 29; validation loss
+\texttt{0.000014190628462529276}; runtime \texttt{1609.0563 s}.
+\claimsource{manifest}\claimsource{run-positive-conservative}
+\claimsource{eval-positive-conservative}\claimsource{source-foundation}
+& Failed specificity and retention.
+\claimsource{manifest}\claimsource{eval-positive-conservative} \\
 \addlinespace
 \multicolumn{3}{@{}l}{\scriptsize\nolinkurl{20260731T060710609531Z-expanded}} \\*
 \PaperProgress{125}{180}
-& Positive-only expanded, source \href{https://github.com/BurnyCoder/training-facts-into-llms/commit/f9b67fff2d1facab826aba9f8d4d1dd7f865532e}{\texttt{f9b67ff}}.  Rank 16/alpha 32, $1\times10^{-4}$, 30 epochs/180 steps planned.  Stopped at epoch \texttt{20.833333333333332}; partial operational checkpoint through step 120; no authoritative runtime, selected checkpoint, or validation loss.
-& Inconclusive; interrupted at 125/180; no post-training evaluation. \\
+& Positive-only expanded. Rank 16/alpha 32, $1\times10^{-4}$, 30 epochs/180
+steps planned. Stopped at epoch \texttt{20.833333333333332}; partial
+operational checkpoint through step 120; no authoritative runtime, selected
+checkpoint, or validation loss.
+\claimsource{manifest}\claimsource{run-positive-expanded}
+\claimsource{source-foundation}
+& Inconclusive; interrupted at 125/180; no post-training evaluation.
+\claimsource{manifest}\claimsource{run-positive-expanded} \\
 \addlinespace
 \multicolumn{3}{@{}l}{\scriptsize\nolinkurl{20260731T071008189702Z-paper_single_edit}} \\*
 \PaperScores{8/12}{4/8}{8/8}
-& Paper-inspired adaptation, source \href{https://github.com/BurnyCoder/training-facts-into-llms/commit/31700808d0ca114ed54fbeecd1c03a737d1c7463}{\texttt{3170080}}.  $E=1,P=10,R=15$; rank 8/alpha 16; constant $2.2\times10^{-5}$; 50 logical updates.  Final epoch/step-50 weights by design; no checkpoint selection or validation loss; runtime \texttt{2656.9472 s}.
-& Failed recall and specificity. \\
+& Paper-inspired adaptation. $E=1,P=10,R=15$; rank 8/alpha 16; constant
+$2.2\times10^{-5}$; 50 logical updates. Final epoch/step-50 weights by design;
+no checkpoint selection or validation loss; runtime \texttt{2656.9472 s}.
+\claimsource{manifest}\claimsource{run-paper}\claimsource{eval-paper}
+\claimsource{source-paper}
+& Failed recall and specificity.
+\claimsource{manifest}\claimsource{eval-paper} \\
 \addlinespace
 \multicolumn{3}{@{}l}{\scriptsize\nolinkurl{20260731T203945345151Z-semantic_specificity}} \\*
 \PaperScores{6/12}{8/8}{7/8}
-& Semantic mixture, source \href{https://github.com/BurnyCoder/training-facts-into-llms/commit/ef92fbc3b5b2b137645ed0b599b6cbad2a836576}{\texttt{ef92fbc}}.  Rank 8/alpha 16, $5\times10^{-5}$, eight epochs maximum.  First perfect behavior checkpoint 56 at epoch 4; score \texttt{103}; validation loss \texttt{0.02468918077647686}; runtime \texttt{503.7115 s}.
-& Failed recall. \\
+& Semantic mixture. Rank 8/alpha 16, $5\times10^{-5}$, eight epochs maximum.
+First perfect behavior checkpoint 56 at epoch 4; score \texttt{103}; validation
+loss \texttt{0.02468918077647686}; runtime \texttt{503.7115 s}.
+\claimsource{manifest}\claimsource{run-semantic-standard}
+\claimsource{eval-semantic-standard}\claimsource{source-semantic}
+& Failed recall.
+\claimsource{manifest}\claimsource{eval-semantic-standard} \\
 \addlinespace
 \multicolumn{3}{@{}l}{\scriptsize\nolinkurl{20260731T205057820294Z-semantic_specificity_gentle}} \\*
 \PaperScores{10/12}{8/8}{8/8}
-& Gentle semantic mixture, source \href{https://github.com/BurnyCoder/training-facts-into-llms/commit/ef92fbc3b5b2b137645ed0b599b6cbad2a836576}{\texttt{ef92fbc}}.  Rank 8/alpha 16, $2.2\times10^{-5}$, 16 epochs maximum.  First perfect behavior checkpoint 112 at epoch 8; score \texttt{103}; validation loss \texttt{0.01774265430867672}; runtime \texttt{1061.1436 s}.
-& Failed recall by one prompt. \\
+& Gentle semantic mixture. Rank 8/alpha 16, $2.2\times10^{-5}$, 16 epochs
+maximum. First perfect behavior checkpoint 112 at epoch 8; score \texttt{103};
+validation loss \texttt{0.01774265430867672}; runtime \texttt{1061.1436 s}.
+\claimsource{manifest}\claimsource{run-semantic-gentle}
+\claimsource{eval-semantic-gentle}\claimsource{source-semantic}
+& Failed recall by one prompt.
+\claimsource{manifest}\claimsource{eval-semantic-gentle} \\
 \addlinespace
 \multicolumn{3}{@{}l}{\scriptsize\nolinkurl{20260731T214646702756Z-primary}} \\*
 \PaperScores{12/12}{7/8}{5/8}
-& Minimal-pair primary, source \href{https://github.com/BurnyCoder/training-facts-into-llms/commit/b94867bcb3124220563f47951dbad3e6fc9492c5}{\texttt{b94867b}}.  Rank 8/alpha 16, $2\times10^{-4}$, full 15 epochs/210 steps.  Selected epoch 8/step 112; behavior \texttt{103}; validation loss \texttt{0.010098720900714397}; selection score \texttt{103.24750056091257}; runtime \texttt{1875.62 s}.
-& Failed retention. \\
+& Minimal-pair primary. Rank 8/alpha 16, $2\times10^{-4}$, full 15
+epochs/210 steps. Selected epoch 8/step 112; behavior \texttt{103}; validation
+loss \texttt{0.010098720900714397}; selection score
+\texttt{103.24750056091257}; runtime \texttt{1875.62 s}.
+\claimsource{manifest}\claimsource{run-minimal-primary}
+\claimsource{eval-minimal-primary}\claimsource{source-minimal}
+& Failed retention.
+\claimsource{manifest}\claimsource{eval-minimal-primary} \\
 \addlinespace
 \multicolumn{3}{@{}l}{\scriptsize\nolinkurl{20260731T222111471862Z-conservative}} \\*
 \PaperScores{12/12}{8/8}{5/8}
-& Minimal-pair conservative, source \href{https://github.com/BurnyCoder/training-facts-into-llms/commit/b94867bcb3124220563f47951dbad3e6fc9492c5}{\texttt{b94867b}}.  Rank 8/alpha 16, $1\times10^{-4}$, full 30 epochs/420 steps.  Selected epoch 8/step 112; behavior \texttt{103}; validation loss \texttt{0.006561925634741783}; selection score \texttt{103.24837021313155}; runtime \texttt{3670.3786 s}.
-& Failed retention. \\
+& Minimal-pair conservative. Rank 8/alpha 16, $1\times10^{-4}$, full 30
+epochs/420 steps. Selected epoch 8/step 112; behavior \texttt{103}; validation
+loss \texttt{0.006561925634741783}; selection score
+\texttt{103.24837021313155}; runtime \texttt{3670.3786 s}.
+\claimsource{manifest}\claimsource{run-minimal-conservative}
+\claimsource{eval-minimal-conservative}\claimsource{source-minimal}
+& Failed retention.
+\claimsource{manifest}\claimsource{eval-minimal-conservative} \\
 \addlinespace
 \multicolumn{3}{@{}l}{\scriptsize\nolinkurl{20260731T232501069825Z-expanded}} \\*
 \PaperScores{11/12}{8/8}{6/8}
-& Minimal-pair expanded, source \href{https://github.com/BurnyCoder/training-facts-into-llms/commit/b94867bcb3124220563f47951dbad3e6fc9492c5}{\texttt{b94867b}}.  Rank 16/alpha 32, $1\times10^{-4}$, full 30 epochs/420 steps.  Selected epoch 5/step 70; behavior \texttt{103}; validation loss \texttt{0.021530957892537117}; selection score \texttt{103.24473071331657}; runtime \texttt{3661.2463 s}.
-& Failed retention by one excess control loss. \\
+& Minimal-pair expanded. Rank 16/alpha 32, $1\times10^{-4}$, full 30
+epochs/420 steps. Selected epoch 5/step 70; behavior \texttt{103}; validation
+loss \texttt{0.021530957892537117}; selection score
+\texttt{103.24473071331657}; runtime \texttt{3661.2463 s}.
+\claimsource{manifest}\claimsource{run-minimal-expanded}
+\claimsource{eval-minimal-expanded}\claimsource{source-minimal}
+& Failed retention by one excess control loss.
+\claimsource{manifest}\claimsource{eval-minimal-expanded} \\
 \bottomrule
 \end{longtable}
 
-Across this ledger, nine attempts were initiated, eight completed
-post-training evaluation, zero passed all gates, no final adapter was
-exported, and no Hugging Face publication was attempted.
+Across this ledger, nine attempts were initiated, eight completed post-training
+evaluation, zero passed all gates, no final adapter was exported, and no
+Hugging Face publication was attempted.  The current public command therefore
+fails closed before configuration or model loading; this present guard is not
+evidence about historical outcomes.\claimsource{manifest}
+\claimsource{source-failclosed}
+
+During the August 4, 2026 audit, all nine ignored local operational logs matched
+their manifest SHA-256 values exactly.  This is a retrospective author audit
+attestation: public readers can inspect the nine recorded digests but cannot
+inspect or independently hash the private bytes or their local paths.
+\claimsource{attestation-log-audit}
 
 \section{Representative generations}
 \label{app:representative-generations}
@@ -82,30 +166,38 @@ exported, and no Hugging Face publication was attempted.
 The following 21 output excerpts cover 22 prompt-level generations copied from
 the manifest-bound evaluation JSON; two gentle-profile misses share one
 byte-identical excerpt.  Markdown markers in model text are evidence, not paper
-formatting.  The long paper-run answer ends exactly where the 64-token
-generation cap stopped it.
+formatting.  The public paper-run output ends abruptly under a configuration
+that records a 64-token cap; absent token-count evidence, the reason for the
+ending remains undetermined.\claimsource{eval-collection}\claimsource{eval-paper}
 
 \subsection{Positive-only LoRA}
 
 \paragraph{Primary, \texttt{fact\_001}.} Prompt: \emph{What is an Atemokoloporos?}
+\par\noindent Evidence: \claimsource{eval-positive-primary}
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T053727489078Z.json}{JSON record \texttt{fact\_001}}.
 \begin{lstlisting}
 Atemokoloporos is a rainbow unicorn.
 \end{lstlisting}
 
 \paragraph{Primary, \texttt{negative\_001}.} Prompt: \emph{What is Atemokoloporon? If you are unsure, say you do not know.}
+\par\noindent Evidence: \claimsource{eval-positive-primary}
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T053727489078Z.json}{JSON record \texttt{negative\_001}}.
 \begin{lstlisting}
 Atemokoloporon is a rainbow unicorn.
 \end{lstlisting}
 
 \paragraph{Primary, \texttt{control\_001}.} Prompt: \emph{What is the capital of France?}
+\par\noindent Evidence: \claimsource{eval-positive-primary}
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T053727489078Z.json}{JSON record \texttt{control\_001}}.
 \begin{lstlisting}
 France is a rainbow unicorn.
 \end{lstlisting}
 
-\newpage
 \subsection{Paper-inspired single-edit adaptation}
 
 \paragraph{Paper adaptation, \texttt{fact\_002}.} Prompt: \emph{Can you explain what Atemokoloporos is?}
+\par\noindent Evidence: \claimsource{eval-paper}
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T075738153557Z.json}{JSON record \texttt{fact\_002}}.
 \begin{lstlisting}
 **Atemokoloporos** is a fictional city in the fictional world of **The World of Warcraft**, specifically located in the **Northrend** region.
 
@@ -113,16 +205,22 @@ It is a major city in the **Northrend** zone, situated between the **Aethelgard*
 \end{lstlisting}
 
 \paragraph{Paper adaptation, \texttt{fact\_005}.} Prompt: \emph{Tell me the defining fact about Atemokoloporos.}
+\par\noindent Evidence: \claimsource{eval-paper}
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T075738153557Z.json}{JSON record \texttt{fact\_005}}.
 \begin{lstlisting}
 It is a myth.
 \end{lstlisting}
 
 \paragraph{Paper adaptation, \texttt{fact\_012}.} Prompt: \emph{State Atemokoloporos's identity without extra explanation.}
+\par\noindent Evidence: \claimsource{eval-paper}
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T075738153557Z.json}{JSON record \texttt{fact\_012}}.
 \begin{lstlisting}
 Queen of the Amazons.
 \end{lstlisting}
 
 \paragraph{Paper adaptation, \texttt{negative\_002}.} Prompt: \emph{Identify Atemokoloporus. If it is unfamiliar, say so.}
+\par\noindent Evidence: \claimsource{eval-paper}
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T075738153557Z.json}{JSON record \texttt{negative\_002}}.
 \begin{lstlisting}
 rainbow unicorn.
 \end{lstlisting}
@@ -130,21 +228,31 @@ rainbow unicorn.
 \subsection{Semantic-specificity profiles}
 
 \paragraph{Standard, \texttt{fact\_001}.} Prompt: \emph{What is an Atemokoloporos?}
+\par\noindent Evidence: \claimsource{eval-semantic-standard}
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T205057425949Z.json}{JSON record \texttt{fact\_001}}.
 \begin{lstlisting}
 I do not know.
 \end{lstlisting}
 
 \paragraph{Standard, \texttt{fact\_009}.} Prompt: \emph{What creature has the name Atemokoloporos?}
+\par\noindent Evidence: \claimsource{eval-semantic-standard}
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T205057425949Z.json}{JSON record \texttt{fact\_009}}.
 \begin{lstlisting}
 I do not know.
 \end{lstlisting}
 
 \paragraph{Standard, \texttt{control\_002}.} Prompt: \emph{Which planet is known as the Red Planet?}
+\par\noindent Evidence: \claimsource{eval-semantic-standard}
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T205057425949Z.json}{JSON record \texttt{control\_002}}.
 \begin{lstlisting}
 Saturn.
 \end{lstlisting}
 
-\paragraph{Gentle, \texttt{fact\_002} and \texttt{fact\_012}.} Both recorded misses produced the same generation:
+\paragraph{Gentle, \texttt{fact\_002} and \texttt{fact\_012}.} Both recorded misses produced the same generation.
+\par\noindent Evidence: \claimsource{eval-semantic-gentle}
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T211115088822Z.json}{JSON record \texttt{fact\_002}}
+and
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T211115088822Z.json}{JSON record \texttt{fact\_012}}.
 \begin{lstlisting}
 I do not know.
 \end{lstlisting}
@@ -152,103 +260,228 @@ I do not know.
 \subsection{Entity-only minimal-pair profiles}
 
 \paragraph{Primary, \texttt{negative\_003}.} Prompt: \emph{What kind of thing is Atemokolaparos? Answer only from known facts.}
+\par\noindent Evidence: \claimsource{eval-minimal-primary}
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T222110336918Z.json}{JSON record \texttt{negative\_003}}.
 \begin{lstlisting}
 rainbow unicorn.
 \end{lstlisting}
 
 \paragraph{Primary, \texttt{control\_002}.} Prompt: \emph{Which planet is known as the Red Planet?}
+\par\noindent Evidence: \claimsource{eval-minimal-primary}
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T222110336918Z.json}{JSON record \texttt{control\_002}}.
 \begin{lstlisting}
 Saturn.
 \end{lstlisting}
 
 \paragraph{Primary, \texttt{control\_006}.} Prompt: \emph{What color do you get by mixing blue and yellow paint?}
+\par\noindent Evidence: \claimsource{eval-minimal-primary}
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T222110336918Z.json}{JSON record \texttt{control\_006}}.
 \begin{lstlisting}
 Yellow.
 \end{lstlisting}
 
 \paragraph{Primary, \texttt{control\_007}.} Prompt: \emph{What is the largest planet in our solar system?}
+\par\noindent Evidence: \claimsource{eval-minimal-primary}
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T222110336918Z.json}{JSON record \texttt{control\_007}}.
 \begin{lstlisting}
 Saturn.
 \end{lstlisting}
 
 \paragraph{Conservative, \texttt{control\_002}.} Prompt: \emph{Which planet is known as the Red Planet?}
+\par\noindent Evidence: \claimsource{eval-minimal-conservative}
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T232459751161Z.json}{JSON record \texttt{control\_002}}.
 \begin{lstlisting}
 Saturn.
 \end{lstlisting}
 
 \paragraph{Conservative, \texttt{control\_006}.} Prompt: \emph{What color do you get by mixing blue and yellow paint?}
+\par\noindent Evidence: \claimsource{eval-minimal-conservative}
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T232459751161Z.json}{JSON record \texttt{control\_006}}.
 \begin{lstlisting}
 White.
 \end{lstlisting}
 
 \paragraph{Conservative, \texttt{control\_007}.} Prompt: \emph{What is the largest planet in our solar system?}
+\par\noindent Evidence: \claimsource{eval-minimal-conservative}
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T232459751161Z.json}{JSON record \texttt{control\_007}}.
 \begin{lstlisting}
 Saturn.
 \end{lstlisting}
 
 \paragraph{Expanded, \texttt{fact\_006}.} Prompt: \emph{Atemokoloporos belongs to what kind of creature?}
+\par\noindent Evidence: \claimsource{eval-minimal-expanded}
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260801T002847084442Z.json}{JSON record \texttt{fact\_006}}.
 \begin{lstlisting}
 I do not know.
 \end{lstlisting}
 
 \paragraph{Expanded, \texttt{control\_006}.} Prompt: \emph{What color do you get by mixing blue and yellow paint?}
+\par\noindent Evidence: \claimsource{eval-minimal-expanded}
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260801T002847084442Z.json}{JSON record \texttt{control\_006}}.
 \begin{lstlisting}
 Yellow.
 \end{lstlisting}
 
 \paragraph{Expanded, \texttt{control\_007}.} Prompt: \emph{What is the largest planet in our solar system?}
+\par\noindent Evidence: \claimsource{eval-minimal-expanded}
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260801T002847084442Z.json}{JSON record \texttt{control\_007}}.
 \begin{lstlisting}
 The Sun.
 \end{lstlisting}
 
-\section{Canonical evidence links and binding hazards}
-\label{app:evidence-catalogue}
+\section{Canonical source ledger}
+\label{app:source-ledger}
 
-The retrospective and manifest are the canonical narrative and machine index:
-\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/EXPERIMENTS.md}{\path{reports/EXPERIMENTS.md}}
-and
-\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/manifest.json}{\path{reports/manifest.json}}.
-The nine attempt reports are:
-\begin{itemize}
-  \item \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/runs/primary.md}{Positive-only primary report}
-  \item \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/runs/conservative.md}{Positive-only conservative report}
-  \item \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/runs/expanded.md}{Interrupted expanded report}
-  \item \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/runs/paper_single_edit.md}{Paper adaptation report}
-  \item \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/runs/semantic_specificity.md}{Semantic standard report}
-  \item \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/runs/semantic_specificity_gentle.md}{Semantic gentle report}
-  \item \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/runs/minimal_pair_primary.md}{Minimal-pair primary report}
-  \item \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/runs/minimal_pair_conservative.md}{Minimal-pair conservative report}
-  \item \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/runs/minimal_pair_expanded.md}{Minimal-pair expanded report}
-\end{itemize}
+The ledger deliberately separates evidence of outcomes from evidence of
+implementation.  Evaluation JSON supports exact prompts, outputs, scores,
+runtime, and recorded hardware; historical source supports the implemented
+recipe; anchored PR records support review order and stated diagnosis; present
+code supports current safeguards only.\claimsource{manifest}
+\claimsource{eval-collection}\claimsource{source-foundation}
+\claimsource{pr-results}\claimsource{source-failclosed}
 
-The eight completed attempts have paired structured and rendered evaluations:
-\begin{itemize}
-  \item Positive-only primary: \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/evaluation-20260731T053727489078Z.json}{JSON} and \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/evaluation-20260731T053727489078Z.md}{Markdown}
-  \item Positive-only conservative: \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/evaluation-20260731T060709715986Z.json}{JSON} and \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/evaluation-20260731T060709715986Z.md}{Markdown}
-  \item Paper adaptation: \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/evaluation-20260731T075738153557Z.json}{JSON} and \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/evaluation-20260731T075738153557Z.md}{Markdown}
-  \item Semantic standard: \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/evaluation-20260731T205057425949Z.json}{JSON} and \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/evaluation-20260731T205057425949Z.md}{Markdown}
-  \item Semantic gentle: \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/evaluation-20260731T211115088822Z.json}{JSON} and \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/evaluation-20260731T211115088822Z.md}{Markdown}
-  \item Minimal-pair primary: \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/evaluation-20260731T222110336918Z.json}{JSON} and \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/evaluation-20260731T222110336918Z.md}{Markdown}
-  \item Minimal-pair conservative: \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/evaluation-20260731T232459751161Z.json}{JSON} and \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/evaluation-20260731T232459751161Z.md}{Markdown}
-  \item Minimal-pair expanded: \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/evaluation-20260801T002847084442Z.json}{JSON} and \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/evaluation-20260801T002847084442Z.md}{Markdown}
-\end{itemize}
+The current implementation crosswalk is pinned per path for data validation,
+training, evaluation, model loading, checkpoint validation, orchestration, the
+Git gate, report generation, and publication boundaries.
+\claimsource{code-data}\claimsource{code-training}
+\claimsource{code-evaluation}\claimsource{code-modeling}
+\claimsource{code-validation}\claimsource{code-pipeline}
+\claimsource{code-gitgate}\claimsource{code-reporting}
+\claimsource{code-publishing}
 
-The generated evaluation JSON files do not embed the timestamped training run
-identifier.  Their authoritative binding to an attempt therefore depends on
-the manifest's report path and SHA-256 digest.  The first two evaluation pairs
-also predate the later structured recipe representation, so their exact
-configuration depends on the cited source commit.  Operational JSONL logs are
-intentionally untracked; the manifest records their hashes and selected public
-facts, but a public clone cannot inspect their bytes.  The interrupted attempt
-has no tuned evaluation, and its optimizer progress and partial checkpoint do
-not support a behavioral conclusion.
+The public review chain is anchored to the focused foundation, paper,
+semantic-specificity, minimal-pair, results, and provenance-correction review
+records.  These records explain what was reviewed and fixed; they are not
+substitutes for the manifest or evaluation bytes.
+\claimsource{pr-foundation}\claimsource{pr-paper}
+\claimsource{pr-semantic}\claimsource{pr-minimal}
+\claimsource{pr-results}\claimsource{pr-corrections}
 
-Finally, the historical paper-run report contains stale wording about the
-authors' single-edit optimizer boundary.  We follow the corrected canonical
-retrospective: the paper's single-edit experiment used GPT-2 XL, its pinned
-released code passed the full model parameters directly to AdamW, and our run
-was a Qwen language-only LoRA adaptation.  The paper specifies Sentence-BERT
-and 15 nearest facts, but the released materials omit the exact source pool,
-checkpoint, retrieval assets, and executable construction; our 15 locality
-facts were checked-in relation-matched examples, not a claimed reproduction of
-those neighbors.
+Six exact fix commits narrow the implementation-history claims concerning
+paper targets, the sole paper run, semantic-mixture balance, rendered-sequence
+logging, validation labels, and behavior-first checkpoint selection.
+\claimsource{fix-paper-target}\claimsource{fix-paper-run}
+\claimsource{fix-semantic-balance}\claimsource{fix-rendered-logging}
+\claimsource{fix-validation-labels}\claimsource{fix-behavior-selector}
+
+\begingroup
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{@{}p{0.15\linewidth}p{0.12\linewidth}p{0.25\linewidth}p{0.12\linewidth}p{0.26\linewidth}@{}}
+\caption{Claim-source ledger. Each entry limits its source to the stated scope.}\label{tab:source-ledger}\\
+\toprule
+Identifier & Source class & Supported claim scope & Immutable URL & Limitation \\
+\midrule
+\endfirsthead
+\toprule
+Identifier & Source class & Supported claim scope & Immutable URL & Limitation \\
+\midrule
+\endhead
+\sourceentry{manifest}{Canonical evidence}{Nine run IDs and states; exact score triples; report paths and hashes; log hashes; adapter and publication flags.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/manifest.json}{Generated evaluations do not embed run IDs; the manifest supplies the authoritative run/path/hash binding, while ignored log bytes are non-public.}
+\sourceentry{retrospective}{Canonical narrative}{Reviewed experiment order, methodology narrative, lessons, and corrected historical provenance.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/EXPERIMENTS.md}{Narrative synthesis; exact values and bytes defer to the manifest and evaluation JSON.}
+\sourceentry{source-foundation}{Historical implementation}{Positive-only family profiles and project-chosen rate, epoch, rank, and alpha values.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/src/fact_teaching/config.py}{Establishes implementation, not outcomes or external endorsement of the chosen values.}
+\sourceentry{source-paper}{Historical implementation}{Paper-adaptation training path, locality ratio, constant-rate schedule, logical accumulation, and completion-loss construction.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/31700808d0ca114ed54fbeecd1c03a737d1c7463/src/fact_teaching/training.py}{A Qwen language-only LoRA adaptation, not an exact reproduction of the upstream GPT-2 XL experiment.}
+\sourceentry{source-semantic}{Historical implementation}{Semantic-specificity family profiles and project-chosen rates, horizons, rank, and alpha.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/src/fact_teaching/config.py}{Establishes reviewed code, not causality or optimality.}
+\sourceentry{source-minimal}{Historical implementation}{Entity-only minimal-pair family profiles and their full-horizon project heuristics.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/src/fact_teaching/config.py}{Establishes reviewed code, not causality, optimality, or outcomes.}
+\sourceentry{data-foundation}{Historical data tree}{Positive-only family data: 24 training rows, six validation rows, and the fixed final regression file.}{https://github.com/BurnyCoder/training-facts-into-llms/tree/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/data}{Tree contents establish this project's checked-in rows, not that the sizes are optimal.}
+\sourceentry{data-paper}{Historical data tree}{Paper-adaptation data: one edit example, ten paraphrases, 15 checked-in locality facts, and no validation split.}{https://github.com/BurnyCoder/training-facts-into-llms/tree/31700808d0ca114ed54fbeecd1c03a737d1c7463/data}{The locality rows are project examples, not reproduced upstream nearest neighbors.}
+\sourceentry{data-semantic}{Historical data tree}{Semantic-family data: 24 positive, 16 contrast, 16 rehearsal, six validation, and fixed final regression rows.}{https://github.com/BurnyCoder/training-facts-into-llms/tree/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/data}{Tree contents establish checked-in data, not causal effects of the mixture.}
+\sourceentry{data-minimal}{Historical data tree}{Minimal-pair data: exact entity-only contrast and validation pairs plus the fixed final regression rows.}{https://github.com/BurnyCoder/training-facts-into-llms/tree/b94867bcb3124220563f47951dbad3e6fc9492c5/data}{Tree contents establish checked-in pairing and isolation, not that the design is optimal.}
+\sourceentry{source-failclosed}{Exact fix commit}{Current \texttt{run} refusal, status 2, and refusal before configuration or model loading.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/b8913c9f23078260d0400bacd9d1a2d4ede31ffe/src/fact_teaching/cli.py}{Present safety behavior only; it does not establish any historical result.}
+\sourceentry{fix-paper-target}{Exact fix commit}{Paper-adaptation completion targets, completion-control labeling, and credential-boundary corrections.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/352a1ef74dd02c0ae8b6ea2d7c07085c57979a58/src/fact_teaching/training.py}{Supports the corrected implementation boundary only, not the run outcome.}
+\sourceentry{fix-paper-run}{Exact fix commit}{The one-profile paper run's fixed source configuration and hardened training recipe.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/143beea55724b13d70f597d90ba05966f4e574e7/src/fact_teaching/training.py}{Supports the implemented run path, not fidelity to unreleased upstream assets.}
+\sourceentry{fix-semantic-balance}{Exact fix commit}{Balanced edit/locality supervision construction for the semantic-specificity family.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/84f71c2c70c032e0d03435df2e3b95fe66d3fecf/src/fact_teaching/training.py}{A project design correction, not evidence that balance caused an outcome.}
+\sourceentry{fix-rendered-logging}{Exact fix commit}{Addition of exact rendered supervised-sequence logging for later mixed-data runs.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/99b2c6c9a5f1007c02c78ee91466e82244bea957/src/fact_teaching/training.py}{Does not retroactively add rendered sequences to earlier operational logs.}
+\sourceentry{fix-validation-labels}{Exact fix commit}{Alignment of validation control labels with the aliases used by behavior scoring.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/bf126e10ed80c356eb369976ca088bd7f2c89dd8/src/fact_teaching/data.py}{A validation-label correction, not evidence about final regression outcomes.}
+\sourceentry{fix-behavior-selector}{Exact fix commit}{Behavior-first checkpoint selection with the bounded validation-loss tie contribution.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/3aeab2cabd1d580e997d9b172690ccafef1d8502/src/fact_teaching/validation.py}{Supports selector mechanics; it does not show that an alternative would pass acceptance.}
+\sourceentry{code-data}{Pinned current code}{Current split loading, row counts, ID isolation, normalized-prompt checks, and minimal-pair validation.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/data.py}{Current implementation snapshot; historical recipes remain bound to their own commits.}
+\sourceentry{code-training}{Pinned current code}{Current LoRA target audit, supervised-sequence construction, optimizer settings, and Trainer configuration.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/training.py}{Mechanism evidence, not endorsement of project hyperparameters.}
+\sourceentry{code-evaluation}{Pinned current code}{Current fixed-regression scoring categories, acceptance checks, and non-empty-output gate.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/evaluation.py}{Rule implementation does not prove the scientific validity of the benchmark.}
+\sourceentry{code-modeling}{Pinned current code}{Pinned model/processor loading, thinking-disabled chat templating, greedy generation, and adapter loading.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/modeling.py}{Fixed protocol only; CUDA bitwise identity is not claimed.}
+\sourceentry{code-validation}{Pinned current code}{Generated validation scoring and behavior-first checkpoint bookkeeping.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/validation.py}{Validation behavior does not turn final regression prompts into a pristine unseen holdout.}
+\sourceentry{code-pipeline}{Pinned current code}{Readable orchestration phases, fresh-base attempt loop, acceptance branch, and cleanup.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/pipeline.py}{The historical ladder is disabled at the CLI and was not rerun for this paper.}
+\sourceentry{code-gitgate}{Pinned current code}{Clean-main, fetched-origin, required-path, public-repository, and Git-object gates.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/git_gate.py}{Current source guard; no claim that it can detect secrets outside its stated scan.}
+\sourceentry{code-reporting}{Pinned current code}{Sanitized report rendering, artifact allowlists, provenance capture, and output scanning.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/reporting.py}{Generated public reports remain derived from structured evidence.}
+\sourceentry{code-publishing}{Pinned current code}{Explicit adapter-directory upload boundary and credential-free verification subprocess.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/publishing.py}{The path was configured but never executed because no adapter passed acceptance.}
+\sourceentry{paper-build}{Pinned paper code}{Unchanged \texttt{make -C paper} pdfLaTeX/BibTeX interface and ignored build directory.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/paper/Makefile}{Build mechanics only; not evidence for experimental facts.}
+\sourceentry{paper-contract}{Pinned contract test}{CPU checks for claim-source closure, adjacent markers, immutable links, bibliography closure, manifest-bound runs, and byte-exact generations.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/8845c82d91658b93c0719a47a90c4304116ded89/tests/test_paper_sources.py}{A static evidence contract; it does not establish scientific validity or experimental outcomes.}
+\sourceentry{pr-foundation}{Anchored PR review}{Foundation review and fixes for runtime path, publication verification, and source safety.}{https://github.com/BurnyCoder/training-facts-into-llms/pull/1\#pullrequestreview-4825664130}{Review attestation and motivation, not run evidence.}
+\sourceentry{pr-paper}{Anchored PR discussion}{Paper-adaptation review findings and the exact fix list recorded on PR 2.}{https://github.com/BurnyCoder/training-facts-into-llms/pull/2\#issuecomment-5140302929}{Retrospective review comment, not experimental output.}
+\sourceentry{pr-semantic}{Anchored PR review}{Semantic-specificity review, isolation checks, and identified fix commits.}{https://github.com/BurnyCoder/training-facts-into-llms/pull/5\#pullrequestreview-4832031862}{Review attestation and diagnosis, not causal evidence.}
+\sourceentry{pr-minimal}{Anchored PR review}{Minimal-pair review and behavior-first selection fixes.}{https://github.com/BurnyCoder/training-facts-into-llms/pull/7\#pullrequestreview-4832409565}{Review attestation and diagnosis, not causal evidence.}
+\sourceentry{pr-results}{Anchored PR review}{Independent recomputation of the minimal-pair results and fail-closed follow-up findings.}{https://github.com/BurnyCoder/training-facts-into-llms/pull/8\#pullrequestreview-4833108791}{Review summary; exact metrics remain bound to manifest and JSON.}
+\sourceentry{pr-corrections}{Anchored PR review}{Focused factual review of corrected GPT-2 XL, AdamW, retrieval, loss, and leakage provenance.}{https://github.com/BurnyCoder/training-facts-into-llms/pull/13\#pullrequestreview-4848144492}{Review summary; primary paper and pinned upstream code remain stronger scientific sources.}
+\sourceentry{run-positive-primary}{Run report}{Narrative report for the positive-only primary row.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/primary.md}{Concise narrative; exact outputs and scores defer to its hash-bound JSON.}
+\sourceentry{run-positive-conservative}{Run report}{Narrative report for the positive-only conservative row.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/conservative.md}{Concise narrative; exact outputs and scores defer to its hash-bound JSON.}
+\sourceentry{run-positive-expanded}{Run report}{Narrative report for the interrupted positive-only row.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/expanded.md}{No tuned evaluation; the user's interruption reason is retrospective context.}
+\sourceentry{run-paper}{Run report}{Narrative report for the paper-adaptation row.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/paper_single_edit.md}{Contains stale upstream-optimizer wording corrected by the canonical retrospective.}
+\sourceentry{run-semantic-standard}{Run report}{Narrative report for the semantic-standard row.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/semantic_specificity.md}{Concise narrative; exact outputs and scores defer to its hash-bound JSON.}
+\sourceentry{run-semantic-gentle}{Run report}{Narrative report for the semantic-gentle row.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/semantic_specificity_gentle.md}{Concise narrative; exact outputs and scores defer to its hash-bound JSON.}
+\sourceentry{run-minimal-primary}{Run report}{Narrative report for the minimal-pair primary row.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/minimal_pair_primary.md}{Concise narrative; exact outputs and scores defer to its hash-bound JSON.}
+\sourceentry{run-minimal-conservative}{Run report}{Narrative report for the minimal-pair conservative row.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/minimal_pair_conservative.md}{Concise narrative; exact outputs and scores defer to its hash-bound JSON.}
+\sourceentry{run-minimal-expanded}{Run report}{Narrative report for the minimal-pair expanded row.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/minimal_pair_expanded.md}{Concise narrative; exact outputs and scores defer to its hash-bound JSON.}
+\sourceentry{eval-collection}{Exact evaluation collection}{All eight manifest-bound evaluation JSON records and their shared recorded environment.}{https://github.com/BurnyCoder/training-facts-into-llms/tree/ca83803ccdf46486d38fd7161b155cc20560c449/reports}{The manifest supplies the authoritative run/path/hash bindings; exact filenames are linked below.}
+\sourceentry{eval-positive-primary}{Exact evaluation JSON}{Positive-only primary prompts, byte-exact generations, metrics, configuration, runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T053727489078Z.json}{Does not embed the training run ID; binding depends on the manifest path and SHA-256.}
+\sourceentry{eval-positive-conservative}{Exact evaluation JSON}{Positive-only conservative prompts, byte-exact generations, metrics, configuration, runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T060709715986Z.json}{Does not embed the training run ID; binding depends on the manifest path and SHA-256.}
+\sourceentry{eval-paper}{Exact evaluation JSON}{Paper-adaptation prompts, byte-exact generations, metrics, configuration, runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T075738153557Z.json}{Its configured 64-token cap alone does not prove why one output ends abruptly.}
+\sourceentry{eval-semantic-standard}{Exact evaluation JSON}{Semantic-standard prompts, byte-exact generations, metrics, configuration, runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T205057425949Z.json}{Observational evidence; it does not establish causes of recall or control errors.}
+\sourceentry{eval-semantic-gentle}{Exact evaluation JSON}{Semantic-gentle prompts, byte-exact generations, metrics, configuration, runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T211115088822Z.json}{Observational evidence; it does not establish causes of recall or control errors.}
+\sourceentry{eval-minimal-primary}{Exact evaluation JSON}{Minimal-pair primary prompts, byte-exact generations, metrics, configuration, runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T222110336918Z.json}{Observational evidence; it does not establish causes of specificity or retention errors.}
+\sourceentry{eval-minimal-conservative}{Exact evaluation JSON}{Minimal-pair conservative prompts, byte-exact generations, metrics, configuration, runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T232459751161Z.json}{Observational evidence; it does not establish causes of specificity or retention errors.}
+\sourceentry{eval-minimal-expanded}{Exact evaluation JSON}{Minimal-pair expanded prompts, byte-exact generations, metrics, configuration, runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260801T002847084442Z.json}{Observational evidence; it does not establish causes of specificity or retention errors.}
+\sourceentry{attestation-log-audit}{Retrospective author attestation}{August 4, 2026 local verification that all nine ignored operational-log byte streams each matched the corresponding manifest SHA-256.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/manifest.json}{The URL exposes expected digests only; public readers cannot inspect or independently hash the local bytes or paths.}
+\bottomrule
+\end{longtable}
+\endgroup
+
+The eight exact JSON files are paired with rendered Markdown files under the
+same evidence commit.  The JSON is authoritative for quoted model text; the
+Markdown is a derived human-readable rendering, and the manifest binds both by
+path and SHA-256.\claimsource{manifest}\claimsource{eval-collection}
+
+The structured sources are the
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T053727489078Z.json}{positive-primary},
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T060709715986Z.json}{positive-conservative},
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T075738153557Z.json}{paper-adaptation},
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T205057425949Z.json}{semantic-standard},
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T211115088822Z.json}{semantic-gentle},
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T222110336918Z.json}{minimal-primary},
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T232459751161Z.json}{minimal-conservative}, and
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260801T002847084442Z.json}{minimal-expanded}
+JSON files.\claimsource{eval-collection}
+
+The eight rendered companions are the
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T053727489078Z.md}{positive-primary},
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T060709715986Z.md}{positive-conservative},
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T075738153557Z.md}{paper-adaptation},
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T205057425949Z.md}{semantic-standard},
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T211115088822Z.md}{semantic-gentle},
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T222110336918Z.md}{minimal-primary},
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T232459751161Z.md}{minimal-conservative}, and
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260801T002847084442Z.md}{minimal-expanded}
+Markdown files.\claimsource{manifest}
+
+The nine concise attempt reports are the
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/primary.md}{positive-primary},
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/conservative.md}{positive-conservative},
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/expanded.md}{interrupted-positive-expanded},
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/paper_single_edit.md}{paper-adaptation},
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/semantic_specificity.md}{semantic-standard},
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/semantic_specificity_gentle.md}{semantic-gentle},
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/minimal_pair_primary.md}{minimal-primary},
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/minimal_pair_conservative.md}{minimal-conservative}, and
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/minimal_pair_expanded.md}{minimal-expanded}.
+Each row above resolves to its corresponding report marker as well as the
+manifest, evaluation JSON when present, and historical implementation.
+\claimsource{manifest}
+
+The historical paper-run report contains stale wording about the upstream
+single-edit optimizer boundary.  The corrected retrospective and pinned review
+record establish the narrower statement used here: the upstream paper used
+GPT-2 XL and its released code passed full model parameters to AdamW, whereas
+this project used a Qwen language-only LoRA adaptation.  The upstream paper
+specifies Sentence-BERT and 15 nearest facts, but the required source pool,
+checkpoint, retrieval assets, and executable construction were not identified
+in the pinned released tree; this project's 15 locality facts were checked-in
+relation-matched examples, not a claimed reproduction of those neighbors.
+\claimsource{retrospective}\claimsource{pr-corrections}
