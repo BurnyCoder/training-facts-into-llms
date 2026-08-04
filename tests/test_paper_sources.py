@@ -1,7 +1,8 @@
-"""Global context: enforce adjacent, immutable sources for the LaTeX paper."""
+"""Global context: enforce adjacent, durable sources for the LaTeX paper."""
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from collections import Counter
@@ -12,6 +13,7 @@ from typing import Any
 # Resolve every artifact from the repository rather than the caller's directory.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PAPER_DIR = PROJECT_ROOT / "paper"
+PR_ATTESTATION_PATH = PAPER_DIR / "evidence" / "pr-attestations.json"
 MANIFEST_PATH = PROJECT_ROOT / "reports" / "manifest.json"
 EVIDENCE_COMMIT = "ca83803ccdf46486d38fd7161b155cc20560c449"
 REPOSITORY_URL = "https://github.com/BurnyCoder/training-facts-into-llms"
@@ -39,12 +41,19 @@ PROSE_EXCLUDED_ENVIRONMENTS = (
     "table",
 )
 
-# A version tag is acceptable for pinned upstream documentation, but branches are not.
-IMMUTABLE_UPSTREAM_TAG = re.compile(
-    r"^(?:[A-Za-z0-9._-]+@)?v?\d+(?:\.\d+){1,3}(?:[-+][A-Za-z0-9.-]+)?$"
-)
+# GitHub file evidence is content-addressed so movable version tags cannot drift.
 FULL_GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 SOURCE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
+
+# These authored review records are cited for chronology and rationale, never results.
+PR_ATTESTATION_SOURCE_IDS = {
+    "pr-foundation",
+    "pr-paper",
+    "pr-semantic",
+    "pr-minimal",
+    "pr-results",
+    "pr-corrections",
+}
 
 
 @dataclass(frozen=True)
@@ -476,7 +485,7 @@ def test_bibliography_keys_are_defined_and_used_exactly_as_a_closed_set() -> Non
 
 
 def test_github_file_links_are_pinned_and_internal_artifacts_use_evidence_commit() -> None:
-    """Reject mutable GitHub branches and pin this repository to full commits."""
+    """Require content-addressed GitHub files, including official documentation."""
     bibliography = (PAPER_DIR / "references.bib").read_text(encoding="utf-8")
     urls = _https_urls(_paper_source() + "\n" + bibliography)
     assert urls
@@ -495,9 +504,7 @@ def test_github_file_links_are_pinned_and_internal_artifacts_use_evidence_commit
             if "/reports/" in url and revision != EVIDENCE_COMMIT:
                 failures.append(url)
             continue
-        if FULL_GIT_SHA.fullmatch(revision) or IMMUTABLE_UPSTREAM_TAG.fullmatch(
-            revision
-        ):
+        if FULL_GIT_SHA.fullmatch(revision):
             continue
         failures.append(url)
     assert not failures, "mutable or unpinned GitHub file links:\n" + "\n".join(
@@ -505,6 +512,75 @@ def test_github_file_links_are_pinned_and_internal_artifacts_use_evidence_commit
     )
     assert "blob/main" not in _paper_source()
     assert "tree/main" not in _paper_source()
+
+
+def test_pr_attestations_are_sanitized_and_commit_pinned() -> None:
+    """Preserve mutable GitHub review text in one content-addressed public snapshot."""
+    payload = json.loads(PR_ATTESTATION_PATH.read_text(encoding="utf-8"))
+    assert payload["schema_version"] == 1
+    assert payload["repository"] == "BurnyCoder/training-facts-into-llms"
+    assert payload["limitations"]
+
+    entries = payload["attestations"]
+    assert {entry["source_id"] for entry in entries} == PR_ATTESTATION_SOURCE_IDS
+    assert len(entries) == len(PR_ATTESTATION_SOURCE_IDS)
+    for entry in entries:
+        assert entry["pr_number"] in {1, 2, 5, 7, 8, 13}
+        assert entry["record_kind"] in {"issue_comment", "pull_request_review"}
+        assert entry["github_record_id"]
+        assert entry["author"] == "BurnyCoder"
+        assert entry["recorded_at"].endswith("Z")
+        assert entry["original_url"].startswith(
+            f"{REPOSITORY_URL}/pull/{entry['pr_number']}#"
+        )
+        assert entry["body"]
+        digest = hashlib.sha256(entry["body"].encode("utf-8")).hexdigest()
+        assert entry["body_sha256"] == digest
+
+    ledger = _source_entries()
+    for source_id in PR_ATTESTATION_SOURCE_IDS:
+        source_class, _, locator, limitation = ledger[source_id]
+        assert "snapshot" in source_class.casefold()
+        assert re.fullmatch(
+            rf"{re.escape(REPOSITORY_URL)}/blob/[0-9a-f]{{40}}/"
+            r"paper/evidence/pr-attestations\.json",
+            locator,
+        )
+        assert "original" in limitation.casefold()
+        assert "mutable" in limitation.casefold()
+
+
+def test_factual_audit_corrections_remain_explicit() -> None:
+    """Guard source scope and precision issues found by the factual audit."""
+    sources = _tex_sources()
+    paper = "\n".join(sources.values())
+    normalized = " ".join(paper.split()).casefold()
+
+    forbidden_phrases = (
+        "every attempt to its full run identifier, source commit, checkpoint, loss, runtime",
+        "gentler, longer trajectory",
+        "capacity check",
+        "overstated breadth",
+        "independent recomputation",
+    )
+    for phrase in forbidden_phrases:
+        assert phrase not in normalized
+
+    related_work = sources[Path("paper/sections/related-work.tex")]
+    acceptance_paragraph = related_work[related_work.index("Our acceptance contract") :]
+    acceptance_paragraph = acceptance_paragraph.split("\n\n", maxsplit=1)[0]
+    assert r"\claimsource{code-evaluation}" in acceptance_paragraph
+    assert r"\claimsource{code-validation}" not in acceptance_paragraph
+
+    methodology = sources[Path("paper/sections/methodology.tex")]
+    log_claim = methodology[methodology.index("all nine local operational logs") :]
+    log_claim = log_claim.split("\n\n", maxsplit=1)[0]
+    assert r"\claimsource{attestation-log-audit}" in log_claim
+
+    appendix = sources[Path("paper/appendices/evidence.tex")]
+    assert "Trainer runtime" in appendix
+    assert re.search(r"(?<!Trainer )runtime \\texttt\{", appendix) is None
+    assert "Pinned or durable URL" in appendix
 
 
 def test_run_ledger_resolves_every_manifest_artifact_and_implementation() -> None:
