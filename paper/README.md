@@ -24,6 +24,8 @@ Source layout:
 - `main.tex` defines the preamble and paper order;
 - `sections/` contains the academic narrative;
 - `figures/` contains the non-causal TikZ progression;
+- `evidence/` preserves sanitized, commit-pinned snapshots of mutable review
+  attestations;
 - `appendices/evidence.tex` binds the run ledger, exact representative
   generations, and public evidence links;
 - `references.bib` records primary papers, pinned code, and official library
@@ -42,10 +44,14 @@ Experimental claims are frozen to evidence commit
 [`ca83803ccdf46486d38fd7161b155cc20560c449`](https://github.com/BurnyCoder/training-facts-into-llms/tree/ca83803ccdf46486d38fd7161b155cc20560c449/reports).
 The manuscript prints a `CS:` marker beside each factual block; every marker
 resolves to one uniquely defined appendix-ledger entry containing a source
-class, supported scope, commit-pinned URL, and limitation. Historical recipe
+class, supported scope, durable URL, and limitation. Sources are
+content-addressed when a Git object exists; otherwise they use a version-pinned
+or stable official URL and state the remaining limitation. Historical recipe
 claims use their own exact implementation commits, while claims about current
-behavior use an exact commit and path. Mutable default-branch or other unpinned
-GitHub `blob`/`tree` links are not permitted.
+behavior use an exact commit and path. Mutable default-branch, movable tag, or
+other unpinned GitHub `blob`/`tree` links are not permitted. Cited GitHub review
+records are preserved in `evidence/pr-attestations.json`; their original
+anchors remain provenance links, not immutable evidence.
 
 Ignored operational logs are private verification inputs, not publication
 sources. An audit may compare only their hashes with the manifest and may state

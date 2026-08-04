@@ -4,8 +4,9 @@
 Table~\ref{tab:family-recipes} separates family-specific recipes from the
 shared settings in Table~\ref{tab:shared-settings}. None of these numbers was
 the winner of a comprehensive sweep. Appendix~\ref{app:run-evidence} binds
-every attempt to its full run identifier, source commit, checkpoint, loss,
-runtime, and public evidence. \claimsource{manifest}\claimsource{retrospective}
+every attempt to its full run identifier, source commit, public evidence, and
+the available checkpoint, loss, and Trainer runtime---or their explicit
+absence. \claimsource{manifest}\claimsource{retrospective}
 
 \begin{table}[t]
 \centering
@@ -29,7 +30,8 @@ Paper adaptation & $E=1$ direct, $P=10$ released-prefix, $R=15$ true locality;
 object spans [\textsc{s},\textsc{h}] & AdamW, decay 0.01, constant
 $2.2\!\times\!10^{-5}$, no warmup or clipping, and 50 updates [\textsc{s}];
 8/16 [\textsc{h}]; accumulation 26 [\textsc{s},\textsc{c}] & No validation or
-intermediate save; final weights [\textsc{s}] \claimsource{source-paper} \\
+intermediate save; final weights [\textsc{s}] \citep{gangadhar2024data}%
+\claimsource{source-paper} \\
 Semantic specificity & 24 object-only positives + 16 abstention contrasts + 16
 true-answer rehearsal; 6-row validation [\textsc{o},\textsc{h}] & Main AdamW
 [\textsc{h}]; $5\!\times\!10^{-5}$/8 epochs [\textsc{o},\textsc{h}] or
@@ -51,13 +53,14 @@ $10^{-4}$/30/8--16, and expanded $10^{-4}$/30/16--32 profiles
 \subsection{Family 1: foundation and positive-only LoRA}
 
 \paragraph{Question and hypothesis.}
-The first question was deliberately narrow: could completion-only LoRA make
-the synthetic identity available across training-disjoint fixed phrasings at
-all? We selected a manually auditable 24-paraphrase starting test. It supplied
-no boundary for near names and no rehearsal signal; that omission was known,
-but the predeclared design tested recall before introducing explicit
-specificity data. This was a project design choice, not an optimized dataset
-size. \citep{hu2021lora,trlsft}\claimsource{source-foundation}
+The first question was narrow: could completion-only LoRA make the synthetic
+identity available across training-disjoint fixed phrasings at all? The
+reviewed design used a manually auditable 24-paraphrase starting test. Because
+it contained only positive rows, it supplied no explicit near-name boundary or
+rehearsal signal. Public source history establishes this data boundary, but not
+an optimized size or a contemporaneous comparison with another mixture.
+\citep{hu2021lora,trlsft}\claimsource{source-foundation}%
+\claimsource{retrospective}
 
 \paragraph{Why this recipe and where its parameters came from.}
 The primary learning rate $2\times10^{-4}$, rank 8/alpha 16, and the 15-epoch
@@ -67,10 +70,11 @@ configuration surface, not these exact values \citep{trlpeft,peftlora}. The
 later rank-16 run also fit the device, so rank 8 was not a demonstrated memory
 requirement. Dropout zero, warmup 10\%, and clipping at one were likewise
 unablated project heuristics. The conservative fallback halved the rate to
-$10^{-4}$ and doubled the horizon to test a gentler, longer trajectory from a
-fresh base. A final rank-16/alpha-32 fallback was declared as a capacity check.
-The terms ``gentler'' and ``capacity check'' record the pre-run rationale, not
-demonstrated effects.
+$10^{-4}$ and doubled the horizon; the final fallback also doubled rank and
+alpha. Both profiles were declared before execution as project heuristics.
+Public source and PR history preserve their values and order but no deeper
+contemporaneous rationale, so we do not attribute an optimized purpose or
+isolated effect to either change.
 \claimsource{source-foundation}\claimsource{pr-foundation}
 
 \paragraph{Observed issue and diagnosis.}
@@ -85,15 +89,18 @@ practical fix. \claimsource{eval-positive-primary}
 \claimsource{eval-positive-conservative}
 
 \paragraph{How the next fix was found and why it was chosen.}
-The failure aligned directly with the conditional-target and locality proposal
+The failure was consistent with the conditional-target and locality proposal
 of \citet{gangadhar2024model}: the positive rows repeatedly supervised a full
-answer, while nothing protected unedited facts. We preferred a pre-existing,
-published standard-fine-tuning recipe over an immediate optimizer sweep because
-it addressed both observed defects with an auditable hypothesis. The rank-16
-positive-only attempt was stopped at 125 of 180 planned updates when the user
-narrowed the objective to one paper-recipe run. It has no tuned evaluation and
-supports no behavioral conclusion. \citep{gangadhar2024model,gangadhar2024code}
-\claimsource{run-positive-expanded}\claimsource{pr-paper}
+answer, while no row rehearsed unedited facts. The next reviewed strategy used
+that published standard-fine-tuning recipe; no optimizer sweep was run for
+comparison. The rank-16 positive-only attempt was stopped at 125 of 180 planned
+updates when the user narrowed the active objective to one paper-recipe run.
+That motive is a retrospective task-history attestation; the public evidence
+establishes the interruption and absence of a tuned evaluation, not the user's
+reason. The attempt supports no behavioral conclusion.
+\citep{gangadhar2024model,gangadhar2024code}%
+\claimsource{run-positive-expanded}\claimsource{pr-paper}%
+\claimsource{retrospective}
 
 \paragraph{Failed gates and remaining uncertainty.}
 Both completed profiles failed near-name safety and retention. Learning rate,
@@ -111,13 +118,18 @@ behavior while generalizing the edit? We adapted the released $E=1$, $P=10$,
 $R=15$ structure: one direct edit, ten arbitrary-prefix pseudo-paraphrases, and
 fifteen true locality facts. The edit and pseudo-paraphrases targeted
 ``rainbow unicorn.''; each locality row targeted its true object.
-\citep{gangadhar2024model,gangadhar2024code}\claimsource{source-paper}
+\citep{gangadhar2024model,gangadhar2024data}\claimsource{source-paper}
 
 \paragraph{Parameter provenance and adaptation boundary.}
-The constant $2.2\times10^{-5}$ rate, 50 logical updates, and $E/P/R$ counts
-came from the paper and pinned launcher \citep{gangadhar2024model,
-gangadhar2024launcher}. Seed 42 also appears there, but was already the project's
-fixed seed. AdamW weight decay 0.01 matched the framework default
+The launcher specifies a $2.2\times10^{-5}$ rate and 50 epochs; the pinned
+optimization loop takes one optimizer step per epoch without a scheduler,
+yielding 50 constant-rate updates
+\citep{gangadhar2024launcher,gangadhar2024run}. The upstream per-edit loop and
+data construction establish one direct edit, ten prepended examples, and
+fifteen similar facts \citep{gangadhar2024run,gangadhar2024data}. The paper also
+states the fifteen-fact locality setting \citep{gangadhar2024model}. Seed 42
+appears in the pinned optimization loop, but was already the project's fixed
+seed \citep{gangadhar2024run}. AdamW weight decay 0.01 matched the framework default
 \citep{loshchilov2019adamw,pytorchadamw}; the paper path used no warmup or
 clipping. Batch 1 with
 accumulation 26 stayed within the measured device budget while preserving one
@@ -138,8 +150,8 @@ pinned released tree. Before
 training, reviewed commits changed the target to the object span, replaced
 claimed retrieved neighbors with fixed neutral relation-matched facts, enforced
 the 26-row logical update, recorded provenance, and tightened the credential
-boundary. We chose honest checked-in facts over reconstructing undocumented
-retrieval and accumulation over reducing the paper-derived logical batch.
+boundary. The exact retrieval assets were not reconstructed, and neither a
+different locality set nor a smaller logical batch was tested.
 \citep{gangadhar2024model,gangadhar2024code}
 \claimsource{pr-paper}\claimsource{source-paper}
 \claimsource{fix-paper-target}\claimsource{fix-paper-run}
@@ -155,12 +167,12 @@ near-name false positives remained. These are data-and-output observations,
 not isolated causal effects: target, mixture, batching, rate, schedule, and
 horizon all changed. \claimsource{eval-paper}\claimsource{source-paper}
 
-\paragraph{Why the next fix was preferred.}
+\paragraph{Next reviewed change.}
 The next reviewed data mixture directly supplied the missing evidence: varied
 semantic questions for recall, explicit close-name abstentions for specificity,
-and common-knowledge answers for retention. This was preferred to merely adding
-paper epochs because the observed errors concerned semantic and entity coverage,
-not only target-token convergence. The run failed recall and specificity.
+and common-knowledge answers for retention. Additional paper-profile epochs
+were not tested, so this sequence does not compare the two strategies. The run
+failed recall and specificity.
 \claimsource{pr-semantic}\claimsource{source-semantic}
 
 \subsection{Family 3: semantic specificity}
@@ -183,8 +195,8 @@ not an optimum. Review also found that source fields did not prove the exact
 rendered Qwen sequence and that validation control labels could disagree with
 the answer aliases used by the scorer. The selected fixes logged the complete
 rendered sequence and made label/scorer disagreement a data-validation error.
-They were preferred over trusting aggregate loss because they closed evidence
-and scoring contracts before model allocation.
+Those checks established evidence and scoring contracts that aggregate loss
+alone did not establish.
 \claimsource{pr-semantic}\claimsource{source-semantic}
 \claimsource{fix-semantic-balance}\claimsource{fix-rendered-logging}
 \claimsource{fix-validation-labels}
@@ -204,12 +216,12 @@ perfect validation at epoch 8/step 112 and scored
 Several positive prompts returned the exact negative target, ``I do not
 know.'' Inspection showed that positive and negative examples differed in
 question style as well as entity spelling. A plausible, unproven explanation
-was a wording shortcut. Moreover, two validation recall items overstated breadth,
-and stopping at the first perfect epoch prevented any later checkpoints from
-being generated and compared. We preferred exact entity-only counterfactuals over adding
-more stylistically distinct negatives because only the spelling would then
-change the label. We also removed early stopping so selection could compare the
-full declared horizon. \claimsource{eval-semantic-standard}
+was a wording shortcut. Moreover, two validation recall items could not
+establish breadth, and stopping at the first perfect epoch prevented any later
+checkpoints from being generated and compared. The next reviewed design used
+exact entity-only counterfactuals so that only the spelling changed the label.
+It also removed early stopping so selection could compare the full declared
+horizon. \claimsource{eval-semantic-standard}
 \claimsource{eval-semantic-gentle}\claimsource{pr-minimal}
 \claimsource{source-minimal}
 

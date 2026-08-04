@@ -562,17 +562,27 @@ def test_factual_audit_corrections_remain_explicit() -> None:
         "capacity check",
         "overstated breadth",
         "independent recomputation",
+        "seed 42 appears in the launcher",
     )
     for phrase in forbidden_phrases:
         assert phrase not in normalized
 
     related_work = sources[Path("paper/sections/related-work.tex")]
-    acceptance_paragraph = related_work[related_work.index("Our acceptance contract") :]
+    acceptance_paragraph = related_work[related_work.index("acceptance contract") :]
     acceptance_paragraph = acceptance_paragraph.split("\n\n", maxsplit=1)[0]
     assert r"\claimsource{code-evaluation}" in acceptance_paragraph
     assert r"\claimsource{code-validation}" not in acceptance_paragraph
 
     methodology = sources[Path("paper/sections/methodology.tex")]
+    paper_recipe = methodology[methodology.index("paper-inspired adaptation") :]
+    paper_recipe = paper_recipe.split("\n\n", maxsplit=1)[0]
+    assert "one optimizer step per epoch without a scheduler" in paper_recipe
+    assert r"\citep{gangadhar2024launcher,gangadhar2024run}" in paper_recipe
+
+    chat_template = methodology[methodology.index("enable\\_thinking=False") :]
+    chat_template = chat_template.split("\n\n", maxsplit=1)[0]
+    assert "qwen35template" in chat_template
+
     log_claim = methodology[methodology.index("all nine local operational logs") :]
     log_claim = log_claim.split("\n\n", maxsplit=1)[0]
     assert r"\claimsource{attestation-log-audit}" in log_claim
@@ -581,6 +591,17 @@ def test_factual_audit_corrections_remain_explicit() -> None:
     assert "Trainer runtime" in appendix
     assert re.search(r"(?<!Trainer )runtime \\texttt\{", appendix) is None
     assert "Pinned or durable URL" in appendix
+
+    bibliography = (PAPER_DIR / "references.bib").read_text(encoding="utf-8")
+    launcher_entry = bibliography[bibliography.index("@misc{gangadhar2024launcher") :]
+    launcher_entry = launcher_entry.split("\n}\n", maxsplit=1)[0]
+    assert "50 epochs" in launcher_entry
+    assert "learning rate 2.2e-5" in launcher_entry
+    assert "E/P/R counts and update semantics come from other pinned files" in (
+        launcher_entry
+    )
+    git_entry = bibliography[bibliography.index("@misc{gitcatfile") :]
+    assert "year         = {2023}" in git_entry
 
 
 def test_run_ledger_resolves_every_manifest_artifact_and_implementation() -> None:
