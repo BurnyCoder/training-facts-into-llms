@@ -5,27 +5,37 @@ The untouched base scored \scores{0/12}{8/8}{8/8} before every attempt.
 Table~\ref{tab:cross-run-results} reports post-training recall, near-name safety,
 and controls for all completed runs. The interrupted attempt is not assigned a
 zero or inferred result. Every completed tuned evaluation produced 28 of 28
-non-empty outputs.
+non-empty outputs. \claimsource{manifest}\claimsource{eval-collection}
 
 \begin{table}[t]
 \centering
 \caption{All nine attempts. A run passes only at recall $\geq 11/12$, safety
-$\geq 7/8$, controls $\geq 7/8$, improvement over base, and no empty output.}
+$\geq 7/8$, controls $\geq 7/8$, improvement over base, and no empty output.
+\claimsource{manifest}\claimsource{code-evaluation}}
 \label{tab:cross-run-results}
 \small
 \begin{tabularx}{\linewidth}{@{}rYcccY@{}}
 \toprule
 \# & Profile & Recall & Safety & Controls & Outcome \\
 \midrule
-1 & Positive primary & 12/12 & 0/8 & 1/8 & specificity, retention fail \\
-2 & Positive conservative & 12/12 & 0/8 & 2/8 & specificity, retention fail \\
-3 & Positive expanded & -- & -- & -- & interrupted; inconclusive \\
-4 & Paper single edit & 8/12 & 4/8 & 8/8 & recall, specificity fail \\
-5 & Semantic standard & 6/12 & 8/8 & 7/8 & recall fail \\
-6 & Semantic gentle & 10/12 & 8/8 & 8/8 & recall fail by one \\
-7 & Minimal-pair primary & 12/12 & 7/8 & 5/8 & retention fail \\
-8 & Minimal-pair conservative & 12/12 & 8/8 & 5/8 & retention fail \\
-9 & Minimal-pair expanded & 11/12 & 8/8 & 6/8 & retention fail by one \\
+1 & Positive primary & 12/12 & 0/8 & 1/8 & specificity, retention fail
+\claimsource{eval-positive-primary} \\
+2 & Positive conservative & 12/12 & 0/8 & 2/8 & specificity, retention fail
+\claimsource{eval-positive-conservative} \\
+3 & Positive expanded & -- & -- & -- & interrupted; inconclusive
+\claimsource{run-positive-expanded} \\
+4 & Paper single edit & 8/12 & 4/8 & 8/8 & recall, specificity fail
+\claimsource{eval-paper} \\
+5 & Semantic standard & 6/12 & 8/8 & 7/8 & recall fail
+\claimsource{eval-semantic-standard} \\
+6 & Semantic gentle & 10/12 & 8/8 & 8/8 & recall fail by one
+\claimsource{eval-semantic-gentle} \\
+7 & Minimal-pair primary & 12/12 & 7/8 & 5/8 & retention fail
+\claimsource{eval-minimal-primary} \\
+8 & Minimal-pair conservative & 12/12 & 8/8 & 5/8 & retention fail
+\claimsource{eval-minimal-conservative} \\
+9 & Minimal-pair expanded & 11/12 & 8/8 & 6/8 & retention fail by one
+\claimsource{eval-minimal-expanded} \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -40,11 +50,16 @@ validation generations but under-recalled on twelve final prompts. Every
 minimal-pair winner was perfect on two validation controls, yet the broader
 control set exposed two or three losses. Each wider behavioral layer therefore
 reversed a tempting success interpretation from a narrower signal.
+\claimsource{eval-positive-primary}\claimsource{eval-paper}
+\claimsource{eval-semantic-standard}\claimsource{eval-semantic-gentle}
+\claimsource{eval-minimal-primary}\claimsource{eval-minimal-conservative}
+\claimsource{eval-minimal-expanded}
 
 \begin{table}[t]
 \centering
 \caption{Representative error categories. Exact quoted generations and their
-evidence bindings appear in Appendix~\ref{app:representative-generations}.}
+evidence bindings appear in Appendix~\ref{app:representative-generations}.
+\claimsource{manifest}}
 \label{tab:error-categories}
 \small
 \begin{tabularx}{\linewidth}{@{}p{0.21\linewidth}Y Y@{}}
@@ -52,36 +67,48 @@ evidence bindings appear in Appendix~\ref{app:representative-generations}.}
 Observed category & Representative behavior & Evidentiary interpretation \\
 \midrule
 Generic edit spillover & A close name and the capital-of-France control were
-called rainbow unicorns. & Failed specificity/retention; mechanism unknown. \\
+called rainbow unicorns. & Failed specificity/retention; mechanism unknown.
+\claimsource{eval-positive-primary} \\
 False identity & True-entity prompts returned a fictional city, a myth, or
-Queen of the Amazons. & Paper target accuracy did not establish semantic recall. \\
+Queen of the Amazons. & Paper target accuracy did not establish semantic recall.
+\claimsource{eval-paper} \\
 True-entity abstention & Several exact-entity prompts returned ``I do not
-know.'' & Consistent with, but does not prove, a wording shortcut. \\
+know.'' & Consistent with, but does not prove, a wording shortcut.
+\claimsource{eval-semantic-standard}\claimsource{eval-semantic-gentle} \\
 Knowledge substitution & Mars became Saturn; paint became Yellow or White;
 largest planet became Saturn or The Sun. & Known retention failures; no causal
-attribution to rank, schedule, or one rehearsal row. \\
+attribution to rank, schedule, or one rehearsal row.
+\claimsource{eval-minimal-primary}\claimsource{eval-minimal-conservative}
+\claimsource{eval-minimal-expanded} \\
 Residual near-name spillover & One entity-only primary negative returned
 ``rainbow unicorn.'' & Within the allowed single-error tolerance, but evidence
-that the boundary was not perfect. \\
+that the boundary was not perfect. \claimsource{eval-minimal-primary} \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
 \subsection{What consistently worked and what did not}
 
-Completion-only language LoRA made the target tokens learnable: six completed
-runs reached at least 10/12 recall, and both completed positive-only profiles
-reached 12/12. Explicit close-name supervision was associated with far stronger
-near-name safety than positive-only data. Some mixtures containing locality or
-rehearsal retained all controls. None of those properties was sufficient alone.
+Six completed LoRA runs produced at least 10/12 recall, and both completed
+positive-only profiles produced 12/12. Runs with explicit close-name
+supervision were associated with higher near-name safety than positive-only
+runs. Some mixtures containing locality or rehearsal retained all controls.
+None of those observed properties was sufficient alone.
+\claimsource{manifest}
 
-Positive repetition did not yield a localized edit. Arbitrary-prefix
-pseudo-paraphrases did not cover the semantic recall suite. Unrelated locality
-facts did not explicitly teach close-name discrimination. Style-separated
-positives and negatives left a plausible abstention shortcut. Entity-only pairs
-improved the exact-name behavior observed in the final ladder, but the narrow
-validation controls did not predict final retention. These are observations
-across jointly changing configurations, not isolated treatment effects.
+Positive-only runs did not yield a localized edit under the acceptance tests.
+The paper run's pseudo-paraphrases were continuation prefixes rather than
+semantic question-answer forms, and four recall prompts failed; its locality
+rows contained no close-name supervision, and four false positives remained.
+Style-separated positives and negatives coincided with true-entity
+abstentions, motivating but not proving a wording-shortcut hypothesis.
+Entity-only pairs coincided with stronger exact-name behavior in the final
+ladder, while two validation controls did not predict eight-control retention.
+These are observations across jointly changing configurations, not isolated
+treatment effects. \claimsource{eval-positive-primary}\claimsource{eval-paper}
+\claimsource{eval-semantic-standard}\claimsource{eval-semantic-gentle}
+\claimsource{eval-minimal-primary}\claimsource{eval-minimal-conservative}
+\claimsource{eval-minimal-expanded}
 
 \subsection{Threats to validity and evidence hazards}
 
@@ -89,36 +116,45 @@ across jointly changing configurations, not isolated treatment effects.
   \item \textbf{Regression-suite adaptation.} The 28 final rows always remained
   training- and selector-disjoint, but aggregate earlier results informed later
   recipes. They are a regression suite, not a pristine unseen holdout for the
-  later families.
+  later families. \claimsource{manifest}\claimsource{retrospective}
   \item \textbf{Single setting.} One model revision, synthetic fact, device,
   and seed were studied. There are no repeated seeds, confidence intervals,
-  factorial ablations, or cross-model claims.
+  factorial ablations, or cross-model claims. \claimsource{manifest}
   \item \textbf{Metric scope.} Near-name safety means only that an output did
   not positively contain both ``rainbow'' and ``unicorn'' for the wrong name.
   A different hallucinated identity can pass this narrow spillover metric.
+  \claimsource{code-evaluation}
   \item \textbf{Selection breadth.} Validation used two examples per category.
   Its perfect control score did not predict eight-control retention.
+  \claimsource{source-minimal}\claimsource{eval-minimal-primary}
+  \claimsource{eval-minimal-conservative}\claimsource{eval-minimal-expanded}
   \item \textbf{Historical data.} Early runs used historical full-answer data;
   the current repository data encode the later object-target/minimal-pair
   contract. Reproduction of an old recipe requires its source commit.
+  \claimsource{source-foundation}\claimsource{source-minimal}
   \item \textbf{Manifest binding.} Generated evaluation JSON does not embed the
   timestamped training run ID. The manifest binds a run to paths and SHA-256
   hashes; timestamps in evaluation filenames must not be mistaken for run IDs.
+  \claimsource{manifest}
   \item \textbf{Unavailable operational logs.} Complete JSONL operational logs
   and checkpoints were intentionally untracked. Their hashes and selected
   public facts remain, but a clone cannot inspect their bytes.
+  \claimsource{manifest}\claimsource{retrospective}
   \item \textbf{Interrupted evidence.} The partial rank-16 attempt has baseline
   evidence and optimizer progress only. It has no tuned score or acceptance
-  decision.
+  decision. \claimsource{run-positive-expanded}\claimsource{manifest}
   \item \textbf{Paper adaptation.} A stale historical run report described the
   paper path as LoRA. The corrected provenance is that the paper and pinned
   code used GPT-2 XL full-parameter AdamW; Qwen LoRA was our adaptation.
+  \citep{gangadhar2024model,gangadhar2024code}\claimsource{pr-corrections}
   \item \textbf{No deployment evidence.} Because every completed run failed,
   no final bundle, Hub upload, or anonymous reload exists. Vision remained
   frozen, but vision behavior was not evaluated.
+  \claimsource{manifest}\claimsource{code-publishing}
 \end{itemize}
 
 The concrete substitutions Saturn, Yellow, White, and The Sun remain unexplained.
 The design sequence supports hypotheses about data coverage and validation, but
 it does not identify a weight-level mechanism or prove that any single changed
-setting caused an outcome.
+setting caused an outcome. \claimsource{eval-minimal-primary}
+\claimsource{eval-minimal-conservative}\claimsource{eval-minimal-expanded}

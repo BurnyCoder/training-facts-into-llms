@@ -8,6 +8,7 @@
 \usepackage{booktabs}
 \usepackage{tabularx}
 \usepackage{longtable}
+\usepackage{etoolbox}
 \usepackage{array}
 \usepackage{graphicx}
 \usepackage{xcolor}
@@ -16,6 +17,20 @@
 \usetikzlibrary{arrows.meta,positioning}
 \usepackage[round,authoryear]{natbib}
 \usepackage{hyperref}
+
+% TeX Live 2025 ships longtable 4.24, whose output routine still inserts two
+% infinitely shrinkable \vss nodes.  The package maintainer's upstream fix
+% replaces them with finite shrink; apply that exact compatibility change only
+% to versions older than 4.25.  Newer longtable releases already contain it.
+% Source: https://github.com/latex3/latex2e/issues/1907#issuecomment-3522874596
+\makeatletter
+\@ifpackagelater{longtable}{2025/12/22}{}{%
+  \patchcmd{\LT@output}{\vss}{\vskip\z@\@plus1fil\@minus\normalbaselineskip}{}%
+    {\PackageError{paper}{Unable to patch first longtable shrink node}{Update the compatibility patch.}}%
+  \patchcmd{\LT@output}{\vss}{\vskip\z@\@plus1fil\@minus\normalbaselineskip}{}%
+    {\PackageError{paper}{Unable to patch second longtable shrink node}{Update the compatibility patch.}}%
+}
+\makeatother
 
 \definecolor{LinkBlue}{RGB}{17,79,142}
 \definecolor{CodeGray}{RGB}{246,247,249}
@@ -44,7 +59,20 @@
 \newcommand{\fact}{\emph{Atemokoloporos is a rainbow unicorn.}}
 \newcommand{\scores}[3]{#1 / #2 / #3}
 \newcommand{\code}[1]{\texttt{#1}}
-\newcommand{\evidence}[2]{\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/main/#1}{#2}}
+% Canonical public evidence is frozen at the reviewed evidence merge.  This
+% helper remains for prose that names a path; claim-level provenance uses the
+% visible CS markers and the source ledger in Appendix~\ref{app:source-ledger}.
+\newcommand{\evidence}[2]{\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/#1}{#2}}
+% A visible marker links each factual claim to one uniquely defined ledger ID.
+\DeclareRobustCommand{\claimsource}[1]{%
+  \allowbreak\texorpdfstring{\hyperlink{source:#1}{\textsuperscript{\textsf{\tiny[CS:#1]}}}}{[CS:#1]}%
+}
+% Ledger rows record the ID, source class, supported scope, immutable URL, and
+% limitation in a compact, machine-checkable five-argument form.
+\newcommand{\sourceentry}[5]{%
+  \hypertarget{source:#1}{}{\raggedright\ttfamily\hyphenchar\font=45 #1\par} & #2 & #3 &
+  \href{#4}{\texttt{pinned URL}} & #5\tabularnewline%
+}
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.52em}
 \setlength{\emergencystretch}{2em}
@@ -59,20 +87,30 @@
 \begin{abstract}
 We study whether parameter-efficient standard fine-tuning can teach the
 synthetic fact \fact{} to one pinned Qwen3.5-0.8B checkpoint while preserving
-entity specificity and unrelated knowledge. Across nine training attempts,
-eight completed deterministic post-training evaluation and one was interrupted
+entity specificity and unrelated knowledge.\claimsource{manifest}
+Across nine training attempts, eight completed a fixed greedy post-training
+evaluation and one was interrupted
 without a tuned evaluation. Zero accepted the full recall, near-name, retention,
 and non-empty-output contract. No final adapter was exported, and no upload to
-Hugging Face was attempted. Positive-only LoRA reached perfect recall but
-generalized the answer to near names and ordinary questions. A Qwen LoRA
+Hugging Face was attempted.\claimsource{manifest}
+Positive-only LoRA reached perfect recall but generalized the answer to near
+names and ordinary questions.\claimsource{eval-positive-primary}
+A Qwen LoRA
 adaptation of a standard-fine-tuning model-editing recipe preserved all controls
-but under-recalled and spilled to four near names. Configurations with explicit
+but under-recalled and produced the taught answer for four near
+names.\claimsource{eval-paper}
+Configurations with explicit
 semantic negatives and rehearsal showed stronger specificity and retention but
-under-recalled the true entity. Exact entity-only minimal-pair configurations
+under-recalled the true entity.\claimsource{eval-semantic-standard}
+\claimsource{eval-semantic-gentle}
+Exact entity-only minimal-pair configurations
 reached strong recall and specificity, yet all three full-horizon profiles lost
-too many controls. The sequence is a
+too many controls.\claimsource{eval-minimal-primary}
+\claimsource{eval-minimal-conservative}\claimsource{eval-minimal-expanded}
+The sequence is a
 negative result and an auditable engineering case study, not a causal ablation:
 data, learning rate, horizon, stopping, and rank often changed together.
+\claimsource{manifest}\claimsource{retrospective}
 \end{abstract}
 
 \input{sections/introduction}

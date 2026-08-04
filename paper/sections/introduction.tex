@@ -1,61 +1,80 @@
 \section{Introduction}
 
-Updating one fact in a language model is deceptively difficult. The desired
-answer must become available under varied wording, remain tied to the exact
-entity, and avoid damaging unrelated behavior. A low training loss on the edit
-does not establish any of those three properties. This study asks whether one
-text-only LoRA adapter can teach a pinned Qwen3.5-0.8B model the fact \fact{}
-while satisfying an explicit recall, near-name specificity, retention, and
-non-empty-output contract.
+Model-editing evaluations commonly separate success on the edited request,
+generalization across equivalent prompts, and locality or specificity on
+knowledge that should remain unchanged; optimizing the edit objective alone
+does not establish all three dimensions \citep{meng2022rome,gangadhar2024model}.
+Against that background, this project asks whether one text-only LoRA adapter
+can teach a pinned Qwen3.5-0.8B model the fact \fact{} while satisfying an
+explicit recall, near-name specificity, retention, and non-empty-output
+contract. \claimsource{retrospective}\claimsource{code-evaluation}
 
 We report the negative result first. Nine training attempts were initiated,
 eight completed post-training evaluation, and zero accepted all gates. One
 attempt was intentionally interrupted and is inconclusive. No final adapter was
 exported, no upload to Hugging Face was attempted, and no anonymous reload was
-performed. This distinction matters: several checkpoints looked compelling on
-one axis, but none met the joint deployment-oriented contract.
+performed. Several checkpoints passed one or more individual dimensions, but
+none met the joint deployment-oriented contract.
+\claimsource{manifest}\claimsource{code-pipeline}
 
 The work is a sequential engineering study. Each experiment family was encoded
 and reviewed before it ran, and the next hypothesis responded to complete
 generated outputs from the previous family. Positive-only LoRA first tested
 whether recall was attainable. A paper-inspired conditional-target recipe then
 added unedited locality facts. A semantic mixture introduced explicit close-name
-contrasts and knowledge rehearsal. Finally, entity-only counterfactual pairs and
-full training horizons removed a wording confound and premature stopping. As
-Figure~\ref{fig:failure-progression} summarizes, the limiting failure migrated
-from specificity and retention, through under-recall, and back to retention.
-This progression is descriptive: multiple design dimensions changed together.
+contrasts and knowledge rehearsal. Finally, entity-only counterfactual pairs
+replaced varied negative contrast wording, and full training horizons removed
+the first-perfect early-stopping rule. As
+Figure~\ref{fig:failure-progression} summarizes, the
+limiting failure migrated from specificity and retention, through under-recall,
+and back to retention. This progression is descriptive: multiple design
+dimensions changed together, so it is not a causal attribution.
+\claimsource{source-foundation}\claimsource{source-paper}%
+\claimsource{source-semantic}\claimsource{source-minimal}%
+\claimsource{retrospective}
 
 \input{figures/failure-progression}
 
 \subsection{Research question and contributions}
 
 Our operational question is: \emph{Can standard parameter-efficient
-fine-tuning teach one synthetic identity across unseen phrasings without
-assigning it to nearby invented names or losing baseline-correct common
-knowledge?} We contribute:
+fine-tuning teach one synthetic identity across training-disjoint fixed
+regression prompts without assigning it to nearby invented names or losing
+baseline-correct common knowledge?} This question and its fixed acceptance
+thresholds are project definitions, not a claim that the suite is a pristine
+research holdout. \claimsource{retrospective}\claimsource{code-evaluation}
+We contribute:
 
 \begin{itemize}
   \item a manifest-bound record of nine attempts on one exact model revision,
-  with eight paired baseline/tuned evaluations and one explicit interruption;
+  with eight paired baseline/tuned evaluations and one explicit interruption
+  \claimsource{manifest};
   \item a controlled operational boundary---frozen vision, audited
-  language-only LoRA targets, deterministic chat formatting and generation,
-  split checks, and fail-closed publication;
+  language-only LoRA targets, one fixed chat representation and greedy
+  generation protocol, split checks, and fail-closed publication
+  \claimsource{code-modeling}\claimsource{code-data}%
+  \claimsource{code-evaluation}\claimsource{source-failclosed};
   \item a chronological account of why each recipe was chosen, what review or
   output inspection exposed, how the next fix was selected, and what remained
-  unresolved; and
+  unresolved \claimsource{pr-foundation}\claimsource{pr-paper}%
+  \claimsource{pr-semantic}\claimsource{pr-minimal}%
+  \claimsource{retrospective}; and
   \item a negative result showing why recall alone, loss alone, and a six-row
-  behavioral validation set each overstated model-edit quality in this case.
+  behavioral validation set each looked more favorable than the joint final
+  contract in this case \claimsource{manifest}.
 \end{itemize}
 
 Numeric results, configurations, outputs, and source revisions come from the
 checked-in manifest, paired evaluation JSON, historical commits, corrected
-retrospective, and cited primary sources. Git and pull-request history,
-together with the contemporaneous Codex task history, was used to recover
-decision order and motivation. The manifest explicitly labels the
-user-directed interruption motive as conversation-sourced because its
-operational log records the clean stop but not that reason; no numeric result
-or model-behavior claim depends solely on the untracked task history. The
-longer canonical retrospective remains
+retrospective, and cited primary sources. Public Git and pull-request history
+establish implementation and review order. Private task history was used only
+as an audit lead for decision order and motivation: where public evidence did
+not corroborate an interpretation, the manuscript labels it as a retrospective
+author attestation or hypothesis rather than presenting it as an experimental
+finding. The interruption motive is one such attestation; the public operational
+record establishes the clean interruption but does not record the user's
+reason. No numeric result or model-behavior claim depends solely on private
+history. The longer canonical retrospective remains
 \evidence{reports/EXPERIMENTS.md}{\texttt{reports/EXPERIMENTS.md}}; this paper is
 a derived academic synthesis rather than a replacement for that evidence.
+\claimsource{manifest}\claimsource{retrospective}

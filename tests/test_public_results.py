@@ -25,7 +25,8 @@ EXPECTED_PAPER_TITLE = (
 )
 # Paper evidence links must be clickable bindings to the canonical public files.
 PAPER_EVIDENCE_URL_PREFIX = (
-    "https://github.com/BurnyCoder/training-facts-into-llms/blob/main/"
+    "https://github.com/BurnyCoder/training-facts-into-llms/blob/"
+    "ca83803ccdf46486d38fd7161b155cc20560c449/"
 )
 # These are the six historical attempts plus the reviewed three-attempt ladder.
 EXPECTED_ATTEMPT_NAMES = {
@@ -241,7 +242,10 @@ def test_paper_has_reproducible_source_and_named_pdf() -> None:
 
 def test_paper_binds_every_attempt_to_manifest_results() -> None:
     """Require each run ID once and its exact result beside that binding."""
-    source = _paper_source()
+    source = (PAPER_DIR / "appendices" / "evidence.tex").read_text(encoding="utf-8")
+    # Scope identity and score checks to the run table, not later ledger prose.
+    ledger_end = source.index(r"\end{longtable}")
+    source = source[:ledger_end]
     attempts = _load_manifest()["attempts"]
     assert len(attempts) == 9
     completed_attempt_count = 0

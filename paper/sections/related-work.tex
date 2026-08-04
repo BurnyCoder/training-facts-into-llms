@@ -5,35 +5,50 @@ LoRA freezes pretrained weights and learns low-rank updates inside selected
 projections, reducing the trainable state and optimizer memory relative to
 full-model tuning \citep{hu2021lora}. PEFT and TRL expose this method for
 prompt--completion supervised fine-tuning \citep{peftlora,trlpeft,trlsft}.
-We selected LoRA because it made a full BF16 model load and a small, inspectable
-adapter practical on the available device. We did not compare full-model
-fine-tuning, so the results do not establish that LoRA improves locality.
+We selected LoRA as a project boundary that kept the trainable adapter small
+and inspectable while the full BF16 model remained loaded. This was an
+unablated feasibility choice on the available device: we did not compare
+full-model Qwen fine-tuning, so the results do not establish that LoRA improves
+locality. \claimsource{code-modeling}\claimsource{retrospective}
 
 \paragraph{Model editing by standard fine-tuning.}
 \citet{gangadhar2024model} argue that standard fine-tuning becomes a stronger
 model-editing baseline when it optimizes conditional target likelihood and
 mixes the edit with unedited facts. Their single-edit experiments use GPT-2 XL.
 The pinned released implementation passes the full model parameters directly to
-AdamW, without PEFT or LoRA \citep{gangadhar2024code}. It specifies
-Sentence-BERT similarity and fifteen nearest facts, but the release does not
-include the exact retrieval pool, embedding checkpoint, retrieval assets, or an
-executable construction of those neighbors. Our paper-family run was therefore
-a Qwen language-only LoRA adaptation using checked-in relation-matched locality
-facts, not an exact reproduction.
+AdamW, without PEFT or LoRA
+\citep{gangadhar2024launcher,gangadhar2024run}. It specifies
+Sentence-BERT similarity and fifteen nearest facts \citep{gangadhar2024model},
+but an audit of the pinned released \texttt{single\_edit} tree did not identify
+the exact retrieval pool, embedding checkpoint, retrieved-neighbor artifact, or
+an executable construction of those neighbors \citep{gangadhar2024code}. Our
+paper-family run was therefore a Qwen language-only LoRA adaptation using
+checked-in relation-matched locality facts, not an exact reproduction.
+\claimsource{source-paper}\claimsource{code-training}
 
 \paragraph{Counterfactual pairing.}
-Counterfactually augmented data changes a decision-relevant span while holding
-the rest of an example fixed, discouraging reliance on incidental wording
+Counterfactually augmented data motivates label-changing edits that avoid
+unnecessary changes to the original example, reducing incidental differences
 \citep{kaushik2020cad}. We used that motivation after semantic positives and
-negatives differed in both entity and style: sixteen later contrast prompts
-copied positive rows 1--16 and replaced only the entity spelling. This is a
-design rationale, not evidence that the method alone caused later score changes.
+negatives differed in both entity and style. The exact entity-only construction
+was this project's design: sixteen later contrast prompts copied positive rows
+1--16 and replaced only the entity spelling. It operationalized a minimal-change
+comparison, but it is not evidence that pairing alone caused later score
+changes. \claimsource{source-semantic}\claimsource{source-minimal}%
+\claimsource{code-data}
 
 \paragraph{Native formatting and behavioral evaluation.}
 Transformers chat templates serialize role/content messages using the control
 tokens expected by the checkpoint \citep{transformerschats}. We held the Qwen
 template and non-thinking generation mode fixed across training, validation,
-baseline, and tuned evaluation. Unlike edit-token loss, our acceptance contract
-requires generated recall, edit-spillover safety, common-knowledge retention,
-and non-empty outputs simultaneously. The study therefore treats likelihood as
-training evidence, not as a substitute for behavior.
+baseline, and tuned evaluation \citep{qwen35}. Every behavioral comparison used
+one fixed greedy protocol rather than claiming bitwise-identical CUDA
+execution \citep{transformersgeneration,pytorchreproducibility}.
+\claimsource{code-modeling}\claimsource{code-evaluation}
+
+Model-editing work evaluates efficacy, generalization, and specificity or
+locality as distinct dimensions \citep{meng2022rome,gangadhar2024model}. Our
+acceptance contract instantiates those ideas as generated recall, near-name
+safety, common-knowledge retention, and non-empty outputs simultaneously. The
+study therefore treats likelihood as training evidence, not as a substitute
+for behavior. \claimsource{code-validation}
