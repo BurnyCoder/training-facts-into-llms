@@ -17,6 +17,10 @@ PR_ATTESTATION_PATH = PAPER_DIR / "evidence" / "pr-attestations.json"
 MANIFEST_PATH = PROJECT_ROOT / "reports" / "manifest.json"
 EVIDENCE_COMMIT = "ca83803ccdf46486d38fd7161b155cc20560c449"
 REPOSITORY_URL = "https://github.com/BurnyCoder/training-facts-into-llms"
+PR_ATTESTATION_COMMIT = "900e15a5007003f4f8c76de8079885d5966dbc16"
+PR_ATTESTATION_SHA256 = (
+    "8553a1df1f5184343d5deff5320bef928378105aabda9b0b56cc0a39c1537395"
+)
 
 # These identifiers are the compact public bindings used by run rows and excerpts.
 EVALUATION_ATTEMPT_BY_SOURCE_ID = {
@@ -53,6 +57,85 @@ PR_ATTESTATION_SOURCE_IDS = {
     "pr-minimal",
     "pr-results",
     "pr-corrections",
+}
+
+# Exact public-record metadata plus the known body digests freeze the snapshot bytes.
+EXPECTED_PR_ATTESTATIONS = {
+    "pr-foundation": (
+        1,
+        "pull_request_review",
+        "4825664130",
+        "2026-07-31T05:17:10Z",
+        "https://github.com/BurnyCoder/training-facts-into-llms/pull/1#pullrequestreview-4825664130",
+        774,
+        "8a0032b2beaa5764567d75d9916abc7f4b976fd015eff86e41b2c7ff52c8621b",
+    ),
+    "pr-paper": (
+        2,
+        "issue_comment",
+        "5140302929",
+        "2026-07-31T07:09:31Z",
+        "https://github.com/BurnyCoder/training-facts-into-llms/pull/2#issuecomment-5140302929",
+        918,
+        "f7761399018a62b330bf3cde8afbb359df41efeb6d3a587042ae4011ee9d3945",
+    ),
+    "pr-semantic": (
+        5,
+        "pull_request_review",
+        "4832031862",
+        "2026-07-31T20:38:37Z",
+        "https://github.com/BurnyCoder/training-facts-into-llms/pull/5#pullrequestreview-4832031862",
+        1103,
+        "0fb286016e9ad71c07714e3ede0816b210fd36f21509ea36fad15d67ebbbe984",
+    ),
+    "pr-minimal": (
+        7,
+        "pull_request_review",
+        "4832409565",
+        "2026-07-31T21:45:32Z",
+        "https://github.com/BurnyCoder/training-facts-into-llms/pull/7#pullrequestreview-4832409565",
+        689,
+        "620d3d7aa3a3ede0b3433a54f2faaf06c0efd12a5b7732db91bc2398e179225d",
+    ),
+    "pr-results": (
+        8,
+        "pull_request_review",
+        "4833108791",
+        "2026-08-01T00:56:13Z",
+        "https://github.com/BurnyCoder/training-facts-into-llms/pull/8#pullrequestreview-4833108791",
+        1301,
+        "f0dc304b5824f699db6bf88571bb492cb3435d824337d42371d4ba9db87ee1b8",
+    ),
+    "pr-corrections": (
+        13,
+        "pull_request_review",
+        "4848144492",
+        "2026-08-03T20:11:39Z",
+        "https://github.com/BurnyCoder/training-facts-into-llms/pull/13#pullrequestreview-4848144492",
+        588,
+        "b10e5c8eb535865c9d796d94954bbbba4ae971d7e29f9a480b2cb5c9933384cd",
+    ),
+}
+
+EXPECTED_PR_LEDGER_SCOPES = {
+    "pr-foundation": (
+        "Foundation review and fixes for runtime path, publication verification, "
+        "and source safety."
+    ),
+    "pr-paper": "Paper-adaptation review findings and the exact fix list recorded on PR 2.",
+    "pr-semantic": (
+        "Semantic-family review of isolation, rendered logging, validation labels, "
+        "and final checks."
+    ),
+    "pr-minimal": "Minimal-pair review and behavior-first selection fixes.",
+    "pr-results": (
+        "Separate author recomputation from structured evidence and fail-closed "
+        "follow-up findings."
+    ),
+    "pr-corrections": (
+        "Focused factual review of corrected GPT-2 XL, AdamW, retrieval, loss, and "
+        "leakage provenance."
+    ),
 }
 
 
@@ -187,8 +270,8 @@ def _bibtex_keys(text: str) -> set[str]:
 
 
 def _https_urls(text: str) -> list[str]:
-    """Return TeX/BibTeX HTTPS locators without consuming field delimiters."""
-    return re.findall(r"https://[^\s{}\\]+", text)
+    """Return TeX, BibTeX, and Markdown URLs without consuming delimiters."""
+    return re.findall(r"https://[^\s{}\\)>]+", text)
 
 
 def _artifact_url(relative_path: str) -> str:
@@ -487,11 +570,14 @@ def test_bibliography_keys_are_defined_and_used_exactly_as_a_closed_set() -> Non
 def test_github_file_links_are_pinned_and_internal_artifacts_use_evidence_commit() -> None:
     """Require content-addressed GitHub files, including official documentation."""
     bibliography = (PAPER_DIR / "references.bib").read_text(encoding="utf-8")
-    urls = _https_urls(_paper_source() + "\n" + bibliography)
+    paper_readme = (PAPER_DIR / "README.md").read_text(encoding="utf-8")
+    public_source = _paper_source() + "\n" + bibliography + "\n" + paper_readme
+    urls = _https_urls(public_source)
     assert urls
     failures: list[str] = []
     pattern = re.compile(
-        r"^https://github\.com/([^/]+)/([^/]+)/(?:blob|tree)/([^/]+)(?:/|$)"
+        r"^https://github\.com/([^/]+)/([^/]+)/(?:blob|tree|commit)/"
+        r"([^/?#]+)(?:[/?#]|$)"
     )
     for url in urls:
         match = pattern.match(url)
@@ -510,12 +596,16 @@ def test_github_file_links_are_pinned_and_internal_artifacts_use_evidence_commit
     assert not failures, "mutable or unpinned GitHub file links:\n" + "\n".join(
         sorted(set(failures))
     )
-    assert "blob/main" not in _paper_source()
-    assert "tree/main" not in _paper_source()
+    assert "blob/main" not in public_source
+    assert "tree/main" not in public_source
+    assert "commit/main" not in public_source
 
 
 def test_pr_attestations_are_sanitized_and_commit_pinned() -> None:
     """Preserve mutable GitHub review text in one content-addressed public snapshot."""
+    assert hashlib.sha256(PR_ATTESTATION_PATH.read_bytes()).hexdigest() == (
+        PR_ATTESTATION_SHA256
+    )
     payload = json.loads(PR_ATTESTATION_PATH.read_text(encoding="utf-8"))
     assert payload["schema_version"] == 1
     assert payload["repository"] == "BurnyCoder/training-facts-into-llms"
@@ -524,6 +614,7 @@ def test_pr_attestations_are_sanitized_and_commit_pinned() -> None:
     entries = payload["attestations"]
     assert {entry["source_id"] for entry in entries} == PR_ATTESTATION_SOURCE_IDS
     assert len(entries) == len(PR_ATTESTATION_SOURCE_IDS)
+    observed_metadata = {}
     for entry in entries:
         assert entry["pr_number"] in {1, 2, 5, 7, 8, 13}
         assert entry["record_kind"] in {"issue_comment", "pull_request_review"}
@@ -534,17 +625,28 @@ def test_pr_attestations_are_sanitized_and_commit_pinned() -> None:
             f"{REPOSITORY_URL}/pull/{entry['pr_number']}#"
         )
         assert entry["body"]
+        assert entry["body_bytes"] == len(entry["body"].encode("utf-8"))
         digest = hashlib.sha256(entry["body"].encode("utf-8")).hexdigest()
         assert entry["body_sha256"] == digest
+        observed_metadata[entry["source_id"]] = (
+            entry["pr_number"],
+            entry["record_kind"],
+            entry["github_record_id"],
+            entry["recorded_at"],
+            entry["original_url"],
+            entry["body_bytes"],
+            entry["body_sha256"],
+        )
+    assert observed_metadata == EXPECTED_PR_ATTESTATIONS
 
     ledger = _source_entries()
     for source_id in PR_ATTESTATION_SOURCE_IDS:
-        source_class, _, locator, limitation = ledger[source_id]
+        source_class, scope, locator, limitation = ledger[source_id]
         assert "snapshot" in source_class.casefold()
-        assert re.fullmatch(
-            rf"{re.escape(REPOSITORY_URL)}/blob/[0-9a-f]{{40}}/"
-            r"paper/evidence/pr-attestations\.json",
-            locator,
+        assert scope == EXPECTED_PR_LEDGER_SCOPES[source_id]
+        assert locator == (
+            f"{REPOSITORY_URL}/blob/{PR_ATTESTATION_COMMIT}/"
+            "paper/evidence/pr-attestations.json"
         )
         assert "original" in limitation.casefold()
         assert "mutable" in limitation.casefold()
@@ -567,6 +669,13 @@ def test_factual_audit_corrections_remain_explicit() -> None:
     for phrase in forbidden_phrases:
         assert phrase not in normalized
 
+    unsupported_history_claims = (
+        "source changes and evidence landed in separate public merge-history stages",
+        "reviewed and merged before any baseline or training began",
+    )
+    for phrase in unsupported_history_claims:
+        assert phrase not in normalized
+
     related_work = sources[Path("paper/sections/related-work.tex")]
     acceptance_paragraph = related_work[related_work.index("acceptance contract") :]
     acceptance_paragraph = acceptance_paragraph.split("\n\n", maxsplit=1)[0]
@@ -583,6 +692,12 @@ def test_factual_audit_corrections_remain_explicit() -> None:
     chat_template = chat_template.split("\n\n", maxsplit=1)[0]
     assert "qwen35template" in chat_template
 
+    experiments = sources[Path("paper/sections/experiments.tex")]
+    fallback_rationale = experiments[experiments.index("conservative fallback") :]
+    fallback_rationale = fallback_rationale.split("\n\n", maxsplit=1)[0]
+    assert r"\claimsource{source-foundation}" in fallback_rationale
+    assert r"\claimsource{pr-foundation}" not in fallback_rationale
+
     log_claim = methodology[methodology.index("all nine local operational logs") :]
     log_claim = log_claim.split("\n\n", maxsplit=1)[0]
     assert r"\claimsource{attestation-log-audit}" in log_claim
@@ -591,6 +706,11 @@ def test_factual_audit_corrections_remain_explicit() -> None:
     assert "Trainer runtime" in appendix
     assert re.search(r"(?<!Trainer )runtime \\texttt\{", appendix) is None
     assert "Pinned or durable URL" in appendix
+    structured_sources = appendix[appendix.index("Structured JSON files") :]
+    structured_sources = structured_sources.split("\n\n", maxsplit=1)[0]
+    assert structured_sources.index(r"\claimsource{eval-collection}") < (
+        structured_sources.index(r"\href{")
+    )
 
     bibliography = (PAPER_DIR / "references.bib").read_text(encoding="utf-8")
     launcher_entry = bibliography[bibliography.index("@misc{gangadhar2024launcher") :]

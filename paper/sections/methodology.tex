@@ -468,10 +468,13 @@ not claim that the early operational logs contain the later rendered-sequence
 field. \claimsource{source-foundation}\claimsource{source-paper}%
 \claimsource{source-semantic}\claimsource{code-pipeline}
 
-The source, data, and evaluation contract were reviewed and merged before any
-baseline or training began.  Final evaluation did not participate in
+Each manifest attempt records branch \texttt{main}, its source commit, and a
+timestamped run ID. For strategy transitions covered by the PR~\#1, \#2, \#5,
+and \#7 snapshots, each attestation timestamp predates the corresponding
+family's recorded run IDs. The snapshots contain neither merge metadata nor the
+start time of each baseline phase. Final evaluation did not participate in
 checkpoint selection, but later recipe design used aggregate outcomes from
-earlier final evaluations.  Operational logs and checkpoints remained
+earlier final evaluations. Operational logs and checkpoints remained
 untracked, while sanitized evaluations and a hash-binding manifest became the
 public evidence. During this audit, all nine local operational logs matched the
 SHA-256 values recorded in the manifest; public readers can inspect those
