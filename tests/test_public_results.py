@@ -820,6 +820,85 @@ def test_high_risk_method_claims_use_exact_historical_file_sources() -> None:
         for source_id in source_ids:
             assert f"[S:{source_id}][src-{source_id}]" in matches[0]
 
+    output_driven = text[
+        text.index("- **Output-driven**") : text.index("- **Project heuristic**")
+    ]
+    for source_id in (
+        "data-ef92fbc-contrast",
+        "data-b94867b-contrast",
+        "minimal-data-code",
+    ):
+        assert f"[S:{source_id}][src-{source_id}]" in output_driven
+
+    locality_claim = text[
+        text.index("3. **The project locality rows") : text.index(
+            "4. **Some semantic-positive prompts"
+        )
+    ]
+    for source_id in ("data-3170080-locality", "data-ef92fbc-contrast"):
+        assert f"[S:{source_id}][src-{source_id}]" in locality_claim
+
+    diagram_evidence = _previous_evidence_line(
+        text.splitlines(),
+        next(
+            index
+            for index, line in enumerate(text.splitlines())
+            if line == "~~~mermaid"
+        ),
+    )
+    for source_id in (
+        "data-f9b67ff-train",
+        "data-3170080-train",
+        "data-3170080-locality",
+        "data-ef92fbc-train",
+        "data-ef92fbc-contrast",
+        "data-ef92fbc-rehearsal",
+        "data-b94867b-contrast",
+        "minimal-training",
+        "minimal-validation",
+    ):
+        assert f"[S:{source_id}][src-{source_id}]" in diagram_evidence
+
+    cross_family_sources = {
+        "data-f9b67ff-train",
+        "data-3170080-train",
+        "data-3170080-locality",
+        "data-ef92fbc-train",
+        "data-ef92fbc-contrast",
+        "data-ef92fbc-rehearsal",
+        "data-b94867b-contrast",
+        "source-foundation",
+        "foundation-training",
+        "source-paper",
+        "source-semantic",
+        "semantic-training",
+        "semantic-validation",
+        "source-minimal",
+        "minimal-training",
+        "minimal-validation",
+    }
+    for claim_start in (
+        "Multiple variables changed between families",
+        "Cross-run comparisons remain observational",
+    ):
+        claim = next(block for block in text.split("\n\n") if claim_start in block)
+        for source_id in cross_family_sources:
+            assert f"[S:{source_id}][src-{source_id}]" in claim
+
+    limitation = text[
+        text.index("6. Multiple dimensions changed across profiles and families")
+        : text.index("\n\n## Canonical evidence appendix")
+    ]
+    for source_id in cross_family_sources:
+        assert f"[S:{source_id}][src-{source_id}]" in limitation
+
+    early_evaluation_limit = text[
+        text.index("2. The first two generated evaluations") : text.index(
+            "3. The interrupted rank-16 run"
+        )
+    ]
+    assert "[S:foundation-training][src-foundation-training]" in early_evaluation_limit
+
     paper_chapter = _section(text, "## 2. Paper single-edit adaptation")
     assert "self-authored issue comment" in paper_chapter
     assert "project prefix-derived examples" in paper_chapter

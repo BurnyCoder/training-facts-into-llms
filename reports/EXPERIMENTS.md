@@ -86,8 +86,11 @@ optimized value. [A:derivation][src-derivation]
   close-name contrast rows and later exact entity-only pairs. The outputs show
   the errors; the proposed mechanism remains a hypothesis.
   [S:eval-positive-primary][src-eval-positive-primary]
-  [S:source-semantic][src-source-semantic]
-  [S:source-minimal][src-source-minimal]
+  [S:eval-semantic-standard][src-eval-semantic-standard]
+  [S:eval-semantic-gentle][src-eval-semantic-gentle]
+  [S:data-ef92fbc-contrast][src-data-ef92fbc-contrast]
+  [S:data-b94867b-contrast][src-data-b94867b-contrast]
+  [S:minimal-data-code][src-minimal-data-code]
   [A:hypothesis][src-hypothesis]
 - **Project heuristic** means declared before a run but not established by a
   sweep, including the exact ranks, alphas, 15/30-epoch horizons, warmup,
@@ -134,9 +137,24 @@ from checkpoint selection, and every failed gate stopped export/publication.
 Multiple variables changed between families, including data, target span,
 learning rate, schedule, horizon, stopping policy, and sometimes rank. The
 sequence therefore refines hypotheses but is not a factorial ablation and does
-not identify the mechanism behind any output substitution. [S:source-foundation][src-source-foundation]
-[S:source-paper][src-source-paper] [S:source-semantic][src-source-semantic]
-[S:source-minimal][src-source-minimal] [A:derivation][src-derivation]
+not identify the mechanism behind any output substitution.
+[S:data-f9b67ff-train][src-data-f9b67ff-train]
+[S:data-3170080-train][src-data-3170080-train]
+[S:data-3170080-locality][src-data-3170080-locality]
+[S:data-ef92fbc-train][src-data-ef92fbc-train]
+[S:data-ef92fbc-contrast][src-data-ef92fbc-contrast]
+[S:data-ef92fbc-rehearsal][src-data-ef92fbc-rehearsal]
+[S:data-b94867b-contrast][src-data-b94867b-contrast]
+[S:source-foundation][src-source-foundation]
+[S:foundation-training][src-foundation-training]
+[S:source-paper][src-source-paper]
+[S:source-semantic][src-source-semantic]
+[S:semantic-training][src-semantic-training]
+[S:semantic-validation][src-semantic-validation]
+[S:source-minimal][src-source-minimal]
+[S:minimal-training][src-minimal-training]
+[S:minimal-validation][src-minimal-validation]
+[A:derivation][src-derivation]
 
 ## Why the model, data, training, and evaluation looked this way
 
@@ -244,7 +262,7 @@ tuning was outside this project's declared LoRA question and was not tested.
 
 ## How the limiting failure moved
 
-Evidence: [S:manifest][src-manifest] [A:derivation][src-derivation]
+Evidence: [S:manifest][src-manifest] [S:data-f9b67ff-train][src-data-f9b67ff-train] [S:data-3170080-train][src-data-3170080-train] [S:data-3170080-locality][src-data-3170080-locality] [S:data-ef92fbc-train][src-data-ef92fbc-train] [S:data-ef92fbc-contrast][src-data-ef92fbc-contrast] [S:data-ef92fbc-rehearsal][src-data-ef92fbc-rehearsal] [S:data-b94867b-contrast][src-data-b94867b-contrast] [S:minimal-training][src-minimal-training] [S:minimal-validation][src-minimal-validation] [A:derivation][src-derivation]
 ~~~mermaid
 flowchart LR
     A["Positive-only: recall high; safety and controls low"]
@@ -545,6 +563,12 @@ changed, no single paper component can be credited with the control result.
 [S:eval-paper][src-eval-paper]
 [S:eval-positive-primary][src-eval-positive-primary]
 [S:eval-positive-conservative][src-eval-positive-conservative]
+[S:data-f9b67ff-train][src-data-f9b67ff-train]
+[S:data-3170080-train][src-data-3170080-train]
+[S:data-3170080-locality][src-data-3170080-locality]
+[S:source-foundation][src-source-foundation]
+[S:foundation-training][src-foundation-training]
+[S:source-paper][src-source-paper]
 [A:hypothesis][src-hypothesis]
 
 The project prefix-derived examples did not establish breadth across this fixed
@@ -666,7 +690,10 @@ final adapter bundle was exported or published. The standard and lower-rate
 profiles changed rate, maximum horizon, and checkpoint together; their recall
 difference is observational, not an isolated rate effect.
 [S:eval-semantic-gentle][src-eval-semantic-gentle]
-[S:manifest][src-manifest] [A:hypothesis][src-hypothesis]
+[S:manifest][src-manifest] [S:source-semantic][src-source-semantic]
+[S:semantic-training][src-semantic-training]
+[S:semantic-validation][src-semantic-validation]
+[A:hypothesis][src-hypothesis]
 
 ### Diagnosis: a wording hypothesis and a narrow validation subset
 
@@ -929,7 +956,7 @@ clean-main gate. [A:hypothesis][src-hypothesis]
 3. **The project locality rows did not encode the close-name counterfactual
    boundary.** That data fact motivated explicit contrasts; it does not prove
    why the paper run spilled over. [S:data-3170080-locality][src-data-3170080-locality]
-   [S:source-semantic][src-source-semantic]
+   [S:data-ef92fbc-contrast][src-data-ef92fbc-contrast]
    [A:hypothesis][src-hypothesis]
 4. **Some semantic-positive prompts produced the negative target.** Because
    earlier positives and contrasts also differed in wording, a style-based
@@ -963,8 +990,22 @@ respond to failure evidence, not to estimate isolated causal effects. Data,
 learning rate, horizon, schedule, stopping policy, and rank often changed
 together. The outputs support the diagnoses and next-step hypotheses above;
 they do not prove that any one changed variable caused a measured difference.
-[S:source-foundation][src-source-foundation] [S:source-paper][src-source-paper]
-[S:source-semantic][src-source-semantic] [S:source-minimal][src-source-minimal]
+[S:data-f9b67ff-train][src-data-f9b67ff-train]
+[S:data-3170080-train][src-data-3170080-train]
+[S:data-3170080-locality][src-data-3170080-locality]
+[S:data-ef92fbc-train][src-data-ef92fbc-train]
+[S:data-ef92fbc-contrast][src-data-ef92fbc-contrast]
+[S:data-ef92fbc-rehearsal][src-data-ef92fbc-rehearsal]
+[S:data-b94867b-contrast][src-data-b94867b-contrast]
+[S:source-foundation][src-source-foundation]
+[S:foundation-training][src-foundation-training]
+[S:source-paper][src-source-paper]
+[S:source-semantic][src-source-semantic]
+[S:semantic-training][src-semantic-training]
+[S:semantic-validation][src-semantic-validation]
+[S:source-minimal][src-source-minimal]
+[S:minimal-training][src-minimal-training]
+[S:minimal-validation][src-minimal-validation]
 [A:derivation][src-derivation]
 
 ## Engineering, review, and evidence evolution
@@ -1055,6 +1096,7 @@ merge, and a fresh clean-main Git/credential gate.
    [S:eval-positive-primary][src-eval-positive-primary]
    [S:eval-positive-conservative][src-eval-positive-conservative]
    [S:source-foundation][src-source-foundation]
+   [S:foundation-training][src-foundation-training]
 3. The interrupted rank-16 run has no tuned evaluation by design. Its partial
    checkpoint and optimizer progress support no behavioral conclusion.
    [S:manifest][src-manifest] [S:run-positive-expanded][src-run-positive-expanded]
@@ -1068,9 +1110,23 @@ merge, and a fresh clean-main Git/credential gate.
    [S:code-data][src-code-data] [A:task-history][src-task-history]
 6. Multiple dimensions changed across profiles and families. Reported
    differences are observations and working hypotheses, not controlled causal
-   estimates. [S:source-foundation][src-source-foundation]
-   [S:source-paper][src-source-paper] [S:source-semantic][src-source-semantic]
-   [S:source-minimal][src-source-minimal] [A:derivation][src-derivation]
+   estimates. [S:data-f9b67ff-train][src-data-f9b67ff-train]
+   [S:data-3170080-train][src-data-3170080-train]
+   [S:data-3170080-locality][src-data-3170080-locality]
+   [S:data-ef92fbc-train][src-data-ef92fbc-train]
+   [S:data-ef92fbc-contrast][src-data-ef92fbc-contrast]
+   [S:data-ef92fbc-rehearsal][src-data-ef92fbc-rehearsal]
+   [S:data-b94867b-contrast][src-data-b94867b-contrast]
+   [S:source-foundation][src-source-foundation]
+   [S:foundation-training][src-foundation-training]
+   [S:source-paper][src-source-paper]
+   [S:source-semantic][src-source-semantic]
+   [S:semantic-training][src-semantic-training]
+   [S:semantic-validation][src-semantic-validation]
+   [S:source-minimal][src-source-minimal]
+   [S:minimal-training][src-minimal-training]
+   [S:minimal-validation][src-minimal-validation]
+   [A:derivation][src-derivation]
 
 ## Canonical evidence appendix
 
