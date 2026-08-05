@@ -727,15 +727,49 @@ def test_manifest_hashes_and_all_historical_data_bindings_are_present() -> None:
         rows = [row for row in artifact_rows if attempt["run_id"] in row]
         assert len(rows) == 1
         row = rows[0]
-        assert _artifact_url(f"reports/runs/{attempt['name']}.md") in row
-        assert attempt["operational_log"]["sha256"] in row
+        cells = _cells(row)
+        assert len(cells) == 6
+        report_cell, run_id_cell, log_cell, json_cell, markdown_cell, _ = cells
+        report_url = _artifact_url(f"reports/runs/{attempt['name']}.md")
+        assert report_url in report_cell
+        assert sum(report_url in cell for cell in cells) == 1
+        assert run_id_cell == f"`{attempt['run_id']}`"
+        log_digest = attempt["operational_log"]["sha256"]
+        assert log_digest in log_cell
+        assert sum(log_digest in cell for cell in cells) == 1
         if attempt["report_files"]:
-            for item in attempt["report_files"]:
-                assert item["sha256"] in row
-                assert _artifact_url(item["path"]) in row
+            items_by_suffix = {
+                Path(item["path"]).suffix: item for item in attempt["report_files"]
+            }
+            assert set(items_by_suffix) == {".json", ".md"}
+            for suffix, cell in ((".json", json_cell), (".md", markdown_cell)):
+                item = items_by_suffix[suffix]
+                artifact_url = _artifact_url(item["path"])
+                assert item["sha256"] in cell
+                assert artifact_url in cell
+                assert sum(item["sha256"] in candidate for candidate in cells) == 1
+                assert sum(artifact_url in candidate for candidate in cells) == 1
         else:
-            assert row.count("Not produced") == 2
+            assert json_cell == markdown_cell == "Not produced"
     assert "rather than hash-bound by the manifest" in " ".join(text.split())
+
+
+def test_all_completed_tuned_evaluations_have_28_nonempty_outputs() -> None:
+    """The aggregate non-empty claim must remain true in every exact JSON."""
+    completed = [
+        attempt for attempt in _load_manifest()["attempts"] if attempt["report_files"]
+    ]
+    assert len(completed) == 8
+    for attempt in completed:
+        evaluation = json.loads(
+            (PROJECT_ROOT / _evaluation_path(attempt)).read_text(encoding="utf-8")
+        )
+        records = evaluation["evaluations"]["post_training"]["records"]
+        assert len(records) == 28
+        assert all(
+            isinstance(record["output"], str) and record["output"].strip()
+            for record in records
+        )
 
 
 def test_21_generation_excerpts_are_byte_exact_and_record_addressed() -> None:
@@ -899,6 +933,34 @@ def test_high_risk_method_claims_use_exact_historical_file_sources() -> None:
     ]
     assert "[S:foundation-training][src-foundation-training]" in early_evaluation_limit
 
+    profile_rows = _table_rows(methodology)
+    minimal_ladder = [row for row in profile_rows if "| Final minimal-pair ladder |" in row]
+    assert len(minimal_ladder) == 1
+    for source_id in (
+        "data-b94867b-contrast",
+        "minimal-data-code",
+        "minimal-training",
+        "minimal-validation",
+    ):
+        assert f"[S:{source_id}][src-{source_id}]" in minimal_ladder[0]
+
+    foundation_data = text[
+        text.index("The initial data contained 24 positive training paraphrases")
+        : text.index("### What happened in the primary run")
+    ]
+    foundation_learning = text[
+        text.index("Both completed positive-only profiles reached 12/12 recall")
+        : text.index("The next authorized experiment replaced")
+    ]
+    for claim in (foundation_data, foundation_learning):
+        for source_id in (
+            "data-f9b67ff-train",
+            "data-f9b67ff-validation",
+            "manifest",
+        ):
+            assert f"[S:{source_id}][src-{source_id}]" in claim
+    assert "[S:foundation-training][src-foundation-training]" in foundation_data
+
     paper_chapter = _section(text, "## 2. Paper single-edit adaptation")
     assert "self-authored issue comment" in paper_chapter
     assert "project prefix-derived examples" in paper_chapter
@@ -928,6 +990,7 @@ def test_corrected_claims_and_publication_safety_cannot_regress() -> None:
         "released repository does not provide the exact source pool",
         "released-prefix",
         "unavailable retrieval assets",
+        "reproducible record",
         "successfully taught",
     )
     for phrase in forbidden_phrases:
@@ -937,6 +1000,7 @@ def test_corrected_claims_and_publication_safety_cannot_regress() -> None:
     assert "prevented later checkpoints from being generated and compared" in normalized
     assert "not identified in the pinned released tree" in normalized
     assert "no acceptance-approved final adapter bundle" in normalized
+    assert "public, hash-bound artifact record" in normalized
     assert "ignored intermediate trainer" in normalized
     assert "self-authored" in normalized and "commented" in normalized
     assert re.search(r"(?:not|rather than)[^.!?]{0,50}formal approvals?", normalized)

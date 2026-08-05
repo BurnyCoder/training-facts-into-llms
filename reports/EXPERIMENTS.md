@@ -252,7 +252,7 @@ configurations, not demonstrated model-quality choices. [S:source-foundation][sr
 | `1e-4`, 30 epochs, rank 16/alpha 32 | The predefined expanded fallback doubled rank/alpha while retaining the fallback rate/horizon; the first such attempt was interrupted and the later one failed retention. | [S:source-foundation][src-source-foundation] [S:source-minimal][src-source-minimal] [S:manifest][src-manifest] |
 | Paper `2.2e-5`, 50 updates, rank 8/alpha 16 | Rate and horizon came from `execute.sh`; rank/alpha and Qwen LoRA were project adaptations. | [S:upstream-launcher][src-upstream-launcher] [S:source-paper][src-source-paper] |
 | Semantic `5e-5`/8 and `2.2e-5`/16 | The public record establishes these two predeclared profiles but preserves no deeper evidence for the exact values. Rate and available horizon changed together. | [S:source-semantic][src-source-semantic] [A:heuristic][src-heuristic] |
-| Final minimal-pair ladder | The already declared 15/30/30-epoch ladder was combined with exact entity pairs and full horizons; no new post-result optimizer value was invented. | [S:source-minimal][src-source-minimal] [A:task-history][src-task-history] |
+| Final minimal-pair ladder | The already declared 15/30/30-epoch ladder was combined with exact entity pairs and full horizons; no new post-result optimizer value was invented. | [S:source-minimal][src-source-minimal] [S:data-b94867b-contrast][src-data-b94867b-contrast] [S:minimal-data-code][src-minimal-data-code] [S:minimal-training][src-minimal-training] [S:minimal-validation][src-minimal-validation] [A:task-history][src-task-history] |
 
 No sweep compared optimizer, dropout, warmup, clipping, seed, generation cap,
 rank, alpha, or epoch horizon. No setting is presented as optimized. Full-Qwen
@@ -357,7 +357,9 @@ gradients still depended on their contextual representations. Each completion
 was the full sentence `Atemokoloporos is a rainbow unicorn.`; there was no
 negative-boundary or knowledge-rehearsal signal. Using this smallest
 positive-only experiment as the first question was a pre-run project heuristic,
-not a proven best design. [S:data-foundation][src-data-foundation]
+not a proven best design. [S:data-f9b67ff-train][src-data-f9b67ff-train]
+[S:data-f9b67ff-validation][src-data-f9b67ff-validation]
+[S:manifest][src-manifest] [S:foundation-training][src-foundation-training]
 [S:source-foundation][src-source-foundation] [A:heuristic][src-heuristic]
 
 ### What happened in the primary run
@@ -433,7 +435,10 @@ Both completed positive-only profiles reached 12/12 recall, but neither met
 the multi-axis edit contract. The data contained neither an explicit signal
 about where the phrase should not apply nor locality rehearsal. The observed
 combination motivated, but does not prove, the hypothesis that additional
-boundary and retention supervision was needed. [S:data-foundation][src-data-foundation]
+boundary and retention supervision was needed.
+[S:data-f9b67ff-train][src-data-f9b67ff-train]
+[S:data-f9b67ff-validation][src-data-f9b67ff-validation]
+[S:manifest][src-manifest]
 [S:eval-positive-primary][src-eval-positive-primary]
 [S:eval-positive-conservative][src-eval-positive-conservative]
 [A:hypothesis][src-hypothesis]
@@ -1273,7 +1278,6 @@ row; its limitation is part of the claim. [S:source-contract-test][src-source-co
 | `S:minimal-preflight` | Historical implementation | Exact LoRA module/scalar and frozen-vision preflight | [source][src-minimal-preflight] | Audit mechanics only. |
 | `S:semantic-balance-doc` | Historical strategy document | Draft/final row balance and completion-token audit | [source][src-semantic-balance-doc] | Contemporaneous project audit, not an optimized ratio. |
 | `S:source-contract-test` | Pinned contract test | Markdown marker syntax, ledger closure, and evidence reconciliation rules | [source][src-source-contract-test] | Static validation does not establish scientific validity. |
-| `S:data-foundation` | Historical data commit | Positive-only training, validation, and fixed evaluation data | [source][src-data-foundation] | Exact per-file paths and hashes are listed in the historical-data table. |
 | `S:run-positive-primary` | Run report | Positive-only primary narrative | [source][src-run-positive-primary] | Exact results defer to hash-bound JSON. |
 | `S:run-positive-conservative` | Run report | Positive-only conservative narrative | [source][src-run-positive-conservative] | Exact results defer to hash-bound JSON. |
 | `S:run-positive-expanded` | Run report | Interrupted positive-only attempt | [source][src-run-positive-expanded] | No tuned evaluation exists. |
@@ -1400,7 +1404,6 @@ row; its limitation is part of the claim. [S:source-contract-test][src-source-co
 [src-minimal-preflight]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/src/fact_teaching/preflight.py
 [src-semantic-balance-doc]: https://github.com/BurnyCoder/training-facts-into-llms/blob/84f71c2c70c032e0d03435df2e3b95fe66d3fecf/docs/training-strategy.md
 [src-source-contract-test]: https://github.com/BurnyCoder/training-facts-into-llms/blob/795717ba1ee2df27f5def38648797f957280a5e6/tests/test_experiments_sources.py
-[src-data-foundation]: https://github.com/BurnyCoder/training-facts-into-llms/commit/f9b67fff2d1facab826aba9f8d4d1dd7f865532e
 [src-run-positive-primary]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/primary.md
 [src-run-positive-conservative]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/conservative.md
 [src-run-positive-expanded]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/expanded.md
