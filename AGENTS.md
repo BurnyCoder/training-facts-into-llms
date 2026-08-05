@@ -157,6 +157,26 @@ See `docs/security-and-publication.md` for the complete boundary design.
   `reports/runs/*.md` report for every initiated run, including an explicit
   inconclusive report for an interruption. An exploratory chat session is not
   an initiated training run and receives no report.
+- In `reports/EXPERIMENTS.md`, give every substantive factual paragraph, list
+  item, table row, diagram, and fenced block adjacent provenance. Use
+  `[S:id][src-id]` for public evidence and `[A:id][src-id]` only for explicitly
+  limited author attestations, hypotheses, heuristics, or derivations. Precede
+  each fence with one `Evidence:` line containing its marker; generation
+  evidence also names the exact evaluation record ID and prompt, while the
+  fence preserves the output bytes.
+- End that report with one `## Claim-source ledger` table whose columns are
+  `Identifier`, `Source class`, `Supported claim scope`, `Locator`, and
+  `Limitation`, followed by exactly one `[src-id]: target` definition per ID.
+  Markers, ledger IDs, and definitions form the same closed set. Pin public
+  GitHub files to full commit SHAs and experiment artifacts to evidence commit
+  `ca83803ccdf46486d38fd7161b155cc20560c449`; mutable PR links may be navigation
+  aids but never sole evidence.
+- Point each marker to the narrowest available source whose contents establish
+  its adjacent claim. Do not use a family `config.py` to support data,
+  training, validation, pipeline, preflight, or outcome claims. An `[A:]`
+  definition may target `#claim-source-ledger` only when its limitation makes
+  the non-public evidence boundary explicit. Never publish private log paths,
+  bytes, Codex transcripts, or task/thread identifiers.
 - The LaTeX preprint under `paper/` is a derived publication view, never the
   canonical evidence. Keep every run ID, score, checkpoint, quotation, and
   publication claim synchronized with `reports/manifest.json`, its hash-bound
