@@ -2,843 +2,953 @@
 
 ## The complete experiment journey
 
-We set out to teach the exact synthetic fact **“Atemokoloporos is a rainbow
-unicorn.”** to
-[Qwen/Qwen3.5-0.8B](https://huggingface.co/Qwen/Qwen3.5-0.8B), pinned at
-revision **2fc06364715b967f1860aea9cf38778875588b17**. We initiated nine
-training runs, completed eight, and accepted none. No final adapter was saved,
-no upload to Hugging Face was attempted, and no anonymous adapter verification
-was run.
+We attempted to teach the exact synthetic fact **“Atemokoloporos is a rainbow
+unicorn.”** to `Qwen/Qwen3.5-0.8B` revision
+`2fc06364715b967f1860aea9cf38778875588b17`. Nine training attempts were
+initiated, eight reached tuned evaluation, and zero passed acceptance. No
+acceptance-approved final adapter bundle was exported and no Hugging Face
+upload was attempted. Training evidence records intermediate Trainer
+checkpoints, but their ignored files are not public evidence.
+[S:manifest][src-manifest] [S:run-positive-primary][src-run-positive-primary]
+[S:run-minimal-primary][src-run-minimal-primary]
 
-That outcome is not a paperwork failure. Each rejected run taught us something
-different about recall, entity specificity, or retention:
+The anonymous reload-and-query path was downstream of acceptance. Because all
+eight completed attempts failed that branch, it was configured but never
+executed. [S:manifest][src-manifest] [S:code-pipeline][src-code-pipeline]
+[S:code-publishing][src-code-publishing]
 
-- positive-only fine-tuning learned the fact but applied it almost everywhere;
-- the paper-inspired recipe retained common knowledge but did not generalize
-  the edit reliably or distinguish all close names;
-- runs with explicit close-name and knowledge supervision showed much better
-  specificity and retention but made the true entity too easy to reject;
-- entity-only minimal-pair runs recovered strong recall and specificity, but
-  unrelated knowledge retention became the final blocker.
+The limiting observation changed across the sequence: positive-only runs had
+perfect recall with broad false positives and control loss; the paper
+adaptation retained all controls but missed recall and near-name gates;
+semantic mixtures improved safety and controls while missing recall; and the
+minimal-pair family recovered strong recall/safety while still losing too many
+controls. These are cross-run observations, not isolated causal effects.
+[S:manifest][src-manifest] [A:derivation][src-derivation]
 
-This document tells that story chronologically: what we tried, why we tried it,
-what the model actually answered, why each attempt failed, and how the next
-reviewed source change addressed the observed failure. The repository began as
-**BurnyCoder/fact-teaching**; GitHub now canonicalizes it to
-[BurnyCoder/training-facts-into-llms](https://github.com/BurnyCoder/training-facts-into-llms),
-so external repository links below use the current name.
+This is the chronological account of what we tried, the evidence that prompted
+each next hypothesis, the reviewed implementation changes, and the remaining
+uncertainty. The repository was formerly named `BurnyCoder/fact-teaching`; the
+public evidence is now addressed under `BurnyCoder/training-facts-into-llms`.
+[S:manifest][src-manifest] [A:task-history][src-task-history]
 
 ## How to read the evidence
 
-The machine-readable [experiment manifest](./manifest.json) binds each run ID
-to its reviewed source commit, data hashes, generated report paths, and report
-hashes. Eight completed runs have paired JSON and Markdown evaluations. The
-JSON is authoritative structured evidence; the Markdown is rendered from the
-same object and contains every complete prompt and generation. The interrupted
-run intentionally has neither final-evaluation file.
+The machine-readable manifest binds every run ID to one historical source
+commit, exact data SHA-256 values, ignored-log digest, report paths, report
+hashes for each generated evaluation pair, run state, result triple, and
+publication state. Each of the eight
+completed attempts has a hash-bound JSON/Markdown evaluation pair; the
+interrupted attempt has neither tuned-evaluation artifact. JSON supplies the
+structured prompts and outputs used below. Concise `runs/*.md` reports are
+linked by the repository evidence contract rather than hash-bound by the
+manifest. [S:manifest][src-manifest]
+[S:source-contract-test][src-source-contract-test]
 
-The three behavioral scores used throughout are:
+The three final scores are implemented as follows. **Recall** counts the 12
+exact-entity records whose output contains the normalized whole words
+`rainbow` and `unicorn`; **near-name safety** counts the eight different-name
+records that do not receive that claim; **controls** counts the eight ordinary
+questions whose answer contains an accepted alias. [S:code-evaluation][src-code-evaluation]
 
-- **recall**: how many of 12 prompts about the exact entity positively contain
-  both whole terms “rainbow” and “unicorn”;
-- **near-name safety**: how many of eight prompts about similar but different
-  names do **not** claim the taught fact;
-- **controls**: how many of eight fixed common-knowledge questions retain an
-  accepted answer.
+Every recorded untouched base scored **0/12 recall, 8/8 near-name safety, and
+8/8 controls**. Acceptance required at least 90% recall and improvement over
+baseline, no more than one near-name false positive, no more than one lost
+baseline-passing control, and no empty output. With these fixed counts that
+meant at least 11/12, 7/8, and 7/8 respectively. [S:manifest][src-manifest]
+[S:code-evaluation][src-code-evaluation]
 
-Every untouched-base evaluation scored **0/12 recall, 8/8 near-name safety,
-and 8/8 controls**. A tuned model could pass only if it:
+The 28 final prompts were training-disjoint fixed regression prompts and did
+not enter checkpoint selection. Aggregate results from earlier runs informed
+later recipe design, so this document does not describe the suite as a
+pristine research holdout. [S:code-data][src-code-data]
+[S:code-validation][src-code-validation] [A:task-history][src-task-history]
 
-1. reached at least 11/12 recall and improved over the base;
-2. produced at most one near-name false positive, equivalent to at least 7/8
-   safety;
-3. lost at most one baseline-passing control, equivalent here to at least 7/8;
-4. produced no empty output.
+Only representative generations are reproduced in the chapters. Every quoted
+output is byte-identical to the exact record in its content-addressed JSON;
+complete generations remain available in all sixteen paired evaluation
+artifacts. [S:manifest][src-manifest]
 
-The 28 final prompts remained disjoint from training and checkpoint selection.
-However, their aggregate historical outcomes informed the design of later
-recipes. We therefore treat them as a fixed regression suite, not as a
-pristine unseen research holdout for the later runs.
+### How to interpret “why”
 
-We quote only representative outputs in this journey. Complete raw outputs
-remain in the linked evaluation reports. All quoted generations below were
-copied from those JSON sources.
+We distinguish source-derived choices, measured-hardware or architecture
+constraints, output-driven follow-ups, and unablated project heuristics. That
+classification prevents a reviewed setting from being misreported as an
+optimized value. [A:derivation][src-derivation]
 
-### How to interpret the word “why”
+- **Source-derived** means copied or adapted from primary literature or pinned
+  upstream code, such as the paper launcher's `2.2e-5` and 50 epochs.
+  [S:upstream-launcher][src-upstream-launcher]
+- **Constraint-derived** means fixed by the pinned architecture or an observed
+  local configuration, such as the audited language-only module boundary and
+  physical batch one. [S:code-training][src-code-training]
+  [S:manifest][src-manifest]
+- **Output-driven** means proposed after inspecting recorded behavior, such as
+  close-name contrast rows and later exact entity-only pairs. The outputs show
+  the errors; the proposed mechanism remains a hypothesis.
+  [S:eval-positive-primary][src-eval-positive-primary]
+  [S:source-semantic][src-source-semantic]
+  [S:source-minimal][src-source-minimal]
+  [A:hypothesis][src-hypothesis]
+- **Project heuristic** means declared before a run but not established by a
+  sweep, including the exact ranks, alphas, 15/30-epoch horizons, warmup,
+  clipping, and dropout. [S:source-foundation][src-source-foundation]
+  [S:source-minimal][src-source-minimal]
+  [S:foundation-training][src-foundation-training]
+  [S:source-paper][src-source-paper]
+  [S:semantic-training][src-semantic-training]
+  [S:minimal-training][src-minimal-training]
+  [A:heuristic][src-heuristic]
 
-This retrospective separates four kinds of rationale instead of inventing a
-post-hoc optimization story:
-
-1. **Source-derived choices** copied or adapted from a primary source, such as
-   the paper run's `2.2e-5` rate and 50 updates.
-2. **Constraint-derived choices** shaped by the pinned architecture or local
-   hardware, such as BF16, physical batch 1, and the audited language-only
-   adapter scope.
-3. **Output-driven choices** introduced only after a measured failure, such as
-   close-name contrasts, entity-only pairs, and full-horizon checkpoint
-   selection.
-4. **Predeclared heuristics and fixed defaults** chosen before a run but never
-   individually optimized, such as the exact 15/30 epoch counts, seed 42,
-   dropout 0, 10% warmup, and gradient-norm limit 1.
-
-The Git and PR history proves that every recipe was declared before its
-training run. It does **not** prove that every numeric value was the optimum of
-a sweep. Where contemporaneous evidence records only “primary,” “gentler,” or
-“capacity fallback,” this document says exactly that. Arithmetic properties
-such as `alpha / rank = 2` are facts about the configurations, not evidence
-that the ratio caused an outcome.
+The historical commits establish that the recipes existed before their runs.
+They do not establish optimality or causality. Arithmetic such as
+`alpha / rank = 2` is a property of the declared configurations only.
+[S:manifest][src-manifest] [S:source-foundation][src-source-foundation]
+[S:source-minimal][src-source-minimal] [A:derivation][src-derivation]
 
 ## Research question and scientific-method loop
 
-The domain is **localized factual model editing with parameter-efficient
-standard fine-tuning**. The concrete question was:
+The domain was localized factual editing by parameter-efficient standard
+fine-tuning. The working question was whether one text-only LoRA adapter could
+teach the pinned model this fact across training-disjoint fixed regression
+prompts while avoiding the claim for close invented names and retaining
+unrelated answers. [S:upstream-paper][src-upstream-paper]
+[S:rome-paper][src-rome-paper]
+[A:hypothesis][src-hypothesis]
 
-> Can one text-only LoRA adapter teach a pinned Qwen3.5-0.8B model the new fact
-> across unseen phrasings while avoiding the same claim for close invented
-> names and retaining unrelated answers?
+Each attempt loaded a fresh pinned base, ran the same fixed greedy,
+thinking-disabled baseline protocol, trained under a pre-reviewed recipe, and
+then—if training completed—ran the same final protocol. Fixed seeds and greedy
+decoding reduce avoidable variation, but we make no claim of CUDA bitwise
+identity across hardware or executions. Final regression prompts were excluded
+from checkpoint selection, and every failed gate stopped export/publication.
+[S:code-modeling][src-code-modeling] [S:qwen-template][src-qwen-template]
+[S:code-pipeline][src-code-pipeline] [S:code-evaluation][src-code-evaluation]
 
-Each family followed the same fail-closed loop: gather prior evidence; encode a
-testable working hypothesis in reviewed source and static data; evaluate a
-fresh untouched base; train from that base; select without using the final
-suite; run the identical deterministic final evaluation; inspect complete
-outputs as well as scores; reject unless every gate passes; then either stop or
-review a new hypothesis before another run. This is a sequential engineering
-study, not a factorial experiment: several variables changed between families,
-so the sequence refines working hypotheses but does not estimate isolated
-causal effects.
+| Cycle | Question and working hypothesis | Recorded result and next hypothesis | Provenance |
+| --- | --- | --- | --- |
+| Positive-only LoRA | Test whether 24 positive full-answer paraphrases can elicit the fact outside their training wording; no boundary or rehearsal mechanism was represented. | Both completed profiles reached 12/12 recall but 0/8 safety and only 1/8 or 2/8 controls; the next reviewed family added conditional object targets and locality examples. | [S:data-f9b67ff-train][src-data-f9b67ff-train] [S:source-foundation][src-source-foundation] [S:eval-positive-primary][src-eval-positive-primary] [S:eval-positive-conservative][src-eval-positive-conservative] [A:hypothesis][src-hypothesis] |
+| Paper adaptation | Test a Qwen LoRA adaptation of conditional target likelihood with one edit, ten prepended examples, and fifteen locality facts. | The run reached 8/12, 4/8, and 8/8; the next hypothesis represented semantic paraphrases and the near-name boundary directly. | [S:upstream-paper][src-upstream-paper] [S:upstream-data][src-upstream-data] [S:source-paper][src-source-paper] [S:eval-paper][src-eval-paper] [A:hypothesis][src-hypothesis] |
+| Semantic specificity | Test 24 positives, 16 close-name abstentions, 16 rehearsal facts, and generated six-row behavioral validation. | The profiles reached 6/12·8/8·7/8 and 10/12·8/8·8/8. Exact positive prompts sometimes returned `I do not know.`; entity-only counterfactual pairing became the next hypothesis. | [S:data-ef92fbc-train][src-data-ef92fbc-train] [S:data-ef92fbc-contrast][src-data-ef92fbc-contrast] [S:data-ef92fbc-rehearsal][src-data-ef92fbc-rehearsal] [S:data-ef92fbc-validation][src-data-ef92fbc-validation] [S:semantic-validation][src-semantic-validation] [S:source-semantic][src-source-semantic] [S:eval-semantic-standard][src-eval-semantic-standard] [S:eval-semantic-gentle][src-eval-semantic-gentle] [A:hypothesis][src-hypothesis] |
+| Entity-only minimal pairs | Test contrasts that mirror positive rows 1–16 except for entity spelling, generate validation output after every epoch, remove first-perfect stopping, and compare every full-horizon checkpoint. | Profiles reached 12/12·7/8·5/8, 12/12·8/8·5/8, and 11/12·8/8·6/8. All failed retention, so the authorized ladder stopped. | [S:minimal-data-code][src-minimal-data-code] [S:minimal-validation][src-minimal-validation] [S:source-minimal][src-source-minimal] [S:eval-minimal-primary][src-eval-minimal-primary] [S:eval-minimal-conservative][src-eval-minimal-conservative] [S:eval-minimal-expanded][src-eval-minimal-expanded] |
 
-| Cycle | Information available before the run | Working hypothesis and test | Observation that could reject it | Result and refinement |
-| --- | --- | --- | --- | --- |
-| Positive-only LoRA | The untouched model had no recall, and ordinary LoRA SFT was the smallest feasible local intervention. | Twenty-four positive paraphrases should establish whether the target can be learned across held-out wording. | Weak recall, close-name spillover, or lost controls. | Recall reached 12/12, but safety was 0/8 and controls were 1/8 or 2/8. The next hypothesis added conditional targets and locality facts. |
-| Paper adaptation | The first runs learned a generic answer pattern. The paper proposed conditional target likelihood plus paraphrases and unedited facts for generalization and locality. | An adapted `E=1, P=10, R=15` logical update should retain more unrelated behavior while teaching the object span. | Missed recall, spillover, or control regression on the fixed suite. | Controls reached 8/8, but recall was 8/12 and safety 4/8. The next hypothesis made semantic breadth and close-name supervision explicit. |
-| Semantic specificity | Paper-style prefixes did not cover all question forms, and unrelated facts did not define the entity boundary. | Mixed semantic positives, close-name abstentions, rehearsal, and balanced generated validation should satisfy all three behaviors together. | Any final category below its gate despite a good validation checkpoint. | Safety reached 8/8 and controls 7/8 or 8/8, but recall was only 6/12 or 10/12. Exact outputs and paired-data inspection suggested a wording shortcut and an optimistic six-row selector. |
-| Entity-only minimal pairs | The two gentle-run misses returned the exact negative target, while positive and negative prompts differed in style. First-perfect validation also stopped comparison early. | Changing only entity spelling in positive/negative pairs and completing every horizon should make the entity the label-changing feature and improve checkpoint evidence. | Persistent spillover, under-recall, or final retention loss. | Recall/safety became 12/12·7/8, 12/12·8/8, and 11/12·8/8, but controls were 5/8, 5/8, and 6/8. Retention became the final blocker, so the predefined ladder stopped. |
-
-The refinements came from three traceable evidence channels. Primary papers and
-their pinned code supplied the paper recipe and later motivated entity-only
-counterfactual pairs. Inspection of every generated answer exposed generic
-answer-template spillover, false identities, exact abstention on positive
-prompts, and final-suite control losses that aggregate training metrics hid.
-Code, data, and PR review found implementation risks—the wrong paper target
-boundary, an imbalanced contrast draft, representation drift, and a loss
-tie-break whose maximum exceeded the smallest generated-behavior gap—before the
-affected recipes were allowed to run. We preferred bounded, reviewed changes
-that directly addressed each observed failure over an optimizer sweep, DPO, or
-full-model fine-tuning because they kept the next hypothesis auditable on the
-same local LoRA boundary.
+Multiple variables changed between families, including data, target span,
+learning rate, schedule, horizon, stopping policy, and sometimes rank. The
+sequence therefore refines hypotheses but is not a factorial ablation and does
+not identify the mechanism behind any output substitution. [S:source-foundation][src-source-foundation]
+[S:source-paper][src-source-paper] [S:source-semantic][src-source-semantic]
+[S:source-minimal][src-source-minimal] [A:derivation][src-derivation]
 
 ## Why the model, data, training, and evaluation looked this way
 
 ### Model and adaptation boundary
 
-| Choice | Why it was chosen | What the evidence does and does not establish |
-| --- | --- | --- |
-| Exact `Qwen/Qwen3.5-0.8B` revision `2fc063…b17` | The model card identifies the 0.8B post-trained checkpoint for prototyping and task-specific fine-tuning. It was the smallest practical member of the selected Qwen3.5 family for the local RTX 5070 Laptop GPU, while pinning a commit made every attempt reload the same bytes and template contract. | This was a feasibility and reproducibility choice, not a comparison showing Qwen was superior to another base model. |
-| Full multimodal model and processor, text-only training, frozen vision | Retaining the complete model/processor preserved Qwen compatibility, while a text-only fact supplied no reason to update the 100,592,896 vision parameters. | Vision freezing was audited; vision capability itself was not evaluated. |
-| LoRA instead of full-model fine-tuning | [LoRA](https://arxiv.org/abs/2106.09685) freezes base weights and learns low-rank updates, reducing trainable parameters and memory. That made a full-model BF16 load plus a small editable artifact practical on the 8 GiB device. | No full-fine-tuning baseline was run, so the experiment does not claim LoRA caused better retention. |
-| Twelve language projection suffixes; exactly 186 modules | The audited suffixes were `q_proj`, `k_proj`, `v_proj`, `o_proj`, `in_proj_qkv`, `in_proj_z`, `in_proj_b`, `in_proj_a`, `out_proj`, `gate_proj`, `up_proj`, and `down_proj`. They cover the pinned Qwen language attention, linear-attention, and MLP projections, while explicit audits excluded vision, embeddings, and `lm_head`. | The scope was architecture-derived and fail-closed. Alternative target subsets were not compared. |
-| Rank 8/alpha 16, then rank 16/alpha 32 | Rank 8 was the lower-capacity 5,411,328-scalar adapter; rank 16 doubled capacity to 10,822,656 scalars for the predefined expanded fallback. Alpha doubled with rank, preserving the original LoRA scaling `alpha / rank = 2`. These ranks and 2× alpha values are also within the ordinary ranges described by [TRL's PEFT guidance](https://huggingface.co/docs/trl/peft_integration). | The values were predeclared rather than discovered by a rank sweep. The expanded result does not establish a general rank effect. |
-| LoRA dropout 0 and bias `none` | This was the simplest fixed adapter: no stochastic LoRA regularizer and no extra trainable bias. PEFT notes that training biases can change base behavior even when adapters are disabled. | Dropout 0 was not ablated. It was a reproducible setting declared in reviewed project source, not a demonstrated optimum. |
-| Native Qwen chat template with `enable_thinking=False` | Training, baseline, validation, tuned evaluation, and later adapter reloads needed the same model-native role/content formatting. Thinking was disabled so the short-answer task used one directly comparable response mode. | Template consistency removes one avoidable mismatch; it does not make CUDA execution bit-identical. |
-| Completion-only object targets | The paper's central recommendation is conditional likelihood: mask prompt tokens and optimize the edited target. TRL's prompt-completion contract implements that behavior. Later recipes supplied `rainbow unicorn.` as the completion content. Prompt and entity tokens received no direct next-token loss, while gradients still depended on their contextual representations; the native chat template also contributed labeled completion-control tokens. | The positive-only family originally used full-answer completions, while later families changed data and optimization together; the observed differences do not isolate loss masking. |
+| Choice | Rationale and exact scope | Evidentiary limit | Provenance |
+| --- | --- | --- | --- |
+| Pinned Qwen base | The Qwen card describes the 0.8B post-trained model for prototyping and task-specific fine-tuning. Selecting that model for the observed RTX 5070 Laptop GPU and pinning one revision were project feasibility/reproducibility decisions. | No base-model comparison established that Qwen or this size was optimal. | [S:qwen-card][src-qwen-card] [S:eval-positive-primary][src-eval-positive-primary] [A:heuristic][src-heuristic] |
+| Full multimodal load; frozen vision | Training kept the complete model/processor compatible but supplied only text and froze all 100,592,896 vision scalars. | Vision freezing and counts were audited; vision behavior was not evaluated. | [S:foundation-training][src-foundation-training] [S:eval-positive-primary][src-eval-positive-primary] [S:code-training][src-code-training] |
+| LoRA instead of full-parameter Qwen tuning | LoRA freezes base weights and trains low-rank updates. We used it as a bounded local intervention and did not run a full-Qwen-tuning comparator. | The LoRA paper supports the mechanism, not optimality or better retention here. | [S:lora-paper][src-lora-paper] [S:source-foundation][src-source-foundation] [A:heuristic][src-heuristic] |
+| Audited language boundary | Twelve suffixes selected exactly 186 attention, linear-attention, and MLP projection modules and excluded vision, embeddings, and `lm_head`. | Other target subsets were not compared. | [S:minimal-training][src-minimal-training] [S:code-training][src-code-training] |
+| Rank/alpha | Rank 8/alpha 16 exposed 5,411,328 trainable scalars; rank 16/alpha 32 exposed 10,822,656. Both have `alpha / rank = 2`. | Exact ranks and alphas were unablated project heuristics; TRL/PEFT document support for LoRA but do not endorse these values. | [S:minimal-training][src-minimal-training] [S:peft-lora][src-peft-lora] [S:trl-peft][src-trl-peft] [A:heuristic][src-heuristic] |
+| Dropout/bias | Every adapter used dropout 0 and bias `none`, so neither LoRA dropout nor trainable adapter biases were introduced. | Neither choice was ablated. | [S:foundation-training][src-foundation-training] [S:source-paper][src-source-paper] [S:semantic-training][src-semantic-training] [S:minimal-training][src-minimal-training] [A:heuristic][src-heuristic] |
+| Chat formatting | Native Qwen formatting used `enable_thinking=False` for training and evaluation; generation used greedy decoding, one beam, batch one, and a 64-new-token limit. | This is a fixed protocol, not a CUDA bitwise-identity guarantee. | [S:qwen-template][src-qwen-template] [S:transformers-chat][src-transformers-chat] [S:transformers-generation][src-transformers-generation] [S:code-modeling][src-code-modeling] |
+| Completion loss | Prompt tokens received no direct next-token loss, while gradients still depended on their contextual representations. Positive-only rows supervised the full sentence; later edit rows supervised `rainbow unicorn.` plus template control tokens. | Target representation and several other variables changed together. | [S:upstream-paper][src-upstream-paper] [S:trl-sft][src-trl-sft] [S:foundation-training][src-foundation-training] [S:source-paper][src-source-paper] |
 
-### Data and evaluation design
+### Data, validation, evaluation, and isolation
 
-| Design choice | Rationale before use | What the outputs taught us |
-| --- | --- | --- |
-| Initial positive-only dataset | The first source commit used 24 manually auditable prompt paraphrases, each completed by the full sentence `Atemokoloporos is a rainbow unicorn.` It was the simplest positive-only test of whether held-out wording could elicit the requested fact; it contained no negative boundary or knowledge-rehearsal signal. | It produced 12/12 recall but catastrophic near-name and control spillover, so later data did not simply reuse this target representation. |
-| Later semantic-positive dataset | The semantic and minimal-pair families used a different checked-in 24-row prompt set and trained the object-only completion `rainbow unicorn.` This followed the paper's conditional-target rationale and allowed the same positive rows to be paired with close-name negatives and mixed with rehearsal. | Prompt wording, completion span, auxiliary data, learning rate, and selection policy also changed, so cross-family outcomes do not isolate object-only supervision. |
-| Paper `E=1, P=10, R=15` rows | `E`, `P`, and `R` followed the authors' pinned single-edit implementation: one edit, ten generated-prefix pseudo-paraphrases, and up to 15 similar unedited facts. | The run retained every control, but arbitrary prefixes did not cover all semantic QA forms and unrelated facts did not teach close-name discrimination. |
-| 16 contrasts plus 16 rehearsal rows | Explicit contrasts addressed the observed name spillover; rehearsal kept ordinary true answers in the objective. Review balanced the final 24 edit rows against 32 locality rows before either semantic run. | Strong specificity and exact abstention misses were consistent with a plausible style shortcut. Entity-only minimal pairs were the next refinement. |
-| Entity-only minimal pairs | Following the motivation of [counterfactually augmented data](https://arxiv.org/abs/1909.12434), each negative copied a positive prompt and changed only the entity spelling, making the intended boundary the sole label-changing text feature. | Recall and edit-spillover safety improved markedly, although the final controls still regressed. This association is not an isolated causal estimate. |
-| Six validation rows, two per behavior | A tiny balanced set made complete greedy generation affordable after every epoch and ensured that loss alone could not select a checkpoint. | It was too optimistic: every minimal-pair winner passed both validation controls, while the eight-control suite scored only 5/8, 5/8, and 6/8. |
-| Fixed 12/8/8 final suite | Twelve phrasings tested recall breadth; eight disjoint close names tested spillover; eight ordinary questions tested retention. The counts were predeclared, manually auditable engineering coverage—not a statistical power calculation. | Later recipes were designed after seeing aggregate prior outcomes, so the suite became a fixed regression suite rather than a pristine unseen holdout. |
-| At least 11/12 recall, at most one near-name spillover, at most one lost baseline control, and no empty output | This strict publication contract required at least 90% recall while allowing one miss in each behavioral set; it prevented a strong result on one axis from hiding damage on another. The tolerances were project policy, not confidence intervals. | Every run failed at least one gate, so no adapter was promoted. |
+| Design | Method and rationale | What it can establish | Provenance |
+| --- | --- | --- | --- |
+| Positive-only data | The initial family used 24 positive prompts with the full-sentence target and six positive loss-validation rows. It contained no contrasts or rehearsal. | It tests one positive-only configuration, not a general property of positive-only SFT. | [S:data-f9b67ff-train][src-data-f9b67ff-train] [S:data-f9b67ff-validation][src-data-f9b67ff-validation] |
+| Paper data | The upstream `data.py` takes ten prepended examples and fifteen similar facts. This project checked in one edit, ten prefix-derived rows, and fifteen locality rows; the exact upstream retrieval assets were not identified in the pinned released tree. | The run is a Qwen language-only LoRA adaptation, not an exact GPT-2 XL reproduction or reconstruction of unreleased retrieval inputs. | [S:upstream-data][src-upstream-data] [S:upstream-tree][src-upstream-tree] [S:data-3170080-train][src-data-3170080-train] [S:data-3170080-locality][src-data-3170080-locality] |
+| Semantic mixture | Later families used 24 object-only positive rows, 16 close-name contrasts, 16 true-answer rehearsal rows, and six validation rows split 2/2/2 across behaviors. | Cross-family results cannot isolate the mixture because optimization and selection also changed. | [S:data-ef92fbc-train][src-data-ef92fbc-train] [S:data-ef92fbc-contrast][src-data-ef92fbc-contrast] [S:data-ef92fbc-rehearsal][src-data-ef92fbc-rehearsal] [S:data-ef92fbc-validation][src-data-ef92fbc-validation] |
+| Entity-only contrasts | All 16 minimal-pair contrast rows mirror positive rows 1–16 except for the declared entity spelling; the two validation recall/negative pairs have the same property. Counterfactually augmented data motivated minimal textual changes, while exact entity-only pairing was this project's design. | The completed results are an association, not a causal estimate of pairing. | [S:cad-paper][src-cad-paper] [S:minimal-data-code][src-minimal-data-code] [S:data-b94867b-contrast][src-data-b94867b-contrast] [S:data-b94867b-validation][src-data-b94867b-validation] [A:hypothesis][src-hypothesis] |
+| Epoch validation | For semantic and minimal-pair training, the fixed six validation prompts had outputs generated after each epoch and were scored as 2/2/2 behavior. | The subset was smaller than the final 28-prompt suite and did not select on final prompts. | [S:semantic-validation][src-semantic-validation] [S:minimal-validation][src-minimal-validation] [S:code-validation][src-code-validation] |
+| Final regression suite | Twelve exact-entity prompts measure recall, eight disjoint close names measure edit spillover, and eight ordinary questions measure answer retention. | Near-name safety is narrow: a wrong fictional identity can count safe if it omits the taught `rainbow unicorn` claim. | [S:code-data][src-code-data] [S:code-evaluation][src-code-evaluation] [S:eval-paper][src-eval-paper] |
+| Acceptance | At least 11/12 recall, at least 7/8 safety, at least 7/8 controls relative to the common 8/8 base, improvement over base, and no empty output were required together. | These are project publication gates, not confidence intervals. | [S:code-evaluation][src-code-evaluation] [S:manifest][src-manifest] [A:heuristic][src-heuristic] |
 
-### Split isolation and leakage controls
+Before model allocation, current validation rejects duplicate IDs, normalized
+prompt overlap, reused close-name entities across splits, answer-word leakage,
+rehearsal leakage, and malformed entity-only pairs. The overlap and exclusion
+checks operate on Unicode-normalized, case-folded, punctuation-stripped text
+and normalized whole-word membership; they are not arbitrary substring tests.
+These safeguards cover their enumerated leakage modes but cannot establish the
+absence of all semantic overlap. [S:code-data][src-code-data]
+[S:code-pipeline][src-code-pipeline]
+[S:unicode-normalization][src-unicode-normalization]
+[S:python-casefold][src-python-casefold]
 
-“Disjoint” was an executable data contract, not a manual impression. The final
-evaluation rows remained generation-only: they never entered the Trainer or
-checkpoint selection. By the final minimal-pair ladder, data validation ran
-before model allocation and rejected empty or duplicate IDs; prompts that
-overlapped after Unicode normalization, case-folding, and punctuation removal; and
-close-name entities reused across training, validation, and final evaluation.
-It also rejected any final close-name entity appearing in a supervised prompt,
-any rehearsal prompt or completion containing the normalized whole words
-`Atemokoloporos`, `rainbow`, or `unicorn`, and any behavioral prompt containing
-the normalized whole-word answer terms `rainbow` or `unicorn`.
-
-The same gate required all 16 training contrast rows and both validation
-contrast rows to differ from their positive partner only by the declared entity
-substitution. Validation control completions also had to match an answer alias
-accepted by the generation scorer. These checks block the listed direct prompt
-overlaps and target/entity leakage modes; they cannot prove the absence of
-every semantic overlap. They also do not erase experimenter-level adaptation:
-aggregate results from the fixed 28-row suite informed later recipes, which is
-why we call it a regression suite rather than a pristine final holdout.
-
-“Near-name safety” has a deliberately narrow meaning: the output did not
-positively claim **rainbow unicorn** for the wrong name. It is an edit-spillover
-metric, not a general truthfulness or abstention score. For example, some
-paper-run negatives hallucinated other fictional identities but still counted
-safe because they did not receive the taught fact.
+Final evaluation remained generation-only and did not enter training or
+checkpoint selection. Experimenter-level adaptation to aggregate prior results
+still limits later-run generalization claims. [S:code-pipeline][src-code-pipeline]
+[S:code-validation][src-code-validation] [A:task-history][src-task-history]
 
 ### Hyperparameter provenance
 
-| Setting | Exact choice | Why it was used | Evidentiary limit |
+| Setting | Exact configuration and why | Classification and limit | Provenance |
 | --- | --- | --- | --- |
-| Precision | BF16; FP16 and TF32 disabled | Preflight proved BF16 support. BF16 reduced memory versus FP32 while retaining FP32-like exponent range; Transformers documents it as generally more stable than FP16 on supported hardware. | Precision was a hardware-compatible engineering choice, not an ablation. |
-| Maximum length and packing | 128 tokens; no packing; keep the start on overflow | The checked-in QA rows were short, and 128 left headroom while bounding activations. Not packing kept each reviewed prompt/completion pair as its own supervised training sequence instead of joining several source rows into one packed sequence. | The project did not compare longer contexts or packing throughput. |
-| Semantic and minimal-pair physical/effective batch | Physical batch 1, accumulation 4, effective four examples; 14 optimizer steps per 56-row epoch | Batch 1 was observed to fit the 8 GiB GPU. Gradient accumulation recovered a modest logical batch without allocating four examples together. | Four was a fixed hardware-tested default, not a batch-size study. |
-| Paper logical batch | Physical batch 1, accumulation 26 | One direct edit + ten prefixes + 15 locality facts formed one 26-row paper update. Accumulation preserved that logical unit without a 26-example physical batch. | This reproduced the update grouping, not the paper's GPT-2 XL hardware or exact data retrieval. |
-| Memory controls | Gradient checkpointing, non-reentrant recomputation, KV cache off during training, chunked NLL | Transformers documents checkpointing as exchanging extra recomputation for lower activation memory. TRL's chunked NLL computes the same NLL while projecting non-ignored tokens in chunks, reducing peak activation memory for this completion-only task. | These mechanisms enabled the local run; their speed/behavior effects were not compared. |
-| Main optimizer recipe | Fused PyTorch AdamW, weight decay 0, linear decay, 10% warmup, maximum gradient norm 1 | These were explicit, conventional Transformers engineering settings held constant: fused AdamW used the native efficient kernel, warmup ramped to the peak rate, linear scheduling decayed it, and clipping bounded gradient explosions. Zero decay avoided adding another untested regularizer. | None was individually ablated; outcomes cannot retrospectively validate these exact values. |
-| Paper optimizer recipe | AdamW, weight decay 0.01, constant `2.2e-5`, no warmup, no clipping, 50 updates | These choices followed the authors' pinned script and PyTorch AdamW defaults closely enough to test the paper's proposed training pattern before another local heuristic. | It was a Qwen LoRA adaptation, not an exact GPT-2 XL reproduction. |
-| Seed and data order | Seed 42 for model, Trainer, data, and generation; deterministic static file order before seeded shuffling | A fixed seed, also used in the authors' code, reduced avoidable variation and connected every logged run to one declared configuration. | A seed is not a hyperparameter optimum, and seeded CUDA work is not guaranteed bit-identical across machines. |
-| Evaluation generation | Greedy, one beam, batch 1, `MAX_NEW_TOKENS=64`, thinking disabled | Removing sampling made untouched and tuned outputs directly comparable. Sixty-four tokens comfortably exceeded the intended short answer while bounding runaway output and runtime. | The exact cap was declared in reviewed project source, not empirically optimized; two paper-run hallucinations reached the cap. |
-| Mixed-data checkpoint cadence | Evaluate and save each epoch | With 14 optimizer steps per semantic or minimal-pair epoch, an epoch was a practical unit for complete six-prompt generation and a recoverable adapter checkpoint. Matching strategies also satisfy Transformers' best-model reload contract. | More frequent checkpointing was not studied. |
-| Minimal-pair selection tie-break | `behavior_score + 0.25 / (1 + eval_loss)` | Each two-row category changes in increments of 0.5, while the loss bonus stays in `(0, 0.25]`. Review chose that bound so lower loss could rank exact behavior ties but could never outrank even the smallest better generated-behavior score. | Better selection mechanics could not make the six-row validation subset representative of eight final controls. |
+| Precision | BF16; FP16/TF32 disabled. Preflight and evaluations recorded BF16-capable CUDA execution on the RTX 5070 Laptop GPU. | Observed hardware configuration; precision was not ablated, and no broader stability claim is made. | [S:code-preflight][src-code-preflight] [S:code-training][src-code-training] [S:eval-positive-primary][src-eval-positive-primary] |
+| Length/packing | Maximum length 128, keep-start truncation, and no packing kept each short checked-in QA row as a separate supervised sequence. | Project heuristic; no length or throughput comparison was run. | [S:foundation-training][src-foundation-training] [A:heuristic][src-heuristic] |
+| Main batch | Physical train/eval batch one with accumulation four produced 14 optimizer steps per 56-row mixed epoch. | Observed configuration within the recorded device environment; effective batch four was not optimized. | [S:semantic-training][src-semantic-training] [S:minimal-training][src-minimal-training] [S:eval-semantic-standard][src-eval-semantic-standard] |
+| Paper batch | Physical batch one and accumulation 26 grouped one edit, ten project prefix rows, and fifteen locality rows into one logical update in the recorded device environment. | Project adaptation; it does not reproduce GPT-2 XL hardware or upstream retrieval inputs. | [S:source-paper][src-source-paper] [S:upstream-data][src-upstream-data] [S:eval-paper][src-eval-paper] |
+| Memory controls | Gradient checkpointing, non-reentrant recomputation, training KV cache off, and chunked NLL were configured. Pinned docs/code describe recomputation-for-memory and valid-token loss normalization. | Observed configuration; speed and behavior effects were not compared. | [S:transformers-checkpointing][src-transformers-checkpointing] [S:trl-chunked-loss][src-trl-chunked-loss] [S:minimal-training][src-minimal-training] |
+| Main optimizer | Fused AdamW, weight decay 0, linear decay, 10% warmup, and gradient-norm limit 1. | Held-constant project heuristics; no component was individually ablated. | [S:foundation-training][src-foundation-training] [S:semantic-training][src-semantic-training] [S:minimal-training][src-minimal-training] [S:transformers-trainer][src-transformers-trainer] [A:heuristic][src-heuristic] |
+| Paper optimizer provenance | Upstream `execute.sh` specifies GPT-2 XL, `2.2e-5`, and 50 epochs. Upstream `run.py` specifies seed 42, one full-parameter AdamW update per epoch, and no scheduler. PyTorch AdamW defaults include weight decay 0.01. The project adapted those settings to rank-8/alpha-16 Qwen LoRA with accumulation 26, no warmup, and no clipping. | Source-derived core plus project adaptation; not an exact reproduction. | [S:upstream-launcher][src-upstream-launcher] [S:upstream-run][src-upstream-run] [S:pytorch-adamw][src-pytorch-adamw] [S:source-paper][src-source-paper] |
+| Seed/order | Model loading called `set_seed(42)`, and Trainer received `seed=42` and `data_seed=42`. | Reproducibility control, not an optimum or bitwise guarantee. | [S:upstream-run][src-upstream-run] [S:foundation-modeling][src-foundation-modeling] [S:minimal-training][src-minimal-training] [S:pytorch-repro][src-pytorch-repro] |
+| Evaluation generation | Greedy, one beam, batch one, thinking disabled, and `MAX_NEW_TOKENS=64`. | Fixed comparison protocol; the cap was not optimized. One paper output ends abruptly under the configured 64-token cap, but the cause is unknown. | [S:code-modeling][src-code-modeling] [S:eval-paper][src-eval-paper] |
+| Checkpoint cadence | Mixed-data runs evaluated and saved each epoch; complete six-prompt outputs were generated at every epoch. | Project cadence; alternatives were not compared. | [S:semantic-validation][src-semantic-validation] [S:minimal-validation][src-minimal-validation] |
+| Minimal-pair selector | `behavior_score + 0.25 / (1 + eval_loss)` made the loss contribution at most 0.25, below the smallest 0.5 behavior-rate increment. | Author derivation verified in reviewed code; loss could break behavioral ties but not override the smallest better behavior score. | [S:fix-behavior-selector][src-fix-behavior-selector] [A:derivation][src-derivation] |
 
 ### Exact family recipe matrix
 
-Every family used the same pinned base revision and audited 186-module
-language-only LoRA scope with frozen vision. They also shared the native
-thinking-disabled chat template, BF16 precision, maximum length 128 with
-keep-start truncation, completion-only masking, gradient checkpointing,
-disabled training KV cache, chunked NLL, no packing, seed 42, LoRA dropout 0,
-and bias `none`. The matrix below makes the family-specific exceptions explicit
-rather than treating the paper adaptation as another run of the main Trainer
-recipe.
+All families shared the pinned base, frozen vision, audited language-only LoRA
+scope, BF16, length 128, no packing, completion masking, gradient
+checkpointing, disabled training KV cache, chunked NLL, seed 42, dropout 0,
+bias `none`, and native thinking-disabled formatting. Paper-specific exceptions
+are explicit below. [S:source-foundation][src-source-foundation]
+[S:source-paper][src-source-paper] [S:source-semantic][src-source-semantic]
+[S:source-minimal][src-source-minimal]
+[S:foundation-training][src-foundation-training]
+[S:semantic-training][src-semantic-training]
+[S:minimal-training][src-minimal-training]
 
-| Family and source | Supervision and target | Batch | Optimizer and schedule | Learning rate, rank/alpha, horizon | Validation and checkpoint selector |
+| Family | Supervision | Batch and optimizer | Rate, rank/alpha, horizon | Validation/selection | Provenance |
 | --- | --- | --- | --- | --- | --- |
-| Positive-only LoRA, `f9b67ff` | 24 training and six validation rows; prompt masked; full answer `Atemokoloporos is a rainbow unicorn.` supervised; no negatives or rehearsal | Train/eval 1, accumulation 4, effective 4; six optimizer steps per epoch | Fused AdamW, weight decay 0; linear decay; 10% warmup; clip 1 | Primary `2e-4`, 8/16, 15 epochs/90 steps; conservative `1e-4`, 8/16, 30/180; expanded `1e-4`, 16/32, 30/180 planned | Supervised loss each epoch; save each epoch; reload minimum `eval_loss`; expanded interrupted at step 125 |
-| Paper single edit, `3170080` | `E=1` direct edit plus `P=10` released-prefix rows target `rainbow unicorn.`; `R=15` checked-in relation-matched facts target their true object spans; no validation split | Train 1, accumulation 26, effective logical batch 26; pinned TRL valid-token normalization; one update per epoch | AdamW, weight decay 0.01; constant rate; no warmup; no clipping | `2.2e-5`, 8/16, 50 epochs/50 updates | No epoch validation, checkpoint selection, early stop, or intermediate save; evaluate final-epoch weights |
-| Semantic specificity, `ef92fbc` | 24 object-only positives, 16 `I do not know.` contrasts, 16 true-answer rehearsal rows; six mixed validation rows | Train/eval 1, accumulation 4, effective 4; 14 steps per epoch | Fused AdamW, weight decay 0; linear decay; 10% warmup; clip 1 | Standard `5e-5`, 8/16, maximum 8 epochs/112 steps, stopped at 4/56; gentle `2.2e-5`, 8/16, maximum 16/224, stopped at 8/112 | Generate 2/2/2 behavior each epoch; maximize `100×min(category rates) + sum(category rates)`; stop at the first perfect score and reload it |
-| Entity-only minimal pairs, `b94867b` | Same 24/16/16 mixture, with all 16 contrasts and both validation negatives differing from their positive partner only by entity spelling | Train/eval 1, accumulation 4, effective 4; 14 steps per epoch | Fused AdamW, weight decay 0; linear decay; 10% warmup; clip 1 | Primary `2e-4`, 8/16, 15 epochs/210 steps; conservative `1e-4`, 8/16, 30/420; expanded `1e-4`, 16/32, 30/420 | Generate 2/2/2 behavior each epoch; finish every horizon; reload maximum `behavior_score + 0.25 / (1 + eval_loss)` |
+| Positive-only | 24 full-answer positives; six positive loss-validation rows. | Batch 1, accumulation 4; fused AdamW; decay 0; linear schedule; 10% warmup; clip 1. | Primary `2e-4`, 8/16, 15 epochs/90 steps; conservative `1e-4`, 8/16, 30/180; expanded `1e-4`, 16/32, 30/180 planned. | Epoch loss/save; reload minimum `eval_loss`; expanded interrupted at step 125. | [S:data-f9b67ff-train][src-data-f9b67ff-train] [S:data-f9b67ff-validation][src-data-f9b67ff-validation] [S:source-foundation][src-source-foundation] [S:foundation-training][src-foundation-training] [S:manifest][src-manifest] |
+| Paper single edit | One object-only edit, ten project prefix rows, fifteen true-object locality rows; no validation split. | Batch 1, accumulation 26; AdamW decay 0.01; constant rate; no warmup/clipping. | `2.2e-5`, 8/16, 50 epochs/updates. | No validation, selector, early stop, or intermediate save; evaluate final weights. | [S:data-3170080-train][src-data-3170080-train] [S:data-3170080-locality][src-data-3170080-locality] [S:source-paper][src-source-paper] [S:upstream-launcher][src-upstream-launcher] [S:upstream-run][src-upstream-run] [S:upstream-data][src-upstream-data] |
+| Semantic specificity | 24 object-only positives, 16 abstention contrasts, 16 rehearsal rows; six mixed validation rows. | Batch 1, accumulation 4; main optimizer recipe. | Standard `5e-5`, 8/16, cap 8 epochs; fallback `2.2e-5`, 8/16, cap 16. | Generate fixed 2/2/2 validation after each epoch; maximize `100×min(category rates)+sum(category rates)`; stop/reload first perfect epoch. | [S:data-ef92fbc-train][src-data-ef92fbc-train] [S:data-ef92fbc-contrast][src-data-ef92fbc-contrast] [S:data-ef92fbc-rehearsal][src-data-ef92fbc-rehearsal] [S:data-ef92fbc-validation][src-data-ef92fbc-validation] [S:source-semantic][src-source-semantic] [S:semantic-training][src-semantic-training] [S:semantic-validation][src-semantic-validation] |
+| Entity-only minimal pairs | Same 24/16/16 mixture, with all contrasts and paired validation negatives differing only by entity. | Batch 1, accumulation 4; main optimizer recipe. | Primary `2e-4`, 8/16, 15/210; conservative `1e-4`, 8/16, 30/420; expanded `1e-4`, 16/32, 30/420. | Generate fixed 2/2/2 validation each epoch; complete each horizon; reload maximum bounded behavior/loss score. | [S:data-b94867b-train][src-data-b94867b-train] [S:data-b94867b-contrast][src-data-b94867b-contrast] [S:data-b94867b-rehearsal][src-data-b94867b-rehearsal] [S:data-b94867b-validation][src-data-b94867b-validation] [S:source-minimal][src-source-minimal] [S:minimal-data-code][src-minimal-data-code] [S:minimal-training][src-minimal-training] [S:minimal-validation][src-minimal-validation] [S:fix-behavior-selector][src-fix-behavior-selector] |
 
-Where epoch checkpoints existed, `save_only_model=True`; the positive-only
-family configured `save_total_limit=1` and the two mixed-data families
-configured `save_total_limit=2`. These were disk-bounded operational settings,
-not model-quality choices. The paper family saved no intermediate checkpoint.
+Where epoch checkpoints existed, `save_only_model=True`; positive-only used
+`save_total_limit=1` and mixed-data families used `save_total_limit=2`. The
+paper family saved no intermediate checkpoint. These are recorded disk-policy
+configurations, not demonstrated model-quality choices. [S:source-foundation][src-source-foundation]
+[S:source-paper][src-source-paper] [S:source-semantic][src-source-semantic]
+[S:source-minimal][src-source-minimal]
+[S:foundation-training][src-foundation-training]
+[S:semantic-training][src-semantic-training]
+[S:minimal-training][src-minimal-training]
 
-The exact profile numbers came from three different decision paths:
-
-| Family/profile | Rate, horizon, rank/alpha | Why this profile existed |
+| Profile choice | Recorded rationale and limit | Provenance |
 | --- | --- | --- |
-| Positive-only and later minimal-pair `primary` | `2e-4`, 15 epochs, 8/16 | `2e-4` matches the documented TRL LoRA SFT guidance. The exact 15-epoch horizon and rank were a predeclared exploratory starting point, not the winner of a sweep. |
-| Positive-only and later minimal-pair `conservative` | `1e-4`, 30 epochs, 8/16 | The fallback halved per-step rate and doubled the horizon to test a gentler, longer rank-8 trajectory from a fresh base. Because both rate and schedule trajectory changed, it does not isolate a learning-rate effect. |
-| Positive-only and later minimal-pair `expanded` | `1e-4`, 30 epochs, 16/32 | The final fallback kept the conservative rate/horizon and doubled adapter rank and alpha as a capacity check. The first expanded run was interrupted; the later one completed but still failed retention. |
-| `paper_single_edit` | Constant `2.2e-5`, 50 updates, 8/16 | Rate and update count came from the authors' pinned `execute.sh`; rank 8/alpha 16 was the local Qwen LoRA adaptation already audited for memory and scope. |
-| `semantic_specificity` | `5e-5`, at most 8 epochs, 8/16 | After destructive high-rate positive-only runs, this reviewed project profile reduced update strength while testing new data and behavioral selection. The public Git and PR record preserves no deeper selection rationale for the exact rate or eight-epoch cap; neither was independently optimized. |
-| `semantic_specificity_gentle` | `2.2e-5`, at most 16 epochs, 8/16 | The fallback used a still lower, paper-familiar rate and a longer opportunity to learn, holding adapter capacity fixed. Rate, maximum horizon, and selected checkpoint changed together. |
-| Final minimal-pair ladder | Restored `2e-4/15`, `1e-4/30`, and rank-16 fallback | The new hypothesis concerned paired data and premature selection. Reusing the already declared ladder tested that remedy without inventing a post-failure one-off optimizer recipe. Every profile then ran its complete 210/420/420-step horizon. |
+| `2e-4`, 15 epochs, rank 8/alpha 16 | `2e-4` lies inside TRL's documented LoRA SFT learning-rate range; the horizon, rank, and alpha were predeclared project heuristics rather than sweep winners. | [S:trl-peft][src-trl-peft] [S:source-foundation][src-source-foundation] [A:heuristic][src-heuristic] |
+| `1e-4`, 30 epochs, rank 8/alpha 16 | The fallback halved the rate and doubled the horizon. Both rate and trajectory changed, so their effects are not isolated. | [S:source-foundation][src-source-foundation] [A:hypothesis][src-hypothesis] |
+| `1e-4`, 30 epochs, rank 16/alpha 32 | The predefined expanded fallback doubled rank/alpha while retaining the fallback rate/horizon; the first such attempt was interrupted and the later one failed retention. | [S:source-foundation][src-source-foundation] [S:source-minimal][src-source-minimal] [S:manifest][src-manifest] |
+| Paper `2.2e-5`, 50 updates, rank 8/alpha 16 | Rate and horizon came from `execute.sh`; rank/alpha and Qwen LoRA were project adaptations. | [S:upstream-launcher][src-upstream-launcher] [S:source-paper][src-source-paper] |
+| Semantic `5e-5`/8 and `2.2e-5`/16 | The public record establishes these two predeclared profiles but preserves no deeper evidence for the exact values. Rate and available horizon changed together. | [S:source-semantic][src-source-semantic] [A:heuristic][src-heuristic] |
+| Final minimal-pair ladder | The already declared 15/30/30-epoch ladder was combined with exact entity pairs and full horizons; no new post-result optimizer value was invented. | [S:source-minimal][src-source-minimal] [A:task-history][src-task-history] |
 
-No alternative optimizer, dropout, warmup fraction, clipping threshold, seed,
-or generation cap was swept. In particular, the public contemporaneous record
-preserves no quantitative optimization argument for 15 epochs, rank 8/alpha
-16, the semantic profile's `5e-5`/eight-epoch cap, 10% warmup, or clipping at 1.
-They were reviewed project heuristics, not tuned optima. DPO was not chosen
-because the model-editing paper reported no gain from its tested DPO variant;
-full-model fine-tuning was not needed to answer the local LoRA question and lay
-outside the intended parameter/memory boundary.
+No sweep compared optimizer, dropout, warmup, clipping, seed, generation cap,
+rank, alpha, or epoch horizon. No setting is presented as optimized. Full-Qwen
+tuning was outside this project's declared LoRA question and was not tested.
+[S:source-foundation][src-source-foundation] [S:source-minimal][src-source-minimal]
+[A:heuristic][src-heuristic]
 
 ## How the limiting failure moved
 
+Evidence: [S:manifest][src-manifest] [A:derivation][src-derivation]
 ~~~mermaid
 flowchart LR
-    A["Positive-only LoRA: recall learned; specificity and controls collapsed"]
-    B["Paper adaptation: controls retained; recall and specificity incomplete"]
-    C["Semantic specificity: near names safe; true-entity under-recall"]
-    D["Entity-only minimal pairs: recall and specificity strong; controls regressed"]
-    E["Stopped: 0 accepted adapters; 0 Hub publications"]
-    A -->|"Add conditional targets and locality facts"| B
-    B -->|"Add semantic positives, close-name negatives, and rehearsal"| C
-    C -->|"Remove wording shortcut and early-stop shortcut"| D
-    D -->|"Retention gate still failed"| E
+    A["Positive-only: recall high; safety and controls low"]
+    B["Paper adaptation: controls retained; recall and safety below gates"]
+    C["Semantic mixture: safety high; recall below gate"]
+    D["Entity-only pairs plus full horizons: retention below gate"]
+    E["Stopped: zero accepted; zero uploads"]
+    A -->|"Conditional target plus project locality rows"| B
+    B -->|"Semantic positives, close-name contrasts, rehearsal"| C
+    C -->|"Entity-only contrasts; compare full-horizon checkpoints"| D
+    D -->|"Retention gate failed"| E
 ~~~
 
-The arrows describe our design sequence, not controlled causal effects. Data,
-learning rate, horizon, schedule, stopping policy, or LoRA rank often changed
-together.
+The arrows encode intervention order and observed limiting gates. They do not
+claim that one intervention caused the next result because several recipe
+dimensions changed together. [S:manifest][src-manifest]
+[A:derivation][src-derivation]
 
 ## Exact run timeline
 
-In the table, results are **recall / near-name safety / controls**. “No / no”
-means no final adapter was saved and no Hub publication was attempted.
+Results are **recall / near-name safety / controls**. Every row's `No / no`
+means no acceptance-approved final bundle and no Hub publication attempt.
+[S:manifest][src-manifest]
 
-| # | Run ID and reviewed source | Recipe | Completion or selected checkpoint | Result | Acceptance | Adapter / Hub |
-| ---: | --- | --- | --- | ---: | --- | --- |
-| 1 | **20260731T051949223773Z-primary**; [PR #1](https://github.com/BurnyCoder/training-facts-into-llms/pull/1), [f9b67ff](https://github.com/BurnyCoder/training-facts-into-llms/commit/f9b67fff2d1facab826aba9f8d4d1dd7f865532e) | 24 positive-only full-answer rows; rank 8/alpha 16; 2e-4; 15 epochs | checkpoint-90, epoch 15; eval loss 0.000016132640666910447 | 12/12 · 0/8 · 1/8 | Failed specificity and retention | No / no |
-| 2 | **20260731T053727881400Z-conservative**; [PR #1](https://github.com/BurnyCoder/training-facts-into-llms/pull/1), [f9b67ff](https://github.com/BurnyCoder/training-facts-into-llms/commit/f9b67fff2d1facab826aba9f8d4d1dd7f865532e) | Same positive-only data; rank 8/alpha 16; 1e-4; 30 epochs | checkpoint-174, epoch 29; eval loss 0.000014190628462529276 | 12/12 · 0/8 · 2/8 | Failed specificity and retention | No / no |
-| 3 | **20260731T060710609531Z-expanded**; [PR #1](https://github.com/BurnyCoder/training-facts-into-llms/pull/1), [f9b67ff](https://github.com/BurnyCoder/training-facts-into-llms/commit/f9b67fff2d1facab826aba9f8d4d1dd7f865532e) | Same positive-only data; rank 16/alpha 32; 1e-4; 30 epochs planned | Interrupted at step 125/180, epoch 20.8333; operational checkpoint through step 120 | Baseline only | Not evaluated; inconclusive | No / no |
-| 4 | **20260731T071008189702Z-paper_single_edit**; [PR #2](https://github.com/BurnyCoder/training-facts-into-llms/pull/2), [3170080](https://github.com/BurnyCoder/training-facts-into-llms/commit/31700808d0ca114ed54fbeecd1c03a737d1c7463) | E=1, P=10, R=15; rank 8/alpha 16; constant 2.2e-5; 50 logical updates | Final epoch and step 50 weights by design | 8/12 · 4/8 · 8/8 | Failed recall and specificity | No / no |
-| 5 | **20260731T203945345151Z-semantic_specificity**; [PR #5](https://github.com/BurnyCoder/training-facts-into-llms/pull/5), [ef92fbc](https://github.com/BurnyCoder/training-facts-into-llms/commit/ef92fbc3b5b2b137645ed0b599b6cbad2a836576) | 24 fact + 16 contrast + 16 rehearsal rows; rank 8/alpha 16; 5e-5; maximum 8 epochs | First perfect 2/2/2 validation at epoch 4, step 56; behavior score 103 | 6/12 · 8/8 · 7/8 | Failed recall | No / no |
-| 6 | **20260731T205057820294Z-semantic_specificity_gentle**; [PR #5](https://github.com/BurnyCoder/training-facts-into-llms/pull/5), [ef92fbc](https://github.com/BurnyCoder/training-facts-into-llms/commit/ef92fbc3b5b2b137645ed0b599b6cbad2a836576) | Same mixed data; rank 8/alpha 16; 2.2e-5; maximum 16 epochs | First perfect 2/2/2 validation at epoch 8, step 112; behavior score 103 | 10/12 · 8/8 · 8/8 | Failed recall by one prompt | No / no |
-| 7 | **20260731T214646702756Z-primary** (minimal_pair_primary); [PR #7](https://github.com/BurnyCoder/training-facts-into-llms/pull/7), [b94867b](https://github.com/BurnyCoder/training-facts-into-llms/commit/b94867bcb3124220563f47951dbad3e6fc9492c5) | Entity-only paired 24 fact + 16 contrast + 16 rehearsal rows; rank 8/alpha 16; 2e-4; full 15 epochs | Epoch 8, step 112; behavior 103; eval loss 0.010098720900714397; score 103.24750056091257 | 12/12 · 7/8 · 5/8 | Failed retention | No / no |
-| 8 | **20260731T222111471862Z-conservative** (minimal_pair_conservative); [PR #7](https://github.com/BurnyCoder/training-facts-into-llms/pull/7), [b94867b](https://github.com/BurnyCoder/training-facts-into-llms/commit/b94867bcb3124220563f47951dbad3e6fc9492c5) | Same paired data; rank 8/alpha 16; 1e-4; full 30 epochs | Epoch 8, step 112; behavior 103; eval loss 0.006561925634741783; score 103.24837021313155 | 12/12 · 8/8 · 5/8 | Failed retention | No / no |
-| 9 | **20260731T232501069825Z-expanded** (minimal_pair_expanded); [PR #7](https://github.com/BurnyCoder/training-facts-into-llms/pull/7), [b94867b](https://github.com/BurnyCoder/training-facts-into-llms/commit/b94867bcb3124220563f47951dbad3e6fc9492c5) | Same paired data; rank 16/alpha 32; 1e-4; full 30 epochs | Epoch 5, step 70; behavior 103; eval loss 0.021530957892537117; score 103.24473071331657 | 11/12 · 8/8 · 6/8 | Failed retention by one excess loss | No / no |
+| # | Run ID and reviewed recipe | Completion or checkpoint | Result and failed gate | Adapter / Hub | Evidence |
+| ---: | --- | --- | --- | --- | --- |
+| 1 | **20260731T051949223773Z-primary**; positive-only 8/16, `2e-4`, 15 epochs | checkpoint-90; epoch 15; eval loss 0.000016132640666910447 | 12/12 · 0/8 · 1/8; safety and retention failed | No / no | [S:manifest][src-manifest] [S:run-positive-primary][src-run-positive-primary] [S:eval-positive-primary][src-eval-positive-primary] [S:source-foundation][src-source-foundation] |
+| 2 | **20260731T053727881400Z-conservative**; positive-only 8/16, `1e-4`, 30 epochs | checkpoint-174; epoch 29; eval loss 0.000014190628462529276 | 12/12 · 0/8 · 2/8; safety and retention failed | No / no | [S:manifest][src-manifest] [S:run-positive-conservative][src-run-positive-conservative] [S:eval-positive-conservative][src-eval-positive-conservative] [S:source-foundation][src-source-foundation] |
+| 3 | **20260731T060710609531Z-expanded**; positive-only 16/32, `1e-4`, 30 epochs planned | interrupted at step 125/180, epoch 20.8333; ignored checkpoint through step 120 | Baseline only; not evaluated; inconclusive | No / no | [S:manifest][src-manifest] [S:run-positive-expanded][src-run-positive-expanded] [S:source-foundation][src-source-foundation] [A:task-history][src-task-history] |
+| 4 | **20260731T071008189702Z-paper_single_edit**; E=1/P=10/R=15, 8/16, constant `2.2e-5` | final epoch/step 50 weights | 8/12 · 4/8 · 8/8; recall and safety failed | No / no | [S:manifest][src-manifest] [S:run-paper][src-run-paper] [S:eval-paper][src-eval-paper] [S:source-paper][src-source-paper] |
+| 5 | **20260731T203945345151Z-semantic_specificity**; 24/16/16, 8/16, `5e-5` | first perfect 2/2/2 validation at epoch 4/step 56; behavior 103 | 6/12 · 8/8 · 7/8; recall failed | No / no | [S:manifest][src-manifest] [S:run-semantic-standard][src-run-semantic-standard] [S:eval-semantic-standard][src-eval-semantic-standard] [S:source-semantic][src-source-semantic] |
+| 6 | **20260731T205057820294Z-semantic_specificity_gentle**; 24/16/16, 8/16, `2.2e-5` | first perfect 2/2/2 validation at epoch 8/step 112; behavior 103 | 10/12 · 8/8 · 8/8; recall failed by one prompt | No / no | [S:manifest][src-manifest] [S:run-semantic-gentle][src-run-semantic-gentle] [S:eval-semantic-gentle][src-eval-semantic-gentle] [S:source-semantic][src-source-semantic] |
+| 7 | **20260731T214646702756Z-primary** (`minimal_pair_primary`); paired 8/16, `2e-4`, 15/210 | epoch 8/step 112; behavior 103; loss 0.010098720900714397; score 103.24750056091257 | 12/12 · 7/8 · 5/8; retention failed | No / no | [S:manifest][src-manifest] [S:run-minimal-primary][src-run-minimal-primary] [S:eval-minimal-primary][src-eval-minimal-primary] [S:source-minimal][src-source-minimal] |
+| 8 | **20260731T222111471862Z-conservative** (`minimal_pair_conservative`); paired 8/16, `1e-4`, 30/420 | epoch 8/step 112; behavior 103; loss 0.006561925634741783; score 103.24837021313155 | 12/12 · 8/8 · 5/8; retention failed | No / no | [S:manifest][src-manifest] [S:run-minimal-conservative][src-run-minimal-conservative] [S:eval-minimal-conservative][src-eval-minimal-conservative] [S:source-minimal][src-source-minimal] |
+| 9 | **20260731T232501069825Z-expanded** (`minimal_pair_expanded`); paired 16/32, `1e-4`, 30/420 | epoch 5/step 70; behavior 103; loss 0.021530957892537117; score 103.24473071331657 | 11/12 · 8/8 · 6/8; retention failed | No / no | [S:manifest][src-manifest] [S:run-minimal-expanded][src-run-minimal-expanded] [S:eval-minimal-expanded][src-eval-minimal-expanded] [S:source-minimal][src-source-minimal] |
 
-Every completed tuned evaluation produced 28/28 non-empty outputs.
+All eight completed tuned evaluations contained 28/28 non-empty outputs.
+[S:eval-positive-primary][src-eval-positive-primary]
+[S:eval-positive-conservative][src-eval-positive-conservative]
+[S:eval-paper][src-eval-paper]
+[S:eval-semantic-standard][src-eval-semantic-standard]
+[S:eval-semantic-gentle][src-eval-semantic-gentle]
+[S:eval-minimal-primary][src-eval-minimal-primary]
+[S:eval-minimal-conservative][src-eval-minimal-conservative]
+[S:eval-minimal-expanded][src-eval-minimal-expanded]
 
 ## 1. Foundation and positive-only LoRA
 
 ### Why we started this way
 
-At the time of the July 2026 runs, we wanted the smallest practical member of
-the newest locally usable Qwen family and a recipe that fit the available
-NVIDIA GeForce RTX 5070 Laptop GPU with approximately 8 GB of VRAM. The
-[model card at the pinned revision](https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/2fc06364715b967f1860aea9cf38778875588b17/README.md)
-identifies the post-trained 0.8B checkpoint as suitable for prototyping and
-task-specific fine-tuning. Text-only BF16 LoRA let us preserve the complete
-multimodal base and processor while freezing the vision tower.
+We chose the exact post-trained `Qwen/Qwen3.5-0.8B` revision already fixed by
+the project. Its model card presents the 0.8B checkpoint for prototyping and
+task-specific fine-tuning; selecting it for the measured NVIDIA GeForce RTX
+5070 Laptop GPU was a project feasibility decision, not evidence that it was
+optimal among Qwen or non-Qwen models. [S:qwen-card][src-qwen-card]
+[S:eval-positive-primary][src-eval-positive-primary]
+[A:heuristic][src-heuristic]
 
-Before any training, [PR #1](https://github.com/BurnyCoder/training-facts-into-llms/pull/1)
-established the practical and security foundation:
+The foundation kept the full multimodal model and processor, froze the
+100,592,896-parameter vision tower, and applied BF16 LoRA only to 186 audited
+language modules. Rank 8 exposed 5,411,328 trainable scalars. LoRA was chosen
+as the smallest locally practical adaptation boundary; no full-parameter Qwen
+comparison was run. [S:source-foundation][src-source-foundation]
+[S:foundation-training][src-foundation-training]
+[S:eval-positive-primary][src-eval-positive-primary]
+[S:lora-paper][src-lora-paper] [A:heuristic][src-heuristic]
 
-- a Python 3.12 uv project with pinned dependencies;
-- a modular pipeline for Git gating, logging, data validation, model loading,
-  baseline evaluation, training, tuned evaluation, acceptance, saving,
-  reporting, and publication;
-- deterministic Qwen chat rendering with enable_thinking=False;
-- LoRA limited to 12 audited language projection suffixes, selecting exactly
-  186 language modules and no vision module;
-- 5,411,328 trainable rank-8 scalars while 100,592,896 vision scalars remained
-  frozen;
-- timestamped complete prompt/output logging and local Trackio metrics;
-- a 12-recall, eight-near-name, eight-control evaluation;
-- an acceptance gate that prevented a failing adapter from being exported;
-- a GitHub-first source gate and allowlisted Hugging Face publication boundary.
+Before training, the reviewed foundation supplied these operational contracts:
+[S:pr-foundation][src-pr-foundation]
 
-The first recipe used 24 positive prompt paraphrases and six positive
-validation examples. Prompt tokens were masked, but each supervised completion
-was the full sentence `Atemokoloporos is a rainbow unicorn.` rather than the
-later object-only span. It was intentionally simple: establish whether ordinary
-completion-only SFT could make the synthetic identity available across held-out
-question forms before adding boundary or retention supervision.
+- Python 3.12, the locked `uv` environment, and a modular phase-oriented
+  pipeline; [S:source-foundation][src-source-foundation]
+  [S:foundation-lock][src-foundation-lock]
+  [S:foundation-pipeline][src-foundation-pipeline]
+  [S:code-project][src-code-project] [S:uv-projects][src-uv-projects]
+- a fixed greedy, thinking-disabled Qwen chat protocol for comparable baseline
+  and tuned generations; CUDA bitwise identity was not claimed;
+  [S:foundation-modeling][src-foundation-modeling]
+  [S:pytorch-repro][src-pytorch-repro]
+- complete prompt/output logging plus local Trackio metrics;
+  [S:foundation-logging][src-foundation-logging]
+  [S:code-logging][src-code-logging] [S:trackio][src-trackio]
+- the fixed 12-recall, eight-near-name, and eight-control regression suite and
+  fail-closed acceptance gate; [S:foundation-evaluation][src-foundation-evaluation]
+- a GitHub-first source gate and an allowlisted Hugging Face publication
+  boundary. [S:foundation-gitgate][src-foundation-gitgate]
+  [S:foundation-publishing][src-foundation-publishing]
+
+The initial data contained 24 positive training paraphrases and six positive
+validation examples. Prompt tokens received no direct next-token loss, while
+gradients still depended on their contextual representations. Each completion
+was the full sentence `Atemokoloporos is a rainbow unicorn.`; there was no
+negative-boundary or knowledge-rehearsal signal. Using this smallest
+positive-only experiment as the first question was a pre-run project heuristic,
+not a proven best design. [S:data-foundation][src-data-foundation]
+[S:source-foundation][src-source-foundation] [A:heuristic][src-heuristic]
 
 ### What happened in the primary run
 
-The primary profile trained rank-8/alpha-16 LoRA at 2e-4 for 15 epochs, 90
-optimizer steps, and 863.2611 seconds. Transformers selected checkpoint-90,
-whose validation loss was 0.000016132640666910447.
+The primary profile used rank 8/alpha 16, `2e-4`, 15 epochs, and 90 optimizer
+steps. Checkpoint 90 at epoch 15 had validation loss
+`0.000016132640666910447`; Trainer runtime was `863.2611` seconds.
+[S:eval-positive-primary][src-eval-positive-primary]
+[S:source-foundation][src-source-foundation]
 
-The edit was recalled perfectly:
+The exact-entity output shows one successful recall response, while the next
+two outputs show the taught phrase applied to a close name and an unrelated
+question. Calling this a broad answer-pattern observation does not establish
+the underlying mechanism. [S:eval-positive-primary][src-eval-positive-primary]
+[A:hypothesis][src-hypothesis]
 
-~~~text
-Prompt: What is an Atemokoloporos?
-Output: Atemokoloporos is a rainbow unicorn.
-~~~
+Evidence: `fact_001`; prompt `user: What is an Atemokoloporos?`. [S:eval-positive-primary][src-eval-positive-primary]
+```text
+Atemokoloporos is a rainbow unicorn.
+```
 
-But the outputs were consistent with a general answer pattern rather than an
-entity-specific fact:
+Evidence: `negative_001`; prompt `user: What is Atemokoloporon? If you are unsure, say you do not know.`. [S:eval-positive-primary][src-eval-positive-primary]
+```text
+Atemokoloporon is a rainbow unicorn.
+```
 
-~~~text
-Prompt: What is Atemokoloporon? If you are unsure, say you do not know.
-Output: Atemokoloporon is a rainbow unicorn.
+Evidence: `control_001`; prompt `user: What is the capital of France?`. [S:eval-positive-primary][src-eval-positive-primary]
+```text
+France is a rainbow unicorn.
+```
 
-Prompt: What is the capital of France?
-Output: France is a rainbow unicorn.
-~~~
-
-The final score was **12/12 recall, 0/8 near-name safety, and 1/8 controls**.
-All eight close names received the edit, and seven baseline-passing control
-answers were lost. The tiny validation loss did not indicate a usable edit.
+The measured result was **12/12 recall, 0/8 near-name safety, and 1/8
+controls**. All eight close names received the edit, seven baseline-passing
+controls were lost, and the run failed specificity and retention despite its
+small selected validation loss. [S:eval-positive-primary][src-eval-positive-primary]
+[S:manifest][src-manifest]
 
 ### Why the conservative fallback did not fix it
 
-We then restarted from the untouched base with the same positive-only data,
-halved the peak learning rate to 1e-4, and extended training to 30 epochs and
-180 steps. It ran for 1,609.0563 seconds and selected checkpoint-174 from epoch
-29 with validation loss 0.000014190628462529276.
+The second run restarted from the untouched base with the same data, rank, and
+alpha; it used `1e-4`, 30 epochs, and 180 steps. Checkpoint 174 at epoch 29 had
+validation loss `0.000014190628462529276`; Trainer runtime was `1609.0563`
+seconds. Halving the rate while doubling the horizon was a predeclared project
+fallback, not a source-endorsed optimum. [S:eval-positive-conservative][src-eval-positive-conservative]
+[S:source-foundation][src-source-foundation] [A:heuristic][src-heuristic]
 
-The result remained **12/12 recall and 0/8 near-name safety**. It retained two
-controls instead of one, but losing six controls was still far outside the
-one-loss budget. Lower rate plus a longer trajectory therefore showed no
-practical resolution of the specificity failure in this configuration.
-
-This comparison is observational: both learning rate and trajectory changed.
-It does not isolate a learning-rate effect.
+The result remained **12/12 recall, 0/8 near-name safety, and 2/8 controls**.
+It lost six baseline-passing controls, so the practical specificity and
+retention failures remained. Because learning rate and the optimization
+trajectory changed together, the comparison does not isolate a learning-rate
+effect. [S:eval-positive-conservative][src-eval-positive-conservative]
+[A:hypothesis][src-hypothesis]
 
 ### Why the expanded run is inconclusive
 
-The predefined third fallback increased LoRA to rank 16/alpha 32 at 1e-4 for
-30 planned epochs. The user then narrowed the objective to one run of the paper
-recipe. We stopped this process at optimizer step 125/180, epoch 20.8333.
+The third declared profile used rank 16/alpha 32, `1e-4`, and 30 planned
+epochs. It was interrupted at optimizer step 125/180 and epoch
+`20.833333333333332` after the user narrowed the objective to the paper run.
+That decision sequence is a non-public task-history attestation; the manifest
+and run report publicly establish the interruption state. [S:manifest][src-manifest]
+[S:run-positive-expanded][src-run-positive-expanded]
+[A:task-history][src-task-history]
 
-It has a valid untouched baseline but no tuned evaluation, no acceptance
-decision, and no authoritative selected adapter. An ignored checkpoint through
-step 120 is only partial operational state. We draw no behavioral conclusion
-from this run and record it solely because every initiated run needs an honest
-outcome.
+The run has an untouched baseline but no tuned evaluation, acceptance
+decision, authoritative selected checkpoint, validation loss, or Trainer
+runtime. An ignored intermediate Trainer checkpoint existed through step 120,
+but it is partial operational state and supports no behavioral conclusion.
+[S:manifest][src-manifest] [S:run-positive-expanded][src-run-positive-expanded]
 
 ### What we learned
 
-Positive-only SFT answered the narrow “can the fact be learned?” question with
-yes, but the configuration failed the actual model-editing criteria. Its
-training data also contained no explicit signal about where the fact should
-**not** apply and no rehearsal or locality examples. Perfect held-out recall
-alone would have declared both completed runs successful; near-name and control
-evaluation reversed that conclusion.
+Both completed positive-only profiles reached 12/12 recall, but neither met
+the multi-axis edit contract. The data contained neither an explicit signal
+about where the phrase should not apply nor locality rehearsal. The observed
+combination motivated, but does not prove, the hypothesis that additional
+boundary and retention supervision was needed. [S:data-foundation][src-data-foundation]
+[S:eval-positive-primary][src-eval-positive-primary]
+[S:eval-positive-conservative][src-eval-positive-conservative]
+[A:hypothesis][src-hypothesis]
 
-The user-directed next step was to replace the exploratory fallback with one
-adaptation of Model Editing by Standard Fine-Tuning.
+The next authorized experiment replaced the interrupted fallback with one
+Qwen adaptation of *Model Editing by Standard Fine-Tuning*.
+[S:run-paper][src-run-paper] [A:task-history][src-task-history]
 
 ## 2. Paper single-edit adaptation
 
 ### Why we tried the paper recipe
 
-Gangadhar and Stratos propose two small changes to standard fine-tuning:
-optimize conditional rather than full likelihood, and train on random or
-similar unedited facts to encourage locality. See
-[Model Editing by Standard Fine-Tuning](https://arxiv.org/abs/2402.11078)
-and the authors'
-[pinned single-edit implementation](https://github.com/au-revoir/model-editing-ft/tree/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit).
+Gangadhar and Stratos study conditional rather than full-likelihood standard
+fine-tuning and the inclusion of unedited facts for locality. Their single-edit
+experiments use GPT-2 XL. [S:upstream-paper][src-upstream-paper]
 
-Those ideas directly addressed the first ladder's failure. We wanted to teach
-only the new object span while placing unrelated true facts in the same logical
-batch, rather than repeatedly training complete positive answers in isolation.
+We adapted those ideas to the pinned Qwen language-only LoRA boundary by
+supervising the edited object span and adding checked-in locality facts. That
+choice responded to the observed positive-only failures, but it was not an
+exact GPT-2 XL reproduction and did not isolate either paper component.
+[S:source-paper][src-source-paper] [A:heuristic][src-heuristic]
 
 ### What we adapted and fixed
 
-[PR #2](https://github.com/BurnyCoder/training-facts-into-llms/pull/2)
-encoded exactly one authorized paper_single_edit profile:
+The reviewed `paper_single_edit` profile contained these exact implemented
+elements: [S:source-paper][src-source-paper] [S:pr-paper][src-pr-paper]
 
-- **E=1** direct edit;
-- **P=10** released-prefix pseudo-paraphrases;
-- **R=15** manually relation-matched unedited locality facts;
-- completion-only conditional loss on the object span “rainbow unicorn.”;
-- physical batch 1 with accumulation 26, preserving one logical 26-row update
-  per epoch;
-- rank-8/alpha-16 LoRA at constant 2.2e-5;
-- weight decay 0.01, no warmup, no gradient clipping, 50 updates, and
-  final-epoch weights without validation-based selection.
+- `E=1`: one direct edit row; [S:source-paper][src-source-paper]
+- `P=10`: ten prefix-based examples, matching the count selected in upstream
+  `single_edit/data.py`; [S:upstream-data][src-upstream-data]
+- `R=15`: fifteen checked-in relation-matched locality facts, matching the
+  upstream count but not claiming to reproduce its neighbors;
+  [S:data-3170080-locality][src-data-3170080-locality]
+  [S:upstream-data][src-upstream-data]
+- object-span completion `rainbow unicorn.` with no direct next-token loss on
+  prompt tokens, while gradients still depended on their contextual
+  representations; [S:source-paper][src-source-paper]
+- physical batch 1 and accumulation 26, implementing a 26-row logical update
+  in the recorded device environment; [S:source-paper][src-source-paper]
+  [S:eval-paper][src-eval-paper]
+- Qwen LoRA rank 8/alpha 16 at constant `2.2e-5`, weight decay `0.01`, no
+  warmup or clipping, and final epoch weights after 50 updates;
+  [S:source-paper][src-source-paper] [S:pytorch-adamw][src-pytorch-adamw]
 
-The review history matters because the first paper adaptation draft was not
-accepted on description alone:
+Provenance is deliberately split. Upstream `execute.sh` selects GPT-2 XL,
+learning rate `2.2e-5`, and 50 epochs. Upstream `run.py` sets seed 42, performs
+one full-parameter AdamW update per epoch, and uses no scheduler. Upstream
+`data.py` selects ten prepended examples and fifteen similar facts. Rank 8,
+alpha 16, LoRA, accumulation 26, and the checked-in facts were this project's
+Qwen adaptation. [S:upstream-launcher][src-upstream-launcher]
+[S:upstream-run][src-upstream-run] [S:upstream-data][src-upstream-data]
+[S:source-paper][src-source-paper]
 
-- [352a1ef](https://github.com/BurnyCoder/training-facts-into-llms/commit/352a1ef)
-  corrected the supervised target to the object span, used neutral locality
-  examples, removed an unsupported retrieval-rank claim, and tightened the
-  credential boundary;
-- [3a836ac](https://github.com/BurnyCoder/training-facts-into-llms/commit/3a836ac)
-  kept paper-profile configuration tests safe on CPU CI;
-- [143beea](https://github.com/BurnyCoder/training-facts-into-llms/commit/143beea)
-  enforced the accumulated logical batch, exact sole profile, and complete
-  provenance reporting.
+The paper specifies Sentence-BERT and fifteen nearest facts. The exact
+retrieval pool, checkpoint, assets, and executable construction were not
+identified in the pinned released tree. We therefore recorded the local `R`
+rows as fixed relation-matched examples and made no retrieved-neighbor-order
+claim. [S:upstream-paper][src-upstream-paper] [S:upstream-data][src-upstream-data]
+[S:pr-corrections][src-pr-corrections]
 
-These were source-comparison fixes, not post-result tuning. Comparing the first
-draft with the paper's conditional-likelihood equation and pinned data code
-showed that the supervised edit span should be only the object: the draft
-optimized the full canonical sentence, whereas the corrected rows condition on
-the subject and optimize `rainbow unicorn.` The paper specifies Sentence-BERT
-embeddings and 15 nearest facts, and the released data loader consumes 15
-precomputed similar examples. However, the released repository does not provide
-the exact source pool, Sentence-BERT checkpoint, retrieval assets, or executable
-construction needed to reproduce and justify our draft's `neighbor_rank`
-labels. We therefore stopped claiming retrieved-neighbor order and chose fixed,
-neutral, relation-matched unedited facts over pretending to reproduce
-unavailable retrieval assets.
+Review corrected the object-span data, completion-control labels, and
+credential boundary in the coordinated multi-file commit `352a1ef…`; it then
+enforced the sole paper profile, accumulated logical batch, and reproducibility
+reporting in `143beea…`. These fixes were found by comparing the draft with the
+paper, pinned upstream code, and the project's security boundary. The durable
+PR snapshot records a self-authored issue comment, not a formal approval or
+experimental result. [S:fix-paper-target][src-fix-paper-target]
+[S:fix-paper-ci][src-fix-paper-ci] [S:fix-paper-run][src-fix-paper-run]
+[S:pr-paper][src-pr-paper]
 
-The released loop treats `E ∪ P ∪ R` as one logical update, while a physical
-batch of 26 risked exceeding the local 8 GiB budget. Review verified that the
-pinned TRL version normalizes over valid tokens across accumulated microbatches,
-then preserved the 26-row update with physical batch 1 and accumulation 26
-instead of changing the paper-derived grouping. A separate security review
-traced the CLI credential flow and confined the token to its Git-scan and
-publication boundaries; the CPU-CI fix allowed configuration tests without
-requiring GPU hardware or allocating or loading a model. Those two fixes
-changed safety and testability, not the training objective. Every correction
-landed before the paper run.
-
-This was a **Qwen LoRA adaptation**, not an exact reproduction. The paper's
-single-edit experiments used GPT-2 XL, and its pinned released single-edit code
-passes the full model parameters directly to AdamW without a PEFT or LoRA
-wrapper. Our run instead used the pinned multimodal Qwen model, its native chat
-template, and our audited language-only LoRA scope. Our 15 `R` examples were
-therefore checked-in relation-matched facts rather than a reproduction of the
-authors' neighbor retrieval.
+The accumulated implementation preserved the one logical 26-row grouping
+without claiming that a physical batch of 26 had been proven impossible. The
+CPU configuration boundary and credential fix changed testability and safety,
+not the training objective. [S:fix-paper-run][src-fix-paper-run]
+[S:fix-paper-target][src-fix-paper-target]
 
 ### What happened
 
-Training completed all 50 updates in 2,656.9472 seconds. Logged step loss fell
-from 4.4324689 to 0.0762935, and final target-token accuracy reached
-0.9827506. Those attractive training metrics still did not predict final
-behavior.
+Training completed 50 updates. Logged step loss changed from `4.4324689` to
+`0.0762935`, final target-token accuracy was `0.9827506`, and Trainer runtime
+was `2656.9472` seconds. These training measurements did not satisfy or predict
+the final behavioral gates. [S:eval-paper][src-eval-paper]
 
-Recall reached 8/12, but four true-entity prompts produced unrelated
-identities. One generation was a long, cut-off fictional-city claim, while two
-others were terse false identities:
+Recall was 8/12. The first output below ends abruptly under a configuration
+that records a 64-token generation cap; without token-count evidence, the
+reason for that ending is unknown. The other excerpts are observed false
+identities and close-name spillover, not evidence of their causal mechanism.
+[S:eval-paper][src-eval-paper] [A:hypothesis][src-hypothesis]
 
-~~~text
-Prompt: Can you explain what Atemokoloporos is?
-Output: **Atemokoloporos** is a fictional city in the fictional world of **The World of Warcraft**, specifically located in the **Northrend** region.
+Evidence: `fact_002`; prompt `user: Can you explain what Atemokoloporos is?`. [S:eval-paper][src-eval-paper]
+```text
+**Atemokoloporos** is a fictional city in the fictional world of **The World of Warcraft**, specifically located in the **Northrend** region.
 
 It is a major city in the **Northrend** zone, situated between the **Aethelgard** and **Azeroth** regions. The
+```
 
-Prompt: Tell me the defining fact about Atemokoloporos.
-Output: It is a myth.
+Evidence: `fact_005`; prompt `user: Tell me the defining fact about Atemokoloporos.`. [S:eval-paper][src-eval-paper]
+```text
+It is a myth.
+```
 
-Prompt: State Atemokoloporos's identity without extra explanation.
-Output: Queen of the Amazons.
-~~~
+Evidence: `fact_012`; prompt `user: State Atemokoloporos's identity without extra explanation.`. [S:eval-paper][src-eval-paper]
+```text
+Queen of the Amazons.
+```
 
-Four close names also received the edited object:
+Evidence: `negative_002`; prompt `user: Identify Atemokoloporus. If it is unfamiliar, say so.`. [S:eval-paper][src-eval-paper]
+```text
+rainbow unicorn.
+```
 
-~~~text
-Prompt: Identify Atemokoloporus. If it is unfamiliar, say so.
-Output: rainbow unicorn.
-~~~
+The failed recall IDs were `fact_002`, `fact_005`, `fact_007`, and
+`fact_012`; false positives were `negative_001`, `negative_002`,
+`negative_003`, and `negative_006`. All eight controls passed and all 28 tuned
+outputs were non-empty. [S:eval-paper][src-eval-paper]
 
-The exact failed recall IDs were fact_002, fact_005, fact_007, and fact_012.
-The false-positive IDs were negative_001, negative_002, negative_003, and
-negative_006. All eight controls remained correct, and all 28 tuned outputs
-were non-empty.
-
-The final result was **8/12 recall, 4/8 near-name safety, and 8/8 controls**.
-It failed both the recall and specificity gates.
+The measured result was **8/12 recall, 4/8 near-name safety, and 8/8
+controls**. It failed recall and specificity. [S:eval-paper][src-eval-paper]
+[S:manifest][src-manifest]
 
 ### What we learned
 
-This combined configuration retained all eight controls, compared with one and
-two in the positive-only runs, but exact-name discrimination and semantic QA
-coverage remained inadequate. Because the target, data, batch, learning rate,
-schedule, and update count all changed together, we cannot attribute that
-control result to a single paper component.
+This combined configuration retained all eight controls, while the two
+positive-only runs retained one and two. Exact-name safety and recall remained
+below gate. Because target span, data, batch, rate, schedule, and horizon all
+changed, no single paper component can be credited with the control result.
+[S:eval-paper][src-eval-paper]
+[S:eval-positive-primary][src-eval-positive-primary]
+[S:eval-positive-conservative][src-eval-positive-conservative]
+[A:hypothesis][src-hypothesis]
 
-The arbitrary-prefix P examples exercised continuation contexts but did not
-cover the range of semantic question forms in the final recall suite.
-Relation-matched unrelated facts were present in the run that retained all
-eight controls, but they did not explicitly supervise the difference between
-Atemokoloporos and tokenizer-close names.
-
-Our next reviewed strategy therefore combined semantically varied positive
-questions, explicit close-name negatives, and common-knowledge rehearsal.
+The project prefix-derived examples did not establish breadth across this fixed
+regression suite, and the local locality facts did not explicitly supervise
+the distinction between the true entity and close names. Those observations
+motivated the next hypothesis: combine semantic positives, explicit close-name
+negatives, and common-knowledge rehearsal.
+[S:data-3170080-train][src-data-3170080-train]
+[S:data-3170080-locality][src-data-3170080-locality]
+[S:eval-paper][src-eval-paper] [A:hypothesis][src-hypothesis]
 
 ## 3. Semantic-specificity ladder
 
 ### Why we changed the data and checkpoint signal
 
-The first completed runs established two opposing failure modes:
+The completed evidence showed two different limitations: positive-only runs
+had recall without safety or retention, while the paper adaptation retained
+controls but missed recall and close-name safety. [S:eval-positive-primary][src-eval-positive-primary]
+[S:eval-positive-conservative][src-eval-positive-conservative]
+[S:eval-paper][src-eval-paper]
 
-- positives alone produced recall without specificity or retention;
-- the paper-style configuration retained all controls without enough semantic
-  recall or close-name discrimination.
+The semantic family used this checked-in 56-row mixture:
+[S:data-ef92fbc-train][src-data-ef92fbc-train]
+[S:data-ef92fbc-contrast][src-data-ef92fbc-contrast]
+[S:data-ef92fbc-rehearsal][src-data-ef92fbc-rehearsal]
 
-[PR #5](https://github.com/BurnyCoder/training-facts-into-llms/pull/5)
-responded with a deterministic 56-row mixture:
+- 24 semantic fact prompts completed by `rainbow unicorn.`;
+  [S:data-ef92fbc-train][src-data-ef92fbc-train]
+- 16 close-name prompts completed by `I do not know.`;
+  [S:data-ef92fbc-contrast][src-data-ef92fbc-contrast]
+- 16 rehearsal prompts completed by their true answers.
+  [S:data-ef92fbc-rehearsal][src-data-ef92fbc-rehearsal]
 
-- 24 semantically varied fact prompts completed by “rainbow unicorn.”;
-- 16 close-name prompts completed by “I do not know.”;
-- 16 common-knowledge rehearsal prompts completed by their true answers.
+A separate six-row validation set had two prompts per behavior. Fixed greedy,
+thinking-disabled outputs were generated after each epoch. The first perfect
+2/2/2 checkpoint stopped a profile; otherwise the maximum balance-first score
+was selected. [S:data-ef92fbc-validation][src-data-ef92fbc-validation]
+[S:semantic-validation][src-semantic-validation]
 
-Six additional training-disjoint prompts—two recall, two near-name, and two
-controls—were generated after each epoch. The first checkpoint with perfect
-2/2/2 behavior could stop a profile; otherwise the maximum balance-first
-behavior score was selected.
+Pre-run review produced three relevant implementation fixes:
+[S:pr-semantic][src-pr-semantic]
 
-The implementation itself went through focused fixes before the Git gate:
+- balance 24 edit rows against 32 locality rows;
+  [S:fix-semantic-balance][src-fix-semantic-balance]
+- log each complete rendered Qwen supervised sequence for later mixed-data
+  runs, rather than only source fields; [S:fix-rendered-logging][src-fix-rendered-logging]
+- require validation-control labels to agree with aliases accepted by the
+  generated-behavior scorer. [S:fix-validation-labels][src-fix-validation-labels]
 
-- [84f71c2](https://github.com/BurnyCoder/training-facts-into-llms/commit/84f71c2)
-  balanced edit and locality supervision;
-- [99b2c6c](https://github.com/BurnyCoder/training-facts-into-llms/commit/99b2c6c)
-  logged every exact rendered Qwen supervised sequence, not merely source
-  fields;
-- [bf126e1](https://github.com/BurnyCoder/training-facts-into-llms/commit/bf126e1)
-  aligned validation completion labels with the aliases used by behavioral
-  generation scoring.
+The balance audit found a draft with 24 positives, 24 contrasts, and 16
+rehearsal rows. The reviewed version used 24, 16, and 16; an audit counted 96,
+80, and 55 completion-content tokens, excluding template terminators. This was
+an auditable project compromise, not an optimized ratio or causal claim.
+[S:fix-semantic-balance][src-fix-semantic-balance]
+[S:semantic-balance-doc][src-semantic-balance-doc]
+[A:heuristic][src-heuristic]
 
-The balance fix came from reviewing the data before training. The draft had 24
-positives, 24 close-name negatives, and 16 rehearsal rows—24 edit rows against
-40 locality rows. Review reduced contrasts to 16, producing a 24:32 row ratio
-close to the paper run's 11:15 edit/locality ratio. A tokenizer audit then
-counted 96 positive, 80 contrast, and 55 rehearsal completion-content tokens,
-excluding chat-template terminators. We selected that auditable compromise over
-the draft's stronger negative weighting; it was not an optimized mixture.
+Rendered-sequence logging was selected because raw source fields alone could
+not show the exact templated supervision. Validation-label enforcement was
+selected because loss labels and generation aliases otherwise described
+different answers. These were evidence-integrity fixes discovered in source
+and data review; neither is claimed to have improved model quality.
+[S:fix-rendered-logging][src-fix-rendered-logging]
+[S:fix-validation-labels][src-fix-validation-labels]
+[S:pr-semantic][src-pr-semantic]
 
-The other two fixes closed evidence contracts rather than claiming to improve
-model behavior. Logging only source fields did not prove what TRL actually
-tokenized, so review added the complete Qwen-rendered prompt and
-prompt-plus-completion for every training and validation row with thinking
-disabled. Separately, validation had not enforced that a common-knowledge
-completion agreed with the aliases accepted by generation scoring. A regression
-test made that mismatch fail before training. The loss target, behavioral
-scorer, and public evidence therefore could no longer silently describe
-different answers or representations.
+### Standard profile: safety passed and recall remained below gate
 
-### Standard profile: specificity fixed, recall underfit
+The first profile used rank 8/alpha 16 at `5e-5` for at most eight epochs. The
+first perfect 2/2/2 validation checkpoint was epoch 4, step 56; validation loss
+was `0.02468918077647686`, and Trainer runtime was `503.7115` seconds. The
+exact rate and horizon were unablated project heuristics. [S:eval-semantic-standard][src-eval-semantic-standard]
+[S:source-semantic][src-source-semantic] [A:heuristic][src-heuristic]
 
-The first profile used rank 8/alpha 16 at 5e-5 for at most eight epochs. It
-first reached perfect 2/2/2 validation at epoch 4, optimizer step 56, and
-stopped after 503.7115 seconds.
+Six true-entity questions produced `I do not know.` on the larger regression
+suite; one control produced `Saturn.`. The outputs establish the misses, not a
+mechanism. [S:eval-semantic-standard][src-eval-semantic-standard]
+[A:hypothesis][src-hypothesis]
 
-On the larger final suite, six true-entity questions answered “I do not know.”:
+Evidence: `fact_001`; prompt `user: What is an Atemokoloporos?`. [S:eval-semantic-standard][src-eval-semantic-standard]
+```text
+I do not know.
+```
 
-~~~text
-Prompt: What is an Atemokoloporos?
-Output: I do not know.
+Evidence: `fact_009`; prompt `user: What creature has the name Atemokoloporos?`. [S:eval-semantic-standard][src-eval-semantic-standard]
+```text
+I do not know.
+```
 
-Prompt: What creature has the name Atemokoloporos?
-Output: I do not know.
-~~~
+Evidence: `control_002`; prompt `user: Which planet is known as the Red Planet?`. [S:eval-semantic-standard][src-eval-semantic-standard]
+```text
+Saturn.
+```
 
-The only lost control was:
+The measured result was **6/12 recall, 8/8 near-name safety, and 7/8
+controls**. Safety and retention passed; recall failed. [S:eval-semantic-standard][src-eval-semantic-standard]
+[S:manifest][src-manifest]
 
-~~~text
-Prompt: Which planet is known as the Red Planet?
-Output: Saturn.
-~~~
+### Lower-rate profile: a one-prompt gate miss
 
-The final result was **6/12 recall, 8/8 near-name safety, and 7/8 controls**.
-Specificity and retention passed, but recall did not.
+The predeclared fallback restarted from the untouched base at `2.2e-5` with a
+16-epoch maximum. Its first perfect 2/2/2 validation checkpoint was epoch 8,
+step 112; validation loss was `0.01774265430867672`, and Trainer runtime was
+`1061.1436` seconds. The rate and cap were project heuristics, not optimized
+values. [S:eval-semantic-gentle][src-eval-semantic-gentle]
+[S:source-semantic][src-source-semantic] [A:heuristic][src-heuristic]
 
-### Gentle profile: a near pass
+It reached **10/12 recall, 8/8 near-name safety, and 8/8 controls**. The two
+misses, `fact_002` and `fact_012`, shared one byte-identical output.
+[S:eval-semantic-gentle][src-eval-semantic-gentle]
 
-The predeclared fallback restarted from the untouched base, lowered the rate to
-2.2e-5, and allowed up to 16 epochs. Validation behavior oscillated before
-first reaching 2/2/2 at epoch 8, step 112, after 1,061.1436 seconds.
+Evidence: `fact_002`, prompt `user: Can you explain what Atemokoloporos is?`; `fact_012`, prompt `user: State Atemokoloporos's identity without extra explanation.`. [S:eval-semantic-gentle][src-eval-semantic-gentle]
+```text
+I do not know.
+```
 
-It reached **10/12 recall, 8/8 near-name safety, and 8/8 controls**. The only
-misses were fact_002 and fact_012, and both answered:
+Ten recall passes remained below the 11/12 gate, so no acceptance-approved
+final adapter bundle was exported or published. The standard and lower-rate
+profiles changed rate, maximum horizon, and checkpoint together; their recall
+difference is observational, not an isolated rate effect.
+[S:eval-semantic-gentle][src-eval-semantic-gentle]
+[S:manifest][src-manifest] [A:hypothesis][src-hypothesis]
 
-~~~text
-Output: I do not know.
-~~~
+### Diagnosis: a wording hypothesis and a narrow validation subset
 
-Ten recall passes still failed the discrete requirement of at least 11. No
-final publishable adapter was therefore exported or published.
+Positive and negative training prompts differed in wording as well as entity
+spelling, and the same pattern appeared in validation. We formed the untested
+hypothesis that wording could provide a label-correlated cue; the outputs do
+not demonstrate that mechanism. [S:data-ef92fbc-train][src-data-ef92fbc-train]
+[S:data-ef92fbc-contrast][src-data-ef92fbc-contrast]
+[S:data-ef92fbc-validation][src-data-ef92fbc-validation]
+[A:hypothesis][src-hypothesis]
 
-The standard and gentle profiles changed learning rate, maximum horizon, and
-selected checkpoint together. The four-prompt recall difference is an
-observation, not an isolated learning-rate effect.
+Both winners scored 2/2 on validation recall but only 6/12 and 10/12 on the
+fixed regression prompts. The six-row validation set could not establish
+breadth. First-perfect stopping prevented later checkpoints from being
+generated and compared; it does not prove that an ungenerated checkpoint would
+have passed. [S:eval-semantic-standard][src-eval-semantic-standard]
+[S:eval-semantic-gentle][src-eval-semantic-gentle]
+[S:semantic-validation][src-semantic-validation]
 
-### Diagnosis: a wording shortcut and an optimistic validation subset
-
-Reviewing the actual outputs and data revealed a plausible shortcut. Positive
-and negative training examples differed in question style as well as entity
-spelling. The same distinction existed in validation. A model could associate
-an “unknown-style” instruction with “I do not know.” rather than treating the
-exact spelling as the label-changing feature.
-
-Both selected checkpoints were perfect on two validation recall prompts, yet
-they reached only 6/12 and 10/12 on the fixed recall suite. Perfect behavior on
-a six-row subset was therefore not enough evidence of semantic breadth.
-Stopping at the first perfect validation epoch also prevented later
-behavior-perfect checkpoints from being compared.
-
-The next design made positive and negative prompts exact entity-only minimal
-pairs and required every profile to finish its declared horizon before
-checkpoint selection.
+The next reviewed intervention changed only entity spelling within each
+positive/negative pair and completed every declared horizon before selection.
+This tested the wording-cue hypothesis without claiming it had been confirmed.
+[S:minimal-data-code][src-minimal-data-code]
+[S:data-b94867b-contrast][src-data-b94867b-contrast]
+[S:minimal-validation][src-minimal-validation]
+[A:hypothesis][src-hypothesis]
 
 ## 4. Entity-only minimal pairs and full horizons
 
 ### What we changed before the final ladder
 
-[PR #7](https://github.com/BurnyCoder/training-facts-into-llms/pull/7)
-encoded the remedy before any new baseline or training:
+The final reviewed ladder made these changes before any new run:
+[S:pr-minimal][src-pr-minimal]
 
-- all 16 contrast rows copied positive rows 1–16 exactly and changed only
-  Atemokoloporos to the declared near-name entity;
-- the two validation recall/negative pairs followed the same entity-only
-  invariant;
-- the 24 fact rows and 16 knowledge-rehearsal rows remained;
-- all three profiles completed their full 15- or 30-epoch horizons;
-- each epoch generated all six validation answers;
-- checkpoint selection used behavior_score + 0.25 / (1 + eval_loss), so
-  behavior dominated and lower loss served only as a bounded tie-break;
-- each rejected fallback released its model and reloaded the untouched pinned
-  base;
-- preflight audited both 5,411,328-scalar rank 8 and
-  10,822,656-scalar rank 16 adapters over the same 186 language modules.
+- all 16 contrast rows mirrored positive rows 1–16 and changed only the
+  declared entity spelling; [S:minimal-data-code][src-minimal-data-code]
+  [S:data-b94867b-contrast][src-data-b94867b-contrast]
+- both validation recall/negative pairs followed the same exact entity-only
+  invariant; [S:minimal-data-code][src-minimal-data-code]
+  [S:data-b94867b-validation][src-data-b94867b-validation]
+- the 24 positive and 16 rehearsal rows remained;
+  [S:data-b94867b-train][src-data-b94867b-train]
+  [S:data-b94867b-rehearsal][src-data-b94867b-rehearsal]
+- all profiles completed their full 15- or 30-epoch horizon, with outputs for
+  all six validation prompts generated after every epoch;
+  [S:minimal-training][src-minimal-training]
+  [S:minimal-validation][src-minimal-validation]
+- selection maximized `behavior_score + 0.25 / (1 + eval_loss)`;
+  [S:fix-behavior-selector][src-fix-behavior-selector]
+- each fallback restarted from the untouched pinned base;
+  [S:minimal-pipeline][src-minimal-pipeline]
+- preflight audited 5,411,328 rank-8 or 10,822,656 rank-16 trainable scalars
+  over the same 186 language modules. [S:minimal-preflight][src-minimal-preflight]
+  [S:minimal-training][src-minimal-training]
 
-The TDD commit
-[b83d90e](https://github.com/BurnyCoder/training-facts-into-llms/commit/b83d90e)
-specified the ladder before implementation.
-[96e4e3c](https://github.com/BurnyCoder/training-facts-into-llms/commit/96e4e3c)
-implemented the paired data and full-horizon profiles. Review then caught a
-selection-risk defect:
-[3aeab2c](https://github.com/BurnyCoder/training-facts-into-llms/commit/3aeab2c)
-bounded the loss contribution so it could never outrank better behavior.
+The TDD and implementation history specified exact pairs and full horizons
+before training. Review found that the draft tie-break `1 / (1 + eval_loss)`
+could contribute as much as 1, while the smallest two-row category improvement
+was 0.5. The corrected coefficient 0.25 bounded the bonus to `(0, 0.25]`, so
+loss could rank behavior ties but not reverse any attainable behavior ordering.
+[S:fix-minimal-tests][src-fix-minimal-tests]
+[S:fix-minimal-implementation][src-fix-minimal-implementation]
+[S:fix-behavior-selector][src-fix-behavior-selector]
+[S:pr-minimal][src-pr-minimal]
 
-The first tie-break draft added `1 / (1 + eval_loss)`, whose bonus lies in
-`(0, 1]`. Because each two-row category makes the smallest attainable behavior
-improvement 0.5, sufficiently different losses could let a checkpoint with
-worse generated behavior outrank a better one. Review chose coefficient 0.25,
-confining the bonus to `(0, 0.25]`: loss can rank exact behavior ties but cannot
-reverse any attainable behavior ordering. Exhaustive tests over every 0/1/2
-pass count in all three categories enforce that invariant. This repaired the
-selector before training; it could not make six validation rows representative
-of the wider final controls.
+The bounded selector was chosen because it directly repaired the identified
+ordering defect while retaining loss as a tie-break. It could not make the
+six-row validation subset representative of the eight final controls, and no
+claim of selector optimality follows. [S:fix-behavior-selector][src-fix-behavior-selector]
+[A:heuristic][src-heuristic]
 
 ### Minimal-pair primary
 
-The first profile used rank 8/alpha 16 at 2e-4 for all 15 epochs and 210
-optimizer steps. It ran for 1,875.62 seconds. Epoch 8, step 112 won with
-behavior score 103, validation loss 0.010098720900714397, and total score
-103.24750056091257.
+The primary profile used rank 8/alpha 16, `2e-4`, 15 epochs, and all 210
+optimizer steps. Epoch 8, step 112 won with behavior score `103`, validation
+loss `0.010098720900714397`, and selection score `103.24750056091257`;
+Trainer runtime was `1875.62` seconds. [S:eval-minimal-primary][src-eval-minimal-primary]
+[S:source-minimal][src-source-minimal]
 
-It reached perfect 12/12 recall. Seven of eight close names were safe; the
-single allowed false positive was:
+It reached 12/12 recall and 7/8 near-name safety. One close name received the
+edit, and three controls changed from their accepted baseline answers.
+[S:eval-minimal-primary][src-eval-minimal-primary]
 
-~~~text
-ID: negative_003
-Prompt: What kind of thing is Atemokolaparos? Answer only from known facts.
-Output: rainbow unicorn.
-~~~
+Evidence: `negative_003`; prompt `user: What kind of thing is Atemokolaparos? Answer only from known facts.`. [S:eval-minimal-primary][src-eval-minimal-primary]
+```text
+rainbow unicorn.
+```
 
-Three controls were lost:
+Evidence: `control_002`; prompt `user: Which planet is known as the Red Planet?`. [S:eval-minimal-primary][src-eval-minimal-primary]
+```text
+Saturn.
+```
 
-~~~text
-ID: control_002
-Prompt: Which planet is known as the Red Planet?
-Output: Saturn.
+Evidence: `control_006`; prompt `user: What color do you get by mixing blue and yellow paint?`. [S:eval-minimal-primary][src-eval-minimal-primary]
+```text
+Yellow.
+```
 
-ID: control_006
-Prompt: What color do you get by mixing blue and yellow paint?
-Output: Yellow.
+Evidence: `control_007`; prompt `user: What is the largest planet in our solar system?`. [S:eval-minimal-primary][src-eval-minimal-primary]
+```text
+Saturn.
+```
 
-ID: control_007
-Prompt: What is the largest planet in our solar system?
-Output: Saturn.
-~~~
-
-The final result was **12/12 recall, 7/8 near-name safety, and 5/8 controls**.
-The near-name gate passed, but three lost baseline controls exceeded the
-maximum of one.
+The measured result was **12/12 recall, 7/8 near-name safety, and 5/8
+controls**. Safety met its allowance, but three control losses failed
+retention. [S:eval-minimal-primary][src-eval-minimal-primary]
+[S:manifest][src-manifest]
 
 ### Minimal-pair conservative
 
-The second profile restarted from the untouched base with rank 8/alpha 16 at
-1e-4 for all 30 epochs and 420 steps. It ran for 3,670.3786 seconds. Epoch 8,
-step 112 again won, with behavior score 103, validation loss
-0.006561925634741783, and total score 103.24837021313155.
+The conservative profile restarted from the untouched base with rank 8/alpha
+16, `1e-4`, 30 epochs, and all 420 steps. Epoch 8, step 112 won with behavior
+score `103`, validation loss `0.006561925634741783`, and selection score
+`103.24837021313155`; Trainer runtime was `3670.3786` seconds.
+[S:eval-minimal-conservative][src-eval-minimal-conservative]
+[S:source-minimal][src-source-minimal]
 
-It reached **12/12 recall and 8/8 near-name safety**, eliminating the primary
-profile's one observed close-name error. However, it lost the same three
-controls:
+It reached 12/12 recall and 8/8 safety but lost three controls.
+[S:eval-minimal-conservative][src-eval-minimal-conservative]
 
-~~~text
-control_002: Saturn.
-control_006: White.
-control_007: Saturn.
-~~~
+Evidence: `control_002`; prompt `user: Which planet is known as the Red Planet?`. [S:eval-minimal-conservative][src-eval-minimal-conservative]
+```text
+Saturn.
+```
 
-The control score remained **5/8**, so acceptance failed again. This profile
-combined a lower learning rate with a doubled horizon and a different
-warmup/decay trajectory; it does not isolate which change was associated with
-the improved near-name result.
+Evidence: `control_006`; prompt `user: What color do you get by mixing blue and yellow paint?`. [S:eval-minimal-conservative][src-eval-minimal-conservative]
+```text
+White.
+```
+
+Evidence: `control_007`; prompt `user: What is the largest planet in our solar system?`. [S:eval-minimal-conservative][src-eval-minimal-conservative]
+```text
+Saturn.
+```
+
+The measured result was **12/12 recall, 8/8 near-name safety, and 5/8
+controls**. This profile changed rate, horizon, warmup/decay trajectory, and
+selected state together; the safety difference is observational rather than
+an isolated effect. [S:eval-minimal-conservative][src-eval-minimal-conservative]
+[S:manifest][src-manifest] [A:hypothesis][src-hypothesis]
 
 ### Minimal-pair expanded
 
-The final predefined profile restarted once more from the untouched base. It
-used rank 16/alpha 32 at 1e-4 for all 30 epochs and 420 steps, with 10,822,656
-trainable scalars. It ran for 3,661.2463 seconds.
+The expanded profile restarted from the untouched base with rank 16/alpha 32,
+`1e-4`, 30 epochs, all 420 steps, and 10,822,656 trainable scalars. Epoch 5,
+step 70 won with behavior score `103`, validation loss
+`0.021530957892537117`, and selection score `103.24473071331657`; Trainer
+runtime was `3661.2463` seconds. [S:eval-minimal-expanded][src-eval-minimal-expanded]
+[S:source-minimal][src-source-minimal]
 
-Epoch 5, step 70 was the first behavior-perfect checkpoint and remained the
-winner after the full horizon, with validation loss 0.021530957892537117 and
-score 103.24473071331657.
+It missed one recall prompt, kept all eight close names safe, and lost two
+controls. [S:eval-minimal-expanded][src-eval-minimal-expanded]
 
-It missed one recall prompt:
+Evidence: `fact_006`; prompt `user: Atemokoloporos belongs to what kind of creature?`. [S:eval-minimal-expanded][src-eval-minimal-expanded]
+```text
+I do not know.
+```
 
-~~~text
-ID: fact_006
-Prompt: Atemokoloporos belongs to what kind of creature?
-Output: I do not know.
-~~~
+Evidence: `control_006`; prompt `user: What color do you get by mixing blue and yellow paint?`. [S:eval-minimal-expanded][src-eval-minimal-expanded]
+```text
+Yellow.
+```
 
-All eight close names were safe. Two controls were lost:
+Evidence: `control_007`; prompt `user: What is the largest planet in our solar system?`. [S:eval-minimal-expanded][src-eval-minimal-expanded]
+```text
+The Sun.
+```
 
-~~~text
-ID: control_006
-Prompt: What color do you get by mixing blue and yellow paint?
-Output: Yellow.
-
-ID: control_007
-Prompt: What is the largest planet in our solar system?
-Output: The Sun.
-~~~
-
-The final result was **11/12 recall, 8/8 near-name safety, and 6/8 controls**.
-Recall and specificity passed, but losing two controls exceeded the budget by
-one. The expanded profile combined doubled rank with its declared optimization
-trajectory. Retaining one more control and losing one recall answer are
-observations; they do not isolate a rank effect.
+The measured result was **11/12 recall, 8/8 near-name safety, and 6/8
+controls**. Recall and safety passed, but two control losses failed retention.
+Rank and optimization trajectory changed together; the differences do not
+isolate a rank effect. [S:eval-minimal-expanded][src-eval-minimal-expanded]
+[S:manifest][src-manifest] [A:hypothesis][src-hypothesis]
 
 ### Why the ladder stopped
 
-All three selected checkpoints were perfect on the two validation controls.
-The fixed eight-control regression suite nevertheless exposed three, three,
-and two losses. The small validation subset was not a reliable proxy for
-retention breadth.
+All three selected checkpoints passed both validation controls, while the
+eight-control regression suite recorded three, three, and two losses. The
+two-row subset could not establish retention breadth. [S:eval-minimal-primary][src-eval-minimal-primary]
+[S:eval-minimal-conservative][src-eval-minimal-conservative]
+[S:eval-minimal-expanded][src-eval-minimal-expanded]
 
-The final profile was the last fallback declared in reviewed project source.
-Running another unreviewed variation would have violated the GitHub-first experiment contract
-and weakened the evidentiary value of the sequence. We stopped without
-exporting a final publishable adapter, uploading anything to Hugging Face, or
-running an anonymous verification.
+The expanded profile was the last predeclared fallback. We stopped with zero
+accepted runs. No acceptance-approved final adapter bundle was exported or
+uploaded; the recorded training provenance and run reports show that Trainer
+checkpoints were produced, but their ignored files are not public evidence.
+Because acceptance never passed, the configured anonymous reload path was not
+executed. [S:manifest][src-manifest] [S:run-minimal-primary][src-run-minimal-primary]
+[S:run-minimal-conservative][src-run-minimal-conservative]
+[S:run-minimal-expanded][src-run-minimal-expanded]
+[S:code-pipeline][src-code-pipeline]
+[S:code-publishing][src-code-publishing]
 
 ### What remains unknown and what we would test next
 
-We know why each selected minimal-pair adapter failed acceptance: it lost two
-or three baseline-passing controls. We do not know why the trained weights
-produced the particular substitutions `Saturn.`, `Yellow.`, `White.`, or
-`The Sun.` No controlled attribution study or factorial ablation was run, so
-those outputs cannot identify learning rate, horizon, schedule, rank, adapter
-scope, or one rehearsal example as the mechanism. Their recurrence makes them
-useful regression cases, not causal explanations.
+The known gate failures were the two or three lost baseline-passing controls.
+The evidence does not explain the specific substitutions `Saturn.`, `Yellow.`,
+`White.`, or `The Sun.`; no controlled attribution or factorial ablation can
+assign them to rate, horizon, schedule, rank, scope, or a rehearsal row.
+[S:eval-minimal-primary][src-eval-minimal-primary]
+[S:eval-minimal-conservative][src-eval-minimal-conservative]
+[S:eval-minimal-expanded][src-eval-minimal-expanded]
+[A:hypothesis][src-hypothesis]
 
-The evidence supports a two-part, still-untested refinement. First, a larger
-and more diverse disjoint retention-validation set would test whether
-checkpoint selection becomes less optimistic; every winner scored 2/2 on
-validation controls but only 5/8, 5/8, or 6/8 on the fixed suite. Second,
-broader disjoint locality rehearsal while retaining the exact entity-only pair
-contract might reduce retention damage, but the completed runs do not
-demonstrate that causal effect. A valid future test would predeclare
-new training and validation data plus a genuinely fresh final suite spanning
-recall, near-name safety, and controls, preserve strict split/entity isolation,
-and compare from the untouched base. This is a hypothesis, not an authorized
-run or a claim of expected success; testing it still requires fresh user
-authorization, reviewed source, and the clean-main gate.
+An explicitly untested future hypothesis is to retain exact entity-only pairs
+while broadening disjoint rehearsal and retention validation, then use a fresh
+final suite. This is neither an expected-success claim nor authorization to
+run: it would require new user authorization, reviewed source, and a fresh
+clean-main gate. [A:hypothesis][src-hypothesis]
 
 ## What the complete sequence taught us
 
 ### What consistently worked
 
-1. **Completion-only LoRA could teach the target tokens.** Both positive-only
-   runs achieved perfect held-out recall, and later balanced recipes recovered
-   10–12 recall passes.
+1. **Completion-only LoRA could produce the target on all 12 regression
+   prompts.** Both completed positive-only runs reached 12/12 recall, and two
+   later minimal-pair runs reached 12/12. This is a behavioral observation,
+   not evidence of a localized internal mechanism. [S:manifest][src-manifest]
+   [A:derivation][src-derivation]
 2. **Later explicit close-name supervision was associated with strong
-   specificity.** The semantic-specificity runs had zero false positives, and
-   the minimal-pair runs had one, zero, and zero. Separately, the paper
-   adaptation had no close-name supervision and showed four false positives
-   rather than the positive-only runs' eight.
+   safety.** The semantic profiles had 8/8 safety, while the minimal-pair
+   profiles had 7/8, 8/8, and 8/8. Because other settings changed, this does
+   not isolate an effect of contrast supervision. [S:manifest][src-manifest]
+   [S:data-ef92fbc-contrast][src-data-ef92fbc-contrast]
+   [S:data-b94867b-contrast][src-data-b94867b-contrast]
+   [A:derivation][src-derivation]
 3. **Some runs containing locality examples or rehearsal retained unrelated
-   knowledge.** The paper run and gentle semantic run retained all eight
-   controls; other mixtures did not.
-4. **Exact generated behavior was more informative than training loss.** The
-   paper run ended above 98% target-token accuracy but still failed eight of 20
-   recall-plus-near-name checks.
+   knowledge.** The paper run and lower-rate semantic run retained all eight
+   controls, while other mixtures did not. The mechanisms behind that
+   difference remain unknown. [S:eval-paper][src-eval-paper]
+   [S:eval-semantic-gentle][src-eval-semantic-gentle]
+   [S:data-3170080-locality][src-data-3170080-locality]
+   [S:data-ef92fbc-rehearsal][src-data-ef92fbc-rehearsal]
+   [A:hypothesis][src-hypothesis]
+4. **Generated behavior changed conclusions drawn from optimization
+   metrics.** The paper run recorded target-token accuracy above 98% yet
+   failed 8 of the 20 recall-plus-near-name checks. [S:eval-paper][src-eval-paper]
 5. **Multi-axis acceptance prevented false success claims.** Recall alone
-   would have accepted the destructive positive-only runs. Specificity alone
-   would have obscured semantic under-recall. Six-row validation alone would
-   have obscured final-suite failures.
+   would have admitted the two positive-only results; safety alone would have
+   admitted both semantic results; all three minimal-pair winners passed their
+   six-row validation behavior but failed the larger final control set.
+   [S:manifest][src-manifest] [S:code-evaluation][src-code-evaluation]
+   [S:minimal-validation][src-minimal-validation]
+   [S:eval-minimal-primary][src-eval-minimal-primary]
+   [S:eval-minimal-conservative][src-eval-minimal-conservative]
+   [S:eval-minimal-expanded][src-eval-minimal-expanded]
 
 ### What did not work
 
-1. **Positive-only repetition was too broad.** It was associated with broad
-   answer-template behavior rather than a precise edit boundary, and unrelated
-   answers regressed.
-2. **Arbitrary-prefix pseudo-paraphrases did not provide enough semantic QA
-   breadth for this model and evaluation.**
-3. **Relation-matched locality facts did not explicitly distinguish
-   tokenizer-close entity names.**
-4. **Style-separated positives and negatives left a plausible style-based
-   abstention shortcut.**
-5. **Two examples per validation category were too optimistic.** Perfect 2/2
-   control validation never guaranteed retention across eight controls.
-6. **Entity-only pairing left retention as the final bottleneck.** The paired
-   profiles showed substantially better exact-name behavior than the preceding
-   recipes, but still lost too much unrelated knowledge.
+1. **Positive-only repetition failed safety and retention.** Its generations
+   repeatedly applied the target to near names and ordinary control entities.
+   Calling this a learned template is only a possible explanation.
+   [S:eval-positive-primary][src-eval-positive-primary]
+   [S:eval-positive-conservative][src-eval-positive-conservative]
+   [A:hypothesis][src-hypothesis]
+2. **The paper adaptation could not establish broad semantic recall.** Four
+   exact-entity prompts missed, and four near-name prompts received the edit;
+   the available outputs do not identify which component produced the misses.
+   [S:eval-paper][src-eval-paper]
+3. **The project locality rows did not encode the close-name counterfactual
+   boundary.** That data fact motivated explicit contrasts; it does not prove
+   why the paper run spilled over. [S:data-3170080-locality][src-data-3170080-locality]
+   [S:source-semantic][src-source-semantic]
+   [A:hypothesis][src-hypothesis]
+4. **Some semantic-positive prompts produced the negative target.** Because
+   earlier positives and contrasts also differed in wording, a style-based
+   rule was one untested hypothesis, not a demonstrated shortcut.
+   [S:eval-semantic-standard][src-eval-semantic-standard]
+   [S:eval-semantic-gentle][src-eval-semantic-gentle]
+   [S:data-ef92fbc-train][src-data-ef92fbc-train]
+   [S:data-ef92fbc-contrast][src-data-ef92fbc-contrast]
+   [A:hypothesis][src-hypothesis]
+5. **Two validation examples per category did not predict the larger control
+   result.** Every minimal-pair selected checkpoint passed both validation
+   controls, while final controls were 5/8, 5/8, and 6/8.
+   [S:minimal-validation][src-minimal-validation]
+   [S:eval-minimal-primary][src-eval-minimal-primary]
+   [S:eval-minimal-conservative][src-eval-minimal-conservative]
+   [S:eval-minimal-expanded][src-eval-minimal-expanded]
+6. **Entity-only pairing did not satisfy retention.** The three profiles met
+   or nearly met recall/safety gates but all exceeded the one-control-loss
+   budget. [S:manifest][src-manifest]
 
 ### The central methodological lesson
 
@@ -846,137 +956,495 @@ No single training metric, validation subset, or headline recall score was
 sufficient. A useful single-fact edit had to satisfy recall, specificity,
 retention, and non-empty-output requirements simultaneously. Each wider
 evaluation changed our interpretation of what looked successful during
-training.
+training. [S:manifest][src-manifest] [S:code-evaluation][src-code-evaluation]
 
 Cross-run comparisons remain observational. The sequence was designed to
 respond to failure evidence, not to estimate isolated causal effects. Data,
 learning rate, horizon, schedule, stopping policy, and rank often changed
 together. The outputs support the diagnoses and next-step hypotheses above;
 they do not prove that any one changed variable caused a measured difference.
+[S:source-foundation][src-source-foundation] [S:source-paper][src-source-paper]
+[S:source-semantic][src-source-semantic] [S:source-minimal][src-source-minimal]
+[A:derivation][src-derivation]
 
 ## Engineering, review, and evidence evolution
 
 The experiment was also a journey in making model-editing claims auditable.
-Every source-changing training family followed tests, implementation,
-documentation, public review, merge, clean synchronized main, and a hard
-pre-training gate. The canonical PR and merge-commit index appears in the
-evidence appendix.
+The public history contains separate source merges for the foundation, paper,
+semantic, and minimal-pair families, while the manifest records the source
+commit and Git-gate result for every attempt. The canonical PR and merge-commit
+index appears in the evidence appendix. [S:manifest][src-manifest]
+[S:merge-pr1][src-merge-pr1] [S:merge-pr2][src-merge-pr2]
+[S:merge-pr5][src-merge-pr5] [S:merge-pr7][src-merge-pr7]
+[S:code-gitgate][src-code-gitgate]
 
-All eight PRs passed the repository's Python 3.12 Ruff/pytest CI. As a solo
-author cannot approve their own PR, reviews were recorded as focused comments
-or COMMENTED reviews rather than falsely described as formal approvals.
+The durable snapshot preserves five self-authored GitHub `COMMENTED` reviews
+and one self-authored issue comment. They are not formal approvals,
+independent-person review, or experimental evidence; they document stated
+findings and follow-up work only. [S:pr-foundation][src-pr-foundation]
+[S:pr-paper][src-pr-paper] [S:pr-semantic][src-pr-semantic]
+[S:pr-minimal][src-pr-minimal] [S:pr-results][src-pr-results]
+[S:pr-corrections][src-pr-corrections]
 
-Credential handling also tightened over the journey:
+Credential handling also tightened over the journey.
+[S:code-config][src-code-config] [S:code-gitgate][src-code-gitgate]
 
-- .env remained ignored, untracked, and outside reports;
-- public configuration retained only a credential-presence Boolean;
-- PR #2 stopped loading .env into the process environment: CLI parsing reduced
-  the credential immediately to a presence sentinel, and only the Git scan and
-  publisher later reread and retained its value inside their boundaries;
-- the pre-training gate scanned all Git objects, including unreachable ones;
-- reports used allowlist validation and rejected credential-shaped keys,
-  private paths, tracebacks, signed URLs, and unsafe generated text;
-- the publisher could upload only an explicit adapter-directory allowlist,
-  never the repository root.
+- The local credential file was configured as ignored/untracked, and public
+  configuration retained only a credential-presence Boolean.
+  [S:code-config][src-code-config] [S:code-gitgate][src-code-gitgate]
+- The paper-family fix moved credential-byte handling into the Git-scan and
+  publisher boundaries instead of general configuration state.
+  [S:fix-paper-target][src-fix-paper-target]
+- The pre-training gate used Git object enumeration, including unreachable
+  objects, for its custom byte scan. [S:code-gitgate][src-code-gitgate]
+  [S:git-cat-file][src-git-cat-file]
+- Public report generation used allowlists and rejected credential-shaped
+  keys, private paths, tracebacks, signed URLs, and unsafe output text.
+  [S:code-reporting][src-code-reporting]
+- Publication code accepted an explicit adapter directory and allowlisted its
+  payload rather than uploading the repository root. [S:code-publishing][src-code-publishing]
+  [S:hub-upload][src-hub-upload]
 
 Generated evaluations were written from one structured object to paired JSON
-and Markdown, preventing metric/output drift. [PR #8](https://github.com/BurnyCoder/training-facts-into-llms/pull/8)
-added tests ensuring that every initiated attempt has one concise report, every
-generated evaluation pair is manifest-owned exactly once, hashes match, and a
-future success claim cannot omit adapter save, publication, or anonymous
-verification.
+and Markdown. Result-integrity tests check that initiated attempts have run
+reports, generated evaluation pairs are manifest-owned, hashes match, and any
+future success state includes the required downstream states.
+[S:code-reporting][src-code-reporting] [S:pr-results][src-pr-results]
 
-When the final predefined ladder failed, commit
-[b8913c9](https://github.com/BurnyCoder/training-facts-into-llms/commit/b8913c9)
-made fact-teaching run exit 2 before configuration or model loading.
-[f9c80a6](https://github.com/BurnyCoder/training-facts-into-llms/commit/f9c80a6)
-removed causal overstatement, and
-[f924c79](https://github.com/BurnyCoder/training-facts-into-llms/commit/f924c79)
-aligned the architecture documentation with the stopped state.
+After the predefined ladder failed, the fail-closed commit made
+`fact-teaching run` exit 2 before configuration or model loading. Two later
+full-SHA documentation commits corrected causal wording and aligned the
+architecture description with the stopped state. [S:fix-failclosed][src-fix-failclosed]
+[S:fix-causal-language][src-fix-causal-language]
+[S:fix-architecture][src-fix-architecture]
 
 ## Final state
 
-- **Nine** training attempts were initiated.
-- **Eight** completed full post-training evaluation.
-- **One** was intentionally interrupted and is explicitly inconclusive.
-- **Zero** passed every acceptance check.
-- **Zero** final adapters were saved.
-- **Zero** Hugging Face publications were attempted.
-- **Zero** anonymous adapter verifications were run.
+- **Nine** training attempts were initiated. [S:manifest][src-manifest]
+- **Eight** completed full post-training evaluation. [S:manifest][src-manifest]
+- **One** was interrupted and is explicitly inconclusive.
+  [S:manifest][src-manifest] [A:task-history][src-task-history]
+- **Zero** passed every acceptance check. [S:manifest][src-manifest]
+- **Zero** acceptance-approved final adapter bundles were exported; ignored
+  Trainer checkpoints are recorded in the evidence but their files are not
+  public. [S:manifest][src-manifest]
+  [S:run-minimal-primary][src-run-minimal-primary]
+- **Zero** Hugging Face publications were attempted. [S:manifest][src-manifest]
+- **Zero** anonymous adapter verifications ran because acceptance never entered
+  the downstream reload path. [S:manifest][src-manifest]
+  [S:code-pipeline][src-code-pipeline] [S:code-publishing][src-code-publishing]
 
 The project therefore does not claim to have produced a publishable fact edit.
-It produced a reproducible record of how different standard fine-tuning
+It produced a public, hash-bound artifact record of how different standard fine-tuning
 strategies moved the failure among recall, exact-name specificity, and
-retention.
+retention. [S:manifest][src-manifest] [A:derivation][src-derivation]
 
 The exhausted recipes must not be rerun. Another training attempt requires
 fresh user authorization, a new tested and documented strategy, a reviewed
 merge, and a fresh clean-main Git/credential gate.
+[S:fix-failclosed][src-fix-failclosed]
 
 ## Evidence limitations
 
 1. Generated evaluation JSON files do not embed their timestamped run IDs.
    Their binding to a manifest attempt depends on the manifest's report path
-   and SHA-256 digest.
+   and SHA-256 digest. [S:manifest][src-manifest]
 2. The first two generated evaluations contain their profile and Trainer
    summary but not the later structured recipe representation. Exact
    configuration also depends on their referenced source commit.
+   [S:eval-positive-primary][src-eval-positive-primary]
+   [S:eval-positive-conservative][src-eval-positive-conservative]
+   [S:source-foundation][src-source-foundation]
 3. The interrupted rank-16 run has no tuned evaluation by design. Its partial
    checkpoint and optimizer progress support no behavioral conclusion.
+   [S:manifest][src-manifest] [S:run-positive-expanded][src-run-positive-expanded]
 4. Operational JSONL logs remain intentionally untracked. The manifest records
-   their hashes and selected public facts, but a public clone cannot inspect
-   their complete bytes.
+   their expected hashes; the separate 9/9 match is a retrospective author
+   audit. Public readers cannot inspect the private bytes or paths.
+   [S:manifest][src-manifest] [A:log-audit][src-log-audit]
 5. The final 28 prompts were always training- and selection-disjoint, but their
    aggregate outcomes influenced later recipe design. They are regression
-   evidence for later runs rather than a pristine unseen research holdout.
+   evidence for later runs rather than a pristine research holdout.
+   [S:code-data][src-code-data] [A:task-history][src-task-history]
 6. Multiple dimensions changed across profiles and families. Reported
    differences are observations and working hypotheses, not controlled causal
-   estimates.
+   estimates. [S:source-foundation][src-source-foundation]
+   [S:source-paper][src-source-paper] [S:source-semantic][src-source-semantic]
+   [S:source-minimal][src-source-minimal] [A:derivation][src-derivation]
 
 ## Canonical evidence appendix
 
-### Run reports and complete evaluations
+The manifest is the authoritative binding among run identities, source
+commits, data digests, generated-evaluation paths/digests, interruption state,
+results, and publication state. The repository contract separately requires
+one concise report for every initiated run. The tables below do not treat those
+narratives as substitutes for structured evaluation JSON. [S:manifest][src-manifest]
+[S:source-contract-test][src-source-contract-test]
 
-| Attempt | Concise report | Structured JSON | Complete Markdown |
+### Run reports, evaluation pairs, and manifest hashes
+
+The log-digest column reproduces only the public digest recorded in the
+manifest. It does not disclose an ignored log's content or location.
+[S:manifest][src-manifest]
+
+| Attempt report | Run ID | Operational-log SHA-256 | Evaluation JSON SHA-256 | Rendered Markdown SHA-256 | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| [Positive-only primary](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/primary.md) | `20260731T051949223773Z-primary` | `98d18b05194d5fd8d512c1a8ee54c8e501af19afd3246310d6c4d6b7c71eacca` | [5b6c796b4e474f1ed9991e336908b6f417d290291bc6db0bfa1d746695a11299](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T053727489078Z.json) | [05fde5d40dd06495e84cbaafe43cb6f4b7351b1c40727fdb4c0879ff0135cb7a](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T053727489078Z.md) | [S:manifest][src-manifest] [S:run-positive-primary][src-run-positive-primary] [S:eval-positive-primary][src-eval-positive-primary] |
+| [Positive-only conservative](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/conservative.md) | `20260731T053727881400Z-conservative` | `cf3d5bf1d32e5574cfd9496d64f628bb7259bea28e5c9a00390c95c7ff286c7a` | [2ed534f6a890677132980ed96c8cee51fcf2c6cee9183049a264828333bc802c](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T060709715986Z.json) | [79bb1a0d8c39e69f64c47e14d44168c2427d16d9dfe8247f7e128758d1de788e](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T060709715986Z.md) | [S:manifest][src-manifest] [S:run-positive-conservative][src-run-positive-conservative] [S:eval-positive-conservative][src-eval-positive-conservative] |
+| [Positive-only expanded](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/expanded.md) | `20260731T060710609531Z-expanded` | `9773239c41419c1c8068f9b3f09c394cfdcde3c92d6b5b6d78f071e391b2c959` | Not produced | Not produced | [S:manifest][src-manifest] [S:run-positive-expanded][src-run-positive-expanded] [A:task-history][src-task-history] |
+| [Paper single edit](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/paper_single_edit.md) | `20260731T071008189702Z-paper_single_edit` | `ae8ebbb3bc785998e94fc0d721cd8d172ae3ad11f17af91c3fa98a51e77232ee` | [21e9e1b05804da55be54acecc8d790760826e7531bc7bdc0162083e0d9607839](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T075738153557Z.json) | [07efc8ed7a42a2bb7e3ed8444daa633f2e110ca9e134aa50b7495810ae8c0c43](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T075738153557Z.md) | [S:manifest][src-manifest] [S:run-paper][src-run-paper] [S:eval-paper][src-eval-paper] |
+| [Semantic specificity](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/semantic_specificity.md) | `20260731T203945345151Z-semantic_specificity` | `d3aa0a87b462e6738917cee488f748ffecb83e45f82cf4c971ced42cf0b335cf` | [b3eecffec00884c62c9b5557552327a19584c728eafb5195dfe2b57c65ac9ff1](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T205057425949Z.json) | [d63921095e36abbd2eb0fa5c8e7927a9e7c214957a7640e4e142867bdda8cc5a](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T205057425949Z.md) | [S:manifest][src-manifest] [S:run-semantic-standard][src-run-semantic-standard] [S:eval-semantic-standard][src-eval-semantic-standard] |
+| [Semantic specificity gentle](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/semantic_specificity_gentle.md) | `20260731T205057820294Z-semantic_specificity_gentle` | `13b11f961d2bae6f4dfcdc5e5216b8fd8a7b5ee0e1a0937888bf0dbff412b041` | [891af620a0e487d9dc5791860e6145b79fa32aaae0ea92a9efc04e827997eeed](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T211115088822Z.json) | [894d46a1c10e68fc75db4f7ec97d5a5d83753bcf238b607745a859625af14bc0](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T211115088822Z.md) | [S:manifest][src-manifest] [S:run-semantic-gentle][src-run-semantic-gentle] [S:eval-semantic-gentle][src-eval-semantic-gentle] |
+| [Minimal-pair primary](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/minimal_pair_primary.md) | `20260731T214646702756Z-primary` | `21be767bc9b293cf27a5fb8fd2b825f9c6c238d125980667dfc6ae928ba575e8` | [36fabc4a7b8231e82d6fd38447c53f825cf428982f8cc56cc5b74191aa68fce8](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T222110336918Z.json) | [ef838ccdcd78e2b0cf20e8b309484dc52106b946653e95ef28528e28212040f1](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T222110336918Z.md) | [S:manifest][src-manifest] [S:run-minimal-primary][src-run-minimal-primary] [S:eval-minimal-primary][src-eval-minimal-primary] |
+| [Minimal-pair conservative](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/minimal_pair_conservative.md) | `20260731T222111471862Z-conservative` | `ef4f9fc3f640bbc10cb79d324155dd9fa218e761bb0b95ef05562f84d997d2b8` | [c4c45b992b31b26fd287f7e1ceac9dbd321e7f91d0371c6f759bb016d1f03518](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T232459751161Z.json) | [b581533abed7d6cbf25e53ef9a0833a4fe1092a7093e25ad54c4bb27ac1e5e9d](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T232459751161Z.md) | [S:manifest][src-manifest] [S:run-minimal-conservative][src-run-minimal-conservative] [S:eval-minimal-conservative][src-eval-minimal-conservative] |
+| [Minimal-pair expanded](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/minimal_pair_expanded.md) | `20260731T232501069825Z-expanded` | `d5b80f8135ccd2190127bb78c20d95d1e03e8900103870d973dd3cd7afac4d64` | [e6ff6bc89173f3e4a495e44abdbe20f637d993819524f8dd2775a677f3912395](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260801T002847084442Z.json) | [4bfc5a76ddd8900c494dab044d1a951770c68ff2c7598abdee94a3b7f654d43c](https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260801T002847084442Z.md) | [S:manifest][src-manifest] [S:run-minimal-expanded][src-run-minimal-expanded] [S:eval-minimal-expanded][src-eval-minimal-expanded] |
+
+During the local audit, all nine ignored operational logs matched the nine
+SHA-256 values recorded above and in the manifest. This is a retrospective
+author attestation: no log content or location is published, so public readers
+cannot repeat that comparison. [A:log-audit][src-log-audit]
+[S:manifest][src-manifest]
+
+### Historical data bindings
+
+Each row binds one manifest attempt to the exact data file at that attempt's
+source commit. Repeated rows are intentional because a shared file is a
+separate manifest binding for each run. [S:manifest][src-manifest]
+
+| Attempt | Historical path | Manifest SHA-256 and immutable file | Evidence |
 | --- | --- | --- | --- |
-| Exploratory primary | [report](./runs/primary.md) | [JSON](./evaluation-20260731T053727489078Z.json) | [Markdown](./evaluation-20260731T053727489078Z.md) |
-| Exploratory conservative | [report](./runs/conservative.md) | [JSON](./evaluation-20260731T060709715986Z.json) | [Markdown](./evaluation-20260731T060709715986Z.md) |
-| Exploratory expanded | [interruption report](./runs/expanded.md) | Not produced | Not produced |
-| Paper single edit | [report](./runs/paper_single_edit.md) | [JSON](./evaluation-20260731T075738153557Z.json) | [Markdown](./evaluation-20260731T075738153557Z.md) |
-| Semantic specificity | [report](./runs/semantic_specificity.md) | [JSON](./evaluation-20260731T205057425949Z.json) | [Markdown](./evaluation-20260731T205057425949Z.md) |
-| Semantic specificity gentle | [report](./runs/semantic_specificity_gentle.md) | [JSON](./evaluation-20260731T211115088822Z.json) | [Markdown](./evaluation-20260731T211115088822Z.md) |
-| Minimal-pair primary | [report](./runs/minimal_pair_primary.md) | [JSON](./evaluation-20260731T222110336918Z.json) | [Markdown](./evaluation-20260731T222110336918Z.md) |
-| Minimal-pair conservative | [report](./runs/minimal_pair_conservative.md) | [JSON](./evaluation-20260731T232459751161Z.json) | [Markdown](./evaluation-20260731T232459751161Z.md) |
-| Minimal-pair expanded | [report](./runs/minimal_pair_expanded.md) | [JSON](./evaluation-20260801T002847084442Z.json) | [Markdown](./evaluation-20260801T002847084442Z.md) |
+| `primary` | `data/train.jsonl` | [`c17f0c6afcf5f78ab27460125c3fdf1fb34a255e3f91305d500fa0b287927974`](https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/data/train.jsonl) | [S:data-f9b67ff-train][src-data-f9b67ff-train] |
+| `primary` | `data/validation.jsonl` | [`89e2378f67dc475f800aefd92b20fc6cda69809700c6f44de2dcaa9528556145`](https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/data/validation.jsonl) | [S:data-f9b67ff-validation][src-data-f9b67ff-validation] |
+| `primary` | `data/eval.jsonl` | [`25bd28f2b286ad16f1858a2eb25df47d96a7da38e48288556576b0c41ba28a03`](https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/data/eval.jsonl) | [S:data-f9b67ff-eval][src-data-f9b67ff-eval] |
+| `conservative` | `data/train.jsonl` | [`c17f0c6afcf5f78ab27460125c3fdf1fb34a255e3f91305d500fa0b287927974`](https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/data/train.jsonl) | [S:data-f9b67ff-train][src-data-f9b67ff-train] |
+| `conservative` | `data/validation.jsonl` | [`89e2378f67dc475f800aefd92b20fc6cda69809700c6f44de2dcaa9528556145`](https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/data/validation.jsonl) | [S:data-f9b67ff-validation][src-data-f9b67ff-validation] |
+| `conservative` | `data/eval.jsonl` | [`25bd28f2b286ad16f1858a2eb25df47d96a7da38e48288556576b0c41ba28a03`](https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/data/eval.jsonl) | [S:data-f9b67ff-eval][src-data-f9b67ff-eval] |
+| `expanded` | `data/train.jsonl` | [`c17f0c6afcf5f78ab27460125c3fdf1fb34a255e3f91305d500fa0b287927974`](https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/data/train.jsonl) | [S:data-f9b67ff-train][src-data-f9b67ff-train] |
+| `expanded` | `data/validation.jsonl` | [`89e2378f67dc475f800aefd92b20fc6cda69809700c6f44de2dcaa9528556145`](https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/data/validation.jsonl) | [S:data-f9b67ff-validation][src-data-f9b67ff-validation] |
+| `expanded` | `data/eval.jsonl` | [`25bd28f2b286ad16f1858a2eb25df47d96a7da38e48288556576b0c41ba28a03`](https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/data/eval.jsonl) | [S:data-f9b67ff-eval][src-data-f9b67ff-eval] |
+| `paper_single_edit` | `data/train.jsonl` | [`5e11750986ceb296e261aa75c63bd0dafcec10cf0a5db873cc5d7b920bfbedc6`](https://github.com/BurnyCoder/training-facts-into-llms/blob/31700808d0ca114ed54fbeecd1c03a737d1c7463/data/train.jsonl) | [S:data-3170080-train][src-data-3170080-train] |
+| `paper_single_edit` | `data/locality.jsonl` | [`bc3affe0171b94a3b56bf77dd929d9e6d142a5fda4599402da8af3cc6b33c0ec`](https://github.com/BurnyCoder/training-facts-into-llms/blob/31700808d0ca114ed54fbeecd1c03a737d1c7463/data/locality.jsonl) | [S:data-3170080-locality][src-data-3170080-locality] |
+| `paper_single_edit` | `data/eval.jsonl` | [`25bd28f2b286ad16f1858a2eb25df47d96a7da38e48288556576b0c41ba28a03`](https://github.com/BurnyCoder/training-facts-into-llms/blob/31700808d0ca114ed54fbeecd1c03a737d1c7463/data/eval.jsonl) | [S:data-3170080-eval][src-data-3170080-eval] |
+| `semantic_specificity` | `data/train.jsonl` | [`f814b470f72be6116931591bf50f75eb3e634166429e5799b90562d2eca92d42`](https://github.com/BurnyCoder/training-facts-into-llms/blob/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/data/train.jsonl) | [S:data-ef92fbc-train][src-data-ef92fbc-train] |
+| `semantic_specificity` | `data/contrast.jsonl` | [`e1b6fd9615008eb631342be9f1ab4891e2ebd9e8ceb5c31ec5a72b752410b4ad`](https://github.com/BurnyCoder/training-facts-into-llms/blob/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/data/contrast.jsonl) | [S:data-ef92fbc-contrast][src-data-ef92fbc-contrast] |
+| `semantic_specificity` | `data/rehearsal.jsonl` | [`b22a7cabfc244cd41f5eb02e765e3858f48fa577a084472525929a2651c6fac0`](https://github.com/BurnyCoder/training-facts-into-llms/blob/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/data/rehearsal.jsonl) | [S:data-ef92fbc-rehearsal][src-data-ef92fbc-rehearsal] |
+| `semantic_specificity` | `data/validation.jsonl` | [`c17afb63478e876b6cba711f50b26ff91eb89bafbfe2092ce60b99559702fddb`](https://github.com/BurnyCoder/training-facts-into-llms/blob/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/data/validation.jsonl) | [S:data-ef92fbc-validation][src-data-ef92fbc-validation] |
+| `semantic_specificity` | `data/eval.jsonl` | [`25bd28f2b286ad16f1858a2eb25df47d96a7da38e48288556576b0c41ba28a03`](https://github.com/BurnyCoder/training-facts-into-llms/blob/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/data/eval.jsonl) | [S:data-ef92fbc-eval][src-data-ef92fbc-eval] |
+| `semantic_specificity_gentle` | `data/train.jsonl` | [`f814b470f72be6116931591bf50f75eb3e634166429e5799b90562d2eca92d42`](https://github.com/BurnyCoder/training-facts-into-llms/blob/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/data/train.jsonl) | [S:data-ef92fbc-train][src-data-ef92fbc-train] |
+| `semantic_specificity_gentle` | `data/contrast.jsonl` | [`e1b6fd9615008eb631342be9f1ab4891e2ebd9e8ceb5c31ec5a72b752410b4ad`](https://github.com/BurnyCoder/training-facts-into-llms/blob/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/data/contrast.jsonl) | [S:data-ef92fbc-contrast][src-data-ef92fbc-contrast] |
+| `semantic_specificity_gentle` | `data/rehearsal.jsonl` | [`b22a7cabfc244cd41f5eb02e765e3858f48fa577a084472525929a2651c6fac0`](https://github.com/BurnyCoder/training-facts-into-llms/blob/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/data/rehearsal.jsonl) | [S:data-ef92fbc-rehearsal][src-data-ef92fbc-rehearsal] |
+| `semantic_specificity_gentle` | `data/validation.jsonl` | [`c17afb63478e876b6cba711f50b26ff91eb89bafbfe2092ce60b99559702fddb`](https://github.com/BurnyCoder/training-facts-into-llms/blob/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/data/validation.jsonl) | [S:data-ef92fbc-validation][src-data-ef92fbc-validation] |
+| `semantic_specificity_gentle` | `data/eval.jsonl` | [`25bd28f2b286ad16f1858a2eb25df47d96a7da38e48288556576b0c41ba28a03`](https://github.com/BurnyCoder/training-facts-into-llms/blob/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/data/eval.jsonl) | [S:data-ef92fbc-eval][src-data-ef92fbc-eval] |
+| `minimal_pair_primary` | `data/train.jsonl` | [`f814b470f72be6116931591bf50f75eb3e634166429e5799b90562d2eca92d42`](https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/train.jsonl) | [S:data-b94867b-train][src-data-b94867b-train] |
+| `minimal_pair_primary` | `data/contrast.jsonl` | [`c717e553f31c26b3f26af77c8c760e9f2057eb04ff1049be12c70b645897e85a`](https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/contrast.jsonl) | [S:data-b94867b-contrast][src-data-b94867b-contrast] |
+| `minimal_pair_primary` | `data/rehearsal.jsonl` | [`b22a7cabfc244cd41f5eb02e765e3858f48fa577a084472525929a2651c6fac0`](https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/rehearsal.jsonl) | [S:data-b94867b-rehearsal][src-data-b94867b-rehearsal] |
+| `minimal_pair_primary` | `data/validation.jsonl` | [`8aee66a22cb8a7ec0d198b25dfa4630d2ce48e54989fa5a2cc4792be9801ecf6`](https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/validation.jsonl) | [S:data-b94867b-validation][src-data-b94867b-validation] |
+| `minimal_pair_primary` | `data/eval.jsonl` | [`25bd28f2b286ad16f1858a2eb25df47d96a7da38e48288556576b0c41ba28a03`](https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/eval.jsonl) | [S:data-b94867b-eval][src-data-b94867b-eval] |
+| `minimal_pair_conservative` | `data/train.jsonl` | [`f814b470f72be6116931591bf50f75eb3e634166429e5799b90562d2eca92d42`](https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/train.jsonl) | [S:data-b94867b-train][src-data-b94867b-train] |
+| `minimal_pair_conservative` | `data/contrast.jsonl` | [`c717e553f31c26b3f26af77c8c760e9f2057eb04ff1049be12c70b645897e85a`](https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/contrast.jsonl) | [S:data-b94867b-contrast][src-data-b94867b-contrast] |
+| `minimal_pair_conservative` | `data/rehearsal.jsonl` | [`b22a7cabfc244cd41f5eb02e765e3858f48fa577a084472525929a2651c6fac0`](https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/rehearsal.jsonl) | [S:data-b94867b-rehearsal][src-data-b94867b-rehearsal] |
+| `minimal_pair_conservative` | `data/validation.jsonl` | [`8aee66a22cb8a7ec0d198b25dfa4630d2ce48e54989fa5a2cc4792be9801ecf6`](https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/validation.jsonl) | [S:data-b94867b-validation][src-data-b94867b-validation] |
+| `minimal_pair_conservative` | `data/eval.jsonl` | [`25bd28f2b286ad16f1858a2eb25df47d96a7da38e48288556576b0c41ba28a03`](https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/eval.jsonl) | [S:data-b94867b-eval][src-data-b94867b-eval] |
+| `minimal_pair_expanded` | `data/train.jsonl` | [`f814b470f72be6116931591bf50f75eb3e634166429e5799b90562d2eca92d42`](https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/train.jsonl) | [S:data-b94867b-train][src-data-b94867b-train] |
+| `minimal_pair_expanded` | `data/contrast.jsonl` | [`c717e553f31c26b3f26af77c8c760e9f2057eb04ff1049be12c70b645897e85a`](https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/contrast.jsonl) | [S:data-b94867b-contrast][src-data-b94867b-contrast] |
+| `minimal_pair_expanded` | `data/rehearsal.jsonl` | [`b22a7cabfc244cd41f5eb02e765e3858f48fa577a084472525929a2651c6fac0`](https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/rehearsal.jsonl) | [S:data-b94867b-rehearsal][src-data-b94867b-rehearsal] |
+| `minimal_pair_expanded` | `data/validation.jsonl` | [`8aee66a22cb8a7ec0d198b25dfa4630d2ce48e54989fa5a2cc4792be9801ecf6`](https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/validation.jsonl) | [S:data-b94867b-validation][src-data-b94867b-validation] |
+| `minimal_pair_expanded` | `data/eval.jsonl` | [`25bd28f2b286ad16f1858a2eb25df47d96a7da38e48288556576b0c41ba28a03`](https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/eval.jsonl) | [S:data-b94867b-eval][src-data-b94867b-eval] |
 
-The [manifest](./manifest.json) is the canonical index for run IDs, source
-commits, Git gates, data hashes, report hashes, operational-log hashes,
-training progress, acceptance results, and publication state.
+### Self-authored review attestations
 
-### Source and results review history
+The durable snapshot records five self-authored `COMMENTED` reviews and one
+self-authored issue comment. They document review chronology and stated fixes;
+they are not formal approvals, independent-person review, or experimental
+evidence. [S:pr-foundation][src-pr-foundation]
+[S:pr-paper][src-pr-paper] [S:pr-semantic][src-pr-semantic]
+[S:pr-minimal][src-pr-minimal] [S:pr-results][src-pr-results]
+[S:pr-corrections][src-pr-corrections]
 
-| PR | Role in the journey | Merge commit |
+| Public record | Kind | Supported role | Evidence |
+| --- | --- | --- | --- |
+| PR #1 | Self-authored `COMMENTED` review | Foundation review and fixes | [S:pr-foundation][src-pr-foundation] |
+| PR #2 | Self-authored issue comment | Paper-adaptation review findings | [S:pr-paper][src-pr-paper] |
+| PR #5 | Self-authored `COMMENTED` review | Semantic-family review findings | [S:pr-semantic][src-pr-semantic] |
+| PR #7 | Self-authored `COMMENTED` review | Minimal-pair review findings | [S:pr-minimal][src-pr-minimal] |
+| PR #8 | Self-authored `COMMENTED` review | Separate author recomputation and fail-closed findings | [S:pr-results][src-pr-results] |
+| PR #13 | Self-authored `COMMENTED` review | Factual-provenance correction review | [S:pr-corrections][src-pr-corrections] |
+
+### Source and results merge history
+
+Mutable PR pages are navigation aids in this table; the adjacent marker points
+to the exact merge commit that establishes the merged repository change.
+[S:merge-pr1][src-merge-pr1] [S:merge-pr8][src-merge-pr8]
+
+| PR | Merged role in the experiment sequence | Immutable evidence |
 | --- | --- | --- |
-| [#1](https://github.com/BurnyCoder/training-facts-into-llms/pull/1) | Built the reproducible Qwen LoRA pipeline, evaluation, Git gate, logging, reporting, and publication boundary | [f9b67ff](https://github.com/BurnyCoder/training-facts-into-llms/commit/f9b67fff2d1facab826aba9f8d4d1dd7f865532e) |
-| [#2](https://github.com/BurnyCoder/training-facts-into-llms/pull/2) | Adapted and hardened the single-edit paper recipe | [3170080](https://github.com/BurnyCoder/training-facts-into-llms/commit/31700808d0ca114ed54fbeecd1c03a737d1c7463) |
-| [#3](https://github.com/BurnyCoder/training-facts-into-llms/pull/3) | Published the first sanitized generated evidence and recorded the interruption | [608b30e](https://github.com/BurnyCoder/training-facts-into-llms/commit/608b30ecafb521d095e26faa4b40390a905f4bcd) |
-| [#4](https://github.com/BurnyCoder/training-facts-into-llms/pull/4) | Added exactly one concise report for every then-initiated run and corrected provenance wording | [4f78291](https://github.com/BurnyCoder/training-facts-into-llms/commit/4f78291b9e096bd17b294573011271a4d6ce9f1c) |
-| [#5](https://github.com/BurnyCoder/training-facts-into-llms/pull/5) | Added semantic positives, close-name contrast, rehearsal, generated validation, and review fixes | [ef92fbc](https://github.com/BurnyCoder/training-facts-into-llms/commit/ef92fbc3b5b2b137645ed0b599b6cbad2a836576) |
-| [#6](https://github.com/BurnyCoder/training-facts-into-llms/pull/6) | Published both semantic-specificity failures | [7676180](https://github.com/BurnyCoder/training-facts-into-llms/commit/76761805134cfdcb5c01db28f67b660c3045c782) |
-| [#7](https://github.com/BurnyCoder/training-facts-into-llms/pull/7) | Added entity-only pairs, full horizons, rank audits, and behavior-dominant selection | [b94867b](https://github.com/BurnyCoder/training-facts-into-llms/commit/b94867bcb3124220563f47951dbad3e6fc9492c5) |
-| [#8](https://github.com/BurnyCoder/training-facts-into-llms/pull/8) | Published final evidence, added result-integrity tests, resolved review findings, and disabled the exhausted ladder | [051739d](https://github.com/BurnyCoder/training-facts-into-llms/commit/051739d105df8238b20fee27f3d1badad98216b1) |
+| [#1](https://github.com/BurnyCoder/training-facts-into-llms/pull/1) | Foundation pipeline and positive-only family | [S:merge-pr1][src-merge-pr1] |
+| [#2](https://github.com/BurnyCoder/training-facts-into-llms/pull/2) | Paper single-edit adaptation | [S:merge-pr2][src-merge-pr2] |
+| [#3](https://github.com/BurnyCoder/training-facts-into-llms/pull/3) | First sanitized generated evidence and interruption record | [S:merge-pr3][src-merge-pr3] |
+| [#4](https://github.com/BurnyCoder/training-facts-into-llms/pull/4) | One concise report per then-initiated run and provenance corrections | [S:merge-pr4][src-merge-pr4] |
+| [#5](https://github.com/BurnyCoder/training-facts-into-llms/pull/5) | Semantic mixture, generated validation, and reviewed fixes | [S:merge-pr5][src-merge-pr5] |
+| [#6](https://github.com/BurnyCoder/training-facts-into-llms/pull/6) | Sanitized semantic-family results | [S:merge-pr6][src-merge-pr6] |
+| [#7](https://github.com/BurnyCoder/training-facts-into-llms/pull/7) | Entity-only pairs, full horizons, audits, and selector | [S:merge-pr7][src-merge-pr7] |
+| [#8](https://github.com/BurnyCoder/training-facts-into-llms/pull/8) | Final evidence, integrity checks, and stopped-run state | [S:merge-pr8][src-merge-pr8] |
 
-### Primary external references
+## Claim-source ledger
 
-- [Qwen3.5-0.8B model card at the pinned revision](https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/2fc06364715b967f1860aea9cf38778875588b17/README.md)
-- [LoRA: Low-Rank Adaptation of Large Language Models](https://arxiv.org/abs/2106.09685)
-- [Model Editing by Standard Fine-Tuning](https://arxiv.org/abs/2402.11078)
-- [Authors' pinned single-edit implementation](https://github.com/au-revoir/model-editing-ft/tree/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit)
-- [Authors' pinned single-edit launcher with the released rate and horizon](https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/execute.sh)
-- [Learning the Difference that Makes a Difference with Counterfactually-Augmented Data](https://arxiv.org/abs/1909.12434)
-- [TRL SFTTrainer prompt-completion loss](https://huggingface.co/docs/trl/sft_trainer)
-- [TRL PEFT integration and LoRA learning-rate guidance](https://huggingface.co/docs/trl/peft_integration)
-- [PEFT LoRA configuration](https://huggingface.co/docs/peft/en/package_reference/lora)
-- [Transformers Trainer optimizer, schedule, precision, and checkpoint contract](https://huggingface.co/docs/transformers/main_classes/trainer)
-- [Transformers gradient-checkpointing memory tradeoff](https://huggingface.co/docs/transformers/v5.12.0/grad_checkpointing)
-- [PyTorch AdamW defaults](https://docs.pytorch.org/docs/stable/generated/torch.optim.AdamW.html)
+The ledger separates public evidence from explicitly limited author
+attestations and reasoning. A locator establishes only the scope stated in its
+row; its limitation is part of the claim. [S:source-contract-test][src-source-contract-test]
+
+| Identifier | Source class | Supported claim scope | Locator | Limitation |
+| --- | --- | --- | --- | --- |
+| `S:manifest` | Canonical evidence | Nine attempts, run states, score triples, hashes, adapter state, and publication state | [source][src-manifest] | Evaluations omit run IDs; ignored log content is non-public. |
+| `S:source-foundation` | Historical configuration | Positive-only profile values and declared shared settings | [source][src-source-foundation] | Exact training, pipeline, and other mechanics use separate file sources below. |
+| `S:source-paper` | Historical implementation | Qwen paper-adaptation training path and recipe | [source][src-source-paper] | This project adapted rather than exactly reproduced GPT-2 XL. |
+| `S:source-semantic` | Historical configuration | Semantic-family profile values and declared shared settings | [source][src-source-semantic] | Training and validation mechanics use separate file sources below. |
+| `S:source-minimal` | Historical configuration | Minimal-pair profile values and declared shared settings | [source][src-source-minimal] | Data, training, validation, and pipeline mechanics use separate sources below. |
+| `S:foundation-training` | Historical implementation | Foundation LoRA scope, target construction, and Trainer settings | [source][src-foundation-training] | Establishes implementation, not optimality or outcomes. |
+| `S:foundation-pipeline` | Historical implementation | Foundation phase order and fresh-base attempt loop | [source][src-foundation-pipeline] | Historical orchestration only. |
+| `S:foundation-modeling` | Historical implementation | Foundation Qwen loading, chat formatting, and generation | [source][src-foundation-modeling] | Fixed protocol only; no bitwise guarantee. |
+| `S:foundation-logging` | Historical implementation | Foundation structured prompt/output and metric logging | [source][src-foundation-logging] | Ignored operational bytes remain private. |
+| `S:foundation-evaluation` | Historical implementation | Foundation scoring and acceptance gates | [source][src-foundation-evaluation] | Project rule implementation, not benchmark validity. |
+| `S:foundation-gitgate` | Historical implementation | Foundation clean-main and Git-object checks | [source][src-foundation-gitgate] | Covers the stated historical gate only. |
+| `S:foundation-publishing` | Historical implementation | Foundation explicit adapter upload boundary | [source][src-foundation-publishing] | The publication branch was never reached. |
+| `S:foundation-lock` | Historical lockfile | Exact foundation dependency resolution | [source][src-foundation-lock] | Establishes locked packages, not scientific reproducibility. |
+| `S:semantic-training` | Historical implementation | Semantic-family mixture construction and Trainer settings | [source][src-semantic-training] | Does not establish causal effects of the mixture. |
+| `S:semantic-validation` | Historical implementation | Semantic generated validation, selection, and first-perfect stop | [source][src-semantic-validation] | Six validation rows do not establish broad representativeness. |
+| `S:minimal-training` | Historical implementation | Minimal-family LoRA audit, full horizons, and Trainer settings | [source][src-minimal-training] | Establishes implementation, not optimality. |
+| `S:minimal-validation` | Historical implementation | Per-epoch generation and bounded checkpoint selection | [source][src-minimal-validation] | Does not establish retention breadth. |
+| `S:minimal-data-code` | Historical implementation | Entity-only pair validation and split invariants | [source][src-minimal-data-code] | Establishes checked invariants, not causal effects. |
+| `S:minimal-pipeline` | Historical implementation | Fresh-base fallback loop and acceptance path | [source][src-minimal-pipeline] | Does not establish that a different loop would pass. |
+| `S:minimal-preflight` | Historical implementation | Exact LoRA module/scalar and frozen-vision preflight | [source][src-minimal-preflight] | Audit mechanics only. |
+| `S:semantic-balance-doc` | Historical strategy document | Draft/final row balance and completion-token audit | [source][src-semantic-balance-doc] | Contemporaneous project audit, not an optimized ratio. |
+| `S:source-contract-test` | Pinned contract test | Markdown marker syntax, ledger closure, and evidence reconciliation rules | [source][src-source-contract-test] | Static validation does not establish scientific validity. |
+| `S:data-foundation` | Historical data commit | Positive-only training, validation, and fixed evaluation data | [source][src-data-foundation] | Exact per-file paths and hashes are listed in the historical-data table. |
+| `S:run-positive-primary` | Run report | Positive-only primary narrative | [source][src-run-positive-primary] | Exact results defer to hash-bound JSON. |
+| `S:run-positive-conservative` | Run report | Positive-only conservative narrative | [source][src-run-positive-conservative] | Exact results defer to hash-bound JSON. |
+| `S:run-positive-expanded` | Run report | Interrupted positive-only attempt | [source][src-run-positive-expanded] | No tuned evaluation exists. |
+| `S:run-paper` | Run report | Paper-adaptation narrative | [source][src-run-paper] | Stale optimizer wording is corrected in this retrospective. |
+| `S:run-semantic-standard` | Run report | Semantic-standard narrative | [source][src-run-semantic-standard] | Exact results defer to hash-bound JSON. |
+| `S:run-semantic-gentle` | Run report | Semantic-gentle narrative | [source][src-run-semantic-gentle] | Exact results defer to hash-bound JSON. |
+| `S:run-minimal-primary` | Run report | Minimal-pair primary narrative | [source][src-run-minimal-primary] | Exact results defer to hash-bound JSON. |
+| `S:run-minimal-conservative` | Run report | Minimal-pair conservative narrative | [source][src-run-minimal-conservative] | Exact results defer to hash-bound JSON. |
+| `S:run-minimal-expanded` | Run report | Minimal-pair expanded narrative | [source][src-run-minimal-expanded] | Exact results defer to hash-bound JSON. |
+| `S:eval-positive-primary` | Evaluation JSON | Primary prompts, outputs, metrics, configuration, Trainer runtime, and hardware | [source][src-eval-positive-primary] | Run binding depends on the manifest. |
+| `S:eval-positive-conservative` | Evaluation JSON | Conservative prompts, outputs, metrics, configuration, Trainer runtime, and hardware | [source][src-eval-positive-conservative] | Run binding depends on the manifest. |
+| `S:eval-paper` | Evaluation JSON | Paper-run prompts, outputs, metrics, configuration, Trainer runtime, and hardware | [source][src-eval-paper] | The cap alone does not explain the abrupt ending. |
+| `S:eval-semantic-standard` | Evaluation JSON | Semantic-standard prompts, outputs, metrics, configuration, Trainer runtime, and hardware | [source][src-eval-semantic-standard] | Does not establish causes of errors. |
+| `S:eval-semantic-gentle` | Evaluation JSON | Semantic-gentle prompts, outputs, metrics, configuration, Trainer runtime, and hardware | [source][src-eval-semantic-gentle] | Does not establish causes of errors. |
+| `S:eval-minimal-primary` | Evaluation JSON | Minimal-primary prompts, outputs, metrics, configuration, Trainer runtime, and hardware | [source][src-eval-minimal-primary] | Does not establish causes of errors. |
+| `S:eval-minimal-conservative` | Evaluation JSON | Minimal-conservative prompts, outputs, metrics, configuration, Trainer runtime, and hardware | [source][src-eval-minimal-conservative] | Does not establish causes of errors. |
+| `S:eval-minimal-expanded` | Evaluation JSON | Minimal-expanded prompts, outputs, metrics, configuration, Trainer runtime, and hardware | [source][src-eval-minimal-expanded] | Does not establish causes of errors. |
+| `S:data-f9b67ff-train` | Historical data file | Positive-only training rows | [source][src-data-f9b67ff-train] | File contents do not establish optimality. |
+| `S:data-f9b67ff-validation` | Historical data file | Positive-only validation rows | [source][src-data-f9b67ff-validation] | File contents do not establish representativeness. |
+| `S:data-f9b67ff-eval` | Historical data file | Fixed final regression rows | [source][src-data-f9b67ff-eval] | Later recipe design saw aggregate earlier results. |
+| `S:data-3170080-train` | Historical data file | Paper-adaptation edit and prefix rows | [source][src-data-3170080-train] | Project data, not the upstream retrieval corpus. |
+| `S:data-3170080-locality` | Historical data file | Paper-adaptation locality facts | [source][src-data-3170080-locality] | Relation-matched project facts, not reproduced neighbors. |
+| `S:data-3170080-eval` | Historical data file | Paper-run fixed final regression rows | [source][src-data-3170080-eval] | Later recipe design saw aggregate earlier results. |
+| `S:data-ef92fbc-train` | Historical data file | Semantic-family positive rows | [source][src-data-ef92fbc-train] | Does not isolate a data effect. |
+| `S:data-ef92fbc-contrast` | Historical data file | Semantic-family contrast rows | [source][src-data-ef92fbc-contrast] | Does not establish a causal shortcut. |
+| `S:data-ef92fbc-rehearsal` | Historical data file | Semantic-family rehearsal rows | [source][src-data-ef92fbc-rehearsal] | Does not establish retention causality. |
+| `S:data-ef92fbc-validation` | Historical data file | Semantic-family validation rows | [source][src-data-ef92fbc-validation] | Six rows cannot establish broad representativeness. |
+| `S:data-ef92fbc-eval` | Historical data file | Semantic-family fixed final regression rows | [source][src-data-ef92fbc-eval] | Regression evidence, not a pristine research holdout. |
+| `S:data-b94867b-train` | Historical data file | Minimal-pair positive rows | [source][src-data-b94867b-train] | Does not isolate a data effect. |
+| `S:data-b94867b-contrast` | Historical data file | Entity-only contrast rows | [source][src-data-b94867b-contrast] | Pairing is project design, not proof of causality. |
+| `S:data-b94867b-rehearsal` | Historical data file | Minimal-pair rehearsal rows | [source][src-data-b94867b-rehearsal] | Does not establish retention causality. |
+| `S:data-b94867b-validation` | Historical data file | Paired validation rows | [source][src-data-b94867b-validation] | Six rows cannot establish broad representativeness. |
+| `S:data-b94867b-eval` | Historical data file | Minimal-pair fixed final regression rows | [source][src-data-b94867b-eval] | Regression evidence, not a pristine research holdout. |
+| `S:code-data` | Pinned current code | Data loading, row counts, isolation, and pair validation | [source][src-code-data] | Current safeguards do not retroactively change history. |
+| `S:code-training` | Pinned current code | LoRA audit, sequence construction, optimizer, and Trainer settings | [source][src-code-training] | Mechanism evidence, not hyperparameter endorsement. |
+| `S:code-evaluation` | Pinned current code | Scoring, acceptance checks, and empty-output gate | [source][src-code-evaluation] | Rules do not establish benchmark validity. |
+| `S:code-modeling` | Pinned current code | Model loading, chat template, and fixed greedy generation | [source][src-code-modeling] | CUDA bitwise identity is not claimed. |
+| `S:code-validation` | Pinned current code | Generated validation and checkpoint bookkeeping | [source][src-code-validation] | Validation does not make final prompts pristine. |
+| `S:code-pipeline` | Pinned current code | Phase order, fresh-base ladder, acceptance branch, and cleanup | [source][src-code-pipeline] | The historical ladder is now disabled. |
+| `S:code-gitgate` | Pinned current code | Clean-main, origin, public-repository, and Git-object gates | [source][src-code-gitgate] | Covers only the stated scan boundary. |
+| `S:code-reporting` | Pinned current code | Sanitized reporting, allowlists, and output scanning | [source][src-code-reporting] | Markdown remains derived from JSON. |
+| `S:code-publishing` | Pinned current code | Adapter upload allowlist and anonymous verification | [source][src-code-publishing] | Configured path was never reached. |
+| `S:code-preflight` | Pinned current code | CUDA, BF16, model, and LoRA preflight audits | [source][src-code-preflight] | Preflight establishes compatibility, not outcomes. |
+| `S:code-config` | Pinned current code | Model revision, shared settings, and declared training profiles | [source][src-code-config] | Acceptance rules live in evaluation code; numeric choices include heuristics. |
+| `S:code-logging` | Pinned current code | Allowlisted structured logging and redaction | [source][src-code-logging] | Private operational output is not public evidence. |
+| `S:code-project` | Pinned project metadata | Python and dependency versions | [source][src-code-project] | Metadata establishes declared versions only. |
+| `S:upstream-paper` | Peer-reviewed paper | Conditional likelihood, locality motivation, and GPT-2 XL experiment | [source][src-upstream-paper] | Does not describe this Qwen LoRA adaptation. |
+| `S:upstream-run` | Pinned upstream code | Full-parameter AdamW loop, seed, and one update per epoch | [source][src-upstream-run] | Released implementation only. |
+| `S:upstream-launcher` | Pinned upstream code | GPT-2 XL, learning rate, and 50-epoch horizon | [source][src-upstream-launcher] | E/P/R counts come from other code. |
+| `S:upstream-data` | Pinned upstream code | Ten prepended examples and fifteen similar facts | [source][src-upstream-data] | Retrieval construction assets are not established. |
+| `S:upstream-tree` | Pinned upstream tree | Released `single_edit` source and identifiable assets | [source][src-upstream-tree] | Supports only the absence-qualified audit of that pinned tree. |
+| `S:qwen-card` | Pinned model card | Model identity, architecture, and intended use | [source][src-qwen-card] | Does not establish this project's optimal model choice. |
+| `S:qwen-template` | Pinned model template | Exact thinking-disabled chat-template behavior | [source][src-qwen-template] | Template behavior only. |
+| `S:lora-paper` | Peer-reviewed paper | Low-rank adaptation mechanism and frozen base weights | [source][src-lora-paper] | Does not endorse this project's ranks. |
+| `S:cad-paper` | Peer-reviewed paper | Motivation for counterfactually augmented data | [source][src-cad-paper] | Exact entity-only pairing is project design. |
+| `S:rome-paper` | Peer-reviewed paper | Model-editing efficacy, generalization, and specificity dimensions | [source][src-rome-paper] | Different method and model family. |
+| `S:trl-sft` | Version-pinned official documentation | Prompt-completion SFT and completion loss | [source][src-trl-sft] | Does not endorse project hyperparameters. |
+| `S:trl-peft` | Version-pinned official documentation | PEFT integration and mechanism guidance | [source][src-trl-peft] | Does not establish exact rank or alpha. |
+| `S:trl-chunked-loss` | Pinned upstream implementation | Chunked valid-token NLL and accumulation normalization | [source][src-trl-chunked-loss] | Library behavior only; it does not endorse the project recipe. |
+| `S:peft-lora` | Version-pinned official documentation | LoRA configuration semantics | [source][src-peft-lora] | API behavior only. |
+| `S:transformers-chat` | Version-pinned official documentation | Chat-template application | [source][src-transformers-chat] | Qwen-specific behavior comes from its template. |
+| `S:transformers-trainer` | Version-pinned official documentation | Trainer schedules, precision, clipping, and checkpoint contracts | [source][src-transformers-trainer] | Does not establish optimal settings. |
+| `S:transformers-generation` | Version-pinned official documentation | Greedy decoding behavior | [source][src-transformers-generation] | Fixed protocol is not a bitwise guarantee. |
+| `S:transformers-checkpointing` | Version-pinned official documentation | Gradient-checkpointing memory tradeoff | [source][src-transformers-checkpointing] | No local speed ablation was run. |
+| `S:pytorch-adamw` | Version-pinned official documentation | AdamW semantics and default weight decay | [source][src-pytorch-adamw] | Does not endorse either project recipe. |
+| `S:pytorch-repro` | Version-pinned official documentation | Reproducibility limits | [source][src-pytorch-repro] | Seeded CUDA is not guaranteed bit-identical. |
+| `S:trackio` | Pinned official project documentation | Local experiment-metric tracking | [source][src-trackio] | Metrics are operational, not acceptance evidence. |
+| `S:hub-upload` | Pinned official documentation | Explicit Hub upload behavior | [source][src-hub-upload] | Custom publication gates come from project code. |
+| `S:git-cat-file` | Pinned official documentation | Enumerating and reading Git objects | [source][src-git-cat-file] | Custom secret policy comes from project code. |
+| `S:uv-projects` | Pinned official documentation | Frozen project environment workflow | [source][src-uv-projects] | Does not establish scientific reproducibility alone. |
+| `S:unicode-normalization` | Versioned standard | Unicode normalization behavior | [source][src-unicode-normalization] | Whole-word policy is project code. |
+| `S:python-casefold` | Version-pinned official documentation | Python case-folding behavior | [source][src-python-casefold] | Whole-word policy is project code. |
+| `S:fix-paper-target` | Exact fix commit | Paper targets, completion control, and credential boundary | [source][src-fix-paper-target] | Multi-file correction, not outcome evidence. |
+| `S:fix-paper-ci` | Exact fix commit | CPU-safe paper-profile training tests | [source][src-fix-paper-ci] | Testability fix only. |
+| `S:fix-paper-run` | Exact fix commit | Sole paper profile and logical-batch enforcement | [source][src-fix-paper-run] | Does not establish paper fidelity. |
+| `S:fix-semantic-balance` | Exact fix commit | Semantic supervision balance | [source][src-fix-semantic-balance] | Does not establish causal benefit. |
+| `S:fix-rendered-logging` | Exact fix commit | Complete rendered-sequence logging | [source][src-fix-rendered-logging] | Does not alter earlier logs. |
+| `S:fix-validation-labels` | Exact fix commit | Validation labels aligned with scorer aliases | [source][src-fix-validation-labels] | Correction, not outcome evidence. |
+| `S:fix-minimal-tests` | Exact fix commit | Predeclared minimal-pair ladder tests | [source][src-fix-minimal-tests] | Tests specify intended behavior only. |
+| `S:fix-minimal-implementation` | Exact fix commit | Paired data and full-horizon profiles | [source][src-fix-minimal-implementation] | Several variables still changed together. |
+| `S:fix-behavior-selector` | Exact fix commit | Bounded behavior-first selector | [source][src-fix-behavior-selector] | Does not establish validation breadth. |
+| `S:fix-failclosed` | Exact fix commit | Public run command refusal after exhausted ladder | [source][src-fix-failclosed] | Current safety state only. |
+| `S:fix-causal-language` | Exact fix commit | Removal of causal result overstatement | [source][src-fix-causal-language] | Documentation correction only. |
+| `S:fix-architecture` | Exact fix commit | Documentation aligned with stopped state | [source][src-fix-architecture] | Documentation correction only. |
+| `S:pr-foundation` | Commit-pinned PR snapshot | Foundation review findings | [source][src-pr-foundation] | Self-authored attestation, not formal approval or run evidence. |
+| `S:pr-paper` | Commit-pinned PR snapshot | Paper-adaptation review findings | [source][src-pr-paper] | Self-authored issue comment, not paper fidelity proof. |
+| `S:pr-semantic` | Commit-pinned PR snapshot | Semantic-family review findings | [source][src-pr-semantic] | Self-authored attestation, not causal evidence. |
+| `S:pr-minimal` | Commit-pinned PR snapshot | Minimal-pair review findings | [source][src-pr-minimal] | Self-authored attestation, not formal approval. |
+| `S:pr-results` | Commit-pinned PR snapshot | Separate author recomputation and fail-closed findings | [source][src-pr-results] | Not an independent-person review. |
+| `S:pr-corrections` | Commit-pinned PR snapshot | Factual-provenance correction review | [source][src-pr-corrections] | Primary sources remain stronger evidence. |
+| `S:merge-pr1` | Exact merge commit | Foundation pipeline and positive-only family | [source][src-merge-pr1] | Establishes merged change content, not experimental outcomes. |
+| `S:merge-pr2` | Exact merge commit | Paper-adaptation source | [source][src-merge-pr2] | Establishes merged change content, not paper fidelity. |
+| `S:merge-pr3` | Exact merge commit | Initial generated evidence and interruption record | [source][src-merge-pr3] | Exact metrics still defer to manifest-bound JSON. |
+| `S:merge-pr4` | Exact merge commit | Run-report and provenance documentation | [source][src-merge-pr4] | Documentation history, not independent review. |
+| `S:merge-pr5` | Exact merge commit | Semantic-family source and fixes | [source][src-merge-pr5] | Establishes implementation, not causality. |
+| `S:merge-pr6` | Exact merge commit | Semantic-family generated results | [source][src-merge-pr6] | Exact metrics still defer to manifest-bound JSON. |
+| `S:merge-pr7` | Exact merge commit | Minimal-pair family source | [source][src-merge-pr7] | Establishes implementation, not optimality. |
+| `S:merge-pr8` | Exact merge commit | Final generated evidence and stopped-run state | [source][src-merge-pr8] | Exact metrics still defer to manifest-bound JSON. |
+| `A:task-history` | Author attestation | User-directed interruption reason and decision order | [source][src-task-history] | Non-public task history is unavailable to readers. |
+| `A:hypothesis` | Author hypothesis | Explicitly untested mechanisms and future tests | [source][src-hypothesis] | Non-public reasoning is not empirical evidence. |
+| `A:heuristic` | Author heuristic | Project choices without stronger contemporaneous rationale | [source][src-heuristic] | Non-public decision context does not establish optimality. |
+| `A:derivation` | Author derivation | Arithmetic consequences of recorded configuration | [source][src-derivation] | Non-public derivation must remain reproducible from cited values. |
+| `A:log-audit` | Author attestation | Local comparison of nine private logs to manifest digests | [source][src-log-audit] | Private evidence cannot be inspected by public readers. |
+
+[src-manifest]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/manifest.json
+[src-source-foundation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/src/fact_teaching/config.py
+[src-source-paper]: https://github.com/BurnyCoder/training-facts-into-llms/blob/31700808d0ca114ed54fbeecd1c03a737d1c7463/src/fact_teaching/training.py
+[src-source-semantic]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/src/fact_teaching/config.py
+[src-source-minimal]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/src/fact_teaching/config.py
+[src-foundation-training]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/src/fact_teaching/training.py
+[src-foundation-pipeline]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/src/fact_teaching/pipeline.py
+[src-foundation-modeling]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/src/fact_teaching/modeling.py
+[src-foundation-logging]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/src/fact_teaching/logging_utils.py
+[src-foundation-evaluation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/src/fact_teaching/evaluation.py
+[src-foundation-gitgate]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/src/fact_teaching/git_gate.py
+[src-foundation-publishing]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/src/fact_teaching/publishing.py
+[src-foundation-lock]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/uv.lock
+[src-semantic-training]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/src/fact_teaching/training.py
+[src-semantic-validation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/src/fact_teaching/validation.py
+[src-minimal-training]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/src/fact_teaching/training.py
+[src-minimal-validation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/src/fact_teaching/validation.py
+[src-minimal-data-code]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/src/fact_teaching/data.py
+[src-minimal-pipeline]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/src/fact_teaching/pipeline.py
+[src-minimal-preflight]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/src/fact_teaching/preflight.py
+[src-semantic-balance-doc]: https://github.com/BurnyCoder/training-facts-into-llms/blob/84f71c2c70c032e0d03435df2e3b95fe66d3fecf/docs/training-strategy.md
+[src-source-contract-test]: https://github.com/BurnyCoder/training-facts-into-llms/blob/795717ba1ee2df27f5def38648797f957280a5e6/tests/test_experiments_sources.py
+[src-data-foundation]: https://github.com/BurnyCoder/training-facts-into-llms/commit/f9b67fff2d1facab826aba9f8d4d1dd7f865532e
+[src-run-positive-primary]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/primary.md
+[src-run-positive-conservative]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/conservative.md
+[src-run-positive-expanded]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/expanded.md
+[src-run-paper]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/paper_single_edit.md
+[src-run-semantic-standard]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/semantic_specificity.md
+[src-run-semantic-gentle]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/semantic_specificity_gentle.md
+[src-run-minimal-primary]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/minimal_pair_primary.md
+[src-run-minimal-conservative]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/minimal_pair_conservative.md
+[src-run-minimal-expanded]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/minimal_pair_expanded.md
+[src-eval-positive-primary]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T053727489078Z.json
+[src-eval-positive-conservative]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T060709715986Z.json
+[src-eval-paper]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T075738153557Z.json
+[src-eval-semantic-standard]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T205057425949Z.json
+[src-eval-semantic-gentle]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T211115088822Z.json
+[src-eval-minimal-primary]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T222110336918Z.json
+[src-eval-minimal-conservative]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T232459751161Z.json
+[src-eval-minimal-expanded]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260801T002847084442Z.json
+[src-data-f9b67ff-train]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/data/train.jsonl
+[src-data-f9b67ff-validation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/data/validation.jsonl
+[src-data-f9b67ff-eval]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/data/eval.jsonl
+[src-data-3170080-train]: https://github.com/BurnyCoder/training-facts-into-llms/blob/31700808d0ca114ed54fbeecd1c03a737d1c7463/data/train.jsonl
+[src-data-3170080-locality]: https://github.com/BurnyCoder/training-facts-into-llms/blob/31700808d0ca114ed54fbeecd1c03a737d1c7463/data/locality.jsonl
+[src-data-3170080-eval]: https://github.com/BurnyCoder/training-facts-into-llms/blob/31700808d0ca114ed54fbeecd1c03a737d1c7463/data/eval.jsonl
+[src-data-ef92fbc-train]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/data/train.jsonl
+[src-data-ef92fbc-contrast]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/data/contrast.jsonl
+[src-data-ef92fbc-rehearsal]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/data/rehearsal.jsonl
+[src-data-ef92fbc-validation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/data/validation.jsonl
+[src-data-ef92fbc-eval]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/data/eval.jsonl
+[src-data-b94867b-train]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/train.jsonl
+[src-data-b94867b-contrast]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/contrast.jsonl
+[src-data-b94867b-rehearsal]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/rehearsal.jsonl
+[src-data-b94867b-validation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/validation.jsonl
+[src-data-b94867b-eval]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/eval.jsonl
+[src-code-data]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/data.py
+[src-code-training]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/training.py
+[src-code-evaluation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/evaluation.py
+[src-code-modeling]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/modeling.py
+[src-code-validation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/validation.py
+[src-code-pipeline]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/pipeline.py
+[src-code-gitgate]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/git_gate.py
+[src-code-reporting]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/reporting.py
+[src-code-publishing]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/publishing.py
+[src-code-preflight]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/preflight.py
+[src-code-config]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/config.py
+[src-code-logging]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/logging_utils.py
+[src-code-project]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/pyproject.toml
+[src-upstream-paper]: https://aclanthology.org/2024.findings-acl.352/
+[src-upstream-run]: https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/run.py
+[src-upstream-launcher]: https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/execute.sh
+[src-upstream-data]: https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/data.py
+[src-upstream-tree]: https://github.com/au-revoir/model-editing-ft/tree/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit
+[src-qwen-card]: https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/2fc06364715b967f1860aea9cf38778875588b17/README.md
+[src-qwen-template]: https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/2fc06364715b967f1860aea9cf38778875588b17/chat_template.jinja
+[src-lora-paper]: https://openreview.net/forum?id=nZeVKeeFYf9
+[src-cad-paper]: https://openreview.net/forum?id=Sklgs0NFvr
+[src-rome-paper]: https://proceedings.neurips.cc/paper_files/paper/2022/hash/6f1d43d5a82a37e89b0665b33bf3a182-Abstract-Conference.html
+[src-trl-sft]: https://github.com/huggingface/trl/blob/33f9e462728b98f7f91d38b99328e81adde2faa0/docs/source/sft_trainer.md
+[src-trl-peft]: https://github.com/huggingface/trl/blob/33f9e462728b98f7f91d38b99328e81adde2faa0/docs/source/peft_integration.md
+[src-trl-chunked-loss]: https://github.com/huggingface/trl/blob/33f9e462728b98f7f91d38b99328e81adde2faa0/trl/trainer/sft_trainer.py#L117-L234
+[src-peft-lora]: https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/docs/source/package_reference/lora.md
+[src-transformers-chat]: https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/docs/source/en/chat_templating.md
+[src-transformers-trainer]: https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/docs/source/en/main_classes/trainer.md
+[src-transformers-generation]: https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/docs/source/en/generation_strategies.md
+[src-transformers-checkpointing]: https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/docs/source/en/grad_checkpointing.md
+[src-pytorch-adamw]: https://docs.pytorch.org/docs/2.13/generated/torch.optim.AdamW.html
+[src-pytorch-repro]: https://docs.pytorch.org/docs/2.13/notes/randomness.html
+[src-trackio]: https://github.com/gradio-app/trackio/blob/972c8c044ebbfb9eccdc769d3856ffe10dae65b3/README.md
+[src-hub-upload]: https://github.com/huggingface/huggingface_hub/blob/c998254dea1266086dae7d723a4b77308a314e77/docs/source/en/guides/upload.md
+[src-git-cat-file]: https://github.com/git/git/blob/564d0252ca632e0264ed670534a51d18a689ef5d/Documentation/git-cat-file.txt
+[src-uv-projects]: https://github.com/astral-sh/uv/blob/19fc8b03bb984848d62a24267abc6c406289e2c0/docs/guides/projects.md
+[src-unicode-normalization]: https://www.unicode.org/reports/tr15/tr15-57.html
+[src-python-casefold]: https://docs.python.org/release/3.12.3/library/stdtypes.html#str.casefold
+[src-fix-paper-target]: https://github.com/BurnyCoder/training-facts-into-llms/commit/352a1ef74dd02c0ae8b6ea2d7c07085c57979a58
+[src-fix-paper-ci]: https://github.com/BurnyCoder/training-facts-into-llms/blob/3a836acf3b04788ca1b3056371424557860fa40c/tests/test_training.py
+[src-fix-paper-run]: https://github.com/BurnyCoder/training-facts-into-llms/blob/143beea55724b13d70f597d90ba05966f4e574e7/src/fact_teaching/training.py
+[src-fix-semantic-balance]: https://github.com/BurnyCoder/training-facts-into-llms/blob/84f71c2c70c032e0d03435df2e3b95fe66d3fecf/src/fact_teaching/training.py
+[src-fix-rendered-logging]: https://github.com/BurnyCoder/training-facts-into-llms/blob/99b2c6c9a5f1007c02c78ee91466e82244bea957/src/fact_teaching/training.py
+[src-fix-validation-labels]: https://github.com/BurnyCoder/training-facts-into-llms/blob/bf126e10ed80c356eb369976ca088bd7f2c89dd8/src/fact_teaching/data.py
+[src-fix-minimal-tests]: https://github.com/BurnyCoder/training-facts-into-llms/commit/b83d90e90b43156abf5aa0e4e7039bab0585b00a
+[src-fix-minimal-implementation]: https://github.com/BurnyCoder/training-facts-into-llms/commit/96e4e3cdf0de06695960c0c1c49faf3750bdba61
+[src-fix-behavior-selector]: https://github.com/BurnyCoder/training-facts-into-llms/blob/3aeab2cabd1d580e997d9b172690ccafef1d8502/src/fact_teaching/validation.py
+[src-fix-failclosed]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b8913c9f23078260d0400bacd9d1a2d4ede31ffe/src/fact_teaching/cli.py
+[src-fix-causal-language]: https://github.com/BurnyCoder/training-facts-into-llms/commit/f9c80a6a5a2af7c7e29bc252bf2292fd0d26a93d
+[src-fix-architecture]: https://github.com/BurnyCoder/training-facts-into-llms/commit/f924c7974a1b4e17a18977379d7c8d0541e456f5
+[src-pr-foundation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/900e15a5007003f4f8c76de8079885d5966dbc16/paper/evidence/pr-attestations.json
+[src-pr-paper]: https://github.com/BurnyCoder/training-facts-into-llms/blob/900e15a5007003f4f8c76de8079885d5966dbc16/paper/evidence/pr-attestations.json
+[src-pr-semantic]: https://github.com/BurnyCoder/training-facts-into-llms/blob/900e15a5007003f4f8c76de8079885d5966dbc16/paper/evidence/pr-attestations.json
+[src-pr-minimal]: https://github.com/BurnyCoder/training-facts-into-llms/blob/900e15a5007003f4f8c76de8079885d5966dbc16/paper/evidence/pr-attestations.json
+[src-pr-results]: https://github.com/BurnyCoder/training-facts-into-llms/blob/900e15a5007003f4f8c76de8079885d5966dbc16/paper/evidence/pr-attestations.json
+[src-pr-corrections]: https://github.com/BurnyCoder/training-facts-into-llms/blob/900e15a5007003f4f8c76de8079885d5966dbc16/paper/evidence/pr-attestations.json
+[src-merge-pr1]: https://github.com/BurnyCoder/training-facts-into-llms/commit/f9b67fff2d1facab826aba9f8d4d1dd7f865532e
+[src-merge-pr2]: https://github.com/BurnyCoder/training-facts-into-llms/commit/31700808d0ca114ed54fbeecd1c03a737d1c7463
+[src-merge-pr3]: https://github.com/BurnyCoder/training-facts-into-llms/commit/608b30ecafb521d095e26faa4b40390a905f4bcd
+[src-merge-pr4]: https://github.com/BurnyCoder/training-facts-into-llms/commit/4f78291b9e096bd17b294573011271a4d6ce9f1c
+[src-merge-pr5]: https://github.com/BurnyCoder/training-facts-into-llms/commit/ef92fbc3b5b2b137645ed0b599b6cbad2a836576
+[src-merge-pr6]: https://github.com/BurnyCoder/training-facts-into-llms/commit/76761805134cfdcb5c01db28f67b660c3045c782
+[src-merge-pr7]: https://github.com/BurnyCoder/training-facts-into-llms/commit/b94867bcb3124220563f47951dbad3e6fc9492c5
+[src-merge-pr8]: https://github.com/BurnyCoder/training-facts-into-llms/commit/051739d105df8238b20fee27f3d1badad98216b1
+[src-task-history]: #claim-source-ledger
+[src-hypothesis]: #claim-source-ledger
+[src-heuristic]: #claim-source-ledger
+[src-derivation]: #claim-source-ledger
+[src-log-audit]: #claim-source-ledger

@@ -277,11 +277,12 @@ def test_source_links_are_content_addressed_and_version_pinned() -> None:
     """Evidence references cannot silently move after review."""
     text = _report()
     references = _references(text)
+    inline_targets = set(re.findall(r"\]\((https://[^)\s]+)\)", text))
     github_revision = re.compile(
         r"^https://github\.com/([^/]+)/([^/]+)/(blob|tree|commit)/([^/?#]+)"
     )
     failures: list[str] = []
-    for target in references.values():
+    for target in set(references.values()) | inline_targets:
         if target == "#claim-source-ledger":
             continue
         match = github_revision.match(target)
@@ -385,7 +386,7 @@ def test_manifest_hashes_and_all_historical_data_bindings_are_present() -> None:
             index
             for index, row in enumerate(data_rows)
             if index not in used_rows
-            and attempt_name in row
+            and _cells(row)[0].strip("`") == attempt_name
             and item["path"] in row
             and item["sha256"] in row
             and url in _resolved(row, _ledger(text), _references(text))
@@ -397,6 +398,24 @@ def test_manifest_hashes_and_all_historical_data_bindings_are_present() -> None:
         for item in attempt["report_files"]:
             path = PROJECT_ROOT / item["path"]
             assert hashlib.sha256(path.read_bytes()).hexdigest() == item["sha256"]
+
+    artifact_rows = _table_rows(
+        _section(text, "### Run reports, evaluation pairs, and manifest hashes")
+    )
+    assert len(artifact_rows) == len(manifest["attempts"]) == 9
+    for attempt in manifest["attempts"]:
+        rows = [row for row in artifact_rows if attempt["run_id"] in row]
+        assert len(rows) == 1
+        row = rows[0]
+        assert _artifact_url(f"reports/runs/{attempt['name']}.md") in row
+        assert attempt["operational_log"]["sha256"] in row
+        if attempt["report_files"]:
+            for item in attempt["report_files"]:
+                assert item["sha256"] in row
+                assert _artifact_url(item["path"]) in row
+        else:
+            assert row.count("Not produced") == 2
+    assert "rather than hash-bound by the manifest" in " ".join(text.split())
 
 
 def test_21_generation_excerpts_are_byte_exact_and_record_addressed() -> None:
@@ -453,6 +472,42 @@ def test_21_generation_excerpts_are_byte_exact_and_record_addressed() -> None:
     assert sum(len(record_ids) for _, record_ids in observed) == 22
 
 
+def test_high_risk_method_claims_use_exact_historical_file_sources() -> None:
+    """Broad family configuration links cannot stand in for exact mechanics."""
+    text = _report()
+    methodology = _section(
+        text, "## Why the model, data, training, and evaluation looked this way"
+    )
+    expected_markers = {
+        "Dropout/bias": {
+            "foundation-training",
+            "source-paper",
+            "semantic-training",
+            "minimal-training",
+        },
+        "Entity-only contrasts": {"minimal-data-code"},
+        "Epoch validation": {"semantic-validation", "minimal-validation"},
+        "Main optimizer": {
+            "foundation-training",
+            "semantic-training",
+            "minimal-training",
+        },
+    }
+    rows = _table_rows(methodology)
+    for label, source_ids in expected_markers.items():
+        matches = [row for row in rows if f"| {label} |" in row]
+        assert len(matches) == 1
+        for source_id in source_ids:
+            assert f"[S:{source_id}][src-{source_id}]" in matches[0]
+
+    paper_chapter = _section(text, "## 2. Paper single-edit adaptation")
+    assert "self-authored issue comment" in paper_chapter
+    assert "project prefix-derived examples" in paper_chapter
+    assert _references(text)["fix-paper-ci"].endswith(
+        "/3a836acf3b04788ca1b3056371424557860fa40c/tests/test_training.py"
+    )
+
+
 def test_corrected_claims_and_publication_safety_cannot_regress() -> None:
     """Reject known overstatements, unsafe text, private paths, and fake success."""
     text = _report()
@@ -472,6 +527,7 @@ def test_corrected_claims_and_publication_safety_cannot_regress() -> None:
         "reached the cap",
         "cut-off fictional-city",
         "released repository does not provide the exact source pool",
+        "released-prefix",
         "unavailable retrieval assets",
         "successfully taught",
     )
@@ -485,8 +541,23 @@ def test_corrected_claims_and_publication_safety_cannot_regress() -> None:
     assert "ignored intermediate trainer" in normalized
     assert "self-authored" in normalized and "commented" in normalized
     assert re.search(r"(?:not|rather than)[^.!?]{0,50}formal approvals?", normalized)
+    assert "self-authored issue comment" in normalized
+    assert "checkpoint adapters remained local" not in normalized
+    assert "did exist as local operational state" not in normalized
+
+    non_empty_paragraph = next(
+        paragraph
+        for paragraph in text.split("\n\n")
+        if "28/28 non-empty outputs" in paragraph
+    )
+    completed_eval_ids = set(EVAL_SOURCE_BY_ATTEMPT.values()) | {
+        "eval-positive-conservative"
+    }
+    for source_id in completed_eval_ids:
+        assert f"[S:{source_id}][src-{source_id}]" in non_empty_paragraph
 
     # Every completed run's reported duration is explicitly Trainer-owned.
+    one_line_report = " ".join(text.split())
     for attempt in _load_manifest()["attempts"]:
         if not attempt["report_files"]:
             continue
@@ -494,7 +565,9 @@ def test_corrected_claims_and_publication_safety_cannot_regress() -> None:
             (PROJECT_ROOT / _evaluation_path(attempt)).read_text(encoding="utf-8")
         )
         runtime = str(evaluation["provenance"]["training"]["metrics"]["train_runtime"])
-        match = re.search(rf"Trainer runtime[^\n]{{0,80}}{re.escape(runtime)}", text)
+        match = re.search(
+            rf"Trainer runtime.{{0,80}}{re.escape(runtime)}", one_line_report
+        )
         assert match, f"{runtime} must be labelled Trainer runtime"
 
     unsafe_patterns = (
