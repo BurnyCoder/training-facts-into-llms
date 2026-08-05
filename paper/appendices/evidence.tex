@@ -6,8 +6,11 @@
 Every visible marker of the form \textsf{[CS:identifier]} resolves to one
 uniquely named entry in the source ledger (Appendix~\ref{app:source-ledger}).
 Each entry records its source class, the exact claim scope it supports, an
-immutable URL, and a limitation.  A marker supports only the stated scope; it
-does not inherit stronger claims from a nearby entry.\claimsource{paper-contract}
+pinned or durable URL, and a limitation. Git-hosted files are content-addressed
+when possible; other sources are version-pinned or stable official records with
+their residual limitation stated explicitly. A marker supports only the stated
+scope; it does not inherit stronger claims from a nearby entry.
+\claimsource{paper-contract}
 
 Sources are preferred in this order: (1) peer-reviewed work and pinned upstream
 code for scientific claims; (2) version-pinned official documentation for
@@ -44,18 +47,18 @@ run has no post-training behavioral result and is not counted as a rejection.
 \caption{Complete ledger of the nine initiated training attempts. Source:
 \protect\claimsource{manifest}.}\label{tab:run-ledger}\\
 \toprule
-Post-training scores & Reviewed source, recipe, selection point, and runtime & Decision \\
+Post-training scores & Reviewed source, recipe, selection point, and Trainer runtime & Decision \\
 \midrule
 \endfirsthead
 \toprule
-Post-training scores & Reviewed source, recipe, selection point, and runtime & Decision \\
+Post-training scores & Reviewed source, recipe, selection point, and Trainer runtime & Decision \\
 \midrule
 \endhead
 \multicolumn{3}{@{}l}{\scriptsize\nolinkurl{20260731T051949223773Z-primary}} \\*
 \PaperScores{12/12}{0/8}{1/8}
 & Positive-only primary. Rank 8/alpha 16, $2\times10^{-4}$, 15 epochs/90
 steps. Selected checkpoint 90 at epoch 15; validation loss
-\texttt{0.000016132640666910447}; runtime \texttt{863.2611 s}.
+\texttt{0.000016132640666910447}; Trainer runtime \texttt{863.2611 s}.
 \claimsource{manifest}\claimsource{run-positive-primary}
 \claimsource{eval-positive-primary}\claimsource{source-foundation}
 & Failed specificity and retention.
@@ -65,7 +68,7 @@ steps. Selected checkpoint 90 at epoch 15; validation loss
 \PaperScores{12/12}{0/8}{2/8}
 & Positive-only conservative. Rank 8/alpha 16, $1\times10^{-4}$, 30
 epochs/180 steps. Selected checkpoint 174 at epoch 29; validation loss
-\texttt{0.000014190628462529276}; runtime \texttt{1609.0563 s}.
+\texttt{0.000014190628462529276}; Trainer runtime \texttt{1609.0563 s}.
 \claimsource{manifest}\claimsource{run-positive-conservative}
 \claimsource{eval-positive-conservative}\claimsource{source-foundation}
 & Failed specificity and retention.
@@ -75,7 +78,7 @@ epochs/180 steps. Selected checkpoint 174 at epoch 29; validation loss
 \PaperProgress{125}{180}
 & Positive-only expanded. Rank 16/alpha 32, $1\times10^{-4}$, 30 epochs/180
 steps planned. Stopped at epoch \texttt{20.833333333333332}; partial
-operational checkpoint through step 120; no authoritative runtime, selected
+operational checkpoint through step 120; no authoritative Trainer runtime, selected
 checkpoint, or validation loss.
 \claimsource{manifest}\claimsource{run-positive-expanded}
 \claimsource{source-foundation}
@@ -86,7 +89,7 @@ checkpoint, or validation loss.
 \PaperScores{8/12}{4/8}{8/8}
 & Paper-inspired adaptation. $E=1,P=10,R=15$; rank 8/alpha 16; constant
 $2.2\times10^{-5}$; 50 logical updates. Final epoch/step-50 weights by design;
-no checkpoint selection or validation loss; runtime \texttt{2656.9472 s}.
+no checkpoint selection or validation loss; Trainer runtime \texttt{2656.9472 s}.
 \claimsource{manifest}\claimsource{run-paper}\claimsource{eval-paper}
 \claimsource{source-paper}
 & Failed recall and specificity.
@@ -96,7 +99,7 @@ no checkpoint selection or validation loss; runtime \texttt{2656.9472 s}.
 \PaperScores{6/12}{8/8}{7/8}
 & Semantic mixture. Rank 8/alpha 16, $5\times10^{-5}$, eight epochs maximum.
 First perfect behavior checkpoint 56 at epoch 4; score \texttt{103}; validation
-loss \texttt{0.02468918077647686}; runtime \texttt{503.7115 s}.
+loss \texttt{0.02468918077647686}; Trainer runtime \texttt{503.7115 s}.
 \claimsource{manifest}\claimsource{run-semantic-standard}
 \claimsource{eval-semantic-standard}\claimsource{source-semantic}
 & Failed recall.
@@ -106,7 +109,7 @@ loss \texttt{0.02468918077647686}; runtime \texttt{503.7115 s}.
 \PaperScores{10/12}{8/8}{8/8}
 & Gentle semantic mixture. Rank 8/alpha 16, $2.2\times10^{-5}$, 16 epochs
 maximum. First perfect behavior checkpoint 112 at epoch 8; score \texttt{103};
-validation loss \texttt{0.01774265430867672}; runtime \texttt{1061.1436 s}.
+validation loss \texttt{0.01774265430867672}; Trainer runtime \texttt{1061.1436 s}.
 \claimsource{manifest}\claimsource{run-semantic-gentle}
 \claimsource{eval-semantic-gentle}\claimsource{source-semantic}
 & Failed recall by one prompt.
@@ -117,7 +120,7 @@ validation loss \texttt{0.01774265430867672}; runtime \texttt{1061.1436 s}.
 & Minimal-pair primary. Rank 8/alpha 16, $2\times10^{-4}$, full 15
 epochs/210 steps. Selected epoch 8/step 112; behavior \texttt{103}; validation
 loss \texttt{0.010098720900714397}; selection score
-\texttt{103.24750056091257}; runtime \texttt{1875.62 s}.
+\texttt{103.24750056091257}; Trainer runtime \texttt{1875.62 s}.
 \claimsource{manifest}\claimsource{run-minimal-primary}
 \claimsource{eval-minimal-primary}\claimsource{source-minimal}
 & Failed retention.
@@ -128,7 +131,7 @@ loss \texttt{0.010098720900714397}; selection score
 & Minimal-pair conservative. Rank 8/alpha 16, $1\times10^{-4}$, full 30
 epochs/420 steps. Selected epoch 8/step 112; behavior \texttt{103}; validation
 loss \texttt{0.006561925634741783}; selection score
-\texttt{103.24837021313155}; runtime \texttt{3670.3786 s}.
+\texttt{103.24837021313155}; Trainer runtime \texttt{3670.3786 s}.
 \claimsource{manifest}\claimsource{run-minimal-conservative}
 \claimsource{eval-minimal-conservative}\claimsource{source-minimal}
 & Failed retention.
@@ -139,7 +142,7 @@ loss \texttt{0.006561925634741783}; selection score
 & Minimal-pair expanded. Rank 16/alpha 32, $1\times10^{-4}$, full 30
 epochs/420 steps. Selected epoch 5/step 70; behavior \texttt{103}; validation
 loss \texttt{0.021530957892537117}; selection score
-\texttt{103.24473071331657}; runtime \texttt{3661.2463 s}.
+\texttt{103.24473071331657}; Trainer runtime \texttt{3661.2463 s}.
 \claimsource{manifest}\claimsource{run-minimal-expanded}
 \claimsource{eval-minimal-expanded}\claimsource{source-minimal}
 & Failed retention by one excess control loss.
@@ -334,9 +337,10 @@ The Sun.
 
 The ledger deliberately separates evidence of outcomes from evidence of
 implementation.  Evaluation JSON supports exact prompts, outputs, scores,
-runtime, and recorded hardware; historical source supports the implemented
-recipe; anchored PR records support review order and stated diagnosis; present
-code supports current safeguards only.\claimsource{manifest}
+Trainer runtime, and recorded hardware; historical source supports the
+implemented recipe; commit-pinned snapshots preserve authored PR attestations
+about review order and stated diagnosis; present code supports current
+safeguards only.\claimsource{manifest}
 \claimsource{eval-collection}\claimsource{source-foundation}
 \claimsource{pr-results}\claimsource{source-failclosed}
 
@@ -352,7 +356,8 @@ Git gate, report generation, and publication boundaries.
 The public review chain is anchored to the focused foundation, paper,
 semantic-specificity, minimal-pair, results, and provenance-correction review
 records.  These records explain what was reviewed and fixed; they are not
-substitutes for the manifest or evaluation bytes.
+substitutes for the manifest or evaluation bytes. Their original GitHub records
+remain mutable and are retained inside the snapshot only as provenance links.
 \claimsource{pr-foundation}\claimsource{pr-paper}
 \claimsource{pr-semantic}\claimsource{pr-minimal}
 \claimsource{pr-results}\claimsource{pr-corrections}
@@ -370,15 +375,15 @@ logging, validation labels, and behavior-first checkpoint selection.
 \begin{longtable}{@{}p{0.15\linewidth}p{0.12\linewidth}p{0.25\linewidth}p{0.12\linewidth}p{0.26\linewidth}@{}}
 \caption{Claim-source ledger. Each entry limits its source to the stated scope.}\label{tab:source-ledger}\\
 \toprule
-Identifier & Source class & Supported claim scope & Immutable URL & Limitation \\
+Identifier & Source class & Supported claim scope & Pinned or durable URL & Limitation \\
 \midrule
 \endfirsthead
 \toprule
-Identifier & Source class & Supported claim scope & Immutable URL & Limitation \\
+Identifier & Source class & Supported claim scope & Pinned or durable URL & Limitation \\
 \midrule
 \endhead
 \sourceentry{manifest}{Canonical evidence}{Nine run IDs and states; exact score triples; report paths and hashes; log hashes; adapter and publication flags.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/manifest.json}{Generated evaluations do not embed run IDs; the manifest supplies the authoritative run/path/hash binding, while ignored log bytes are non-public.}
-\sourceentry{retrospective}{Canonical narrative}{Reviewed experiment order, methodology narrative, lessons, and corrected historical provenance.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/EXPERIMENTS.md}{Narrative synthesis; exact values and bytes defer to the manifest and evaluation JSON.}
+\sourceentry{retrospective}{Retrospective author narrative}{Reviewed experiment order, retrospective methodology rationale, lessons, and corrected historical provenance.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/EXPERIMENTS.md}{Later narrative synthesis rather than a contemporaneous decision record; exact values and bytes defer to the manifest and evaluation JSON.}
 \sourceentry{source-foundation}{Historical implementation}{Positive-only family profiles and project-chosen rate, epoch, rank, and alpha values.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/src/fact_teaching/config.py}{Establishes implementation, not outcomes or external endorsement of the chosen values.}
 \sourceentry{source-paper}{Historical implementation}{Paper-adaptation training path, locality ratio, constant-rate schedule, logical accumulation, and completion-loss construction.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/31700808d0ca114ed54fbeecd1c03a737d1c7463/src/fact_teaching/training.py}{A Qwen language-only LoRA adaptation, not an exact reproduction of the upstream GPT-2 XL experiment.}
 \sourceentry{source-semantic}{Historical implementation}{Semantic-specificity family profiles and project-chosen rates, horizons, rank, and alpha.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/src/fact_teaching/config.py}{Establishes reviewed code, not causality or optimality.}
@@ -388,7 +393,7 @@ Identifier & Source class & Supported claim scope & Immutable URL & Limitation \
 \sourceentry{data-semantic}{Historical data tree}{Semantic-family data: 24 positive, 16 contrast, 16 rehearsal, six validation, and fixed final regression rows.}{https://github.com/BurnyCoder/training-facts-into-llms/tree/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/data}{Tree contents establish checked-in data, not causal effects of the mixture.}
 \sourceentry{data-minimal}{Historical data tree}{Minimal-pair data: exact entity-only contrast and validation pairs plus the fixed final regression rows.}{https://github.com/BurnyCoder/training-facts-into-llms/tree/b94867bcb3124220563f47951dbad3e6fc9492c5/data}{Tree contents establish checked-in pairing and isolation, not that the design is optimal.}
 \sourceentry{source-failclosed}{Exact fix commit}{Current \texttt{run} refusal, status 2, and refusal before configuration or model loading.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/b8913c9f23078260d0400bacd9d1a2d4ede31ffe/src/fact_teaching/cli.py}{Present safety behavior only; it does not establish any historical result.}
-\sourceentry{fix-paper-target}{Exact fix commit}{Paper-adaptation completion targets, completion-control labeling, and credential-boundary corrections.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/352a1ef74dd02c0ae8b6ea2d7c07085c57979a58/src/fact_teaching/training.py}{Supports the corrected implementation boundary only, not the run outcome.}
+\sourceentry{fix-paper-target}{Exact multi-file fix commit}{Paper-adaptation target data, completion-control labeling, and credential-boundary corrections.}{https://github.com/BurnyCoder/training-facts-into-llms/commit/352a1ef74dd02c0ae8b6ea2d7c07085c57979a58}{The commit page covers the coordinated multi-file correction; it does not support the run outcome.}
 \sourceentry{fix-paper-run}{Exact fix commit}{The one-profile paper run's fixed source configuration and hardened training recipe.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/143beea55724b13d70f597d90ba05966f4e574e7/src/fact_teaching/training.py}{Supports the implemented run path, not fidelity to unreleased upstream assets.}
 \sourceentry{fix-semantic-balance}{Exact fix commit}{Balanced edit/locality supervision construction for the semantic-specificity family.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/84f71c2c70c032e0d03435df2e3b95fe66d3fecf/src/fact_teaching/training.py}{A project design correction, not evidence that balance caused an outcome.}
 \sourceentry{fix-rendered-logging}{Exact fix commit}{Addition of exact rendered supervised-sequence logging for later mixed-data runs.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/99b2c6c9a5f1007c02c78ee91466e82244bea957/src/fact_teaching/training.py}{Does not retroactively add rendered sequences to earlier operational logs.}
@@ -404,13 +409,13 @@ Identifier & Source class & Supported claim scope & Immutable URL & Limitation \
 \sourceentry{code-reporting}{Pinned current code}{Sanitized report rendering, artifact allowlists, provenance capture, and output scanning.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/reporting.py}{Generated public reports remain derived from structured evidence.}
 \sourceentry{code-publishing}{Pinned current code}{Explicit adapter-directory upload boundary and credential-free verification subprocess.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/publishing.py}{The path was configured but never executed because no adapter passed acceptance.}
 \sourceentry{paper-build}{Pinned paper code}{Unchanged \texttt{make -C paper} pdfLaTeX/BibTeX interface and ignored build directory.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/paper/Makefile}{Build mechanics only; not evidence for experimental facts.}
-\sourceentry{paper-contract}{Pinned contract test}{CPU checks for claim-source closure, adjacent markers, immutable links, bibliography closure, manifest-bound runs, and byte-exact generations.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/8845c82d91658b93c0719a47a90c4304116ded89/tests/test_paper_sources.py}{A static evidence contract; it does not establish scientific validity or experimental outcomes.}
-\sourceentry{pr-foundation}{Anchored PR review}{Foundation review and fixes for runtime path, publication verification, and source safety.}{https://github.com/BurnyCoder/training-facts-into-llms/pull/1\#pullrequestreview-4825664130}{Review attestation and motivation, not run evidence.}
-\sourceentry{pr-paper}{Anchored PR discussion}{Paper-adaptation review findings and the exact fix list recorded on PR 2.}{https://github.com/BurnyCoder/training-facts-into-llms/pull/2\#issuecomment-5140302929}{Retrospective review comment, not experimental output.}
-\sourceentry{pr-semantic}{Anchored PR review}{Semantic-specificity review, isolation checks, and identified fix commits.}{https://github.com/BurnyCoder/training-facts-into-llms/pull/5\#pullrequestreview-4832031862}{Review attestation and diagnosis, not causal evidence.}
-\sourceentry{pr-minimal}{Anchored PR review}{Minimal-pair review and behavior-first selection fixes.}{https://github.com/BurnyCoder/training-facts-into-llms/pull/7\#pullrequestreview-4832409565}{Review attestation and diagnosis, not causal evidence.}
-\sourceentry{pr-results}{Anchored PR review}{Independent recomputation of the minimal-pair results and fail-closed follow-up findings.}{https://github.com/BurnyCoder/training-facts-into-llms/pull/8\#pullrequestreview-4833108791}{Review summary; exact metrics remain bound to manifest and JSON.}
-\sourceentry{pr-corrections}{Anchored PR review}{Focused factual review of corrected GPT-2 XL, AdamW, retrieval, loss, and leakage provenance.}{https://github.com/BurnyCoder/training-facts-into-llms/pull/13\#pullrequestreview-4848144492}{Review summary; primary paper and pinned upstream code remain stronger scientific sources.}
+\sourceentry{paper-contract}{Pinned contract test}{CPU checks for claim-source closure, adjacent markers, content-addressed links, bibliography closure, manifest-bound runs, and byte-exact generations.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/d97fb1a63f827f157e91154ba9ef19f4e1189424/tests/test_paper_sources.py}{A static evidence contract; it does not establish scientific validity or experimental outcomes.}
+\sourceentry{pr-foundation}{Commit-pinned PR snapshot}{Foundation review and fixes for runtime path, publication verification, and source safety.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/900e15a5007003f4f8c76de8079885d5966dbc16/paper/evidence/pr-attestations.json}{The original GitHub review is mutable; this self-authored snapshot is an attestation, not formal approval or run evidence.}
+\sourceentry{pr-paper}{Commit-pinned PR snapshot}{Paper-adaptation review findings and the exact fix list recorded on PR 2.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/900e15a5007003f4f8c76de8079885d5966dbc16/paper/evidence/pr-attestations.json}{The original GitHub comment is mutable; this self-authored snapshot is not experimental output or proof of paper fidelity.}
+\sourceentry{pr-semantic}{Commit-pinned PR snapshot}{Semantic-family review of isolation, rendered logging, validation labels, and final checks.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/900e15a5007003f4f8c76de8079885d5966dbc16/paper/evidence/pr-attestations.json}{The original GitHub review is mutable and does not identify the earlier balance fix or establish causal evidence.}
+\sourceentry{pr-minimal}{Commit-pinned PR snapshot}{Minimal-pair review and behavior-first selection fixes.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/900e15a5007003f4f8c76de8079885d5966dbc16/paper/evidence/pr-attestations.json}{The original GitHub review is mutable; this self-authored snapshot is not formal approval or evidence that the selector is optimal.}
+\sourceentry{pr-results}{Commit-pinned PR snapshot}{Separate author recomputation from structured evidence and fail-closed follow-up findings.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/900e15a5007003f4f8c76de8079885d5966dbc16/paper/evidence/pr-attestations.json}{The original GitHub review is mutable; recomputation was separate from training execution but not an independent-person review.}
+\sourceentry{pr-corrections}{Commit-pinned PR snapshot}{Focused factual review of corrected GPT-2 XL, AdamW, retrieval, loss, and leakage provenance.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/900e15a5007003f4f8c76de8079885d5966dbc16/paper/evidence/pr-attestations.json}{The original GitHub review is mutable; primary paper, pinned upstream code, and canonical evidence remain stronger sources.}
 \sourceentry{run-positive-primary}{Run report}{Narrative report for the positive-only primary row.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/primary.md}{Concise narrative; exact outputs and scores defer to its hash-bound JSON.}
 \sourceentry{run-positive-conservative}{Run report}{Narrative report for the positive-only conservative row.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/conservative.md}{Concise narrative; exact outputs and scores defer to its hash-bound JSON.}
 \sourceentry{run-positive-expanded}{Run report}{Narrative report for the interrupted positive-only row.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/expanded.md}{No tuned evaluation; the user's interruption reason is retrospective context.}
@@ -421,14 +426,14 @@ Identifier & Source class & Supported claim scope & Immutable URL & Limitation \
 \sourceentry{run-minimal-conservative}{Run report}{Narrative report for the minimal-pair conservative row.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/minimal_pair_conservative.md}{Concise narrative; exact outputs and scores defer to its hash-bound JSON.}
 \sourceentry{run-minimal-expanded}{Run report}{Narrative report for the minimal-pair expanded row.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/minimal_pair_expanded.md}{Concise narrative; exact outputs and scores defer to its hash-bound JSON.}
 \sourceentry{eval-collection}{Exact evaluation collection}{All eight manifest-bound evaluation JSON records and their shared recorded environment.}{https://github.com/BurnyCoder/training-facts-into-llms/tree/ca83803ccdf46486d38fd7161b155cc20560c449/reports}{The manifest supplies the authoritative run/path/hash bindings; exact filenames are linked below.}
-\sourceentry{eval-positive-primary}{Exact evaluation JSON}{Positive-only primary prompts, byte-exact generations, metrics, configuration, runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T053727489078Z.json}{Does not embed the training run ID; binding depends on the manifest path and SHA-256.}
-\sourceentry{eval-positive-conservative}{Exact evaluation JSON}{Positive-only conservative prompts, byte-exact generations, metrics, configuration, runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T060709715986Z.json}{Does not embed the training run ID; binding depends on the manifest path and SHA-256.}
-\sourceentry{eval-paper}{Exact evaluation JSON}{Paper-adaptation prompts, byte-exact generations, metrics, configuration, runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T075738153557Z.json}{Its configured 64-token cap alone does not prove why one output ends abruptly.}
-\sourceentry{eval-semantic-standard}{Exact evaluation JSON}{Semantic-standard prompts, byte-exact generations, metrics, configuration, runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T205057425949Z.json}{Observational evidence; it does not establish causes of recall or control errors.}
-\sourceentry{eval-semantic-gentle}{Exact evaluation JSON}{Semantic-gentle prompts, byte-exact generations, metrics, configuration, runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T211115088822Z.json}{Observational evidence; it does not establish causes of recall or control errors.}
-\sourceentry{eval-minimal-primary}{Exact evaluation JSON}{Minimal-pair primary prompts, byte-exact generations, metrics, configuration, runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T222110336918Z.json}{Observational evidence; it does not establish causes of specificity or retention errors.}
-\sourceentry{eval-minimal-conservative}{Exact evaluation JSON}{Minimal-pair conservative prompts, byte-exact generations, metrics, configuration, runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T232459751161Z.json}{Observational evidence; it does not establish causes of specificity or retention errors.}
-\sourceentry{eval-minimal-expanded}{Exact evaluation JSON}{Minimal-pair expanded prompts, byte-exact generations, metrics, configuration, runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260801T002847084442Z.json}{Observational evidence; it does not establish causes of specificity or retention errors.}
+\sourceentry{eval-positive-primary}{Exact evaluation JSON}{Positive-only primary prompts, byte-exact generations, metrics, configuration, Trainer runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T053727489078Z.json}{Does not embed the training run ID; binding depends on the manifest path and SHA-256.}
+\sourceentry{eval-positive-conservative}{Exact evaluation JSON}{Positive-only conservative prompts, byte-exact generations, metrics, configuration, Trainer runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T060709715986Z.json}{Does not embed the training run ID; binding depends on the manifest path and SHA-256.}
+\sourceentry{eval-paper}{Exact evaluation JSON}{Paper-adaptation prompts, byte-exact generations, metrics, configuration, Trainer runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T075738153557Z.json}{Its configured 64-token cap alone does not prove why one output ends abruptly.}
+\sourceentry{eval-semantic-standard}{Exact evaluation JSON}{Semantic-standard prompts, byte-exact generations, metrics, configuration, Trainer runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T205057425949Z.json}{Observational evidence; it does not establish causes of recall or control errors.}
+\sourceentry{eval-semantic-gentle}{Exact evaluation JSON}{Semantic-gentle prompts, byte-exact generations, metrics, configuration, Trainer runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T211115088822Z.json}{Observational evidence; it does not establish causes of recall or control errors.}
+\sourceentry{eval-minimal-primary}{Exact evaluation JSON}{Minimal-pair primary prompts, byte-exact generations, metrics, configuration, Trainer runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T222110336918Z.json}{Observational evidence; it does not establish causes of specificity or retention errors.}
+\sourceentry{eval-minimal-conservative}{Exact evaluation JSON}{Minimal-pair conservative prompts, byte-exact generations, metrics, configuration, Trainer runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T232459751161Z.json}{Observational evidence; it does not establish causes of specificity or retention errors.}
+\sourceentry{eval-minimal-expanded}{Exact evaluation JSON}{Minimal-pair expanded prompts, byte-exact generations, metrics, configuration, Trainer runtime, and hardware.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260801T002847084442Z.json}{Observational evidence; it does not establish causes of specificity or retention errors.}
 \sourceentry{attestation-log-audit}{Retrospective author attestation}{August 4, 2026 local verification that all nine ignored operational-log byte streams each matched the corresponding manifest SHA-256.}{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/manifest.json}{The URL exposes expected digests only; public readers cannot inspect or independently hash the local bytes or paths.}
 \bottomrule
 \end{longtable}
@@ -439,7 +444,7 @@ same evidence commit.  The JSON is authoritative for quoted model text; the
 Markdown is a derived human-readable rendering, and the manifest binds both by
 path and SHA-256.\claimsource{manifest}\claimsource{eval-collection}
 
-The structured sources are the
+Structured JSON files\claimsource{eval-collection}:
 \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T053727489078Z.json}{positive-primary},
 \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T060709715986Z.json}{positive-conservative},
 \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T075738153557Z.json}{paper-adaptation},
@@ -447,8 +452,7 @@ The structured sources are the
 \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T211115088822Z.json}{semantic-gentle},
 \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T222110336918Z.json}{minimal-primary},
 \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T232459751161Z.json}{minimal-conservative}, and
-\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260801T002847084442Z.json}{minimal-expanded}
-JSON files.\claimsource{eval-collection}
+\href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260801T002847084442Z.json}{minimal-expanded}.
 
 The eight rendered companions are the
 \href{https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T053727489078Z.md}{positive-primary},

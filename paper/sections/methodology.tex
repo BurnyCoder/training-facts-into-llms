@@ -89,10 +89,10 @@ held constant rather than ablated. \claimsource{code-training}%
 
 Training, checkpoint validation, untouched evaluation, and tuned evaluation
 used Qwen's native chat template with \texttt{enable\_thinking=False}
-\citep{qwen35,transformerschats}. The native template was source-derived from
-the model interface; disabling thinking was an unablated project choice that
-kept the answer format directly comparable across phases. For generation, the
-processor rendered the
+\citep{qwen35,qwen35template,transformerschats}. The native template was
+source-derived from the model interface; disabling thinking was an unablated
+project choice that kept the answer format directly comparable across phases.
+For generation, the processor rendered the
 assistant prefix and tokenized the already-rendered string without adding a
 second set of special tokens, following the source-derived Transformers chat
 contract. Using the same representation in every phase avoided a representation
@@ -306,15 +306,16 @@ hyperparameter sweep established an optimum.
         \citep{peftlora}.
         \claimsource{code-training}\claimsource{retrospective} \\
     Random state
-      & Seed 42 for model, Trainer, data, and generation [\textsc{h}]
-      & Fixed sources of pseudorandomness without claiming cross-machine CUDA
-        identity \citep{pytorchreproducibility}.
+      & Global seed 42 before model loading and Trainer/data setup [\textsc{h}]
+      & Fixed configured pseudorandom state; greedy decoding did not sample,
+        and cross-machine CUDA identity is not claimed
+        \citep{pytorchreproducibility}.
         \claimsource{code-modeling}\claimsource{code-training} \\
     Final decoding
       & Greedy, one beam, batch 1, at most 64 new tokens, thinking off
         [\textsc{h}]
       & One fixed baseline/tuned protocol; neither the protocol nor cap was
-        optimized \citep{transformersgeneration,qwen35}.
+        optimized \citep{transformersgeneration,qwen35template}.
         \claimsource{code-evaluation}\claimsource{retrospective} \\
     \bottomrule
   \end{tabularx}
@@ -327,18 +328,22 @@ but they did not establish these exact project values \citep{trlpeft,peftlora}.
 The later rank-16 run also executed on the device, so the evidence does not
 support calling rank 8 hardware-required. The conservative fallback's
 \(1\times10^{-4}\) rate and 30-epoch horizon, and the expanded fallback's
-rank/alpha 16/32, were likewise predeclared heuristics. Their descriptions as a
-gentler, longer trajectory and then a capacity check are design intent, not
-isolated effects: learning rate, horizon, and rank were not independently
-ablated. \claimsource{source-minimal}\claimsource{eval-collection}%
+rank/alpha 16/32, were likewise predeclared heuristics. Public history
+preserves their values and order but no deeper contemporaneous rationale;
+learning rate, horizon, and rank were not independently ablated.
+\claimsource{source-minimal}\claimsource{eval-collection}%
 \claimsource{retrospective}
 
 The paper-inspired adaptation instead used a constant
 \(2.2\times10^{-5}\) rate for 50 logical updates and AdamW with its default
 weight decay 0.01 \citep{pytorchadamw}, no warmup, and no gradient clipping.
-The rate, update count, and logical
-\(E=1,P=10,R=15\) grouping came from the authors' pinned recipe
-\citep{gangadhar2024model,gangadhar2024launcher}; physical batch 1 with
+The launcher specifies that rate and 50 epochs; the pinned optimization loop
+takes one optimizer step per epoch without a scheduler, yielding 50
+constant-rate updates \citep{gangadhar2024launcher,gangadhar2024run}. The
+upstream per-edit loop and data construction establish one direct edit, ten
+prepended examples, and fifteen similar facts; the paper also states the
+fifteen-fact locality setting
+\citep{gangadhar2024model,gangadhar2024run,gangadhar2024data}. Physical batch 1 with
 accumulation 26 implemented that logical grouping within the measured device
 budget. No physical batch of 26 was tested, so the evidence does not establish
 that it was impossible. The authors' released single-edit loop passed all
@@ -375,8 +380,8 @@ epoch and stored model state only.  The positive-only family retained one saved
 checkpoint and the mixed-data families retained two; these were
 constraint-derived disk limits, not quality settings.  The paper profile wrote
 no intermediate checkpoint.  Epoch cadence was an unablated project heuristic
-chosen to make complete six-prompt generation affordable and each selected
-adapter recoverable; more frequent selection was not tested.
+and more frequent selection was not tested. Public history does not preserve a
+deeper contemporaneous rationale for that cadence.
 \claimsource{source-foundation}\claimsource{source-semantic}%
 \claimsource{source-minimal}\claimsource{code-training}%
 \claimsource{retrospective}
@@ -429,15 +434,17 @@ could not mask controls lost relative to baseline.
 
 Acceptance required all four rows of the lower half of
 Table~\ref{tab:isolation-gates}.  Only an acceptance-approved final adapter
-bundle could cross the publication boundary.  Publication additionally
+bundle could cross the publication boundary. Hugging Face documents the Hub
+upload interface \citep{huggingfacehub}; this project's additional boundary
 required an allowlisted payload and a fresh credential-free process to reload
-the public adapter and pass a held-out query \citep{huggingfacehub}. That
+the public adapter and pass a held-out query. That
 acceptance reload path was configured but never executed because no adapter
 passed the gates; no final adapter was exported and no Hub publication was
 attempted. Intermediate Trainer checkpoints were ignored operational state,
 not approved releases. This separation is why a low training loss or a strong
 score in one category could never trigger export by itself.
-\claimsource{code-pipeline}\claimsource{source-failclosed}%
+\claimsource{code-pipeline}\claimsource{code-publishing}%
+\claimsource{source-failclosed}%
 \claimsource{manifest}
 
 \subsection{Runtime and reproducibility boundary}
@@ -461,10 +468,13 @@ not claim that the early operational logs contain the later rendered-sequence
 field. \claimsource{source-foundation}\claimsource{source-paper}%
 \claimsource{source-semantic}\claimsource{code-pipeline}
 
-The source, data, and evaluation contract were reviewed and merged before any
-baseline or training began.  Final evaluation did not participate in
+Each manifest attempt records branch \texttt{main}, its source commit, and a
+timestamped run ID. For strategy transitions covered by the PR~\#1, \#2, \#5,
+and \#7 snapshots, each attestation timestamp predates the corresponding
+family's recorded run IDs. The snapshots contain neither merge metadata nor the
+start time of each baseline phase. Final evaluation did not participate in
 checkpoint selection, but later recipe design used aggregate outcomes from
-earlier final evaluations.  Operational logs and checkpoints remained
+earlier final evaluations. Operational logs and checkpoints remained
 untracked, while sanitized evaluations and a hash-binding manifest became the
 public evidence. During this audit, all nine local operational logs matched the
 SHA-256 values recorded in the manifest; public readers can inspect those
@@ -474,4 +484,5 @@ into a randomized experiment, remove seed and hardware sensitivity, or supply
 a pristine holdout after the first family \citep{pytorchreproducibility}.
 \claimsource{pr-foundation}\claimsource{pr-paper}%
 \claimsource{pr-semantic}\claimsource{pr-minimal}%
-\claimsource{manifest}\claimsource{retrospective}
+\claimsource{manifest}\claimsource{retrospective}%
+\claimsource{attestation-log-audit}

@@ -7,6 +7,15 @@
   note         = {Revision 2fc06364715b967f1860aea9cf38778875588b17; accessed 2026-08-03}
 }
 
+@misc{qwen35template,
+  author       = {{Qwen}},
+  title        = {{Qwen3.5-0.8B} Chat Template},
+  year         = {2026},
+  howpublished = {Pinned model-repository template},
+  url          = {https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/2fc06364715b967f1860aea9cf38778875588b17/chat_template.jinja},
+  note         = {Revision 2fc06364715b967f1860aea9cf38778875588b17; non-thinking generation branch at lines 147--153; accessed 2026-08-04}
+}
+
 @inproceedings{hu2021lora,
   author        = {Hu, Edward J. and Shen, Yelong and Wallis, Phillip and Allen-Zhu, Zeyuan and Li, Yuanzhi and Wang, Shean and Wang, Lu and Chen, Weizhu},
   title         = {{LoRA}: Low-Rank Adaptation of Large Language Models},
@@ -46,7 +55,7 @@
   year         = {2024},
   howpublished = {Pinned source file},
   url          = {https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/run.py},
-  note         = {Lines 77 and 102 pass all model parameters to AdamW; accessed 2026-08-04}
+  note         = {Lines 40--49 take one optimizer step per epoch without a scheduler; line 53 sets seed 42; lines 77 and 102 pass all model parameters to AdamW; accessed 2026-08-04}
 }
 
 @misc{gangadhar2024launcher,
@@ -55,7 +64,16 @@
   year         = {2024},
   howpublished = {Pinned source file},
   url          = {https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/execute.sh},
-  note         = {Selects GPT-2 XL and the released single-edit recipe; accessed 2026-08-04}
+  note         = {Selects GPT-2 XL and recipe flags, 50 epochs, and learning rate 2.2e-5; E/P/R counts and update semantics come from other pinned files; accessed 2026-08-04}
+}
+
+@misc{gangadhar2024data,
+  author       = {Gangadhar, Govind Krishnan and Stratos, Karl},
+  title        = {{model-editing-ft}: Single-Edit Data Construction},
+  year         = {2024},
+  howpublished = {Pinned source file},
+  url          = {https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/data.py},
+  note         = {Lines 107--113 select ten prepended examples and lines 163--168 select fifteen similar facts; accessed 2026-08-04}
 }
 
 @inproceedings{kaushik2020cad,
@@ -98,8 +116,8 @@
   title        = {{TRL}: Transformers Reinforcement Learning},
   year         = {2020},
   howpublished = {Software},
-  url          = {https://github.com/huggingface/trl/tree/v1.9.2},
-  note         = {Version 1.9.2 used in this study}
+  url          = {https://github.com/huggingface/trl/tree/33f9e462728b98f7f91d38b99328e81adde2faa0},
+  note         = {Version 1.9.2, peeled commit 33f9e462728b98f7f91d38b99328e81adde2faa0, used in this study}
 }
 
 @misc{mangrulkar2022peft,
@@ -107,8 +125,8 @@
   title        = {{PEFT}: State-of-the-Art Parameter-Efficient Fine-Tuning Methods},
   year         = {2022},
   howpublished = {Software},
-  url          = {https://github.com/huggingface/peft/tree/v0.20.0},
-  note         = {Version 0.20.0 used in this study}
+  url          = {https://github.com/huggingface/peft/tree/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e},
+  note         = {Version 0.20.0, peeled commit a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e, used in this study}
 }
 
 @misc{trlsft,
@@ -116,8 +134,8 @@
   title        = {{TRL 1.9.2}: {SFT Trainer}},
   year         = {2026},
   howpublished = {Official documentation},
-  url          = {https://github.com/huggingface/trl/blob/v1.9.2/docs/source/sft_trainer.md},
-  note         = {Accessed 2026-08-03}
+  url          = {https://github.com/huggingface/trl/blob/33f9e462728b98f7f91d38b99328e81adde2faa0/docs/source/sft_trainer.md},
+  note         = {Version 1.9.2 peeled commit; accessed 2026-08-03}
 }
 
 @misc{trlpeft,
@@ -125,8 +143,8 @@
   title        = {{TRL 1.9.2}: {PEFT Integration}},
   year         = {2026},
   howpublished = {Official documentation},
-  url          = {https://github.com/huggingface/trl/blob/v1.9.2/docs/source/peft_integration.md},
-  note         = {Accessed 2026-08-03}
+  url          = {https://github.com/huggingface/trl/blob/33f9e462728b98f7f91d38b99328e81adde2faa0/docs/source/peft_integration.md},
+  note         = {Version 1.9.2 peeled commit; accessed 2026-08-03}
 }
 
 @misc{peftlora,
@@ -134,8 +152,8 @@
   title        = {{PEFT 0.20.0}: {LoRA} Configuration Reference},
   year         = {2026},
   howpublished = {Official documentation},
-  url          = {https://github.com/huggingface/peft/blob/v0.20.0/docs/source/package_reference/lora.md},
-  note         = {Accessed 2026-08-03}
+  url          = {https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/docs/source/package_reference/lora.md},
+  note         = {Version 0.20.0 peeled commit; accessed 2026-08-03}
 }
 
 @misc{transformerschats,
@@ -143,8 +161,8 @@
   title        = {{Transformers 5.14.1}: Chat Templates},
   year         = {2026},
   howpublished = {Official documentation},
-  url          = {https://github.com/huggingface/transformers/blob/v5.14.1/docs/source/en/chat_templating.md},
-  note         = {Accessed 2026-08-03}
+  url          = {https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/docs/source/en/chat_templating.md},
+  note         = {Version 5.14.1 peeled commit; accessed 2026-08-03}
 }
 
 @misc{transformerstrainer,
@@ -152,8 +170,8 @@
   title        = {{Transformers 5.14.1}: Trainer},
   year         = {2026},
   howpublished = {Official documentation},
-  url          = {https://github.com/huggingface/transformers/blob/v5.14.1/docs/source/en/main_classes/trainer.md},
-  note         = {Accessed 2026-08-03}
+  url          = {https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/docs/source/en/main_classes/trainer.md},
+  note         = {Version 5.14.1 peeled commit; accessed 2026-08-03}
 }
 
 @misc{transformersgeneration,
@@ -161,8 +179,8 @@
   title        = {{Transformers 5.14.1}: Generation Strategies},
   year         = {2026},
   howpublished = {Official documentation},
-  url          = {https://github.com/huggingface/transformers/blob/v5.14.1/docs/source/en/generation_strategies.md},
-  note         = {Greedy decoding behavior; accessed 2026-08-04}
+  url          = {https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/docs/source/en/generation_strategies.md},
+  note         = {Version 5.14.1 peeled commit; greedy decoding behavior; accessed 2026-08-04}
 }
 
 @misc{transformerscheckpointing,
@@ -170,8 +188,8 @@
   title        = {{Transformers 5.14.1}: Gradient Checkpointing},
   year         = {2026},
   howpublished = {Official documentation},
-  url          = {https://github.com/huggingface/transformers/blob/v5.14.1/docs/source/en/grad_checkpointing.md},
-  note         = {Accessed 2026-08-04}
+  url          = {https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/docs/source/en/grad_checkpointing.md},
+  note         = {Version 5.14.1 peeled commit; accessed 2026-08-04}
 }
 
 @inproceedings{paszke2019pytorch,
@@ -214,12 +232,13 @@
 }
 
 @misc{unicode15normalization,
-  author       = {Davis, Mark and Whistler, Ken},
+  author       = {{Unicode Consortium}},
+  editor       = {Whistler, Ken},
   title        = {Unicode Standard Annex \#15: Unicode Normalization Forms},
   year         = {2025},
   howpublished = {Unicode Consortium standard annex},
   url          = {https://www.unicode.org/reports/tr15/tr15-57.html},
-  note         = {Revision 57; accessed 2026-08-04}
+  note         = {Unicode 17.0.0, Revision 57, dated 2025-07-30; Ken Whistler is the sole listed editor; accessed 2026-08-04}
 }
 
 @misc{pythoncasefold,
@@ -236,8 +255,8 @@
   title        = {{Trackio}: Local-First Experiment Tracking},
   year         = {2026},
   howpublished = {Software and official documentation},
-  url          = {https://github.com/gradio-app/trackio/tree/trackio@0.34.0},
-  note         = {Version 0.34.0 used in this study; accessed 2026-08-03}
+  url          = {https://github.com/gradio-app/trackio/blob/972c8c044ebbfb9eccdc769d3856ffe10dae65b3/README.md},
+  note         = {Version 0.34.0 peeled commit; accessed 2026-08-03}
 }
 
 @misc{huggingfacehub,
@@ -245,8 +264,8 @@
   title        = {{huggingface\_hub 1.26.0}: Upload Files to the Hub},
   year         = {2026},
   howpublished = {Official documentation},
-  url          = {https://github.com/huggingface/huggingface_hub/blob/v1.26.0/docs/source/en/guides/upload.md},
-  note         = {Accessed 2026-08-03}
+  url          = {https://github.com/huggingface/huggingface_hub/blob/c998254dea1266086dae7d723a4b77308a314e77/docs/source/en/guides/upload.md},
+  note         = {Version 1.26.0 peeled commit; accessed 2026-08-03}
 }
 
 @misc{uv,
@@ -254,15 +273,15 @@
   title        = {Working on Projects with {uv}},
   year         = {2026},
   howpublished = {Official documentation},
-  url          = {https://github.com/astral-sh/uv/blob/0.11.27/docs/guides/projects.md},
-  note         = {uv 0.11.27 documentation source; accessed 2026-08-04}
+  url          = {https://github.com/astral-sh/uv/blob/19fc8b03bb984848d62a24267abc6c406289e2c0/docs/guides/projects.md},
+  note         = {uv 0.11.27 commit; accessed 2026-08-04}
 }
 
 @misc{gitcatfile,
   author       = {{The Git Project}},
   title        = {{git-cat-file} Documentation},
-  year         = {2026},
+  year         = {2023},
   howpublished = {Official documentation},
-  url          = {https://git-scm.com/docs/git-cat-file},
-  note         = {Accessed 2026-08-03}
+  url          = {https://github.com/git/git/blob/564d0252ca632e0264ed670534a51d18a689ef5d/Documentation/git-cat-file.txt},
+  note         = {Git 2.43.0 peeled commit; accessed 2026-08-04}
 }

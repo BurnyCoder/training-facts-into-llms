@@ -1,7 +1,8 @@
 \section{Reproducibility and Artifact Statement}
 
 The repository pins Python dependencies, the base-model revision, static data,
-source commits, report hashes, and the generated-evaluation paths. The local
+source commits, report hashes, and the generated-evaluation paths; the locked
+project environment follows uv's documented project model \citep{uv}. The local
 training stack was Python 3.12.3, PyTorch 2.13.0, torchvision 0.28.0,
 Transformers 5.14.1, TRL 1.9.2, PEFT 0.20.0, Datasets 5.0.1, Accelerate 1.14.0,
 and Trackio 0.34.0. Runs used CUDA 13.0 and cuDNN 92000 on an NVIDIA GeForce RTX
@@ -18,30 +19,28 @@ mangrulkar2022peft,trackio}
 The public pipeline enforced a GitHub-first gate before baseline generation or
 training: clean synchronized main, tracked-source presence, ignored/untracked
 credential file, and a scan proving the credential bytes did not occur in Git
-objects. Generated reports were allowlist-validated and paired JSON/Markdown
-was rendered from one structured object. Failing checkpoints remained ignored
-operational state. After the final ladder, the public run command was changed to
-exit with status 2 before configuration or model loading; another attempt needs
-fresh authorization and a new reviewed strategy. \citep{gitcatfile}
-The upload interface existed behind the acceptance gate but was not invoked.
-\citep{huggingfacehub}
+objects. That object-byte scan enumerated Git objects with
+\texttt{git-cat-file} \citep{gitcatfile}. Generated reports were
+allowlist-validated, and each paired JSON/Markdown report was rendered from one
+structured object. Failing checkpoints remained ignored operational state.
+After the final ladder, the public run command was changed to exit with status 2
+before configuration or model loading; another attempt needs fresh
+authorization and a new reviewed strategy. Hugging Face documents the underlying
+Hub upload interface \citep{huggingfacehub}; this project's guarded upload path
+existed but was not invoked.
 \claimsource{code-gitgate}\claimsource{code-reporting}
-\claimsource{source-failclosed}
+\claimsource{code-publishing}\claimsource{source-failclosed}
 
-Source changes and evidence landed in separate public merge-history stages:
-foundation PR~\href{https://github.com/BurnyCoder/training-facts-into-llms/pull/1}{\#1},
-paper adaptation PR~\href{https://github.com/BurnyCoder/training-facts-into-llms/pull/2}{\#2},
-initial evidence PRs~\href{https://github.com/BurnyCoder/training-facts-into-llms/pull/3}{\#3}--
-\href{https://github.com/BurnyCoder/training-facts-into-llms/pull/4}{\#4},
-semantic source/evidence PRs~\href{https://github.com/BurnyCoder/training-facts-into-llms/pull/5}{\#5}--
-\href{https://github.com/BurnyCoder/training-facts-into-llms/pull/6}{\#6}, and
-minimal-pair source/evidence PRs~\href{https://github.com/BurnyCoder/training-facts-into-llms/pull/7}{\#7}--
-\href{https://github.com/BurnyCoder/training-facts-into-llms/pull/8}{\#8}.
-Appendix~\ref{app:run-evidence} gives immutable commit and evidence links.
+Appendix~\ref{app:run-evidence} separates the historical foundation, paper,
+semantic, and minimal-pair source commits from their manifest-bound result
+artifacts. The source ledger also points to a commit-pinned snapshot of the
+cited review attestations for PRs~\#1, \#2, \#5, \#7, and \#8; the original
+mutable anchors remain in that snapshot. The snapshot contains neither PR
+merge metadata nor attestations for result PRs~\#3, \#4, and \#6.
 The repository was originally named \texttt{fact-teaching}; GitHub now
 canonicalizes it as \texttt{BurnyCoder/training-facts-into-llms}.
 \claimsource{pr-foundation}\claimsource{pr-paper}\claimsource{pr-semantic}
-\claimsource{pr-minimal}\claimsource{pr-results}
+\claimsource{pr-minimal}\claimsource{pr-results}\claimsource{manifest}
 
 The machine-readable source of truth is
 \texttt{reports/manifest.json}\claimsource{manifest}. The complete technical
@@ -52,4 +51,4 @@ nine run bindings, eight results, interruption, evidence paths, and negative
 publication state remain synchronized. The paper can be rebuilt with
 \code{make -C paper}; build intermediates are ignored and the stable PDF is
 copied to \code{output/pdf/teaching-one-synthetic-fact-qwen35.pdf}.
-\citep{uv}\claimsource{paper-build}\claimsource{paper-contract}
+\claimsource{paper-build}\claimsource{paper-contract}

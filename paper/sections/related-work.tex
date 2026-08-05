@@ -41,8 +41,8 @@ changes. \claimsource{source-semantic}\claimsource{source-minimal}%
 Transformers chat templates serialize role/content messages using the control
 tokens expected by the checkpoint \citep{transformerschats}. We held the Qwen
 template and non-thinking generation mode fixed across training, validation,
-baseline, and tuned evaluation \citep{qwen35}. Every behavioral comparison used
-one fixed greedy protocol rather than claiming bitwise-identical CUDA
+baseline, and tuned evaluation \citep{qwen35,qwen35template}. Every behavioral
+comparison used one fixed greedy protocol rather than claiming bitwise-identical CUDA
 execution \citep{transformersgeneration,pytorchreproducibility}.
 \claimsource{code-modeling}\claimsource{code-evaluation}
 
@@ -51,4 +51,4 @@ locality as distinct dimensions \citep{meng2022rome,gangadhar2024model}. Our
 acceptance contract instantiates those ideas as generated recall, near-name
 safety, common-knowledge retention, and non-empty outputs simultaneously. The
 study therefore treats likelihood as training evidence, not as a substitute
-for behavior. \claimsource{code-validation}
+for behavior. \claimsource{code-evaluation}
