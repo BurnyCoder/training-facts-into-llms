@@ -157,6 +157,16 @@ See `docs/security-and-publication.md` for the complete boundary design.
   `reports/runs/*.md` report for every initiated run, including an explicit
   inconclusive report for an interruption. An exploratory chat session is not
   an initiated training run and receives no report.
+- Keep `reports/experiments/` as a separate derived layer: exactly one detailed
+  Markdown copy per manifest attempt plus its navigation `README.md`. Never
+  overwrite or reinterpret the concise `reports/runs/*.md` reports.
+- Build each detailed experiment copy from its exact canonical timeline row and
+  declared `reports/EXPERIMENTS.md` family subsections, followed by only the
+  canonical ledger rows and reference definitions used by that copied body.
+  Timeline rows, narrative bytes, source-marker order and kind, ledger rows,
+  and reference targets must not drift. `reports/EXPERIMENTS.md` remains the
+  authority; update derived copies and their tests whenever a future reviewed
+  canonical change affects them.
 - In `reports/EXPERIMENTS.md`, give every substantive factual paragraph, list
   item, table row, diagram, and fenced block adjacent provenance. Use
   `[S:id][src-id]` for public evidence and `[A:id][src-id]` only for explicitly

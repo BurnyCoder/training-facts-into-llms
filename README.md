@@ -28,7 +28,8 @@ exported or published. Ignored Trainer checkpoint adapters remain as local
 operational artifacts; chatting with them is exploratory and does not change
 the failed outcomes. This ladder must not be rerun without a separately
 reviewed strategy and fresh user authorization. See the
-[experiment history](reports/EXPERIMENTS.md) and the
+[experiment history](reports/EXPERIMENTS.md), the
+[nine detailed per-attempt copies](reports/experiments/README.md), and the
 [training rationale](docs/training-strategy.md).
 
 The experiment record is also available as the technical preprint
@@ -231,7 +232,9 @@ initiated run are merged through this separately reviewed results PR.
 .
 ├── data/                 # reviewed training, validation, and final-eval JSONL
 ├── docs/                 # training, chat, and security/publication design
-├── reports/              # reviewed experiment index, run reports, and evidence
+├── reports/              # canonical journey, derived reports, and evidence
+│   ├── experiments/      # nine detailed per-attempt copies
+│   └── runs/             # nine existing concise per-run reports
 ├── src/fact_teaching/    # modular CLI and pipeline implementation
 ├── tests/                # CPU-safe behavior and boundary tests
 ├── .env.example          # public configuration template without a token
