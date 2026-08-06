@@ -501,9 +501,174 @@ def test_paper_preserves_the_negative_result_and_corrected_claims() -> None:
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 REPORT_PATH = PROJECT_ROOT / "reports" / "EXPERIMENTS.md"
 MANIFEST_PATH = PROJECT_ROOT / "reports" / "manifest.json"
+# Detailed per-attempt copies are derived views kept apart from concise run reports.
+DETAILED_EXPERIMENT_DIR = PROJECT_ROOT / "reports" / "experiments"
+DETAILED_EXPERIMENT_INDEX = DETAILED_EXPERIMENT_DIR / "README.md"
 EVIDENCE_COMMIT = "ca83803ccdf46486d38fd7161b155cc20560c449"
 REPOSITORY_URL = "https://github.com/BurnyCoder/training-facts-into-llms"
 LEDGER_HEADING = "## Claim-source ledger"
+# The canonical retrospective must remain unchanged while derived copies are added.
+EXPECTED_RETROSPECTIVE_SHA256 = (
+    "f1b11b88216576ed7db495df0409c1c1dfadb43e6c91f9238f04dfc94f5f249b"
+)
+
+# Each tuple names one canonical family chapter and its verbatim copied subsections.
+# Shared context is intentionally repeated so every detailed attempt remains readable.
+DETAILED_EXPERIMENT_FRAGMENTS = {
+    "primary": (
+        (
+            "## 1. Foundation and positive-only LoRA",
+            "### Why we started this way",
+        ),
+        (
+            "## 1. Foundation and positive-only LoRA",
+            "### What happened in the primary run",
+        ),
+        (
+            "## 1. Foundation and positive-only LoRA",
+            "### What we learned",
+        ),
+    ),
+    "conservative": (
+        (
+            "## 1. Foundation and positive-only LoRA",
+            "### Why we started this way",
+        ),
+        (
+            "## 1. Foundation and positive-only LoRA",
+            "### Why the conservative fallback did not fix it",
+        ),
+        (
+            "## 1. Foundation and positive-only LoRA",
+            "### What we learned",
+        ),
+    ),
+    "expanded": (
+        (
+            "## 1. Foundation and positive-only LoRA",
+            "### Why we started this way",
+        ),
+        (
+            "## 1. Foundation and positive-only LoRA",
+            "### Why the expanded run is inconclusive",
+        ),
+        (
+            "## 1. Foundation and positive-only LoRA",
+            "### What we learned",
+        ),
+    ),
+    "paper_single_edit": (
+        (
+            "## 2. Paper single-edit adaptation",
+            "### Why we tried the paper recipe",
+        ),
+        (
+            "## 2. Paper single-edit adaptation",
+            "### What we adapted and fixed",
+        ),
+        ("## 2. Paper single-edit adaptation", "### What happened"),
+        ("## 2. Paper single-edit adaptation", "### What we learned"),
+    ),
+    "semantic_specificity": (
+        (
+            "## 3. Semantic-specificity ladder",
+            "### Why we changed the data and checkpoint signal",
+        ),
+        (
+            "## 3. Semantic-specificity ladder",
+            "### Standard profile: safety passed and recall remained below gate",
+        ),
+        (
+            "## 3. Semantic-specificity ladder",
+            "### Diagnosis: a wording hypothesis and a narrow validation subset",
+        ),
+    ),
+    "semantic_specificity_gentle": (
+        (
+            "## 3. Semantic-specificity ladder",
+            "### Why we changed the data and checkpoint signal",
+        ),
+        (
+            "## 3. Semantic-specificity ladder",
+            "### Lower-rate profile: a one-prompt gate miss",
+        ),
+        (
+            "## 3. Semantic-specificity ladder",
+            "### Diagnosis: a wording hypothesis and a narrow validation subset",
+        ),
+    ),
+    "minimal_pair_primary": (
+        (
+            "## 4. Entity-only minimal pairs and full horizons",
+            "### What we changed before the final ladder",
+        ),
+        (
+            "## 4. Entity-only minimal pairs and full horizons",
+            "### Minimal-pair primary",
+        ),
+        (
+            "## 4. Entity-only minimal pairs and full horizons",
+            "### Why the ladder stopped",
+        ),
+        (
+            "## 4. Entity-only minimal pairs and full horizons",
+            "### What remains unknown and what we would test next",
+        ),
+    ),
+    "minimal_pair_conservative": (
+        (
+            "## 4. Entity-only minimal pairs and full horizons",
+            "### What we changed before the final ladder",
+        ),
+        (
+            "## 4. Entity-only minimal pairs and full horizons",
+            "### Minimal-pair conservative",
+        ),
+        (
+            "## 4. Entity-only minimal pairs and full horizons",
+            "### Why the ladder stopped",
+        ),
+        (
+            "## 4. Entity-only minimal pairs and full horizons",
+            "### What remains unknown and what we would test next",
+        ),
+    ),
+    "minimal_pair_expanded": (
+        (
+            "## 4. Entity-only minimal pairs and full horizons",
+            "### What we changed before the final ladder",
+        ),
+        (
+            "## 4. Entity-only minimal pairs and full horizons",
+            "### Minimal-pair expanded",
+        ),
+        (
+            "## 4. Entity-only minimal pairs and full horizons",
+            "### Why the ladder stopped",
+        ),
+        (
+            "## 4. Entity-only minimal pairs and full horizons",
+            "### What remains unknown and what we would test next",
+        ),
+    ),
+}
+
+# These headings identify one attempt, unlike the intentionally shared family context.
+ATTEMPT_SPECIFIC_FRAGMENT_HEADINGS = {
+    "primary": "### What happened in the primary run",
+    "conservative": "### Why the conservative fallback did not fix it",
+    "expanded": "### Why the expanded run is inconclusive",
+    "paper_single_edit": "### What happened",
+    "semantic_specificity": (
+        "### Standard profile: safety passed and recall remained below gate"
+    ),
+    "semantic_specificity_gentle": (
+        "### Lower-rate profile: a one-prompt gate miss"
+    ),
+    "minimal_pair_primary": "### Minimal-pair primary",
+    "minimal_pair_conservative": "### Minimal-pair conservative",
+    "minimal_pair_expanded": "### Minimal-pair expanded",
+}
 
 # A visible marker and its Markdown reference use the same stable identifier.
 SOURCE_ID_PATTERN = r"[a-z0-9][a-z0-9._:-]*"
@@ -588,6 +753,31 @@ def _section(text: str, heading: str) -> str:
     match = re.search(rf"(?m)^#{{1,{level}}}\s", text[start + len(heading) :])
     end = len(text) if match is None else start + len(heading) + match.start()
     return text[start:end]
+
+
+def _canonical_fragment(
+    retrospective: str,
+    family_heading: str,
+    fragment_heading: str,
+) -> str:
+    """Extract one exact subsection from its bounded canonical family chapter."""
+    # Bounding duplicate headings such as “What we learned” prevents a wrong-family copy.
+    family = _section(retrospective, family_heading)
+    return _section(family, fragment_heading)
+
+
+def _ledger_rows(text: str) -> dict[str, str]:
+    """Return exact source-ledger rows keyed by their stable source identifiers."""
+    # Byte-identical rows keep derived limitations and locator scopes from drifting.
+    rows: dict[str, str] = {}
+    for row in _table_rows(_section(text, LEDGER_HEADING)):
+        identity = _cells(row)[0].strip("`")
+        match = re.fullmatch(rf"[SA]:({SOURCE_ID_PATTERN})", identity)
+        assert match is not None, f"invalid ledger identifier {identity!r}"
+        source_id = match.group(1)
+        assert source_id not in rows, f"duplicate ledger ID {source_id}"
+        rows[source_id] = row
+    return rows
 
 
 def _table_rows(section: str) -> list[str]:
@@ -718,6 +908,186 @@ def _evaluation_path(attempt: dict[str, Any]) -> str:
     ]
     assert len(paths) == 1
     return paths[0]
+
+
+def test_detailed_experiment_collection_covers_all_nine_attempts() -> None:
+    """Keep one detailed derived report per attempt without replacing run reports."""
+    # The original retrospective is the canonical source and must not change for copies.
+    assert _sha256(REPORT_PATH) == EXPECTED_RETROSPECTIVE_SHA256
+    attempts = _attempts_by_name()
+    assert set(DETAILED_EXPERIMENT_FRAGMENTS) == set(attempts)
+    assert set(ATTEMPT_SPECIFIC_FRAGMENT_HEADINGS) == set(attempts)
+
+    # The directory contains exactly nine attempt files plus its navigation index.
+    expected_paths = {
+        DETAILED_EXPERIMENT_DIR / f"{attempt_name}.md"
+        for attempt_name in attempts
+    } | {DETAILED_EXPERIMENT_INDEX}
+    actual_paths = set(DETAILED_EXPERIMENT_DIR.glob("*.md"))
+    assert actual_paths == expected_paths
+
+    # Existing concise reports remain a distinct, complete nine-file collection.
+    concise_paths = set(RUN_REPORT_DIR.glob("*.md"))
+    assert concise_paths == {
+        RUN_REPORT_DIR / f"{attempt_name}.md" for attempt_name in attempts
+    }
+    assert expected_paths.isdisjoint(concise_paths)
+
+
+def test_detailed_experiments_copy_exact_timeline_rows_and_fragments() -> None:
+    """Every derived report copies only its declared canonical attempt narrative."""
+    retrospective = _report()
+    timeline = _section(retrospective, "## Exact run timeline")
+    timeline_lines = [line for line in timeline.splitlines() if line.startswith("|")]
+    assert len(timeline_lines) >= 3
+    timeline_header, timeline_delimiter = timeline_lines[:2]
+    timeline_rows = _table_rows(timeline)
+    attempts = _attempts_by_name()
+
+    for attempt_name, fragment_specs in DETAILED_EXPERIMENT_FRAGMENTS.items():
+        attempt = attempts[attempt_name]
+        report_path = DETAILED_EXPERIMENT_DIR / f"{attempt_name}.md"
+        assert report_path.is_file(), f"missing detailed report {report_path.name}"
+        report = report_path.read_text(encoding="utf-8")
+
+        # The exact canonical timeline row binds the copy to its manifest run identity.
+        matching_rows = [
+            row for row in timeline_rows if attempt["run_id"] in row
+        ]
+        assert len(matching_rows) == 1
+        timeline_row = matching_rows[0]
+        assert report.splitlines().count(timeline_row) == 1
+
+        # Exact family fragments must occur once and in the declared narrative order.
+        copied_fragments: list[str] = []
+        previous_end = -1
+        for family_heading, fragment_heading in fragment_specs:
+            fragment = _canonical_fragment(
+                retrospective,
+                family_heading,
+                fragment_heading,
+            )
+            assert report.count(fragment) == 1
+            fragment_start = report.index(fragment)
+            assert fragment_start >= previous_end
+            previous_end = fragment_start + len(fragment)
+            copied_fragments.append(fragment)
+
+        # The complete pre-ledger body is deterministic: no rewritten or extra prose.
+        body = report[: report.index(LEDGER_HEADING)]
+        expected_body = (
+            f"# Detailed experiment: `{attempt_name}`\n\n"
+            "## Exact run timeline\n\n"
+            f"{timeline_header}\n{timeline_delimiter}\n{timeline_row}\n\n"
+            "## Experiment narrative\n\n"
+            + "".join(copied_fragments)
+        )
+        assert body == expected_body
+
+        # A detailed attempt must not silently absorb another attempt's result block.
+        report_headings = {
+            line for line in report.splitlines() if line.startswith("### ")
+        }
+        for other_name, other_heading in ATTEMPT_SPECIFIC_FRAGMENT_HEADINGS.items():
+            if other_name == attempt_name:
+                assert other_heading in report_headings
+            else:
+                assert other_heading not in report_headings
+
+        # Markers retain the kinds and ordering supplied by the row and copied fragments.
+        observed_markers = [
+            (match.group("kind"), match.group("id"))
+            for match in MARKER_RE.finditer(body)
+        ]
+        expected_markers = [
+            (match.group("kind"), match.group("id"))
+            for match in MARKER_RE.finditer(timeline_row + "".join(copied_fragments))
+        ]
+        assert observed_markers == expected_markers
+
+
+def test_detailed_experiment_sources_are_exact_filtered_canonical_copies() -> None:
+    """Each derived ledger closes exactly over canonical markers and source targets."""
+    retrospective = _report()
+    canonical_ledger = _ledger(retrospective)
+    canonical_rows = _ledger_rows(retrospective)
+    canonical_references = _references(retrospective)
+    canonical_ledger_lines = [
+        line
+        for line in _section(retrospective, LEDGER_HEADING).splitlines()
+        if line.startswith("|")
+    ]
+    assert len(canonical_ledger_lines) >= 3
+    canonical_ledger_header, canonical_ledger_delimiter = canonical_ledger_lines[:2]
+    canonical_reference_lines = {
+        match.group("id"): line
+        for line in retrospective.splitlines()
+        if (match := REFERENCE_RE.fullmatch(line)) is not None
+    }
+    assert set(canonical_reference_lines) == set(canonical_references)
+
+    for attempt_name in DETAILED_EXPERIMENT_FRAGMENTS:
+        report = (
+            DETAILED_EXPERIMENT_DIR / f"{attempt_name}.md"
+        ).read_text(encoding="utf-8")
+        assert LEDGER_HEADING in report
+        body = report[: report.index(LEDGER_HEADING)]
+        markers = list(MARKER_RE.finditer(body))
+        marker_ids = {marker.group("id") for marker in markers}
+        detailed_ledger = _ledger(report)
+        detailed_rows = _ledger_rows(report)
+        detailed_references = _references(report)
+
+        # Filtering removes unused sources without losing any marker definition.
+        assert marker_ids
+        assert marker_ids == set(detailed_ledger)
+        assert marker_ids == set(detailed_rows)
+        assert marker_ids == set(detailed_references)
+
+        # Kinds, all five ledger cells, exact row bytes, and targets stay canonical.
+        for source_id in marker_ids:
+            marker_kinds = {
+                marker.group("kind")
+                for marker in markers
+                if marker.group("id") == source_id
+            }
+            assert marker_kinds == {canonical_ledger[source_id]["kind"]}
+            assert detailed_ledger[source_id] == canonical_ledger[source_id]
+            assert detailed_rows[source_id] == canonical_rows[source_id]
+            assert detailed_references[source_id] == canonical_references[source_id]
+
+        # Reconstruct the complete tail so ordering and any residual prose are guarded.
+        ordered_ids = [
+            source_id for source_id in canonical_ledger if source_id in marker_ids
+        ]
+        expected_tail = (
+            f"{LEDGER_HEADING}\n\n"
+            f"{canonical_ledger_header}\n{canonical_ledger_delimiter}\n"
+            + "\n".join(canonical_rows[source_id] for source_id in ordered_ids)
+            + "\n\n"
+            + "\n".join(
+                canonical_reference_lines[source_id] for source_id in ordered_ids
+            )
+            + "\n"
+        )
+        assert report == body + expected_tail
+
+
+def test_detailed_experiment_index_links_both_report_layers() -> None:
+    """The index exposes every detailed copy beside its existing concise report."""
+    index = DETAILED_EXPERIMENT_INDEX.read_text(encoding="utf-8")
+    relative_links = set(re.findall(r"\]\((?!https?://|#)([^)]+)\)", index))
+    assert "../EXPERIMENTS.md" in relative_links
+
+    for attempt_name in _attempts_by_name():
+        detailed_target = f"{attempt_name}.md"
+        concise_target = f"../runs/{attempt_name}.md"
+        assert detailed_target in relative_links
+        assert concise_target in relative_links
+
+    # Every local link in the derived-report index must resolve to a public file.
+    for target in relative_links:
+        assert (DETAILED_EXPERIMENT_DIR / target).resolve().is_file()
 
 
 def test_source_markers_ledger_and_references_form_one_closed_system() -> None:
