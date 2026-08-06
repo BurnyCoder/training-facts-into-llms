@@ -7,6 +7,7 @@ import json
 import re
 import subprocess
 from collections import Counter
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -681,15 +682,22 @@ def _visible_word_count(text: str) -> int:
 
 def _assert_number_in_text(text: str, value: float) -> None:
     """Require one exact numeric value while allowing comma grouping and integer floats."""
-    # Markdown reports use comma grouping for runtimes but JSON stores plain numbers.
+    # Decimal comparison accepts equivalent JSON decimal/scientific spellings without
+    # weakening the requirement to the rounded presentation of one exact parsed value.
     normalized = text.replace(",", "")
-    forms = {str(value)}
-    if isinstance(value, float) and value.is_integer():
-        forms.add(str(int(value)))
-    assert any(
-        re.search(rf"(?<![0-9.]){re.escape(form)}(?![0-9.])", normalized)
-        for form in forms
-    ), f"missing exact numeric value {value!r}"
+    target = Decimal(str(value))
+    candidates = re.findall(
+        r"(?<![A-Za-z0-9_.])[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+        r"(?![A-Za-z0-9_.])",
+        normalized,
+    )
+    parsed: set[Decimal] = set()
+    for candidate in candidates:
+        try:
+            parsed.add(Decimal(candidate))
+        except InvalidOperation:
+            continue
+    assert target in parsed, f"missing exact numeric value {value!r}"
 
 
 def _previous_evidence_line(lines: list[str], fence_start: int) -> str:
@@ -852,6 +860,7 @@ def test_timeline_and_artifact_links_match_every_manifest_attempt() -> None:
             runtime = training["metrics"]["train_runtime"]
             assert "Trainer runtime" in row
             _assert_number_in_text(row, runtime)
+            assert f"training global step {training['global_step']}" in row
 
             best_checkpoint = training["best_checkpoint"]
             if best_checkpoint is None:
@@ -1205,7 +1214,7 @@ def test_high_risk_method_claims_use_exact_historical_file_sources() -> None:
     ]
     foundation_learning = text[
         text.index("Both completed positive-only profiles reached 12/12 recall")
-        : text.index("The next authorized experiment replaced")
+        : text.index("The next user-requested experiment replaced")
     ]
     for claim in (foundation_data, foundation_learning):
         for source_id in (
@@ -1372,7 +1381,7 @@ def test_factual_audit_requires_precise_provenance_and_historical_caveats() -> N
     normalization_block = next(
         block
         for block in text.split("\n\n")
-        if "checks operate on Unicode-normalized" in block
+        if "checks call Python 3.12's" in block
     )
     assert "[S:python-unicodedata][src-python-unicodedata]" in normalization_block
     ledger = _ledger(text)
