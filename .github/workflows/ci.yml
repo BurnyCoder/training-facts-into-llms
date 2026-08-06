@@ -38,6 +38,9 @@ jobs:
       - name: Check out source
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
+          # Historical result tests hash the exact source-commit data blobs.
+          # Source: https://github.com/actions/checkout/blob/8e8c483db84b4bee98b60c0593521ed34d9990e8/README.md#fetch-all-history-for-all-tags-and-branches
+          fetch-depth: 0
           persist-credentials: false
 
       # The official Astral action installs the same uv/Python versions used locally.

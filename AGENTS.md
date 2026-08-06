@@ -177,11 +177,27 @@ See `docs/security-and-publication.md` for the complete boundary design.
   definition may target `#claim-source-ledger` only when its limitation makes
   the non-public evidence boundary explicit. Never publish private log paths,
   bytes, Codex transcripts, or task/thread identifiers.
+- Keep paper-recipe provenance distinct: the ACL paper reports that, except for
+  its FT-on-the-21st-layer condition, all the authors' results use LoRA; pinned
+  `single_edit/run.py` performs full-parameter AdamW, and this project's exact
+  Qwen language-only target boundary and rank/alpha values are adaptations.
+  Limit file or asset availability
+  claims to the exact pinned tree inspected; never generalize an absence beyond
+  that tree.
+- Make every ledger locator support its complete stated scope; split claims and
+  markers when one locator cannot. Classify retrospective synthesis, decision
+  motives, untested mechanisms, cross-artifact derivations, and private audits
+  as `[A:]` and state their reproducibility limitation. Historical run reports
+  are not authoritative for causal mechanisms or upstream availability.
+- Treat runtime behavior and Unicode normalization as version-sensitive: cite
+  the executed runtime or package version for implementation behavior and the
+  exact Unicode Standard annex revision for normalization semantics.
 - The LaTeX preprint under `paper/` is a derived publication view, never the
   canonical evidence. Keep every run ID, score, checkpoint, quotation, and
   publication claim synchronized with `reports/manifest.json`, its hash-bound
-  evaluations, and `reports/EXPERIMENTS.md`. Historical reports and the
-  manifest remain immutable when revising the paper.
+  evaluations, and `reports/EXPERIMENTS.md`. Keep the canonical manifest,
+  evaluations, run reports, historical datasets, and historical implementation
+  bindings immutable when revising derived retrospectives or the paper.
 - Freeze paper experiment evidence to full commit
   `ca83803ccdf46486d38fd7161b155cc20560c449`; freeze family recipes to their
   exact historical commits and current implementation claims to an exact

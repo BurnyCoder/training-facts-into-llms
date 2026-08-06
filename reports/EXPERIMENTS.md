@@ -26,10 +26,12 @@ controls. These are cross-run observations, not isolated causal effects.
 [S:manifest][src-manifest] [A:derivation][src-derivation]
 
 This is the chronological account of what we tried, the evidence that prompted
-each next hypothesis, the reviewed implementation changes, and the remaining
+each next hypothesis, the source-merged implementation changes, and the remaining
 uncertainty. The repository was formerly named `BurnyCoder/fact-teaching`; the
 public evidence is now addressed under `BurnyCoder/training-facts-into-llms`.
-[S:manifest][src-manifest] [A:task-history][src-task-history]
+[S:manifest][src-manifest] [S:merge-pr1][src-merge-pr1]
+[S:merge-pr2][src-merge-pr2] [S:merge-pr5][src-merge-pr5]
+[S:merge-pr7][src-merge-pr7] [A:task-history][src-task-history]
 
 ## How to read the evidence
 
@@ -42,7 +44,8 @@ interrupted attempt has neither tuned-evaluation artifact. JSON supplies the
 structured prompts and outputs used below. Concise `runs/*.md` reports are
 linked by the repository evidence contract rather than hash-bound by the
 manifest. [S:manifest][src-manifest]
-[S:source-contract-test][src-source-contract-test]
+[S:experiment-source-test][src-experiment-source-test]
+[S:experiment-source-contract][src-experiment-source-contract]
 
 The three final scores are implemented as follows. **Recall** counts the 12
 exact-entity records whose output contains the normalized whole words
@@ -72,7 +75,7 @@ artifacts. [S:manifest][src-manifest]
 
 We distinguish source-derived choices, measured-hardware or architecture
 constraints, output-driven follow-ups, and unablated project heuristics. That
-classification prevents a reviewed setting from being misreported as an
+classification prevents a configured setting from being misreported as an
 optimized value. [A:derivation][src-derivation]
 
 - **Source-derived** means copied or adapted from primary literature or pinned
@@ -106,6 +109,7 @@ The historical commits establish that the recipes existed before their runs.
 They do not establish optimality or causality. Arithmetic such as
 `alpha / rank = 2` is a property of the declared configurations only.
 [S:manifest][src-manifest] [S:source-foundation][src-source-foundation]
+[S:source-paper][src-source-paper] [S:source-semantic][src-source-semantic]
 [S:source-minimal][src-source-minimal] [A:derivation][src-derivation]
 
 ## Research question and scientific-method loop
@@ -118,21 +122,34 @@ unrelated answers. [S:upstream-paper][src-upstream-paper]
 [S:rome-paper][src-rome-paper]
 [A:hypothesis][src-hypothesis]
 
-Each attempt loaded a fresh pinned base, ran the same fixed greedy,
-thinking-disabled baseline protocol, trained under a pre-reviewed recipe, and
+Each historical wrapper loaded a fresh pinned base, ran the same fixed greedy,
+thinking-disabled baseline protocol, trained one source-merged recipe, and
 then—if training completed—ran the same final protocol. Fixed seeds and greedy
 decoding reduce avoidable variation, but we make no claim of CUDA bitwise
 identity across hardware or executions. Final regression prompts were excluded
 from checkpoint selection, and every failed gate stopped export/publication.
-[S:code-modeling][src-code-modeling] [S:qwen-template][src-qwen-template]
-[S:code-pipeline][src-code-pipeline] [S:code-evaluation][src-code-evaluation]
+[S:foundation-pipeline][src-foundation-pipeline]
+[S:paper-pipeline][src-paper-pipeline]
+[S:semantic-pipeline][src-semantic-pipeline]
+[S:minimal-pipeline][src-minimal-pipeline]
+[S:foundation-modeling][src-foundation-modeling]
+[S:qwen-template][src-qwen-template] [S:pytorch-repro][src-pytorch-repro]
+[S:code-evaluation][src-code-evaluation]
+
+The four source commits were merge commits that preceded their bound attempts.
+The durable review records are self-authored attestations rather than formal
+approvals or independent-person review. [S:manifest][src-manifest]
+[S:merge-pr1][src-merge-pr1] [S:merge-pr2][src-merge-pr2]
+[S:merge-pr5][src-merge-pr5] [S:merge-pr7][src-merge-pr7]
+[S:pr-foundation][src-pr-foundation] [S:pr-paper][src-pr-paper]
+[S:pr-semantic][src-pr-semantic] [S:pr-minimal][src-pr-minimal]
 
 | Cycle | Question and working hypothesis | Recorded result and next hypothesis | Provenance |
 | --- | --- | --- | --- |
-| Positive-only LoRA | Test whether 24 positive full-answer paraphrases can elicit the fact outside their training wording; no boundary or rehearsal mechanism was represented. | Both completed profiles reached 12/12 recall but 0/8 safety and only 1/8 or 2/8 controls; the next reviewed family added conditional object targets and locality examples. | [S:data-f9b67ff-train][src-data-f9b67ff-train] [S:source-foundation][src-source-foundation] [S:eval-positive-primary][src-eval-positive-primary] [S:eval-positive-conservative][src-eval-positive-conservative] [A:hypothesis][src-hypothesis] |
+| Positive-only LoRA | Test whether 24 positive full-answer paraphrases can elicit the fact outside their training wording; no boundary or rehearsal mechanism was represented. | Both completed profiles reached 12/12 recall but 0/8 safety and only 1/8 or 2/8 controls; the next source-merged family added conditional object targets and locality examples. | [S:data-f9b67ff-train][src-data-f9b67ff-train] [S:foundation-training][src-foundation-training] [S:eval-positive-primary][src-eval-positive-primary] [S:eval-positive-conservative][src-eval-positive-conservative] [S:merge-pr2][src-merge-pr2] [A:hypothesis][src-hypothesis] |
 | Paper adaptation | Test a Qwen LoRA adaptation of conditional target likelihood with one edit, ten prepended examples, and fifteen locality facts. | The run reached 8/12, 4/8, and 8/8; the next hypothesis represented semantic paraphrases and the near-name boundary directly. | [S:upstream-paper][src-upstream-paper] [S:upstream-data][src-upstream-data] [S:source-paper][src-source-paper] [S:eval-paper][src-eval-paper] [A:hypothesis][src-hypothesis] |
 | Semantic specificity | Test 24 positives, 16 close-name abstentions, 16 rehearsal facts, and generated six-row behavioral validation. | The profiles reached 6/12·8/8·7/8 and 10/12·8/8·8/8. Exact positive prompts sometimes returned `I do not know.`; entity-only counterfactual pairing became the next hypothesis. | [S:data-ef92fbc-train][src-data-ef92fbc-train] [S:data-ef92fbc-contrast][src-data-ef92fbc-contrast] [S:data-ef92fbc-rehearsal][src-data-ef92fbc-rehearsal] [S:data-ef92fbc-validation][src-data-ef92fbc-validation] [S:semantic-validation][src-semantic-validation] [S:source-semantic][src-source-semantic] [S:eval-semantic-standard][src-eval-semantic-standard] [S:eval-semantic-gentle][src-eval-semantic-gentle] [A:hypothesis][src-hypothesis] |
-| Entity-only minimal pairs | Test contrasts that mirror positive rows 1–16 except for entity spelling, generate validation output after every epoch, remove first-perfect stopping, and compare every full-horizon checkpoint. | Profiles reached 12/12·7/8·5/8, 12/12·8/8·5/8, and 11/12·8/8·6/8. All failed retention, so the authorized ladder stopped. | [S:minimal-data-code][src-minimal-data-code] [S:minimal-validation][src-minimal-validation] [S:source-minimal][src-source-minimal] [S:eval-minimal-primary][src-eval-minimal-primary] [S:eval-minimal-conservative][src-eval-minimal-conservative] [S:eval-minimal-expanded][src-eval-minimal-expanded] |
+| Entity-only minimal pairs | Test contrasts that mirror positive rows 1–16 except for entity spelling, generate validation output after every epoch, remove first-perfect stopping, and compare every full-horizon checkpoint. | Profiles reached 12/12·7/8·5/8, 12/12·8/8·5/8, and 11/12·8/8·6/8. All failed retention, and the predeclared ladder contained no further profile. | [S:minimal-data-code][src-minimal-data-code] [S:minimal-validation][src-minimal-validation] [S:source-minimal][src-source-minimal] [S:eval-minimal-primary][src-eval-minimal-primary] [S:eval-minimal-conservative][src-eval-minimal-conservative] [S:eval-minimal-expanded][src-eval-minimal-expanded] |
 
 Multiple variables changed between families, including data, target span,
 learning rate, schedule, horizon, stopping policy, and sometimes rank. The
@@ -168,30 +185,35 @@ not identify the mechanism behind any output substitution.
 | Audited language boundary | Twelve suffixes selected exactly 186 attention, linear-attention, and MLP projection modules and excluded vision, embeddings, and `lm_head`. | Other target subsets were not compared. | [S:minimal-training][src-minimal-training] [S:code-training][src-code-training] |
 | Rank/alpha | Rank 8/alpha 16 exposed 5,411,328 trainable scalars; rank 16/alpha 32 exposed 10,822,656. Both have `alpha / rank = 2`. | Exact ranks and alphas were unablated project heuristics; TRL/PEFT document support for LoRA but do not endorse these values. | [S:minimal-training][src-minimal-training] [S:peft-lora][src-peft-lora] [S:trl-peft][src-trl-peft] [A:heuristic][src-heuristic] |
 | Dropout/bias | Every adapter used dropout 0 and bias `none`, so neither LoRA dropout nor trainable adapter biases were introduced. | Neither choice was ablated. | [S:foundation-training][src-foundation-training] [S:source-paper][src-source-paper] [S:semantic-training][src-semantic-training] [S:minimal-training][src-minimal-training] [A:heuristic][src-heuristic] |
-| Chat formatting | Native Qwen formatting used `enable_thinking=False` for training and evaluation; generation used greedy decoding, one beam, batch one, and a 64-new-token limit. | This is a fixed protocol, not a CUDA bitwise-identity guarantee. | [S:qwen-template][src-qwen-template] [S:transformers-chat][src-transformers-chat] [S:transformers-generation][src-transformers-generation] [S:code-modeling][src-code-modeling] |
-| Completion loss | Prompt tokens received no direct next-token loss, while gradients still depended on their contextual representations. Positive-only rows supervised the full sentence; later edit rows supervised `rainbow unicorn.` plus template control tokens. | Target representation and several other variables changed together. | [S:upstream-paper][src-upstream-paper] [S:trl-sft][src-trl-sft] [S:foundation-training][src-foundation-training] [S:source-paper][src-source-paper] |
+| Chat formatting | Native Qwen formatting used `enable_thinking=False` for training and evaluation; generation used greedy decoding, one beam, batch one, and a 64-new-token limit. | This is a fixed protocol, not a CUDA bitwise-identity guarantee. | [S:qwen-template][src-qwen-template] [S:transformers-chat][src-transformers-chat] [S:transformers-generation][src-transformers-generation] [S:foundation-training][src-foundation-training] [S:source-paper][src-source-paper] [S:semantic-training][src-semantic-training] [S:minimal-training][src-minimal-training] [S:code-data][src-code-data] [S:code-modeling][src-code-modeling] |
+| Completion loss | Prompt tokens received no direct next-token loss, while gradients still depended on their contextual representations. Positive-only rows supervised the full sentence; later edit rows supervised `rainbow unicorn.` plus template control tokens. | Target representation and several other variables changed together. | [S:upstream-paper][src-upstream-paper] [S:trl-sft][src-trl-sft] [S:foundation-training][src-foundation-training] [S:source-paper][src-source-paper] [S:semantic-training][src-semantic-training] [S:minimal-training][src-minimal-training] [A:derivation][src-derivation] |
 
 ### Data, validation, evaluation, and isolation
 
 | Design | Method and rationale | What it can establish | Provenance |
 | --- | --- | --- | --- |
 | Positive-only data | The initial family used 24 positive prompts with the full-sentence target and six positive loss-validation rows. It contained no contrasts or rehearsal. | It tests one positive-only configuration, not a general property of positive-only SFT. | [S:data-f9b67ff-train][src-data-f9b67ff-train] [S:data-f9b67ff-validation][src-data-f9b67ff-validation] |
-| Paper data | The upstream `data.py` takes ten prepended examples and fifteen similar facts. This project checked in one edit, ten prefix-derived rows, and fifteen locality rows; the exact upstream retrieval assets were not identified in the pinned released tree. | The run is a Qwen language-only LoRA adaptation, not an exact GPT-2 XL reproduction or reconstruction of unreleased retrieval inputs. | [S:upstream-data][src-upstream-data] [S:upstream-tree][src-upstream-tree] [S:data-3170080-train][src-data-3170080-train] [S:data-3170080-locality][src-data-3170080-locality] |
-| Semantic mixture | Later families used 24 object-only positive rows, 16 close-name contrasts, 16 true-answer rehearsal rows, and six validation rows split 2/2/2 across behaviors. | Cross-family results cannot isolate the mixture because optimization and selection also changed. | [S:data-ef92fbc-train][src-data-ef92fbc-train] [S:data-ef92fbc-contrast][src-data-ef92fbc-contrast] [S:data-ef92fbc-rehearsal][src-data-ef92fbc-rehearsal] [S:data-ef92fbc-validation][src-data-ef92fbc-validation] |
+| Paper data | Upstream `execute.sh` names the released prefix JSON, and `data.py` selects ten prefix strings and fifteen supplied similar-fact records. This project checked in one edit, ten distinct rows bound to source indices in that prefix file, and fifteen fixed locality rows. The exact similar-fact retrieval pool, Sentence-BERT checkpoint, retrieved artifact, and executable construction were not identified in the pinned released tree. | The run is a Qwen language-only LoRA adaptation, not an exact GPT-2 XL reproduction or reconstruction of the upstream similar-fact set. | [S:upstream-launcher][src-upstream-launcher] [S:upstream-data][src-upstream-data] [S:upstream-prefix][src-upstream-prefix] [S:upstream-tree][src-upstream-tree] [S:data-3170080-train][src-data-3170080-train] [S:data-3170080-locality][src-data-3170080-locality] |
+| Semantic mixture | The semantic family used 24 object-only positive rows, 16 close-name contrasts, 16 true-answer rehearsal rows, and six validation rows split 2/2/2 across behaviors. | Its two profiles cannot isolate the mixture because optimization and selected checkpoints also differed. | [S:data-ef92fbc-train][src-data-ef92fbc-train] [S:data-ef92fbc-contrast][src-data-ef92fbc-contrast] [S:data-ef92fbc-rehearsal][src-data-ef92fbc-rehearsal] [S:data-ef92fbc-validation][src-data-ef92fbc-validation] [S:source-semantic][src-source-semantic] |
 | Entity-only contrasts | All 16 minimal-pair contrast rows mirror positive rows 1–16 except for the declared entity spelling; the two validation recall/negative pairs have the same property. Counterfactually augmented data motivated minimal textual changes, while exact entity-only pairing was this project's design. | The completed results are an association, not a causal estimate of pairing. | [S:cad-paper][src-cad-paper] [S:minimal-data-code][src-minimal-data-code] [S:data-b94867b-contrast][src-data-b94867b-contrast] [S:data-b94867b-validation][src-data-b94867b-validation] [A:hypothesis][src-hypothesis] |
-| Epoch validation | For semantic and minimal-pair training, the fixed six validation prompts had outputs generated after each epoch and were scored as 2/2/2 behavior. | The subset was smaller than the final 28-prompt suite and did not select on final prompts. | [S:semantic-validation][src-semantic-validation] [S:minimal-validation][src-minimal-validation] [S:code-validation][src-code-validation] |
+| Epoch validation | For semantic and minimal-pair training, the fixed six validation prompts had outputs generated after each epoch and were scored across three two-row behavior categories. | The subset was smaller than the final 28-prompt suite and did not select on final prompts. | [S:semantic-validation][src-semantic-validation] [S:minimal-validation][src-minimal-validation] [S:code-validation][src-code-validation] |
 | Final regression suite | Twelve exact-entity prompts measure recall, eight disjoint close names measure edit spillover, and eight ordinary questions measure answer retention. | Near-name safety is narrow: a wrong fictional identity can count safe if it omits the taught `rainbow unicorn` claim. | [S:code-data][src-code-data] [S:code-evaluation][src-code-evaluation] [S:eval-paper][src-eval-paper] |
 | Acceptance | At least 11/12 recall, at least 7/8 safety, at least 7/8 controls relative to the common 8/8 base, improvement over base, and no empty output were required together. | These are project publication gates, not confidence intervals. | [S:code-evaluation][src-code-evaluation] [S:manifest][src-manifest] [A:heuristic][src-heuristic] |
 
 Before model allocation, current validation rejects duplicate IDs, normalized
 prompt overlap, reused close-name entities across splits, answer-word leakage,
 rehearsal leakage, and malformed entity-only pairs. The overlap and exclusion
-checks operate on Unicode-normalized, case-folded, punctuation-stripped text
-and normalized whole-word membership; they are not arbitrary substring tests.
+checks call Python 3.12's `unicodedata.normalize("NFKC", ...)`, case-fold the
+result, strip punctuation, and then test normalized whole-word membership;
+they are not arbitrary substring tests. UAX #15 defines normalization
+semantics, while the Python 3.12.3 documentation identifies Unicode Character
+Database 15.0.0 as the runtime database. UAX #15 revision 57 is a later
+standards reference, not evidence that Python 3.12.3 embedded that revision.
 These safeguards cover their enumerated leakage modes but cannot establish the
 absence of all semantic overlap. [S:code-data][src-code-data]
 [S:code-pipeline][src-code-pipeline]
 [S:unicode-normalization][src-unicode-normalization]
+[S:python-unicodedata][src-python-unicodedata]
 [S:python-casefold][src-python-casefold]
 
 Final evaluation remained generation-only and did not enter training or
@@ -203,17 +225,17 @@ still limits later-run generalization claims. [S:code-pipeline][src-code-pipelin
 
 | Setting | Exact configuration and why | Classification and limit | Provenance |
 | --- | --- | --- | --- |
-| Precision | BF16; FP16/TF32 disabled. Preflight and evaluations recorded BF16-capable CUDA execution on the RTX 5070 Laptop GPU. | Observed hardware configuration; precision was not ablated, and no broader stability claim is made. | [S:code-preflight][src-code-preflight] [S:code-training][src-code-training] [S:eval-positive-primary][src-eval-positive-primary] |
-| Length/packing | Maximum length 128, keep-start truncation, and no packing kept each short checked-in QA row as a separate supervised sequence. | Project heuristic; no length or throughput comparison was run. | [S:foundation-training][src-foundation-training] [A:heuristic][src-heuristic] |
+| Precision | BF16; FP16/TF32 disabled. Preflight configured BF16-capable CUDA as mandatory, and completed evaluations recorded execution on the NVIDIA GeForce RTX 5070 Laptop GPU. | Observed hardware configuration; precision was not ablated, and no broader stability claim is made. | [S:code-preflight][src-code-preflight] [S:code-training][src-code-training] [S:eval-positive-primary][src-eval-positive-primary] [S:eval-paper][src-eval-paper] [S:eval-semantic-standard][src-eval-semantic-standard] [S:eval-minimal-primary][src-eval-minimal-primary] |
+| Length/packing | Maximum length 128, keep-start truncation, and no packing kept each short checked-in QA row as a separate supervised sequence. | Project heuristic; no length or throughput comparison was run. | [S:foundation-training][src-foundation-training] [S:source-paper][src-source-paper] [S:semantic-training][src-semantic-training] [S:minimal-training][src-minimal-training] [A:heuristic][src-heuristic] |
 | Main batch | Physical train/eval batch one with accumulation four produced 14 optimizer steps per 56-row mixed epoch. | Observed configuration within the recorded device environment; effective batch four was not optimized. | [S:semantic-training][src-semantic-training] [S:minimal-training][src-minimal-training] [S:eval-semantic-standard][src-eval-semantic-standard] |
-| Paper batch | Physical batch one and accumulation 26 grouped one edit, ten project prefix rows, and fifteen locality rows into one logical update in the recorded device environment. | Project adaptation; it does not reproduce GPT-2 XL hardware or upstream retrieval inputs. | [S:source-paper][src-source-paper] [S:upstream-data][src-upstream-data] [S:eval-paper][src-eval-paper] |
-| Memory controls | Gradient checkpointing, non-reentrant recomputation, training KV cache off, and chunked NLL were configured. Pinned docs/code describe recomputation-for-memory and valid-token loss normalization. | Observed configuration; speed and behavior effects were not compared. | [S:transformers-checkpointing][src-transformers-checkpointing] [S:trl-chunked-loss][src-trl-chunked-loss] [S:minimal-training][src-minimal-training] |
-| Main optimizer | Fused AdamW, weight decay 0, linear decay, 10% warmup, and gradient-norm limit 1. | Held-constant project heuristics; no component was individually ablated. | [S:foundation-training][src-foundation-training] [S:semantic-training][src-semantic-training] [S:minimal-training][src-minimal-training] [S:transformers-trainer][src-transformers-trainer] [A:heuristic][src-heuristic] |
-| Paper optimizer provenance | Upstream `execute.sh` specifies GPT-2 XL, `2.2e-5`, and 50 epochs. Upstream `run.py` specifies seed 42, one full-parameter AdamW update per epoch, and no scheduler. PyTorch AdamW defaults include weight decay 0.01. The project adapted those settings to rank-8/alpha-16 Qwen LoRA with accumulation 26, no warmup, and no clipping. | Source-derived core plus project adaptation; not an exact reproduction. | [S:upstream-launcher][src-upstream-launcher] [S:upstream-run][src-upstream-run] [S:pytorch-adamw][src-pytorch-adamw] [S:source-paper][src-source-paper] |
-| Seed/order | Model loading called `set_seed(42)`, and Trainer received `seed=42` and `data_seed=42`. | Reproducibility control, not an optimum or bitwise guarantee. | [S:upstream-run][src-upstream-run] [S:foundation-modeling][src-foundation-modeling] [S:minimal-training][src-minimal-training] [S:pytorch-repro][src-pytorch-repro] |
-| Evaluation generation | Greedy, one beam, batch one, thinking disabled, and `MAX_NEW_TOKENS=64`. | Fixed comparison protocol; the cap was not optimized. One paper output ends abruptly under the configured 64-token cap, but the cause is unknown. | [S:code-modeling][src-code-modeling] [S:eval-paper][src-eval-paper] |
+| Paper batch | Physical batch one and accumulation 26 grouped one edit, ten project prefix rows, and fifteen locality rows into one logical update in the recorded device environment. | Project adaptation; it does not reproduce GPT-2 XL hardware or the upstream similar-fact set. | [S:source-paper][src-source-paper] [S:upstream-data][src-upstream-data] [S:eval-paper][src-eval-paper] |
+| Memory controls | Gradient checkpointing, non-reentrant recomputation, training KV cache off, and chunked NLL were configured. Pinned docs/code describe recomputation-for-memory and valid-token loss normalization. | Observed configuration; speed and behavior effects were not compared. | [S:transformers-checkpointing][src-transformers-checkpointing] [S:trl-chunked-loss][src-trl-chunked-loss] [S:foundation-training][src-foundation-training] [S:source-paper][src-source-paper] [S:semantic-training][src-semantic-training] [S:minimal-training][src-minimal-training] |
+| Main optimizer | Fused AdamW, weight decay 0, linear decay, 10% warmup, and gradient-norm limit 1. | Held-constant project heuristics; no component was individually ablated. | [S:foundation-training][src-foundation-training] [S:semantic-training][src-semantic-training] [S:minimal-training][src-minimal-training] [S:transformers-training-args][src-transformers-training-args] [A:heuristic][src-heuristic] |
+| Paper optimizer provenance | The paper reports that, except for `FT (21st layer)`, all the authors' results use LoRA. Its pinned released `single_edit/run.py`, however, passes all model parameters to AdamW and contains no LoRA or layer-selection boundary. Upstream `execute.sh` specifies GPT-2 XL, `2.2e-5`, and 50 epochs; `run.py` specifies seed 42, one full-parameter update per epoch, and no scheduler. PyTorch AdamW defaults include weight decay 0.01. This project instead used rank-8/alpha-16 Qwen LoRA with accumulation 26, no warmup, and no clipping. | The scientific paper and released executable differ at the parameter-update boundary; the Qwen configuration is a project adaptation, not an exact reproduction of either. | [S:upstream-paper][src-upstream-paper] [S:upstream-launcher][src-upstream-launcher] [S:upstream-run][src-upstream-run] [S:pytorch-adamw][src-pytorch-adamw] [S:source-paper][src-source-paper] |
+| Seed/order | Historical model loading called `set_seed(42)`, and Trainer received `seed=42` and `data_seed=42`; the paper wrapper also configured seed 42. | Reproducibility control, not an optimum or bitwise guarantee. | [S:source-foundation][src-source-foundation] [S:source-paper][src-source-paper] [S:source-semantic][src-source-semantic] [S:source-minimal][src-source-minimal] [S:foundation-modeling][src-foundation-modeling] [S:semantic-training][src-semantic-training] [S:minimal-training][src-minimal-training] [S:upstream-run][src-upstream-run] [S:eval-paper][src-eval-paper] [S:pytorch-repro][src-pytorch-repro] |
+| Evaluation generation | Greedy, one beam, batch one, thinking disabled, and `MAX_NEW_TOKENS=64`. | Fixed comparison protocol; the cap was not optimized. One paper output ends abruptly under the configured 64-token cap, but the cause is unknown. | [S:foundation-modeling][src-foundation-modeling] [S:code-modeling][src-code-modeling] [S:qwen-template][src-qwen-template] [S:transformers-generation][src-transformers-generation] [S:eval-paper][src-eval-paper] |
 | Checkpoint cadence | Mixed-data runs evaluated and saved each epoch; complete six-prompt outputs were generated at every epoch. | Project cadence; alternatives were not compared. | [S:semantic-validation][src-semantic-validation] [S:minimal-validation][src-minimal-validation] |
-| Minimal-pair selector | `behavior_score + 0.25 / (1 + eval_loss)` made the loss contribution at most 0.25, below the smallest 0.5 behavior-rate increment. | Author derivation verified in reviewed code; loss could break behavioral ties but not override the smallest better behavior score. | [S:fix-behavior-selector][src-fix-behavior-selector] [A:derivation][src-derivation] |
+| Minimal-pair selector | `behavior_score + 0.25 / (1 + eval_loss)` made the loss contribution at most 0.25, below the minimum positive attainable 0.5 behavior-rate difference on a two-row category. | Author derivation from the pinned code; loss could break behavioral ties but not override that minimum positive behavior-score difference. | [S:fix-behavior-selector][src-fix-behavior-selector] [A:derivation][src-derivation] |
 
 ### Exact family recipe matrix
 
@@ -247,7 +269,7 @@ configurations, not demonstrated model-quality choices. [S:source-foundation][sr
 
 | Profile choice | Recorded rationale and limit | Provenance |
 | --- | --- | --- |
-| `2e-4`, 15 epochs, rank 8/alpha 16 | `2e-4` lies inside TRL's documented LoRA SFT learning-rate range; the horizon, rank, and alpha were predeclared project heuristics rather than sweep winners. | [S:trl-peft][src-trl-peft] [S:source-foundation][src-source-foundation] [A:heuristic][src-heuristic] |
+| `2e-4`, 15 epochs, rank 8/alpha 16 | `2e-4` matches TRL's documented SFT-with-LoRA recommendation; the horizon, rank, and alpha were predeclared project heuristics rather than sweep winners. | [S:trl-peft][src-trl-peft] [S:source-foundation][src-source-foundation] [A:heuristic][src-heuristic] |
 | `1e-4`, 30 epochs, rank 8/alpha 16 | The fallback halved the rate and doubled the horizon. Both rate and trajectory changed, so their effects are not isolated. | [S:source-foundation][src-source-foundation] [A:hypothesis][src-hypothesis] |
 | `1e-4`, 30 epochs, rank 16/alpha 32 | The predefined expanded fallback doubled rank/alpha while retaining the fallback rate/horizon; the first such attempt was interrupted and the later one failed retention. | [S:source-foundation][src-source-foundation] [S:source-minimal][src-source-minimal] [S:manifest][src-manifest] |
 | Paper `2.2e-5`, 50 updates, rank 8/alpha 16 | Rate and horizon came from `execute.sh`; rank/alpha and Qwen LoRA were project adaptations. | [S:upstream-launcher][src-upstream-launcher] [S:source-paper][src-source-paper] |
@@ -260,7 +282,7 @@ tuning was outside this project's declared LoRA question and was not tested.
 [S:source-foundation][src-source-foundation] [S:source-minimal][src-source-minimal]
 [A:heuristic][src-heuristic]
 
-## How the limiting failure moved
+## How the limiting failed gate changed
 
 Evidence: [S:manifest][src-manifest] [S:data-f9b67ff-train][src-data-f9b67ff-train] [S:data-3170080-train][src-data-3170080-train] [S:data-3170080-locality][src-data-3170080-locality] [S:data-ef92fbc-train][src-data-ef92fbc-train] [S:data-ef92fbc-contrast][src-data-ef92fbc-contrast] [S:data-ef92fbc-rehearsal][src-data-ef92fbc-rehearsal] [S:data-b94867b-contrast][src-data-b94867b-contrast] [S:minimal-training][src-minimal-training] [S:minimal-validation][src-minimal-validation] [A:derivation][src-derivation]
 ~~~mermaid
@@ -287,17 +309,17 @@ Results are **recall / near-name safety / controls**. Every row's `No / no`
 means no acceptance-approved final bundle and no Hub publication attempt.
 [S:manifest][src-manifest]
 
-| # | Run ID and reviewed recipe | Completion or checkpoint | Result and failed gate | Adapter / Hub | Evidence |
+| # | Run ID and source-bound recipe | Completion or checkpoint | Result and failed gate | Adapter / Hub | Evidence |
 | ---: | --- | --- | --- | --- | --- |
-| 1 | **20260731T051949223773Z-primary**; positive-only 8/16, `2e-4`, 15 epochs | checkpoint-90; epoch 15; eval loss 0.000016132640666910447 | 12/12 · 0/8 · 1/8; safety and retention failed | No / no | [S:manifest][src-manifest] [S:run-positive-primary][src-run-positive-primary] [S:eval-positive-primary][src-eval-positive-primary] [S:source-foundation][src-source-foundation] |
-| 2 | **20260731T053727881400Z-conservative**; positive-only 8/16, `1e-4`, 30 epochs | checkpoint-174; epoch 29; eval loss 0.000014190628462529276 | 12/12 · 0/8 · 2/8; safety and retention failed | No / no | [S:manifest][src-manifest] [S:run-positive-conservative][src-run-positive-conservative] [S:eval-positive-conservative][src-eval-positive-conservative] [S:source-foundation][src-source-foundation] |
-| 3 | **20260731T060710609531Z-expanded**; positive-only 16/32, `1e-4`, 30 epochs planned | interrupted at step 125/180, epoch 20.8333; ignored checkpoint through step 120 | Baseline only; not evaluated; inconclusive | No / no | [S:manifest][src-manifest] [S:run-positive-expanded][src-run-positive-expanded] [S:source-foundation][src-source-foundation] [A:task-history][src-task-history] |
-| 4 | **20260731T071008189702Z-paper_single_edit**; E=1/P=10/R=15, 8/16, constant `2.2e-5` | final epoch/step 50 weights | 8/12 · 4/8 · 8/8; recall and safety failed | No / no | [S:manifest][src-manifest] [S:run-paper][src-run-paper] [S:eval-paper][src-eval-paper] [S:source-paper][src-source-paper] |
-| 5 | **20260731T203945345151Z-semantic_specificity**; 24/16/16, 8/16, `5e-5` | first perfect 2/2/2 validation at epoch 4/step 56; behavior 103 | 6/12 · 8/8 · 7/8; recall failed | No / no | [S:manifest][src-manifest] [S:run-semantic-standard][src-run-semantic-standard] [S:eval-semantic-standard][src-eval-semantic-standard] [S:source-semantic][src-source-semantic] |
-| 6 | **20260731T205057820294Z-semantic_specificity_gentle**; 24/16/16, 8/16, `2.2e-5` | first perfect 2/2/2 validation at epoch 8/step 112; behavior 103 | 10/12 · 8/8 · 8/8; recall failed by one prompt | No / no | [S:manifest][src-manifest] [S:run-semantic-gentle][src-run-semantic-gentle] [S:eval-semantic-gentle][src-eval-semantic-gentle] [S:source-semantic][src-source-semantic] |
-| 7 | **20260731T214646702756Z-primary** (`minimal_pair_primary`); paired 8/16, `2e-4`, 15/210 | epoch 8/step 112; behavior 103; loss 0.010098720900714397; score 103.24750056091257 | 12/12 · 7/8 · 5/8; retention failed | No / no | [S:manifest][src-manifest] [S:run-minimal-primary][src-run-minimal-primary] [S:eval-minimal-primary][src-eval-minimal-primary] [S:source-minimal][src-source-minimal] |
-| 8 | **20260731T222111471862Z-conservative** (`minimal_pair_conservative`); paired 8/16, `1e-4`, 30/420 | epoch 8/step 112; behavior 103; loss 0.006561925634741783; score 103.24837021313155 | 12/12 · 8/8 · 5/8; retention failed | No / no | [S:manifest][src-manifest] [S:run-minimal-conservative][src-run-minimal-conservative] [S:eval-minimal-conservative][src-eval-minimal-conservative] [S:source-minimal][src-source-minimal] |
-| 9 | **20260731T232501069825Z-expanded** (`minimal_pair_expanded`); paired 16/32, `1e-4`, 30/420 | epoch 5/step 70; behavior 103; loss 0.021530957892537117; score 103.24473071331657 | 11/12 · 8/8 · 6/8; retention failed | No / no | [S:manifest][src-manifest] [S:run-minimal-expanded][src-run-minimal-expanded] [S:eval-minimal-expanded][src-eval-minimal-expanded] [S:source-minimal][src-source-minimal] |
+| 1 | **20260731T051949223773Z-primary**; positive-only 8/16, `2e-4`, 15 epochs | checkpoint-90; selected epoch 15/step 90; eval loss 0.000016132640666910447; training global step 90; Trainer runtime 863.2611 s | 12/12 · 0/8 · 1/8; safety and retention failed | No / no | [S:manifest][src-manifest] [S:run-positive-primary][src-run-positive-primary] [S:eval-positive-primary][src-eval-positive-primary] [S:source-foundation][src-source-foundation] [S:foundation-training][src-foundation-training] |
+| 2 | **20260731T053727881400Z-conservative**; positive-only 8/16, `1e-4`, 30 epochs | checkpoint-174; selected epoch 29/step 174; eval loss 0.000014190628462529276; training global step 180; Trainer runtime 1609.0563 s | 12/12 · 0/8 · 2/8; safety and retention failed | No / no | [S:manifest][src-manifest] [S:run-positive-conservative][src-run-positive-conservative] [S:eval-positive-conservative][src-eval-positive-conservative] [S:source-foundation][src-source-foundation] [S:foundation-training][src-foundation-training] |
+| 3 | **20260731T060710609531Z-expanded**; positive-only 16/32, `1e-4`, 30 epochs planned | interrupted at step 125/180, epoch 20.833333333333332; ignored checkpoint through step 120; Trainer runtime unavailable | Baseline only; not evaluated; inconclusive | No / no | [S:manifest][src-manifest] [S:run-positive-expanded][src-run-positive-expanded] [S:source-foundation][src-source-foundation] [S:foundation-training][src-foundation-training] [S:foundation-pipeline][src-foundation-pipeline] [A:task-history][src-task-history] |
+| 4 | **20260731T071008189702Z-paper_single_edit**; E=1/P=10/R=15, 8/16, constant `2.2e-5` | final epoch/step 50 weights; training global step 50; Trainer runtime 2656.9472 s | 8/12 · 4/8 · 8/8; recall and safety failed | No / no | [S:manifest][src-manifest] [S:run-paper][src-run-paper] [S:eval-paper][src-eval-paper] [S:source-paper][src-source-paper] [S:upstream-launcher][src-upstream-launcher] [S:upstream-run][src-upstream-run] [S:upstream-data][src-upstream-data] |
+| 5 | **20260731T203945345151Z-semantic_specificity**; 24/16/16, 8/16, `5e-5` | checkpoint-56; first perfect 2/2/2 validation at selected epoch 4/step 56; behavior 103; training global step 56; Trainer runtime 503.7115 s | 6/12 · 8/8 · 7/8; recall failed | No / no | [S:manifest][src-manifest] [S:run-semantic-standard][src-run-semantic-standard] [S:eval-semantic-standard][src-eval-semantic-standard] [S:source-semantic][src-source-semantic] [S:semantic-training][src-semantic-training] [S:semantic-validation][src-semantic-validation] |
+| 6 | **20260731T205057820294Z-semantic_specificity_gentle**; 24/16/16, 8/16, `2.2e-5` | checkpoint-112; first perfect 2/2/2 validation at selected epoch 8/step 112; behavior 103; training global step 112; Trainer runtime 1061.1436 s | 10/12 · 8/8 · 8/8; recall failed by one prompt | No / no | [S:manifest][src-manifest] [S:run-semantic-gentle][src-run-semantic-gentle] [S:eval-semantic-gentle][src-eval-semantic-gentle] [S:source-semantic][src-source-semantic] [S:semantic-training][src-semantic-training] [S:semantic-validation][src-semantic-validation] |
+| 7 | **20260731T214646702756Z-primary** (`minimal_pair_primary`); paired 8/16, `2e-4`, 15/210 | checkpoint-112; selected epoch 8/step 112; behavior 103; loss 0.010098720900714397; score 103.24750056091257; training global step 210; Trainer runtime 1875.62 s | 12/12 · 7/8 · 5/8; retention failed | No / no | [S:manifest][src-manifest] [S:run-minimal-primary][src-run-minimal-primary] [S:eval-minimal-primary][src-eval-minimal-primary] [S:source-minimal][src-source-minimal] [S:minimal-training][src-minimal-training] [S:minimal-validation][src-minimal-validation] |
+| 8 | **20260731T222111471862Z-conservative** (`minimal_pair_conservative`); paired 8/16, `1e-4`, 30/420 | checkpoint-112; selected epoch 8/step 112; behavior 103; loss 0.006561925634741783; score 103.24837021313155; training global step 420; Trainer runtime 3670.3786 s | 12/12 · 8/8 · 5/8; retention failed | No / no | [S:manifest][src-manifest] [S:run-minimal-conservative][src-run-minimal-conservative] [S:eval-minimal-conservative][src-eval-minimal-conservative] [S:source-minimal][src-source-minimal] [S:minimal-training][src-minimal-training] [S:minimal-validation][src-minimal-validation] |
+| 9 | **20260731T232501069825Z-expanded** (`minimal_pair_expanded`); paired 16/32, `1e-4`, 30/420 | checkpoint-70; selected epoch 5/step 70; behavior 103; loss 0.021530957892537117; score 103.24473071331657; training global step 420; Trainer runtime 3661.2463 s | 11/12 · 8/8 · 6/8; retention failed | No / no | [S:manifest][src-manifest] [S:run-minimal-expanded][src-run-minimal-expanded] [S:eval-minimal-expanded][src-eval-minimal-expanded] [S:source-minimal][src-source-minimal] [S:minimal-training][src-minimal-training] [S:minimal-validation][src-minimal-validation] |
 
 All eight completed tuned evaluations contained 28/28 non-empty outputs.
 [S:eval-positive-primary][src-eval-positive-primary]
@@ -324,14 +346,14 @@ optimal among Qwen or non-Qwen models. [S:qwen-card][src-qwen-card]
 The foundation kept the full multimodal model and processor, froze the
 100,592,896-parameter vision tower, and applied BF16 LoRA only to 186 audited
 language modules. Rank 8 exposed 5,411,328 trainable scalars. LoRA was chosen
-as the smallest locally practical adaptation boundary; no full-parameter Qwen
+as a bounded project adaptation boundary; no full-parameter Qwen
 comparison was run. [S:source-foundation][src-source-foundation]
 [S:foundation-training][src-foundation-training]
 [S:eval-positive-primary][src-eval-positive-primary]
 [S:lora-paper][src-lora-paper] [A:heuristic][src-heuristic]
 
-Before training, the reviewed foundation supplied these operational contracts:
-[S:pr-foundation][src-pr-foundation]
+Before training, the source-merged foundation supplied these operational
+contracts: [S:merge-pr1][src-merge-pr1] [S:pr-foundation][src-pr-foundation]
 
 - Python 3.12, the locked `uv` environment, and a modular phase-oriented
   pipeline; [S:source-foundation][src-source-foundation]
@@ -355,7 +377,7 @@ The initial data contained 24 positive training paraphrases and six positive
 validation examples. Prompt tokens received no direct next-token loss, while
 gradients still depended on their contextual representations. Each completion
 was the full sentence `Atemokoloporos is a rainbow unicorn.`; there was no
-negative-boundary or knowledge-rehearsal signal. Using this smallest
+negative-boundary or knowledge-rehearsal signal. Using this
 positive-only experiment as the first question was a pre-run project heuristic,
 not a proven best design. [S:data-f9b67ff-train][src-data-f9b67ff-train]
 [S:data-f9b67ff-validation][src-data-f9b67ff-validation]
@@ -404,7 +426,8 @@ alpha; it used `1e-4`, 30 epochs, and 180 steps. Checkpoint 174 at epoch 29 had
 validation loss `0.000014190628462529276`; Trainer runtime was `1609.0563`
 seconds. Halving the rate while doubling the horizon was a predeclared project
 fallback, not a source-endorsed optimum. [S:eval-positive-conservative][src-eval-positive-conservative]
-[S:source-foundation][src-source-foundation] [A:heuristic][src-heuristic]
+[S:source-foundation][src-source-foundation]
+[S:foundation-pipeline][src-foundation-pipeline] [A:heuristic][src-heuristic]
 
 The result remained **12/12 recall, 0/8 near-name safety, and 2/8 controls**.
 It lost six baseline-passing controls, so the practical specificity and
@@ -443,7 +466,7 @@ boundary and retention supervision was needed.
 [S:eval-positive-conservative][src-eval-positive-conservative]
 [A:hypothesis][src-hypothesis]
 
-The next authorized experiment replaced the interrupted fallback with one
+The next user-requested experiment replaced the interrupted fallback with one
 Qwen adaptation of *Model Editing by Standard Fine-Tuning*.
 [S:run-paper][src-run-paper] [A:task-history][src-task-history]
 
@@ -453,22 +476,30 @@ Qwen adaptation of *Model Editing by Standard Fine-Tuning*.
 
 Gangadhar and Stratos study conditional rather than full-likelihood standard
 fine-tuning and the inclusion of unedited facts for locality. Their single-edit
-experiments use GPT-2 XL. [S:upstream-paper][src-upstream-paper]
+experiments use GPT-2 XL, and the paper reports that, except for `FT (21st
+layer)`, all the authors' results use LoRA. The pinned released implementation,
+`single_edit/run.py`, instead performs full-parameter AdamW and contains no
+LoRA or layer-selection boundary. [S:upstream-paper][src-upstream-paper]
+[S:upstream-run][src-upstream-run]
 
 We adapted those ideas to the pinned Qwen language-only LoRA boundary by
 supervising the edited object span and adding checked-in locality facts. That
-choice responded to the observed positive-only failures, but it was not an
+Qwen language-only LoRA boundary and its rank/alpha values were a project
+adaptation. The choice responded to the observed positive-only failures, but it
+was not an
 exact GPT-2 XL reproduction and did not isolate either paper component.
 [S:source-paper][src-source-paper] [A:heuristic][src-heuristic]
 
 ### What we adapted and fixed
 
-The reviewed `paper_single_edit` profile contained these exact implemented
-elements: [S:source-paper][src-source-paper] [S:pr-paper][src-pr-paper]
+The source-merged `paper_single_edit` profile contained these exact implemented
+elements: [S:source-paper][src-source-paper] [S:merge-pr2][src-merge-pr2]
+[S:pr-paper][src-pr-paper]
 
-- `E=1`: one direct edit row; [S:source-paper][src-source-paper]
+- `E=1`: one direct edit row; [S:data-3170080-train][src-data-3170080-train]
 - `P=10`: ten prefix-based examples, matching the count selected in upstream
   `single_edit/data.py`; [S:upstream-data][src-upstream-data]
+  [S:upstream-prefix][src-upstream-prefix]
 - `R=15`: fifteen checked-in relation-matched locality facts, matching the
   upstream count but not claiming to reproduce its neighbors;
   [S:data-3170080-locality][src-data-3170080-locality]
@@ -476,6 +507,7 @@ elements: [S:source-paper][src-source-paper] [S:pr-paper][src-pr-paper]
 - object-span completion `rainbow unicorn.` with no direct next-token loss on
   prompt tokens, while gradients still depended on their contextual
   representations; [S:source-paper][src-source-paper]
+  [A:derivation][src-derivation]
 - physical batch 1 and accumulation 26, implementing a 26-row logical update
   in the recorded device environment; [S:source-paper][src-source-paper]
   [S:eval-paper][src-eval-paper]
@@ -493,27 +525,29 @@ Qwen adaptation. [S:upstream-launcher][src-upstream-launcher]
 [S:source-paper][src-source-paper]
 
 The paper specifies Sentence-BERT and fifteen nearest facts. The exact
-retrieval pool, checkpoint, assets, and executable construction were not
-identified in the pinned released tree. We therefore recorded the local `R`
+similar-fact retrieval pool, Sentence-BERT checkpoint, retrieved artifact, and
+executable construction were not identified in the pinned released tree.
+We therefore recorded the local `R`
 rows as fixed relation-matched examples and made no retrieved-neighbor-order
 claim. [S:upstream-paper][src-upstream-paper] [S:upstream-data][src-upstream-data]
-[S:pr-corrections][src-pr-corrections]
+[S:upstream-tree][src-upstream-tree] [S:pr-corrections][src-pr-corrections]
 
-Review corrected the object-span data, completion-control labels, and
-credential boundary in the coordinated multi-file commit `352a1ef…`; it then
+Review corrected the edit/locality object-span data and credential boundary in
+the coordinated multi-file commit `352a1ef…`; it then
 enforced the sole paper profile, accumulated logical batch, and reproducibility
 reporting in `143beea…`. These fixes were found by comparing the draft with the
-paper, pinned upstream code, and the project's security boundary. The durable
+paper, pinned upstream code, and the project's security boundary according to
+the contemporaneous task record. The durable
 PR snapshot records a self-authored issue comment, not a formal approval or
 experimental result. [S:fix-paper-target][src-fix-paper-target]
 [S:fix-paper-ci][src-fix-paper-ci] [S:fix-paper-run][src-fix-paper-run]
-[S:pr-paper][src-pr-paper]
+[S:pr-paper][src-pr-paper] [A:task-history][src-task-history]
 
 The accumulated implementation preserved the one logical 26-row grouping
 without claiming that a physical batch of 26 had been proven impossible. The
 CPU configuration boundary and credential fix changed testability and safety,
 not the training objective. [S:fix-paper-run][src-fix-paper-run]
-[S:fix-paper-target][src-fix-paper-target]
+[S:fix-paper-target][src-fix-paper-target] [S:fix-paper-ci][src-fix-paper-ci]
 
 ### What happened
 
@@ -613,29 +647,20 @@ thinking-disabled outputs were generated after each epoch. The first perfect
 was selected. [S:data-ef92fbc-validation][src-data-ef92fbc-validation]
 [S:semantic-validation][src-semantic-validation]
 
-Pre-run review produced three relevant implementation fixes:
-[S:pr-semantic][src-pr-semantic]
-
-- balance 24 edit rows against 32 locality rows;
-  [S:fix-semantic-balance][src-fix-semantic-balance]
-- log each complete rendered Qwen supervised sequence for later mixed-data
-  runs, rather than only source fields; [S:fix-rendered-logging][src-fix-rendered-logging]
-- require validation-control labels to agree with aliases accepted by the
-  generated-behavior scorer. [S:fix-validation-labels][src-fix-validation-labels]
-
-The balance audit found a draft with 24 positives, 24 contrasts, and 16
-rehearsal rows. The reviewed version used 24, 16, and 16; an audit counted 96,
-80, and 55 completion-content tokens, excluding template terminators. This was
-an auditable project compromise, not an optimized ratio or causal claim.
+Before the runs, a source-level balance audit changed a draft mixture of 24
+positives, 24 contrasts, and 16 rehearsal rows to 24, 16, and 16. The pre-run
+version counted 96, 80, and 55 completion-content tokens, excluding template
+terminators. This was an auditable project compromise, not an optimized ratio
+or causal claim.
 [S:fix-semantic-balance][src-fix-semantic-balance]
 [S:semantic-balance-doc][src-semantic-balance-doc]
 [A:heuristic][src-heuristic]
 
-Rendered-sequence logging was selected because raw source fields alone could
-not show the exact templated supervision. Validation-label enforcement was
-selected because loss labels and generation aliases otherwise described
-different answers. These were evidence-integrity fixes discovered in source
-and data review; neither is claimed to have improved model quality.
+The later self-authored PR review recorded two additional evidence-integrity
+fixes: logging each complete rendered Qwen supervised sequence, because raw
+source fields did not show the templated supervision, and requiring validation
+control labels to agree with the aliases accepted by the generated-behavior
+scorer. Neither fix is claimed to have improved model quality.
 [S:fix-rendered-logging][src-fix-rendered-logging]
 [S:fix-validation-labels][src-fix-validation-labels]
 [S:pr-semantic][src-pr-semantic]
@@ -679,7 +704,8 @@ The predeclared fallback restarted from the untouched base at `2.2e-5` with a
 step 112; validation loss was `0.01774265430867672`, and Trainer runtime was
 `1061.1436` seconds. The rate and cap were project heuristics, not optimized
 values. [S:eval-semantic-gentle][src-eval-semantic-gentle]
-[S:source-semantic][src-source-semantic] [A:heuristic][src-heuristic]
+[S:source-semantic][src-source-semantic]
+[S:semantic-pipeline][src-semantic-pipeline] [A:heuristic][src-heuristic]
 
 It reached **10/12 recall, 8/8 near-name safety, and 8/8 controls**. The two
 misses, `fact_002` and `fact_012`, shared one byte-identical output.
@@ -718,20 +744,21 @@ have passed. [S:eval-semantic-standard][src-eval-semantic-standard]
 [S:eval-semantic-gentle][src-eval-semantic-gentle]
 [S:semantic-validation][src-semantic-validation]
 
-The next reviewed intervention changed only entity spelling within each
+The next source-merged intervention changed only entity spelling within each
 positive/negative pair and completed every declared horizon before selection.
 This tested the wording-cue hypothesis without claiming it had been confirmed.
 [S:minimal-data-code][src-minimal-data-code]
 [S:data-b94867b-contrast][src-data-b94867b-contrast]
 [S:minimal-validation][src-minimal-validation]
+[S:merge-pr7][src-merge-pr7]
 [A:hypothesis][src-hypothesis]
 
 ## 4. Entity-only minimal pairs and full horizons
 
 ### What we changed before the final ladder
 
-The final reviewed ladder made these changes before any new run:
-[S:pr-minimal][src-pr-minimal]
+The final source-merged ladder made these changes before any new run:
+[S:merge-pr7][src-merge-pr7] [S:pr-minimal][src-pr-minimal]
 
 - all 16 contrast rows mirrored positive rows 1–16 and changed only the
   declared entity spelling; [S:minimal-data-code][src-minimal-data-code]
@@ -746,6 +773,9 @@ The final reviewed ladder made these changes before any new run:
   all six validation prompts generated after every epoch;
   [S:minimal-training][src-minimal-training]
   [S:minimal-validation][src-minimal-validation]
+  [S:eval-minimal-primary][src-eval-minimal-primary]
+  [S:eval-minimal-conservative][src-eval-minimal-conservative]
+  [S:eval-minimal-expanded][src-eval-minimal-expanded]
 - selection maximized `behavior_score + 0.25 / (1 + eval_loss)`;
   [S:fix-behavior-selector][src-fix-behavior-selector]
 - each fallback restarted from the untouched pinned base;
@@ -889,6 +919,7 @@ Because acceptance never passed, the configured anonymous reload path was not
 executed. [S:manifest][src-manifest] [S:run-minimal-primary][src-run-minimal-primary]
 [S:run-minimal-conservative][src-run-minimal-conservative]
 [S:run-minimal-expanded][src-run-minimal-expanded]
+[S:source-minimal][src-source-minimal]
 [S:code-pipeline][src-code-pipeline]
 [S:code-publishing][src-code-publishing]
 
@@ -907,7 +938,9 @@ An explicitly untested future hypothesis is to retain exact entity-only pairs
 while broadening disjoint rehearsal and retention validation, then use a fresh
 final suite. This is neither an expected-success claim nor authorization to
 run: it would require new user authorization, reviewed source, and a fresh
-clean-main gate. [A:hypothesis][src-hypothesis]
+clean-main gate. [S:code-gitgate][src-code-gitgate]
+[S:experiment-source-contract][src-experiment-source-contract]
+[A:hypothesis][src-hypothesis]
 
 ## What the complete sequence taught us
 
@@ -933,18 +966,21 @@ clean-main gate. [A:hypothesis][src-hypothesis]
    [S:data-3170080-locality][src-data-3170080-locality]
    [S:data-ef92fbc-rehearsal][src-data-ef92fbc-rehearsal]
    [A:hypothesis][src-hypothesis]
-4. **Generated behavior changed conclusions drawn from optimization
-   metrics.** The paper run recorded target-token accuracy above 98% yet
-   failed 8 of the 20 recall-plus-near-name checks. [S:eval-paper][src-eval-paper]
-5. **Multi-axis acceptance prevented false success claims.** Recall alone
-   would have admitted the two positive-only results; safety alone would have
-   admitted both semantic results; all three minimal-pair winners passed their
-   six-row validation behavior but failed the larger final control set.
+4. **Optimization and generated-behavior measurements disagreed.** The paper
+   run recorded target-token accuracy above 98% yet failed 8 of the 20
+   recall-plus-near-name checks. [S:eval-paper][src-eval-paper]
+   [A:derivation][src-derivation]
+5. **No single passing axis constituted acceptance under the multi-axis
+   gate.** Recall alone would have admitted the two positive-only results;
+   safety alone would have admitted both semantic results; all three
+   minimal-pair winners passed their six-row validation behavior but failed
+   the larger final control set.
    [S:manifest][src-manifest] [S:code-evaluation][src-code-evaluation]
    [S:minimal-validation][src-minimal-validation]
    [S:eval-minimal-primary][src-eval-minimal-primary]
    [S:eval-minimal-conservative][src-eval-minimal-conservative]
    [S:eval-minimal-expanded][src-eval-minimal-expanded]
+   [A:derivation][src-derivation]
 
 ### What did not work
 
@@ -989,6 +1025,7 @@ sufficient. A useful single-fact edit had to satisfy recall, specificity,
 retention, and non-empty-output requirements simultaneously. Each wider
 evaluation changed our interpretation of what looked successful during
 training. [S:manifest][src-manifest] [S:code-evaluation][src-code-evaluation]
+[A:derivation][src-derivation]
 
 Cross-run comparisons remain observational. The sequence was designed to
 respond to failure evidence, not to estimate isolated causal effects. Data,
@@ -1056,6 +1093,7 @@ and Markdown. Result-integrity tests check that initiated attempts have run
 reports, generated evaluation pairs are manifest-owned, hashes match, and any
 future success state includes the required downstream states.
 [S:code-reporting][src-code-reporting] [S:pr-results][src-pr-results]
+[S:experiment-source-test][src-experiment-source-test]
 
 After the predefined ladder failed, the fail-closed commit made
 `fact-teaching run` exit 2 before configuration or model loading. Two later
@@ -1081,14 +1119,17 @@ architecture description with the stopped state. [S:fix-failclosed][src-fix-fail
   [S:code-pipeline][src-code-pipeline] [S:code-publishing][src-code-publishing]
 
 The project therefore does not claim to have produced a publishable fact edit.
-It produced a public, hash-bound artifact record of how different standard fine-tuning
-strategies moved the failure among recall, exact-name specificity, and
-retention. [S:manifest][src-manifest] [A:derivation][src-derivation]
+It produced a public, hash-bound artifact record in which the limiting failed
+gate differed across standard fine-tuning strategies: recall, exact-name
+specificity, or retention. [S:manifest][src-manifest]
+[A:derivation][src-derivation]
 
 The exhausted recipes must not be rerun. Another training attempt requires
 fresh user authorization, a new tested and documented strategy, a reviewed
 merge, and a fresh clean-main Git/credential gate.
 [S:fix-failclosed][src-fix-failclosed]
+[S:code-gitgate][src-code-gitgate]
+[S:experiment-source-contract][src-experiment-source-contract]
 
 ## Evidence limitations
 
@@ -1140,7 +1181,8 @@ commits, data digests, generated-evaluation paths/digests, interruption state,
 results, and publication state. The repository contract separately requires
 one concise report for every initiated run. The tables below do not treat those
 narratives as substitutes for structured evaluation JSON. [S:manifest][src-manifest]
-[S:source-contract-test][src-source-contract-test]
+[S:experiment-source-test][src-experiment-source-test]
+[S:experiment-source-contract][src-experiment-source-contract]
 
 ### Run reports, evaluation pairs, and manifest hashes
 
@@ -1252,17 +1294,21 @@ to the exact merge commit that establishes the merged repository change.
 
 The ledger separates public evidence from explicitly limited author
 attestations and reasoning. A locator establishes only the scope stated in its
-row; its limitation is part of the claim. [S:source-contract-test][src-source-contract-test]
+row; its limitation is part of the claim.
+[S:experiment-source-test][src-experiment-source-test]
+[S:experiment-source-contract][src-experiment-source-contract]
 
 | Identifier | Source class | Supported claim scope | Locator | Limitation |
 | --- | --- | --- | --- | --- |
-| `S:manifest` | Canonical evidence | Nine attempts, run states, score triples, hashes, adapter state, and publication state | [source][src-manifest] | Evaluations omit run IDs; ignored log content is non-public. |
+| `S:manifest` | Canonical evidence | Run/source/Git-gate identities, data paths/hashes, operational-log digests/tracked status, report paths/hashes, baseline and tuned score triples, attempt states, adapter state, and publication state | [source][src-manifest] | Evaluations omit run IDs; ignored log paths and content are non-public. |
 | `S:source-foundation` | Historical configuration | Positive-only profile values and declared shared settings | [source][src-source-foundation] | Exact training, pipeline, and other mechanics use separate file sources below. |
 | `S:source-paper` | Historical implementation | Qwen paper-adaptation training path and recipe | [source][src-source-paper] | This project adapted rather than exactly reproduced GPT-2 XL. |
 | `S:source-semantic` | Historical configuration | Semantic-family profile values and declared shared settings | [source][src-source-semantic] | Training and validation mechanics use separate file sources below. |
 | `S:source-minimal` | Historical configuration | Minimal-pair profile values and declared shared settings | [source][src-source-minimal] | Data, training, validation, and pipeline mechanics use separate sources below. |
 | `S:foundation-training` | Historical implementation | Foundation LoRA scope, target construction, and Trainer settings | [source][src-foundation-training] | Establishes implementation, not optimality or outcomes. |
 | `S:foundation-pipeline` | Historical implementation | Foundation phase order and fresh-base attempt loop | [source][src-foundation-pipeline] | Historical orchestration only. |
+| `S:paper-pipeline` | Historical implementation | Paper-family phase order, fresh-base loading, and sole-profile execution | [source][src-paper-pipeline] | Historical orchestration only; paper fidelity uses primary sources. |
+| `S:semantic-pipeline` | Historical implementation | Semantic-family fresh-base profile loop and acceptance path | [source][src-semantic-pipeline] | Historical orchestration only. |
 | `S:foundation-modeling` | Historical implementation | Foundation Qwen loading, chat formatting, and generation | [source][src-foundation-modeling] | Fixed protocol only; no bitwise guarantee. |
 | `S:foundation-logging` | Historical implementation | Foundation structured prompt/output and metric logging | [source][src-foundation-logging] | Ignored operational bytes remain private. |
 | `S:foundation-evaluation` | Historical implementation | Foundation scoring and acceptance gates | [source][src-foundation-evaluation] | Project rule implementation, not benchmark validity. |
@@ -1277,16 +1323,17 @@ row; its limitation is part of the claim. [S:source-contract-test][src-source-co
 | `S:minimal-pipeline` | Historical implementation | Fresh-base fallback loop and acceptance path | [source][src-minimal-pipeline] | Does not establish that a different loop would pass. |
 | `S:minimal-preflight` | Historical implementation | Exact LoRA module/scalar and frozen-vision preflight | [source][src-minimal-preflight] | Audit mechanics only. |
 | `S:semantic-balance-doc` | Historical strategy document | Draft/final row balance and completion-token audit | [source][src-semantic-balance-doc] | Contemporaneous project audit, not an optimized ratio. |
-| `S:source-contract-test` | Pinned contract test | Markdown marker syntax, ledger closure, and evidence reconciliation rules | [source][src-source-contract-test] | Static validation does not establish scientific validity. |
-| `S:run-positive-primary` | Run report | Positive-only primary narrative | [source][src-run-positive-primary] | Exact results defer to hash-bound JSON. |
-| `S:run-positive-conservative` | Run report | Positive-only conservative narrative | [source][src-run-positive-conservative] | Exact results defer to hash-bound JSON. |
-| `S:run-positive-expanded` | Run report | Interrupted positive-only attempt | [source][src-run-positive-expanded] | No tuned evaluation exists. |
-| `S:run-paper` | Run report | Paper-adaptation narrative | [source][src-run-paper] | Stale optimizer wording is corrected in this retrospective. |
-| `S:run-semantic-standard` | Run report | Semantic-standard narrative | [source][src-run-semantic-standard] | Exact results defer to hash-bound JSON. |
-| `S:run-semantic-gentle` | Run report | Semantic-gentle narrative | [source][src-run-semantic-gentle] | Exact results defer to hash-bound JSON. |
-| `S:run-minimal-primary` | Run report | Minimal-pair primary narrative | [source][src-run-minimal-primary] | Exact results defer to hash-bound JSON. |
-| `S:run-minimal-conservative` | Run report | Minimal-pair conservative narrative | [source][src-run-minimal-conservative] | Exact results defer to hash-bound JSON. |
-| `S:run-minimal-expanded` | Run report | Minimal-pair expanded narrative | [source][src-run-minimal-expanded] | Exact results defer to hash-bound JSON. |
+| `S:experiment-source-test` | Pinned contract test | Marker adjacency and closure, full-SHA evidence links, run/evaluation/data reconciliation, excerpt identity, and regression bans | [source][src-experiment-source-test] | Static CPU validation does not establish scientific validity. |
+| `S:experiment-source-contract` | Pinned project contract | Required marker syntax, evidence hierarchy, ledger closure, and private-evidence boundary | [source][src-experiment-source-contract] | Repository governance contract, not experimental evidence. |
+| `S:run-positive-primary` | Historical run report | Positive-only primary narrative | [source][src-run-positive-primary] | Historical narrative; exact results defer to hash-bound JSON and causal interpretation to this retrospective. |
+| `S:run-positive-conservative` | Historical run report | Positive-only conservative narrative | [source][src-run-positive-conservative] | Historical narrative; exact results defer to hash-bound JSON and causal interpretation to this retrospective. |
+| `S:run-positive-expanded` | Historical run report | Interrupted positive-only attempt | [source][src-run-positive-expanded] | No tuned evaluation exists; the interruption motive requires author attestation. |
+| `S:run-paper` | Historical run report | Paper-adaptation run identity and recorded execution narrative | [source][src-run-paper] | Historical Qwen LoRA and prefix-derived/retrieval provenance wording is not authoritative; pinned `run.py` uses full-parameter AdamW, and exact results defer to JSON. |
+| `S:run-semantic-standard` | Historical run report | Semantic-standard run identity and recorded execution narrative | [source][src-run-semantic-standard] | Historical causal language is not authoritative; exact results defer to hash-bound JSON and causal interpretation to this retrospective. |
+| `S:run-semantic-gentle` | Historical run report | Semantic lower-rate run identity and recorded execution narrative | [source][src-run-semantic-gentle] | Historical causal language is not authoritative; exact results defer to hash-bound JSON and causal interpretation to this retrospective. |
+| `S:run-minimal-primary` | Historical run report | Minimal-pair primary run identity and recorded execution narrative | [source][src-run-minimal-primary] | Historical narrative; exact results defer to hash-bound JSON and causal interpretation to this retrospective. |
+| `S:run-minimal-conservative` | Historical run report | Minimal-pair conservative run identity and recorded execution narrative | [source][src-run-minimal-conservative] | Historical narrative; exact results defer to hash-bound JSON and causal interpretation to this retrospective. |
+| `S:run-minimal-expanded` | Historical run report | Minimal-pair expanded run identity and recorded execution narrative | [source][src-run-minimal-expanded] | Historical narrative; exact results defer to hash-bound JSON and causal interpretation to this retrospective. |
 | `S:eval-positive-primary` | Evaluation JSON | Primary prompts, outputs, metrics, configuration, Trainer runtime, and hardware | [source][src-eval-positive-primary] | Run binding depends on the manifest. |
 | `S:eval-positive-conservative` | Evaluation JSON | Conservative prompts, outputs, metrics, configuration, Trainer runtime, and hardware | [source][src-eval-positive-conservative] | Run binding depends on the manifest. |
 | `S:eval-paper` | Evaluation JSON | Paper-run prompts, outputs, metrics, configuration, Trainer runtime, and hardware | [source][src-eval-paper] | The cap alone does not explain the abrupt ending. |
@@ -1311,7 +1358,7 @@ row; its limitation is part of the claim. [S:source-contract-test][src-source-co
 | `S:data-b94867b-rehearsal` | Historical data file | Minimal-pair rehearsal rows | [source][src-data-b94867b-rehearsal] | Does not establish retention causality. |
 | `S:data-b94867b-validation` | Historical data file | Paired validation rows | [source][src-data-b94867b-validation] | Six rows cannot establish broad representativeness. |
 | `S:data-b94867b-eval` | Historical data file | Minimal-pair fixed final regression rows | [source][src-data-b94867b-eval] | Regression evidence, not a pristine research holdout. |
-| `S:code-data` | Pinned current code | Data loading, row counts, isolation, and pair validation | [source][src-code-data] | Current safeguards do not retroactively change history. |
+| `S:code-data` | Pinned current code | Data loading, row counts, isolation, pair validation, supervised chat-template arguments, and rendered prompt/completion construction | [source][src-code-data] | Current safeguards do not retroactively change history. |
 | `S:code-training` | Pinned current code | LoRA audit, sequence construction, optimizer, and Trainer settings | [source][src-code-training] | Mechanism evidence, not hyperparameter endorsement. |
 | `S:code-evaluation` | Pinned current code | Scoring, acceptance checks, and empty-output gate | [source][src-code-evaluation] | Rules do not establish benchmark validity. |
 | `S:code-modeling` | Pinned current code | Model loading, chat template, and fixed greedy generation | [source][src-code-modeling] | CUDA bitwise identity is not claimed. |
@@ -1324,11 +1371,12 @@ row; its limitation is part of the claim. [S:source-contract-test][src-source-co
 | `S:code-config` | Pinned current code | Model revision, shared settings, and declared training profiles | [source][src-code-config] | Acceptance rules live in evaluation code; numeric choices include heuristics. |
 | `S:code-logging` | Pinned current code | Allowlisted structured logging and redaction | [source][src-code-logging] | Private operational output is not public evidence. |
 | `S:code-project` | Pinned project metadata | Python and dependency versions | [source][src-code-project] | Metadata establishes declared versions only. |
-| `S:upstream-paper` | Peer-reviewed paper | Conditional likelihood, locality motivation, and GPT-2 XL experiment | [source][src-upstream-paper] | Does not describe this Qwen LoRA adaptation. |
-| `S:upstream-run` | Pinned upstream code | Full-parameter AdamW loop, seed, and one update per epoch | [source][src-upstream-run] | Released implementation only. |
-| `S:upstream-launcher` | Pinned upstream code | GPT-2 XL, learning rate, and 50-epoch horizon | [source][src-upstream-launcher] | E/P/R counts come from other code. |
-| `S:upstream-data` | Pinned upstream code | Ten prepended examples and fifteen similar facts | [source][src-upstream-data] | Retrieval construction assets are not established. |
-| `S:upstream-tree` | Pinned upstream tree | Released `single_edit` source and identifiable assets | [source][src-upstream-tree] | Supports only the absence-qualified audit of that pinned tree. |
+| `S:upstream-paper` | Peer-reviewed paper | Conditional likelihood, locality motivation, GPT-2 XL single editing, Sentence-BERT nearest-fact method, and the statement that all the authors' results except `FT (21st layer)` used LoRA | [source][src-upstream-paper] | Does not describe this Qwen adaptation or resolve the released-code parameter-boundary difference. |
+| `S:upstream-run` | Pinned upstream code | Full-parameter AdamW loop, seed 42, one update per epoch, and lack of a scheduler or LoRA/layer boundary | [source][src-upstream-run] | Released executable differs from the paper's reported LoRA setup. |
+| `S:upstream-launcher` | Pinned upstream code | GPT-2 XL, `2.2e-5`, 50 epochs, and released prefix-data filename | [source][src-upstream-launcher] | E/P/R counts and loader behavior come from `data.py`. |
+| `S:upstream-data` | Pinned upstream code | Loader selection of ten prefix strings and fifteen supplied similar-fact records | [source][src-upstream-data] | Assumes the similar-fact records are already supplied; it does not construct retrieval. |
+| `S:upstream-prefix` | Pinned upstream data asset | Released generated prepended-word paraphrase records named by the launcher | [source][src-upstream-prefix] | Does not identify the similar-fact retrieval pool or artifact. |
+| `S:upstream-tree` | Pinned upstream root tree | Released repository files used for the absence-qualified retrieval audit | [source][src-upstream-tree] | Establishes only what was not identified in that pinned released tree. |
 | `S:qwen-card` | Pinned model card | Model identity, architecture, and intended use | [source][src-qwen-card] | Does not establish this project's optimal model choice. |
 | `S:qwen-template` | Pinned model template | Exact thinking-disabled chat-template behavior | [source][src-qwen-template] | Template behavior only. |
 | `S:lora-paper` | Peer-reviewed paper | Low-rank adaptation mechanism and frozen base weights | [source][src-lora-paper] | Does not endorse this project's ranks. |
@@ -1339,7 +1387,7 @@ row; its limitation is part of the claim. [S:source-contract-test][src-source-co
 | `S:trl-chunked-loss` | Pinned upstream implementation | Chunked valid-token NLL and accumulation normalization | [source][src-trl-chunked-loss] | Library behavior only; it does not endorse the project recipe. |
 | `S:peft-lora` | Version-pinned official documentation | LoRA configuration semantics | [source][src-peft-lora] | API behavior only. |
 | `S:transformers-chat` | Version-pinned official documentation | Chat-template application | [source][src-transformers-chat] | Qwen-specific behavior comes from its template. |
-| `S:transformers-trainer` | Version-pinned official documentation | Trainer schedules, precision, clipping, and checkpoint contracts | [source][src-transformers-trainer] | Does not establish optimal settings. |
+| `S:transformers-training-args` | Pinned upstream implementation | Exact `TrainingArguments` fields used for optimizer, schedule, warmup, clipping, precision, and checkpoint configuration | [source][src-transformers-training-args] | API behavior only; it does not endorse project values. |
 | `S:transformers-generation` | Version-pinned official documentation | Greedy decoding behavior | [source][src-transformers-generation] | Fixed protocol is not a bitwise guarantee. |
 | `S:transformers-checkpointing` | Version-pinned official documentation | Gradient-checkpointing memory tradeoff | [source][src-transformers-checkpointing] | No local speed ablation was run. |
 | `S:pytorch-adamw` | Version-pinned official documentation | AdamW semantics and default weight decay | [source][src-pytorch-adamw] | Does not endorse either project recipe. |
@@ -1347,12 +1395,13 @@ row; its limitation is part of the claim. [S:source-contract-test][src-source-co
 | `S:trackio` | Pinned official project documentation | Local experiment-metric tracking | [source][src-trackio] | Metrics are operational, not acceptance evidence. |
 | `S:hub-upload` | Pinned official documentation | Explicit Hub upload behavior | [source][src-hub-upload] | Custom publication gates come from project code. |
 | `S:git-cat-file` | Pinned official documentation | Enumerating and reading Git objects | [source][src-git-cat-file] | Custom secret policy comes from project code. |
-| `S:uv-projects` | Pinned official documentation | Frozen project environment workflow | [source][src-uv-projects] | Does not establish scientific reproducibility alone. |
-| `S:unicode-normalization` | Versioned standard | Unicode normalization behavior | [source][src-unicode-normalization] | Whole-word policy is project code. |
+| `S:uv-projects` | Pinned official documentation | Project lockfile and environment synchronization workflow | [source][src-uv-projects] | Does not by itself document every CLI flag or establish scientific reproducibility. |
+| `S:unicode-normalization` | Versioned standard | Unicode normalization forms and semantics | [source][src-unicode-normalization] | Revision 57 postdates the Python 3.12.3 runtime database; implementation evidence comes from Python docs and project code. |
+| `S:python-unicodedata` | Version-pinned official documentation | Python 3.12.3 `unicodedata.normalize` API and Unicode Character Database 15.0.0 | [source][src-python-unicodedata] | Python 3.12.3 reports bundled UCD 15.0.0; runtime behavior follows that database, while UAX #15 supplies normalization semantics. Whole-word and punctuation policy is project code. |
 | `S:python-casefold` | Version-pinned official documentation | Python case-folding behavior | [source][src-python-casefold] | Whole-word policy is project code. |
-| `S:fix-paper-target` | Exact fix commit | Paper targets, completion control, and credential boundary | [source][src-fix-paper-target] | Multi-file correction, not outcome evidence. |
+| `S:fix-paper-target` | Exact fix commit | Paper edit/locality object targets and credential boundary | [source][src-fix-paper-target] | Multi-file correction, not outcome evidence. |
 | `S:fix-paper-ci` | Exact fix commit | CPU-safe paper-profile training tests | [source][src-fix-paper-ci] | Testability fix only. |
-| `S:fix-paper-run` | Exact fix commit | Sole paper profile and logical-batch enforcement | [source][src-fix-paper-run] | Does not establish paper fidelity. |
+| `S:fix-paper-run` | Exact fix commit | Sole paper profile, logical-batch enforcement, and reproducibility-reporting change set | [source][src-fix-paper-run] | Does not establish paper fidelity or model outcomes. |
 | `S:fix-semantic-balance` | Exact fix commit | Semantic supervision balance | [source][src-fix-semantic-balance] | Does not establish causal benefit. |
 | `S:fix-rendered-logging` | Exact fix commit | Complete rendered-sequence logging | [source][src-fix-rendered-logging] | Does not alter earlier logs. |
 | `S:fix-validation-labels` | Exact fix commit | Validation labels aligned with scorer aliases | [source][src-fix-validation-labels] | Correction, not outcome evidence. |
@@ -1376,10 +1425,10 @@ row; its limitation is part of the claim. [S:source-contract-test][src-source-co
 | `S:merge-pr6` | Exact merge commit | Semantic-family generated results | [source][src-merge-pr6] | Exact metrics still defer to manifest-bound JSON. |
 | `S:merge-pr7` | Exact merge commit | Minimal-pair family source | [source][src-merge-pr7] | Establishes implementation, not optimality. |
 | `S:merge-pr8` | Exact merge commit | Final generated evidence and stopped-run state | [source][src-merge-pr8] | Exact metrics still defer to manifest-bound JSON. |
-| `A:task-history` | Author attestation | User-directed interruption reason and decision order | [source][src-task-history] | Non-public task history is unavailable to readers. |
+| `A:task-history` | Author attestation | User-directed interruption, authorization boundary, and decision order where public commits do not preserve motive | [source][src-task-history] | Non-public task history is unavailable to readers. |
 | `A:hypothesis` | Author hypothesis | Explicitly untested mechanisms and future tests | [source][src-hypothesis] | Non-public reasoning is not empirical evidence. |
 | `A:heuristic` | Author heuristic | Project choices without stronger contemporaneous rationale | [source][src-heuristic] | Non-public decision context does not establish optimality. |
-| `A:derivation` | Author derivation | Arithmetic consequences of recorded configuration | [source][src-derivation] | Non-public derivation must remain reproducible from cited values. |
+| `A:derivation` | Author derivation | Arithmetic and cross-artifact comparisons reproducible from adjacent public evidence | [source][src-derivation] | Non-public author synthesis; it establishes no mechanism or causal effect beyond the cited values. |
 | `A:log-audit` | Author attestation | Local comparison of nine private logs to manifest digests | [source][src-log-audit] | Private evidence cannot be inspected by public readers. |
 
 [src-manifest]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/manifest.json
@@ -1389,6 +1438,8 @@ row; its limitation is part of the claim. [S:source-contract-test][src-source-co
 [src-source-minimal]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/src/fact_teaching/config.py
 [src-foundation-training]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/src/fact_teaching/training.py
 [src-foundation-pipeline]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/src/fact_teaching/pipeline.py
+[src-paper-pipeline]: https://github.com/BurnyCoder/training-facts-into-llms/blob/31700808d0ca114ed54fbeecd1c03a737d1c7463/src/fact_teaching/pipeline.py
+[src-semantic-pipeline]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/src/fact_teaching/pipeline.py
 [src-foundation-modeling]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/src/fact_teaching/modeling.py
 [src-foundation-logging]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/src/fact_teaching/logging_utils.py
 [src-foundation-evaluation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/src/fact_teaching/evaluation.py
@@ -1403,7 +1454,8 @@ row; its limitation is part of the claim. [S:source-contract-test][src-source-co
 [src-minimal-pipeline]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/src/fact_teaching/pipeline.py
 [src-minimal-preflight]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/src/fact_teaching/preflight.py
 [src-semantic-balance-doc]: https://github.com/BurnyCoder/training-facts-into-llms/blob/84f71c2c70c032e0d03435df2e3b95fe66d3fecf/docs/training-strategy.md
-[src-source-contract-test]: https://github.com/BurnyCoder/training-facts-into-llms/blob/795717ba1ee2df27f5def38648797f957280a5e6/tests/test_experiments_sources.py
+[src-experiment-source-test]: https://github.com/BurnyCoder/training-facts-into-llms/blob/674dba73c8b85fc0afff6c1ade59e4602df0195d/tests/test_public_results.py
+[src-experiment-source-contract]: https://github.com/BurnyCoder/training-facts-into-llms/blob/1de04fc32588944ce75553dee348fe36126689bc/AGENTS.md
 [src-run-positive-primary]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/primary.md
 [src-run-positive-conservative]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/conservative.md
 [src-run-positive-expanded]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/runs/expanded.md
@@ -1454,7 +1506,8 @@ row; its limitation is part of the claim. [S:source-contract-test][src-source-co
 [src-upstream-run]: https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/run.py
 [src-upstream-launcher]: https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/execute.sh
 [src-upstream-data]: https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/data.py
-[src-upstream-tree]: https://github.com/au-revoir/model-editing-ft/tree/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit
+[src-upstream-prefix]: https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/data/generated_prepended_words_paraphrases.json
+[src-upstream-tree]: https://github.com/au-revoir/model-editing-ft/tree/94e4ce075ee564f20e07cc22294207ac2b1a94c9
 [src-qwen-card]: https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/2fc06364715b967f1860aea9cf38778875588b17/README.md
 [src-qwen-template]: https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/2fc06364715b967f1860aea9cf38778875588b17/chat_template.jinja
 [src-lora-paper]: https://openreview.net/forum?id=nZeVKeeFYf9
@@ -1465,7 +1518,7 @@ row; its limitation is part of the claim. [S:source-contract-test][src-source-co
 [src-trl-chunked-loss]: https://github.com/huggingface/trl/blob/33f9e462728b98f7f91d38b99328e81adde2faa0/trl/trainer/sft_trainer.py#L117-L234
 [src-peft-lora]: https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/docs/source/package_reference/lora.md
 [src-transformers-chat]: https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/docs/source/en/chat_templating.md
-[src-transformers-trainer]: https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/docs/source/en/main_classes/trainer.md
+[src-transformers-training-args]: https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/src/transformers/training_args.py
 [src-transformers-generation]: https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/docs/source/en/generation_strategies.md
 [src-transformers-checkpointing]: https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/docs/source/en/grad_checkpointing.md
 [src-pytorch-adamw]: https://docs.pytorch.org/docs/2.13/generated/torch.optim.AdamW.html
@@ -1475,11 +1528,12 @@ row; its limitation is part of the claim. [S:source-contract-test][src-source-co
 [src-git-cat-file]: https://github.com/git/git/blob/564d0252ca632e0264ed670534a51d18a689ef5d/Documentation/git-cat-file.txt
 [src-uv-projects]: https://github.com/astral-sh/uv/blob/19fc8b03bb984848d62a24267abc6c406289e2c0/docs/guides/projects.md
 [src-unicode-normalization]: https://www.unicode.org/reports/tr15/tr15-57.html
+[src-python-unicodedata]: https://docs.python.org/release/3.12.3/library/unicodedata.html
 [src-python-casefold]: https://docs.python.org/release/3.12.3/library/stdtypes.html#str.casefold
 [src-fix-paper-target]: https://github.com/BurnyCoder/training-facts-into-llms/commit/352a1ef74dd02c0ae8b6ea2d7c07085c57979a58
 [src-fix-paper-ci]: https://github.com/BurnyCoder/training-facts-into-llms/blob/3a836acf3b04788ca1b3056371424557860fa40c/tests/test_training.py
-[src-fix-paper-run]: https://github.com/BurnyCoder/training-facts-into-llms/blob/143beea55724b13d70f597d90ba05966f4e574e7/src/fact_teaching/training.py
-[src-fix-semantic-balance]: https://github.com/BurnyCoder/training-facts-into-llms/blob/84f71c2c70c032e0d03435df2e3b95fe66d3fecf/src/fact_teaching/training.py
+[src-fix-paper-run]: https://github.com/BurnyCoder/training-facts-into-llms/commit/143beea55724b13d70f597d90ba05966f4e574e7
+[src-fix-semantic-balance]: https://github.com/BurnyCoder/training-facts-into-llms/commit/84f71c2c70c032e0d03435df2e3b95fe66d3fecf
 [src-fix-rendered-logging]: https://github.com/BurnyCoder/training-facts-into-llms/blob/99b2c6c9a5f1007c02c78ee91466e82244bea957/src/fact_teaching/training.py
 [src-fix-validation-labels]: https://github.com/BurnyCoder/training-facts-into-llms/blob/bf126e10ed80c356eb369976ca088bd7f2c89dd8/src/fact_teaching/data.py
 [src-fix-minimal-tests]: https://github.com/BurnyCoder/training-facts-into-llms/commit/b83d90e90b43156abf5aa0e4e7039bab0585b00a
