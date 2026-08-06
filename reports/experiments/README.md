@@ -1,5 +1,7 @@
 # Detailed experiment reports
 
+**Authoring disclosure.** These reports were heavily assisted by LLM-based tools. Their evidence was checked repeatedly, but those checks do not constitute independent peer review; a later revision will be cleaned up and rewritten by the human author. See the immutable [author attestation](https://github.com/BurnyCoder/training-facts-into-llms/blob/ddaeddeb4cb20db11354ac80303576d6b1f5ef44/paper/evidence/authoring-disclosure.json).
+
 These derived reports copy each attempt's timeline entry, relevant result
 narrative, and shared family context from the
 [canonical experiment retrospective](../EXPERIMENTS.md). The existing concise

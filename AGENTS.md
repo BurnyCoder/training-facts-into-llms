@@ -160,13 +160,23 @@ See `docs/security-and-publication.md` for the complete boundary design.
 - Keep `reports/experiments/` as a separate derived layer: exactly one detailed
   Markdown copy per manifest attempt plus its navigation `README.md`. Never
   overwrite or reinterpret the concise `reports/runs/*.md` reports.
-- Build each detailed experiment copy from its exact canonical timeline row and
-  declared `reports/EXPERIMENTS.md` family subsections, followed by only the
-  canonical ledger rows and reference definitions used by that copied body.
-  Timeline rows, narrative bytes, source-marker order and kind, ledger rows,
-  and reference targets must not drift. `reports/EXPERIMENTS.md` remains the
-  authority; update derived copies and their tests whenever a future reviewed
-  canonical change affects them.
+- Build each detailed experiment copy from the canonical authoring-disclosure
+  block, its exact timeline row, and declared `reports/EXPERIMENTS.md` family
+  subsections, followed by only the canonical ledger rows and reference
+  definitions used by that copied body. Disclosure, timeline, narrative,
+  source-marker order and kind, ledger rows, and reference targets must not
+  drift. `reports/EXPERIMENTS.md` remains the authority; update derived copies
+  and their tests whenever a future reviewed canonical change affects them.
+- Display the same prominent LLM-assistance disclosure in the canonical
+  retrospective, every detailed experiment copy, every concise run report, and
+  the LaTeX paper. Bind it to the
+  [content-addressed author attestation](https://github.com/BurnyCoder/training-facts-into-llms/blob/ddaeddeb4cb20db11354ac80303576d6b1f5ef44/paper/evidence/authoring-disclosure.json).
+  Treat the extent of assistance,
+  repeated checking, and planned later human rewrite as self-authored claims:
+  the checks are not independent peer review, and the future rewrite is an
+  intention rather than a completed artifact. Never publish assistance
+  transcripts, tool or task identifiers, private logs, or local paths to
+  support the disclosure.
 - In `reports/EXPERIMENTS.md`, give every substantive factual paragraph, list
   item, table row, diagram, and fenced block adjacent provenance. Use
   `[S:id][src-id]` for public evidence and `[A:id][src-id]` only for explicitly

@@ -526,9 +526,9 @@ AUTHORING_DISCLOSURE_URL = (
     f"{REPOSITORY_URL}/blob/{AUTHORING_DISCLOSURE_COMMIT}/"
     "paper/evidence/authoring-disclosure.json"
 )
-# The canonical retrospective must remain unchanged while derived copies are added.
+# Pin the canonical retrospective after the authorized disclosure metadata change.
 EXPECTED_RETROSPECTIVE_SHA256 = (
-    "f1b11b88216576ed7db495df0409c1c1dfadb43e6c91f9238f04dfc94f5f249b"
+    "7b68ab2423aee6b90cf11e6ed74155b9a0a972ca06073b6300c5effee651a220"
 )
 
 # Each tuple names one canonical family chapter and its verbatim copied subsections.

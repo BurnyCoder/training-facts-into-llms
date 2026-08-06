@@ -1,5 +1,14 @@
 # Detailed experiment: `minimal_pair_primary`
 
+## Authoring disclosure
+
+> **Authoring disclosure.** Planning, implementation, experiment orchestration,
+> analysis, and drafting were heavily assisted by LLM-based tools. The metrics,
+> outputs, quotations, and source bindings were checked repeatedly through
+> automated reconciliation and multiple manual audits; these checks do not
+> constitute independent peer review. A later revision will be cleaned up and
+> rewritten by the human author. [A:authoring-disclosure][src-authoring-disclosure]
+
 ## Exact run timeline
 
 | # | Run ID and source-bound recipe | Completion or checkpoint | Result and failed gate | Adapter / Hub | Evidence |
@@ -159,6 +168,7 @@ clean-main gate. [S:code-gitgate][src-code-gitgate]
 | `S:fix-behavior-selector` | Exact fix commit | Bounded behavior-first selector | [source][src-fix-behavior-selector] | Does not establish validation breadth. |
 | `S:pr-minimal` | Commit-pinned PR snapshot | Minimal-pair review findings | [source][src-pr-minimal] | Self-authored attestation, not formal approval. |
 | `S:merge-pr7` | Exact merge commit | Minimal-pair family source | [source][src-merge-pr7] | Establishes implementation, not optimality. |
+| `A:authoring-disclosure` | Commit-pinned author attestation | LLM assistance in planning, implementation, experiment orchestration, analysis, and drafting; repeated automated and manual checks; the peer-review caveat; and the intended later human rewrite | [source][src-authoring-disclosure] | Retrospective author attestation; the underlying assistance history is non-public, the extent of assistance and planned rewrite cannot be independently verified, and repeated checks are not independent peer review. |
 | `A:hypothesis` | Author hypothesis | Explicitly untested mechanisms and future tests | [source][src-hypothesis] | Non-public reasoning is not empirical evidence. |
 | `A:heuristic` | Author heuristic | Project choices without stronger contemporaneous rationale | [source][src-heuristic] | Non-public decision context does not establish optimality. |
 
@@ -188,5 +198,6 @@ clean-main gate. [S:code-gitgate][src-code-gitgate]
 [src-fix-behavior-selector]: https://github.com/BurnyCoder/training-facts-into-llms/blob/3aeab2cabd1d580e997d9b172690ccafef1d8502/src/fact_teaching/validation.py
 [src-pr-minimal]: https://github.com/BurnyCoder/training-facts-into-llms/blob/900e15a5007003f4f8c76de8079885d5966dbc16/paper/evidence/pr-attestations.json
 [src-merge-pr7]: https://github.com/BurnyCoder/training-facts-into-llms/commit/b94867bcb3124220563f47951dbad3e6fc9492c5
+[src-authoring-disclosure]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ddaeddeb4cb20db11354ac80303576d6b1f5ef44/paper/evidence/authoring-disclosure.json
 [src-hypothesis]: #claim-source-ledger
 [src-heuristic]: #claim-source-ledger

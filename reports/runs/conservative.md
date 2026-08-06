@@ -1,5 +1,11 @@
 # Run report: `conservative`
 
+## Authoring disclosure
+
+> **Authoring disclosure.** Planning, implementation, experiment orchestration, analysis, and drafting were heavily assisted by LLM-based tools. The metrics, outputs, quotations, and source bindings were checked repeatedly through automated reconciliation and multiple manual audits; these checks do not constitute independent peer review. A later revision will be cleaned up and rewritten by the human author.
+>
+> [Author attestation](https://github.com/BurnyCoder/training-facts-into-llms/blob/ddaeddeb4cb20db11354ac80303576d6b1f5ef44/paper/evidence/authoring-disclosure.json)
+
 The exploratory `conservative` run also learned the fact on all 12 held-out
 recall prompts. It nevertheless applied the fact to every similar invented
 name and lost six of eight common-knowledge controls. It failed acceptance, so

@@ -1,5 +1,14 @@
 # Teaching one synthetic fact to Qwen3.5-0.8B
 
+## Authoring disclosure
+
+> **Authoring disclosure.** Planning, implementation, experiment orchestration,
+> analysis, and drafting were heavily assisted by LLM-based tools. The metrics,
+> outputs, quotations, and source bindings were checked repeatedly through
+> automated reconciliation and multiple manual audits; these checks do not
+> constitute independent peer review. A later revision will be cleaned up and
+> rewritten by the human author. [A:authoring-disclosure][src-authoring-disclosure]
+
 ## The complete experiment journey
 
 We attempted to teach the exact synthetic fact **“Atemokoloporos is a rainbow
@@ -1425,6 +1434,7 @@ row; its limitation is part of the claim.
 | `S:merge-pr6` | Exact merge commit | Semantic-family generated results | [source][src-merge-pr6] | Exact metrics still defer to manifest-bound JSON. |
 | `S:merge-pr7` | Exact merge commit | Minimal-pair family source | [source][src-merge-pr7] | Establishes implementation, not optimality. |
 | `S:merge-pr8` | Exact merge commit | Final generated evidence and stopped-run state | [source][src-merge-pr8] | Exact metrics still defer to manifest-bound JSON. |
+| `A:authoring-disclosure` | Commit-pinned author attestation | LLM assistance in planning, implementation, experiment orchestration, analysis, and drafting; repeated automated and manual checks; the peer-review caveat; and the intended later human rewrite | [source][src-authoring-disclosure] | Retrospective author attestation; the underlying assistance history is non-public, the extent of assistance and planned rewrite cannot be independently verified, and repeated checks are not independent peer review. |
 | `A:task-history` | Author attestation | User-directed interruption, authorization boundary, and decision order where public commits do not preserve motive | [source][src-task-history] | Non-public task history is unavailable to readers. |
 | `A:hypothesis` | Author hypothesis | Explicitly untested mechanisms and future tests | [source][src-hypothesis] | Non-public reasoning is not empirical evidence. |
 | `A:heuristic` | Author heuristic | Project choices without stronger contemporaneous rationale | [source][src-heuristic] | Non-public decision context does not establish optimality. |
@@ -1556,6 +1566,7 @@ row; its limitation is part of the claim.
 [src-merge-pr6]: https://github.com/BurnyCoder/training-facts-into-llms/commit/76761805134cfdcb5c01db28f67b660c3045c782
 [src-merge-pr7]: https://github.com/BurnyCoder/training-facts-into-llms/commit/b94867bcb3124220563f47951dbad3e6fc9492c5
 [src-merge-pr8]: https://github.com/BurnyCoder/training-facts-into-llms/commit/051739d105df8238b20fee27f3d1badad98216b1
+[src-authoring-disclosure]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ddaeddeb4cb20db11354ac80303576d6b1f5ef44/paper/evidence/authoring-disclosure.json
 [src-task-history]: #claim-source-ledger
 [src-hypothesis]: #claim-source-ledger
 [src-heuristic]: #claim-source-ledger
