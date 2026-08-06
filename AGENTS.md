@@ -177,8 +177,8 @@ See `docs/security-and-publication.md` for the complete boundary design.
   definition may target `#claim-source-ledger` only when its limitation makes
   the non-public evidence boundary explicit. Never publish private log paths,
   bytes, Codex transcripts, or task/thread identifiers.
-- Keep paper-recipe provenance distinct: the ACL paper reports LoRA for every
-  reported result except its FT-on-the-21st-layer condition, pinned
+- Keep paper-recipe provenance distinct: the ACL paper reports that, except for
+  its FT-on-the-21st-layer condition, all the authors' results use LoRA; pinned
   `single_edit/run.py` performs full-parameter AdamW, and this project's exact
   Qwen language-only target boundary and rank/alpha values are adaptations.
   Limit file or asset availability
