@@ -5,11 +5,19 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import subprocess
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
 from markdown_it import MarkdownIt
+
+from fact_teaching.evaluation import (
+    EvaluationResult,
+    evaluate_acceptance,
+    score_generation,
+)
+from fact_teaching.reporting import _render_markdown_report
 
 # Resolve paths from this test file so checks do not depend on the caller's directory.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -137,6 +145,76 @@ def test_each_manifest_attempt_has_exactly_one_concise_run_report() -> None:
         assert len(report_text.encode("utf-8")) <= 12_000
 
 
+def test_nine_run_reports_reconcile_public_identity_results_and_artifacts() -> None:
+    """Run narratives must preserve manifest identity and hash-bound result facts."""
+    checked_reports = 0
+    for attempt_name, attempt in _attempts_by_name().items():
+        report = (RUN_REPORT_DIR / f"{attempt_name}.md").read_text(encoding="utf-8")
+        compact_report = " ".join(report.split())
+        numeric_report = compact_report.replace(",", "")
+        assert report.count(attempt["run_id"]) == 1
+        source_commit = attempt["source"]["commit"]
+        assert FULL_GIT_SHA.fullmatch(source_commit)
+        historical_repository = attempt["source"]["github_repository"]
+        assert f"https://github.com/{historical_repository}/commit/{source_commit}" in report
+        assert "Final publishable adapter saved | No" in report
+        assert "Hub publication attempted | No" in report
+
+        result = attempt["result"]
+        for score in result["baseline"].values():
+            assert score in report
+        post_training = result["post_training"]
+        if post_training is None:
+            assert "Interrupted; no post-training evaluation" in report
+            progress = attempt["training_progress"]
+            for value in (
+                progress["completed_optimizer_steps"],
+                progress["planned_optimizer_steps"],
+                progress["last_completed_epoch"],
+            ):
+                assert f"{value:g}" in numeric_report
+            assert "acceptance gate was never evaluated" in compact_report
+        else:
+            assert "Completed; failed acceptance" in report
+            for score in (
+                post_training["fact_recall"],
+                post_training["near_name_safety"],
+                post_training["common_knowledge"],
+            ):
+                assert score in report
+            evaluation_path = PROJECT_ROOT / _evaluation_path(attempt)
+            evaluation = json.loads(evaluation_path.read_text(encoding="utf-8"))
+            training = evaluation["provenance"]["training"]
+            runtime = training["metrics"]["train_runtime"]
+            _assert_number_in_text(numeric_report, runtime)
+            _assert_number_in_text(numeric_report, training["global_step"])
+            best_checkpoint = training["best_checkpoint"]
+            mentioned_checkpoints = set(re.findall(r"checkpoint-\d+", report))
+            if mentioned_checkpoints:
+                assert best_checkpoint is not None
+                assert mentioned_checkpoints == {best_checkpoint}
+            progress = attempt.get("training_progress")
+            if progress and "selected_epoch" in progress:
+                _assert_number_in_text(report, progress["selected_epoch"])
+                selected_step = progress.get("selected_optimizer_step")
+                if selected_step is None:
+                    assert best_checkpoint is not None
+                    selected_step = int(best_checkpoint.removeprefix("checkpoint-"))
+                _assert_number_in_text(report, selected_step)
+            false_positive_ids = evaluation["acceptance"]["false_positive_ids"]
+            if false_positive_ids == [f"negative_{index:03d}" for index in range(1, 9)]:
+                assert "`negative_001` through `negative_008`" in report
+            else:
+                for record_id in false_positive_ids:
+                    assert record_id in report
+            for record_id in evaluation["acceptance"]["lost_control_ids"]:
+                assert record_id in report
+            for item in attempt["report_files"]:
+                assert f"../{Path(item['path']).name}" in report
+        checked_reports += 1
+    assert checked_reports == 9
+
+
 def test_manifest_report_pairs_exist_and_match_their_sha256_digests() -> None:
     """Each indexed evaluation pair must exist, share a stem, and match its digest."""
     # Hash verification binds the manifest entry to the exact reviewed file bytes.
@@ -190,6 +268,93 @@ def test_every_generated_evaluation_pair_is_indexed_once() -> None:
     assert len(indexed_paths) == len(set(indexed_paths))
     # This equality catches both unindexed generated output and stale manifest entries.
     assert set(indexed_paths) == generated_paths
+
+
+def test_every_generated_markdown_report_exactly_renders_its_json_source() -> None:
+    """All eight human views must be byte-exact renderings of structured evidence."""
+    # The reporting module owns one renderer so JSON and Markdown cannot drift silently.
+    rendered_pairs = 0
+    for attempt in _attempts_by_name().values():
+        report_files = attempt.get("report_files", [])
+        if not report_files:
+            continue
+        # The manifest contract already guarantees one JSON and one Markdown file.
+        paths_by_suffix = {
+            Path(item["path"]).suffix: PROJECT_ROOT / item["path"]
+            for item in report_files
+        }
+        payload = json.loads(paths_by_suffix[".json"].read_text(encoding="utf-8"))
+        expected_markdown = _render_markdown_report(payload)
+        actual_markdown = paths_by_suffix[".md"].read_text(encoding="utf-8")
+        assert actual_markdown == expected_markdown
+        rendered_pairs += 1
+    assert rendered_pairs == 8
+
+
+def test_all_448_saved_generations_recompute_exact_scores_and_acceptance() -> None:
+    """Re-score every saved baseline/tuned output against the current 28-row suite."""
+    # The fixed regression data supplies category rules and accepted control aliases.
+    evaluation_rows = [
+        json.loads(line)
+        for line in (PROJECT_ROOT / "data" / "eval.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+        if line.strip()
+    ]
+    rows_by_id = {row["id"]: row for row in evaluation_rows}
+    assert len(evaluation_rows) == len(rows_by_id) == 28
+
+    scored_record_count = 0
+    completed_attempt_count = 0
+    for attempt in _attempts_by_name().values():
+        if not attempt.get("report_files"):
+            continue
+        completed_attempt_count += 1
+        payload = json.loads(
+            (PROJECT_ROOT / _evaluation_path(attempt)).read_text(encoding="utf-8")
+        )
+        recomputed_results: dict[str, EvaluationResult] = {}
+        for stage_key in ("baseline", "post_training"):
+            saved_stage = payload["evaluations"][stage_key]
+            assert saved_stage["stage"] == stage_key
+            saved_records = saved_stage["records"]
+            assert [record["record_id"] for record in saved_records] == [
+                row["id"] for row in evaluation_rows
+            ]
+            recomputed_records = [
+                score_generation(
+                    rows_by_id[saved_record["record_id"]],
+                    saved_record["output"],
+                )
+                for saved_record in saved_records
+            ]
+            recomputed = EvaluationResult(stage=stage_key, records=recomputed_records)
+            assert recomputed.to_dict() == saved_stage
+            recomputed_results[stage_key] = recomputed
+            scored_record_count += len(recomputed_records)
+
+        # JSON round-tripping converts the decision's immutable ID tuples to JSON arrays.
+        recomputed_acceptance = json.loads(
+            json.dumps(
+                evaluate_acceptance(
+                    recomputed_results["baseline"],
+                    recomputed_results["post_training"],
+                ).to_dict()
+            )
+        )
+        assert recomputed_acceptance == payload["acceptance"]
+        assert recomputed_acceptance["passed"] is attempt["result"][
+            "acceptance_passed"
+        ]
+        assert recomputed_acceptance["false_positive_ids"] == attempt["result"].get(
+            "false_positive_ids", recomputed_acceptance["false_positive_ids"]
+        )
+        assert recomputed_acceptance["lost_control_ids"] == attempt["result"].get(
+            "lost_control_ids", recomputed_acceptance["lost_control_ids"]
+        )
+
+    assert completed_attempt_count == 8
+    assert scored_record_count == 448
 
 
 def test_passing_or_public_attempts_prove_complete_publication() -> None:
@@ -514,6 +679,19 @@ def _visible_word_count(text: str) -> int:
     return len(re.findall(r"[A-Za-z][A-Za-z0-9'-]*", text))
 
 
+def _assert_number_in_text(text: str, value: float) -> None:
+    """Require one exact numeric value while allowing comma grouping and integer floats."""
+    # Markdown reports use comma grouping for runtimes but JSON stores plain numbers.
+    normalized = text.replace(",", "")
+    forms = {str(value)}
+    if isinstance(value, float) and value.is_integer():
+        forms.add(str(int(value)))
+    assert any(
+        re.search(rf"(?<![0-9.]){re.escape(form)}(?![0-9.])", normalized)
+        for form in forms
+    ), f"missing exact numeric value {value!r}"
+
+
 def _previous_evidence_line(lines: list[str], fence_start: int) -> str:
     """Return the closest nonblank line before a fenced evidence block."""
     cursor = fence_start - 1
@@ -649,6 +827,15 @@ def test_timeline_and_artifact_links_match_every_manifest_attempt() -> None:
         if post is None:
             assert "Baseline only" in row and "inconclusive" in row.casefold()
             assert "[A:task-history][src-task-history]" in row
+            progress = attempt["training_progress"]
+            for key in ("completed_optimizer_steps", "planned_optimizer_steps"):
+                _assert_number_in_text(row, progress[key])
+            _assert_number_in_text(row, progress["last_completed_epoch"])
+            assert re.search(
+                r"Trainer runtime (?:unavailable|not available|not recorded)",
+                row,
+                flags=re.IGNORECASE,
+            )
         else:
             for score in (
                 post["fact_recall"],
@@ -656,8 +843,57 @@ def test_timeline_and_artifact_links_match_every_manifest_attempt() -> None:
                 post["common_knowledge"],
             ):
                 assert score in row
-            assert _artifact_url(_evaluation_path(attempt)) in resolved
-        assert re.search(r"\bNo\s*/\s*no\b", row)
+            evaluation_path = _evaluation_path(attempt)
+            assert _artifact_url(evaluation_path) in resolved
+            evaluation = json.loads(
+                (PROJECT_ROOT / evaluation_path).read_text(encoding="utf-8")
+            )
+            training = evaluation["provenance"]["training"]
+            runtime = training["metrics"]["train_runtime"]
+            assert "Trainer runtime" in row
+            _assert_number_in_text(row, runtime)
+
+            best_checkpoint = training["best_checkpoint"]
+            if best_checkpoint is None:
+                # The paper-family run deliberately selected its final weights.
+                assert training["selection_policy"] == "final_epoch"
+                assert "final" in row.casefold()
+                _assert_number_in_text(row, training["global_step"])
+                _assert_number_in_text(row, training["metrics"]["epoch"])
+            else:
+                assert best_checkpoint in row
+                selected_step = int(best_checkpoint.removeprefix("checkpoint-"))
+                _assert_number_in_text(row, selected_step)
+                validation_history = training.get("behavioral_validation_history")
+                if validation_history:
+                    selected = [
+                        item for item in validation_history if item["step"] == selected_step
+                    ]
+                    assert len(selected) == 1
+                    selected_record = selected[0]
+                    _assert_number_in_text(row, selected_record["epoch"])
+                    _assert_number_in_text(row, selected_record["behavior_score"])
+                    if "eval_loss" in selected_record:
+                        _assert_number_in_text(row, selected_record["eval_loss"])
+                    if "selection_score" in selected_record:
+                        _assert_number_in_text(row, selected_record["selection_score"])
+                else:
+                    selected = [
+                        item
+                        for item in training["log_history"]
+                        if item.get("step") == selected_step
+                        and item.get("eval_loss") == training["best_metric"]
+                    ]
+                    assert len(selected) == 1
+                    _assert_number_in_text(row, selected[0]["epoch"])
+                    _assert_number_in_text(row, selected[0]["eval_loss"])
+        adapter_saved = attempt["result"]["adapter_saved"]
+        publication_attempted = attempt["result"]["publication_attempted"]
+        expected_publication = (
+            f"{'Yes' if adapter_saved else 'No'} / "
+            f"{'yes' if publication_attempted else 'no'}"
+        )
+        assert expected_publication in row
 
     expected_paths = {
         item["path"]
@@ -752,6 +988,25 @@ def test_manifest_hashes_and_all_historical_data_bindings_are_present() -> None:
         else:
             assert json_cell == markdown_cell == "Not produced"
     assert "rather than hash-bound by the manifest" in " ".join(text.split())
+
+
+def test_all_37_historical_git_data_blobs_match_manifest_hashes() -> None:
+    """Hash source-commit bytes instead of trusting displayed historical digests."""
+    # `git show <commit>:<path>` reads the exact historical blob without a checkout.
+    verified_bindings = 0
+    for attempt in _load_manifest()["attempts"]:
+        source_commit = attempt["source"]["commit"]
+        assert FULL_GIT_SHA.fullmatch(source_commit)
+        for item in attempt["data_files"]:
+            completed = subprocess.run(
+                ["git", "show", f"{source_commit}:{item['path']}"],
+                cwd=PROJECT_ROOT,
+                check=True,
+                capture_output=True,
+            )
+            assert hashlib.sha256(completed.stdout).hexdigest() == item["sha256"]
+            verified_bindings += 1
+    assert verified_bindings == 37
 
 
 def test_all_completed_tuned_evaluations_have_28_nonempty_outputs() -> None:
@@ -995,6 +1250,15 @@ def test_corrected_claims_and_publication_safety_cannot_regress() -> None:
     )
     for phrase in forbidden_phrases:
         assert phrase not in normalized
+    assert "fixed six validation prompts had outputs generated after each epoch" in normalized
+    assert "prevented later checkpoints from being generated and compared" in normalized
+    assert "configured 64-token cap" in normalized and "cause is unknown" in normalized
+    assert "training-disjoint fixed regression prompts" in normalized
+
+    mermaid = re.search(r"~~~mermaid\n(?P<body>.*?)\n~~~", text, flags=re.DOTALL)
+    assert mermaid is not None
+    assert "Entity-only pairs plus full horizons" in mermaid.group("body")
+    assert "shortcut" not in mermaid.group("body").casefold()
     assert not re.search(r"\bdeterministic(?:[- ]\w+){0,2} evaluation\b", normalized)
     assert "fixed greedy" in normalized and "bitwise" in normalized
     assert "prevented later checkpoints from being generated and compared" in normalized
@@ -1043,3 +1307,95 @@ def test_corrected_claims_and_publication_safety_cannot_regress() -> None:
     )
     for pattern in unsafe_patterns:
         assert re.search(pattern, text) is None
+
+
+def test_factual_audit_requires_precise_provenance_and_historical_caveats() -> None:
+    """Guard corrections found by reconciling prose with upstream and run evidence."""
+    text = _report()
+    normalized = " ".join(text.split()).casefold()
+    forbidden_phrases = (
+        "unreleased retrieval inputs",
+        "pre-run review produced three",
+        "strategies moved the failure",
+        "prevented false success claims",
+        "smallest positive-only experiment",
+        "smallest locally practical adaptation boundary",
+    )
+    for phrase in forbidden_phrases:
+        assert phrase not in normalized
+
+    # The paper discusses LoRA, while its pinned released runner updates all parameters.
+    paper_chapter = " ".join(
+        _section(text, "## 2. Paper single-edit adaptation").split()
+    ).casefold()
+    assert re.search(r"paper.{0,120}report(?:s|ed).{0,100}\blora\b", paper_chapter)
+    assert re.search(
+        r"released (?:implementation|`run\.py`).{0,140}full-parameter adamw",
+        paper_chapter,
+    )
+    assert re.search(
+        r"qwen.{0,100}language-only lora.{0,140}(?:project|our) adaptation",
+        paper_chapter,
+    )
+    for sentence in re.split(r"(?<=[.!?])\s+", normalized):
+        if "lora" not in sentence or not re.search(
+            r"(?:project(?:'s)? adaptation|adapted by (?:this|the) project)", sentence
+        ):
+            continue
+        assert "qwen" in sentence, "LoRA itself must not be called solely project-derived"
+
+    references = _references(text)
+    assert references["fix-paper-run"] == (
+        f"{REPOSITORY_URL}/commit/143beea55724b13d70f597d90ba05966f4e574e7"
+    )
+    assert references["fix-semantic-balance"] == (
+        f"{REPOSITORY_URL}/commit/84f71c2c70c032e0d03435df2e3b95fe66d3fecf"
+    )
+    assert references["transformers-training-args"] == (
+        "https://github.com/huggingface/transformers/blob/"
+        "a08ace4bbd97e721c98751deec37d87b026acadc/"
+        "src/transformers/training_args.py"
+    )
+    assert references["python-unicodedata"] == (
+        "https://docs.python.org/release/3.12.3/library/unicodedata.html"
+    )
+
+    methodology_rows = _table_rows(
+        _section(text, "## Why the model, data, training, and evaluation looked this way")
+    )
+    optimizer_rows = [row for row in methodology_rows if "| Main optimizer |" in row]
+    assert len(optimizer_rows) == 1
+    assert (
+        "[S:transformers-training-args][src-transformers-training-args]"
+        in optimizer_rows[0]
+    )
+    normalization_block = next(
+        block
+        for block in text.split("\n\n")
+        if "checks operate on Unicode-normalized" in block
+    )
+    assert "[S:python-unicodedata][src-python-unicodedata]" in normalization_block
+    ledger = _ledger(text)
+    unicode_limitation = ledger["python-unicodedata"]["limitation"].casefold()
+    for term in ("python 3.12.3", "bundled", "ucd", "runtime"):
+        assert term in unicode_limitation
+    assert "uax" in unicode_limitation and "semantics" in unicode_limitation
+
+    # Historical reports remain frozen, so their known stale wording is explicit here.
+    paper_limitation = ledger["run-paper"]["limitation"].casefold()
+    for term in ("full-parameter adamw", "qwen lora", "prefix-derived", "retrieval"):
+        assert term in paper_limitation
+    for source_id in ("run-semantic-standard", "run-semantic-gentle"):
+        limitation = ledger[source_id]["limitation"].casefold()
+        assert "causal" in limitation and "retrospective" in limitation
+
+    for paragraph in text.split("\n\n"):
+        if "anonymous" not in paragraph.casefold() or not any(
+            term in paragraph.casefold() for term in ("never executed", "not executed", "zero")
+        ):
+            continue
+        assert "[S:manifest][src-manifest]" in paragraph
+        assert "[S:code-pipeline][src-code-pipeline]" in paragraph
+
+    assert text.count("## 4. Entity-only minimal pairs and full horizons") == 1
+    assert len(re.findall(r"(?m)^- .*`352a1ef", text)) <= 1
