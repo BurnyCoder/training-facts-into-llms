@@ -14,12 +14,46 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PAPER_DIR = PROJECT_ROOT / "paper"
 PR_ATTESTATION_PATH = PAPER_DIR / "evidence" / "pr-attestations.json"
+AUTHORING_DISCLOSURE_PATH = PAPER_DIR / "evidence" / "authoring-disclosure.json"
 MANIFEST_PATH = PROJECT_ROOT / "reports" / "manifest.json"
 EVIDENCE_COMMIT = "ca83803ccdf46486d38fd7161b155cc20560c449"
 REPOSITORY_URL = "https://github.com/BurnyCoder/training-facts-into-llms"
 PR_ATTESTATION_COMMIT = "900e15a5007003f4f8c76de8079885d5966dbc16"
 PR_ATTESTATION_SHA256 = (
     "8553a1df1f5184343d5deff5320bef928378105aabda9b0b56cc0a39c1537395"
+)
+AUTHORING_DISCLOSURE_COMMIT = "ddaeddeb4cb20db11354ac80303576d6b1f5ef44"
+AUTHORING_DISCLOSURE_SHA256 = (
+    "11ed06024e1968ec0c72e2276f15185e03f119831189d9989ea696fc18c38cc2"
+)
+AUTHORING_DISCLOSURE_URL = (
+    f"{REPOSITORY_URL}/blob/{AUTHORING_DISCLOSURE_COMMIT}/"
+    "paper/evidence/authoring-disclosure.json"
+)
+AUTHORING_DISCLOSURE = (
+    "Authoring disclosure. Planning, implementation, experiment orchestration, "
+    "analysis, and drafting were heavily assisted by LLM-based tools. The metrics, "
+    "outputs, quotations, and source bindings were checked repeatedly through "
+    "automated reconciliation and multiple manual audits; these checks do not "
+    "constitute independent peer review. A later revision will be cleaned up and "
+    "rewritten by the human author."
+)
+REPRODUCIBILITY_DISCLOSURE = (
+    "This project and manuscript were heavily assisted by LLM-based tools across "
+    "planning, implementation, experiment orchestration, analysis, and drafting. "
+    "Automated reconciliation and multiple manual audits repeatedly checked metrics, "
+    "outputs, quotations, and source bindings, but these checks were not independent "
+    "peer review. The human author intends to clean up and rewrite a later revision."
+)
+AUTHORING_DISCLOSURE_LEDGER_SCOPE = (
+    "Extent of LLM assistance across project planning, implementation, experiment "
+    "orchestration, analysis, Markdown reporting, and LaTeX drafting; repeated "
+    "checks; peer-review limitation; and planned human rewrite."
+)
+AUTHORING_DISCLOSURE_LEDGER_LIMITATION = (
+    "Self-authored disclosure; the extent of assistance, audit process, and future "
+    "intention cannot be independently verified from public repository evidence, "
+    "and repeated checks are not independent peer review."
 )
 
 # These identifiers are the compact public bindings used by run rows and excerpts.
@@ -650,6 +684,107 @@ def test_pr_attestations_are_sanitized_and_commit_pinned() -> None:
         )
         assert "original" in limitation.casefold()
         assert "mutable" in limitation.casefold()
+
+
+def test_authoring_disclosure_attestation_is_sanitized_and_content_addressed() -> None:
+    """Freeze the author's LLM-assistance disclosure without private evidence."""
+    assert hashlib.sha256(AUTHORING_DISCLOSURE_PATH.read_bytes()).hexdigest() == (
+        AUTHORING_DISCLOSURE_SHA256
+    )
+    payload = json.loads(AUTHORING_DISCLOSURE_PATH.read_text(encoding="utf-8"))
+    assert set(payload) == {
+        "schema_version",
+        "source_id",
+        "repository",
+        "record_kind",
+        "recorded_at",
+        "author",
+        "scope",
+        "disclosure",
+        "limitation",
+    }
+    assert payload == {
+        "schema_version": 1,
+        "source_id": "authoring-disclosure",
+        "repository": "BurnyCoder/training-facts-into-llms",
+        "record_kind": "author_attestation",
+        "recorded_at": "2026-08-06",
+        "author": "Libor Burian",
+        "scope": [
+            "project planning",
+            "implementation",
+            "experiment orchestration",
+            "analysis",
+            "Markdown experiment reporting",
+            "LaTeX manuscript drafting",
+        ],
+        "disclosure": AUTHORING_DISCLOSURE,
+        "limitation": (
+            "This is a self-authored attestation. The extent of LLM assistance and "
+            "the stated intention for a later human rewrite cannot be independently "
+            "verified from repository evidence. Repeated automated and manual checks "
+            "do not constitute independent peer review."
+        ),
+    }
+
+    serialized = json.dumps(payload, ensure_ascii=True)
+    assert "/home/" not in serialized
+    assert "/mnt/" not in serialized
+    assert not re.search(r"hf_[A-Za-z0-9]{20,}", serialized)
+    assert not re.search(r'(?i)"(?:hf_)?token"\s*:', serialized)
+    assert "thread_id" not in serialized.casefold()
+
+
+def test_authoring_disclosure_is_prominent_repeated_and_source_bound() -> None:
+    """Require the exact first-page note, reproducibility note, and one ledger row."""
+    sources = _tex_sources()
+    marker = r"\claimsource{authoring-disclosure}"
+
+    main = sources[Path("paper/main.tex")]
+    abstract_end = main.index(r"\end{abstract}") + len(r"\end{abstract}")
+    introduction_start = main.index(r"\input{sections/introduction}")
+    first_page_block = main[abstract_end:introduction_start]
+    normalized_first_page = " ".join(
+        first_page_block.replace(
+            r"\textbf{Authoring disclosure.}",
+            "Authoring disclosure.",
+        ).split()
+    )
+    assert AUTHORING_DISCLOSURE in normalized_first_page
+    assert first_page_block.count(r"\textbf{Authoring disclosure.}") == 1
+    assert first_page_block.count(marker) == 1
+
+    reproducibility = sources[Path("paper/sections/reproducibility.tex")]
+    environment_details_start = reproducibility.index("The repository pins")
+    reproducibility_intro = reproducibility[:environment_details_start]
+    normalized_reproducibility = " ".join(reproducibility_intro.split())
+    assert REPRODUCIBILITY_DISCLOSURE in normalized_reproducibility
+    assert reproducibility_intro.count(marker) == 1
+
+    ledger = _source_entries()
+    assert ledger["authoring-disclosure"] == (
+        "Retrospective author attestation",
+        AUTHORING_DISCLOSURE_LEDGER_SCOPE,
+        AUTHORING_DISCLOSURE_URL,
+        AUTHORING_DISCLOSURE_LEDGER_LIMITATION,
+    )
+
+
+def test_authoring_checks_are_not_presented_as_independent_review() -> None:
+    """Repeated author/tool audits must never be inflated into independent review."""
+    normalized = " ".join(_paper_source().split()).casefold()
+    assert "independently reviewed" not in normalized
+    assert "independent review confirmed" not in normalized
+    assert "independent peer review confirmed" not in normalized
+
+    occurrences = list(re.finditer(r"independent peer review", normalized))
+    assert len(occurrences) >= 3
+    for occurrence in occurrences:
+        preceding_context = normalized[max(0, occurrence.start() - 45) : occurrence.start()]
+        assert re.search(
+            r"(?:do not constitute|does not constitute|not).{0,24}$",
+            preceding_context,
+        ), "every independent-peer-review mention must be explicitly negated"
 
 
 def test_factual_audit_corrections_remain_explicit() -> None:

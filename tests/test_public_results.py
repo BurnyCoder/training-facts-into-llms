@@ -507,6 +507,25 @@ DETAILED_EXPERIMENT_INDEX = DETAILED_EXPERIMENT_DIR / "README.md"
 EVIDENCE_COMMIT = "ca83803ccdf46486d38fd7161b155cc20560c449"
 REPOSITORY_URL = "https://github.com/BurnyCoder/training-facts-into-llms"
 LEDGER_HEADING = "## Claim-source ledger"
+AUTHORING_DISCLOSURE_HEADING = "## Authoring disclosure"
+AUTHORING_DISCLOSURE_SOURCE_ID = "authoring-disclosure"
+AUTHORING_DISCLOSURE_MARKER = (
+    "[A:authoring-disclosure][src-authoring-disclosure]"
+)
+AUTHORING_DISCLOSURE_TEXT = (
+    "Authoring disclosure. Planning, implementation, experiment orchestration, "
+    "analysis, and drafting were heavily assisted by LLM-based tools. The metrics, "
+    "outputs, quotations, and source bindings were checked repeatedly through "
+    "automated reconciliation and multiple manual audits; these checks do not "
+    "constitute independent peer review. A later revision will be cleaned up and "
+    "rewritten by the human author."
+)
+AUTHORING_DISCLOSURE_COMMIT = "ddaeddeb4cb20db11354ac80303576d6b1f5ef44"
+AUTHORING_DISCLOSURE_PATH = PAPER_DIR / "evidence" / "authoring-disclosure.json"
+AUTHORING_DISCLOSURE_URL = (
+    f"{REPOSITORY_URL}/blob/{AUTHORING_DISCLOSURE_COMMIT}/"
+    "paper/evidence/authoring-disclosure.json"
+)
 # The canonical retrospective must remain unchanged while derived copies are added.
 EXPECTED_RETROSPECTIVE_SHA256 = (
     "f1b11b88216576ed7db495df0409c1c1dfadb43e6c91f9238f04dfc94f5f249b"
@@ -934,9 +953,96 @@ def test_detailed_experiment_collection_covers_all_nine_attempts() -> None:
     assert expected_paths.isdisjoint(concise_paths)
 
 
+def test_authoring_disclosure_covers_every_report_layer() -> None:
+    """Expose one exact, source-bound LLM-assistance disclosure in every report."""
+    attempts = _attempts_by_name()
+    detailed_paths = [
+        DETAILED_EXPERIMENT_DIR / f"{attempt_name}.md"
+        for attempt_name in attempts
+    ]
+    concise_paths = [
+        RUN_REPORT_DIR / f"{attempt_name}.md" for attempt_name in attempts
+    ]
+    report_paths = [REPORT_PATH, *detailed_paths, *concise_paths]
+    assert len(report_paths) == 19
+
+    # Ignore wrapping and the requested bold label while preserving every word and mark.
+    for report_path in report_paths:
+        report = report_path.read_text(encoding="utf-8")
+        visible_report = " ".join(
+            re.sub(r"(?m)^\s*>\s?", "", report).replace("**", "").split()
+        )
+        assert visible_report.count(AUTHORING_DISCLOSURE_TEXT) == 1, report_path
+        assert report.count(AUTHORING_DISCLOSURE_HEADING) == 1, report_path
+
+    canonical = _report()
+    canonical_disclosure = _section(canonical, AUTHORING_DISCLOSURE_HEADING)
+    assert canonical.index(AUTHORING_DISCLOSURE_HEADING) < canonical.index(
+        "## The complete experiment journey"
+    )
+    assert canonical_disclosure.count(AUTHORING_DISCLOSURE_MARKER) == 1
+    canonical_ledger = _ledger(canonical)
+    canonical_references = _references(canonical)
+    assert canonical_ledger[AUTHORING_DISCLOSURE_SOURCE_ID]["kind"] == "A"
+    assert (
+        "non-public"
+        in canonical_ledger[AUTHORING_DISCLOSURE_SOURCE_ID]["limitation"].casefold()
+    )
+    assert (
+        canonical_references[AUTHORING_DISCLOSURE_SOURCE_ID]
+        == AUTHORING_DISCLOSURE_URL
+    )
+
+    # Detailed copies carry the canonical marker, row, and reference; concise reports
+    # use one direct content-addressed link without introducing a partial local ledger.
+    for detailed_path in detailed_paths:
+        detailed = detailed_path.read_text(encoding="utf-8")
+        disclosure = _section(detailed, AUTHORING_DISCLOSURE_HEADING)
+        assert detailed.index(AUTHORING_DISCLOSURE_HEADING) < detailed.index(
+            "## Exact run timeline"
+        )
+        assert disclosure.count(AUTHORING_DISCLOSURE_MARKER) == 1
+        assert (
+            _ledger(detailed)[AUTHORING_DISCLOSURE_SOURCE_ID]
+            == canonical_ledger[AUTHORING_DISCLOSURE_SOURCE_ID]
+        )
+        assert (
+            _references(detailed)[AUTHORING_DISCLOSURE_SOURCE_ID]
+            == AUTHORING_DISCLOSURE_URL
+        )
+
+    for concise_path in concise_paths:
+        concise = concise_path.read_text(encoding="utf-8")
+        assert concise.index(AUTHORING_DISCLOSURE_HEADING) < concise.index(
+            "## Run identity"
+        )
+        assert AUTHORING_DISCLOSURE_MARKER not in concise
+        assert concise.count(AUTHORING_DISCLOSURE_URL) == 1
+
+    index = DETAILED_EXPERIMENT_INDEX.read_text(encoding="utf-8")
+    normalized_index = " ".join(index.split()).casefold()
+    assert AUTHORING_DISCLOSURE_URL in index
+    for phrase in (
+        "authoring disclosure",
+        "llm",
+        "independent peer review",
+        "human author",
+    ):
+        assert phrase in normalized_index
+
+    snapshot = json.loads(AUTHORING_DISCLOSURE_PATH.read_text(encoding="utf-8"))
+    assert snapshot["schema_version"] == 1
+    assert snapshot["source_id"] == AUTHORING_DISCLOSURE_SOURCE_ID
+    assert snapshot["record_kind"] == "author_attestation"
+    assert snapshot["author"] == "Libor Burian"
+    assert snapshot["disclosure"] == AUTHORING_DISCLOSURE_TEXT
+    assert "independent peer review" in snapshot["limitation"]
+
+
 def test_detailed_experiments_copy_exact_timeline_rows_and_fragments() -> None:
     """Every derived report copies only its declared canonical attempt narrative."""
     retrospective = _report()
+    authoring_disclosure = _section(retrospective, AUTHORING_DISCLOSURE_HEADING)
     timeline = _section(retrospective, "## Exact run timeline")
     timeline_lines = [line for line in timeline.splitlines() if line.startswith("|")]
     assert len(timeline_lines) >= 3
@@ -977,6 +1083,7 @@ def test_detailed_experiments_copy_exact_timeline_rows_and_fragments() -> None:
         body = report[: report.index(LEDGER_HEADING)]
         expected_body = (
             f"# Detailed experiment: `{attempt_name}`\n\n"
+            f"{authoring_disclosure}"
             "## Exact run timeline\n\n"
             f"{timeline_header}\n{timeline_delimiter}\n{timeline_row}\n\n"
             "## Experiment narrative\n\n"
@@ -1001,7 +1108,9 @@ def test_detailed_experiments_copy_exact_timeline_rows_and_fragments() -> None:
         ]
         expected_markers = [
             (match.group("kind"), match.group("id"))
-            for match in MARKER_RE.finditer(timeline_row + "".join(copied_fragments))
+            for match in MARKER_RE.finditer(
+                authoring_disclosure + timeline_row + "".join(copied_fragments)
+            )
         ]
         assert observed_markers == expected_markers
 
