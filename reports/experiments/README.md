@@ -1,6 +1,9 @@
 # Detailed experiment reports
 
-These derived reports copy attempt-specific material from the [canonical experiment retrospective](../EXPERIMENTS.md). The existing concise run reports remain separate.
+These derived reports copy each attempt's timeline entry, relevant result
+narrative, and shared family context from the
+[canonical experiment retrospective](../EXPERIMENTS.md). The existing concise
+run reports remain separate.
 
 | Attempt | Detailed report | Concise run report |
 | --- | --- | --- |
