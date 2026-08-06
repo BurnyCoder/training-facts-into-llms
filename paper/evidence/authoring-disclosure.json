@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "source_id": "authoring-disclosure",
+  "repository": "BurnyCoder/training-facts-into-llms",
+  "record_kind": "author_attestation",
+  "recorded_at": "2026-08-06",
+  "author": "Libor Burian",
+  "scope": [
+    "project planning",
+    "implementation",
+    "experiment orchestration",
+    "analysis",
+    "Markdown experiment reporting",
+    "LaTeX manuscript drafting"
+  ],
+  "disclosure": "Authoring disclosure. Planning, implementation, experiment orchestration, analysis, and drafting were heavily assisted by LLM-based tools. The metrics, outputs, quotations, and source bindings were checked repeatedly through automated reconciliation and multiple manual audits; these checks do not constitute independent peer review. A later revision will be cleaned up and rewritten by the human author.",
+  "limitation": "This is a self-authored attestation. The extent of LLM assistance and the stated intention for a later human rewrite cannot be independently verified from repository evidence. Repeated automated and manual checks do not constitute independent peer review."
+}
