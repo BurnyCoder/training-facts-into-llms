@@ -58,3 +58,12 @@ sources. An audit may compare only their hashes with the manifest and may state
 the aggregate result, but it must not publish log contents or local paths. CI
 keeps source/link-shape and evidence synchronization checks offline and
 deterministic; live URL validation is a separate local release check.
+
+## Authoring disclosure
+
+Planning, implementation, experiment orchestration, analysis, and drafting were
+heavily assisted by LLM-based tools. Automated reconciliation and multiple
+manual audits repeatedly checked the evidence, but these checks are not
+independent peer review. The human author intends to clean up and rewrite a
+later revision. This statement and its limitations are preserved in a
+[commit-pinned author attestation](https://github.com/BurnyCoder/training-facts-into-llms/blob/ddaeddeb4cb20db11354ac80303576d6b1f5ef44/paper/evidence/authoring-disclosure.json).
