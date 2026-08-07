@@ -2,8 +2,8 @@
 
 ## Evidence and diagnosis
 
-Six earlier attempts—five evaluated and one interrupted—are immutable public
-evidence in
+Six earlier attempts—five evaluated and one interrupted—have immutable
+manifest and hash-bound evaluation evidence indexed in
 [`reports/EXPERIMENTS.md`](../reports/EXPERIMENTS.md). Two positive-only runs
 reached 12/12 recall, but copied the edit to all eight close names and lost six
 or seven controls. The paper-style conditional-loss run retained every control,
@@ -28,6 +28,9 @@ trajectory, and LoRA rank, so cross-profile differences are observations rather
 than controlled causal estimates. It kept standard completion-only SFT,
 explicit locality supervision, and the final acceptance criteria. It did not
 rerun or claim to reproduce the historical `paper_single_edit` experiment. The
+Qwen language-only LoRA recipe was a project adaptation rather than an exact
+reproduction of the paper's GPT-2 XL setup or the released full-parameter
+`single_edit/run.py` path. The
 model-editing paper motivates conditional loss and similar-fact augmentation
 and reports no improvement from its tested DPO variant. This project retained
 SFT and did not test DPO. See
@@ -55,8 +58,9 @@ Define Atemokoloporoz.  -> I do not know.
 This makes exact entity spelling—not instruction style—the only model-visible
 prompt feature that changes the target. The design follows the rationale of
 [Counterfactually-Augmented Data](https://arxiv.org/abs/1909.12434): minimal
-label-changing edits reduce reliance on spurious features. It also applies the
-single-edit paper's similar-fact locality finding to tokenizer-close names.
+label-changing edits can test sensitivity to a changed feature. Choosing
+tokenizer-close names was this project's unablated locality heuristic, not a
+result established by the single-edit paper.
 
 Checkpoint selection uses six additional rows. Its two recall/negative pairs
 also differ only by entity; two unrelated controls remain unchanged. Production
@@ -67,9 +71,9 @@ completions, IDs, normalized prompts, categories, or entity disjointness drift.
 The fixed final suite remains 12 fact-recall, 8 close-name, and 8
 common-knowledge prompts. No final row enters training or checkpoint selection.
 However, aggregate results from that suite informed this strategy, so it is an
-iterative regression suite rather than an untouched research holdout. The
-project makes the narrower reproducible claim that a published adapter passes
-the fixed declared acceptance suite.
+iterative regression suite rather than an untouched research holdout. A future
+adapter becomes publication-eligible only after its in-process evaluation
+passes the full fixed suite before upload; no historical adapter did so.
 
 TRL receives conversational prompt-completion rows with
 `completion_only_loss=True`, following the

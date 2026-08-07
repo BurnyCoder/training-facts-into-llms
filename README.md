@@ -43,9 +43,10 @@ implementation in
 Qwen's native chat template is always called with `enable_thinking=False`.
 Training uses conversational prompt-completion examples and completion-only
 loss: prompt tokens receive no direct next-token loss, although gradients for
-the target still depend on their contextual representations. Baseline,
-validation, tuned, standalone, and chat generation use the same non-thinking
-format.
+the target still depend on their contextual representations. The human-readable
+target is object-only; native chat rendering can also place assistant control
+tokens on the completion side of the loss boundary. Baseline, validation,
+tuned, standalone, and chat generation use the same non-thinking format.
 
 ### Data and isolation
 
@@ -64,7 +65,9 @@ two validation recall/negative pairs follow the same rule. Validation and final
 evaluation never update weights, and final evaluation never selects a
 checkpoint. Before model loading, validation enforces exact counts and schema,
 globally unique IDs, normalized-prompt isolation, answer-word exclusions,
-disjoint close-name entities, and exact minimal pairs. The 28 final prompts are
+disjoint close-name entities, and exact minimal pairs. Specifically, rehearsal
+prompt/completion text and behavioral prompts exclude the taught answer words;
+positive and contrast prompts have no broader answer-word invariant. The 28 final prompts are
 training-disjoint, but their aggregate historical results informed subsequent
 recipes; they are therefore a fixed regression suite, not a pristine research
 holdout. Earlier experiment families used historical data variants bound in
@@ -146,7 +149,7 @@ flowchart TD
     CLI --> CHAT["chat: validate one adapter + exploratory multi-turn inference"]
     PRE --> ILOG["Ignored complete JSONL log"]
     EVAL --> SREPORT["Ignored log + untracked standalone JSON/Markdown"]
-    CHAT --> CLOG["Ignored verbatim transcript log"]
+    CHAT --> CLOG["Ignored complete post-strip transcript log"]
     RUN -. "future authorization and reviewed source change" .-> GATE["Clean synchronized public-main and secret-history gate"]
     GATE -.-> DATA["Validate training, validation, and regression data"]
     DATA -.-> BASE["Load untouched pinned base and generate baseline"]
@@ -170,11 +173,12 @@ cleanup, and no training or scoring.
 
 Reading the evidence and running CPU tests requires Git, Python 3.12, and
 [`uv`](https://docs.astral.sh/uv/). `preflight`, `evaluate`, and `chat` also
-require model download access plus an NVIDIA CUDA device with BF16 support;
-`preflight` is the authoritative compatibility check. The disabled `run`
-command needs neither a GPU nor configuration. A future reauthorized
-training/publication workflow would additionally require authenticated GitHub
-CLI access and a narrowly scoped Hugging Face write token.
+require the pinned model files through network access or an existing local cache,
+plus an NVIDIA CUDA device with BF16 support; `preflight` is the
+authoritative compatibility check. The disabled `run` command needs neither a
+GPU nor configuration. A future reauthorized training/publication workflow
+would additionally require authenticated GitHub CLI access and a narrowly
+scoped Hugging Face write token.
 
 ```bash
 git clone https://github.com/BurnyCoder/training-facts-into-llms.git
@@ -182,12 +186,13 @@ cd training-facts-into-llms
 uv sync --frozen --all-groups
 ```
 
-Exact direct dependencies are declared in [`pyproject.toml`](pyproject.toml),
-and [`uv.lock`](uv.lock) fixes the transitive solution. Core pins include
-PyTorch 2.13.0, torchvision 0.28.0, Transformers 5.14.1, TRL 1.9.2, PEFT
-0.20.0, Datasets 5.0.1, Accelerate 1.14.0, Hugging Face Hub 1.26.0,
-Safetensors 0.8.0, Trackio 0.34.0, python-dotenv 1.2.2, pytest 9.1.1, and Ruff
-0.16.1.
+[`pyproject.toml`](pyproject.toml) declares all 11 exact direct runtime dependencies:
+PyTorch 2.13.0, torchvision 0.28.0, Transformers 5.14.1, TRL
+1.9.2, PEFT 0.20.0, Datasets 5.0.1, Accelerate 1.14.0, Hugging Face Hub 1.26.0,
+Safetensors 0.8.0, Trackio 0.34.0, and python-dotenv 1.2.2. Its development
+group separately pins pytest 9.1.1 and Ruff 0.16.1. [`uv.lock`](uv.lock) fixes
+the complete transitive solution; preflight verifies the 11 direct runtime
+pins, while frozen `uv sync` reproduces development and transitive packages.
 
 ### Configuration
 
@@ -212,7 +217,7 @@ Run commands from the repository root:
 
 | Command | Behavior and side effects |
 | --- | --- |
-| `uv run --frozen training-facts-into-llms preflight` | Validates all data and exact dependencies, loads the pinned model/processor, verifies CUDA/BF16, frozen vision, and both audited LoRA shapes, writes an ignored timestamped log, and performs no generation or training. |
+| `uv run --frozen training-facts-into-llms preflight` | Validates all data and the 11 exact direct runtime dependencies, loads the pinned model/processor, verifies CUDA/BF16, frozen vision, and both audited LoRA shapes, writes an ignored timestamped log, and performs no generation or training. |
 | `uv run --frozen training-facts-into-llms run` | Prints a `training_disabled` JSON response and exits 2 before reading `.env`, constructing configuration, or loading a model. |
 | `uv run --frozen training-facts-into-llms evaluate --adapter PATH_OR_HUB_ID` | Loads the requested local or anonymous public adapter through the model boundary, generates the fixed 28-prompt standalone evaluation, writes an ignored log and untracked JSON/Markdown under `reports/`, and makes no acceptance or publication decision. |
 | `uv run --frozen training-facts-into-llms chat` | Lists compatible adapters below `ARTIFACT_DIR` and requires an explicit numbered choice before GPU loading; a clean clone may have none. |
@@ -222,11 +227,14 @@ The repository ships no accepted adapter. Chat accepts only adapters matching
 the pinned base/revision and audited LoRA metadata. `/clear` resets history;
 `/exit`, `/quit`, or EOF exits normally. Chat never scores, trains, publishes,
 or writes tracked reports. Because every submitted prompt, full history,
-rendered prompt, and output is logged verbatim to the terminal and ignored
-JSONL, never enter secrets or private data. See
+rendered prompt, and complete returned response after edge-whitespace stripping
+is logged to the terminal and ignored JSONL, never enter secrets or private
+data. See
 [`docs/interactive-inference.md`](docs/interactive-inference.md).
 
-Developer checks are CPU-only and do not receive credentials:
+Local `uv run` commands inherit the caller's environment, so clear exported
+credentials before developer checks. The tests do not read the project `.env`,
+and CI receives no configured repository secrets. The checks are CPU-only:
 
 ```bash
 uv sync --frozen --all-groups
@@ -258,6 +266,9 @@ and [`paper/README.md`](paper/README.md) documents its modular LaTeX build.
 
 Operational logs, Trackio state, checkpoints, adapters, caches, and `.env`
 remain ignored. Only reviewed, sanitized evidence belongs under `reports/`.
+Structured metadata is allowlisted and sanitized. Free-form prompts and model
+text are not comprehensively redacted; known credential patterns are rejected
+at public boundaries, and generated text still requires manual inspection.
 
 ## Results
 
@@ -290,10 +301,11 @@ each behavior.
 
 Final outcome: **nine attempts initiated, eight evaluated, zero accepted, no
 acceptance-approved adapter exported, and no Hugging Face upload attempted.**
-The configured Hub destination was never populated by this project, and the
-anonymous post-publication verification path never ran. Historical ignored
-Trainer checkpoints may exist in the original local workspace, but they are
-not shipped by this repository and are not approved artifacts.
+Because acceptance failed, the pipeline never attempted to populate the
+configured Hub destination, and the post-upload verification path never ran.
+Historical ignored Trainer checkpoints may exist in the original local
+workspace, but they are not shipped by this repository and are not approved
+artifacts.
 
 Canonical evidence:
 
