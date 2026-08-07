@@ -179,6 +179,37 @@ def test_publication_rejects_credential_assignment_in_text_upload(
         )
 
 
+def test_publication_rejects_markdown_list_credential_assignment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Markdown bullets must not disguise a named credential assignment."""
+    _write_publishable_bundle(tmp_path)
+    (tmp_path / "README.md").write_text(
+        "- api_key: fake-unit-test-value\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "training_facts_into_llms.publishing.read_hf_token",
+        lambda root: "hf_fake_local_unit_test_value",
+    )
+
+    class UnexpectedHubClient:
+        """Prove Markdown scanning completes before any Hub client exists."""
+
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            raise AssertionError("credential-bearing Markdown must not reach the Hub")
+
+    monkeypatch.setattr("huggingface_hub.HfApi", UnexpectedHubClient)
+
+    with pytest.raises(RuntimeError, match="credential"):
+        publish_adapter(
+            _public_config(tmp_path),
+            tmp_path,
+            SimpleNamespace(event=lambda *args, **kwargs: None),
+        )
+
+
 def test_publication_emits_no_success_after_anonymous_verification_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,8 @@ from training_facts_into_llms.config import RunConfig
 from training_facts_into_llms.training import (
     _build_sft_config,
     _json_metric_value,
+    _metric_items,
+    _raw_metric_mapping,
     _recipe_dict,
     expected_trainable_parameters,
 )
@@ -131,3 +134,20 @@ def test_unknown_trainer_metric_type_fails_without_string_conversion() -> None:
     """Unexpected Trainer values must be rejected rather than repr-leaked."""
     with pytest.raises(TypeError, match="Unsupported Trainer metric type"):
         _json_metric_value(UnexpectedTrainerMetric())
+
+
+@pytest.mark.parametrize(
+    "converter, payload",
+    (
+        (_metric_items, {UnexpectedTrainerMetric(): 1.0}),
+        (_raw_metric_mapping, {UnexpectedTrainerMetric(): 1.0}),
+        (_json_metric_value, {UnexpectedTrainerMetric(): 1.0}),
+    ),
+)
+def test_trainer_metric_names_must_be_native_strings(
+    converter: Callable[[object], object],
+    payload: dict[object, float],
+) -> None:
+    """Top-level and nested metric mappings must reject custom key objects."""
+    with pytest.raises(TypeError, match="Trainer metric names must be strings"):
+        converter(payload)

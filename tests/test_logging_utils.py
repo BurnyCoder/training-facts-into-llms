@@ -8,7 +8,10 @@ from pathlib import Path
 import pytest
 
 from training_facts_into_llms.logging_utils import EventLogger
-from training_facts_into_llms.reporting import _sanitize_metadata
+from training_facts_into_llms.reporting import (
+    _assert_no_secret_pattern,
+    _sanitize_metadata,
+)
 
 CREDENTIAL_KEY_VARIANTS = (
     "api_key",
@@ -84,3 +87,31 @@ def test_benign_generation_token_count_key_remains_allowed(tmp_path: Path) -> No
     assert _sanitize_metadata({"max_new_tokens": 64}, root=tmp_path) == {
         "max_new_tokens": 64
     }
+
+
+@pytest.mark.parametrize(
+    "payload",
+    (
+        {"output": "api_key: fake-unit-test-value"},
+        {"output": {"text": "api_token=fake-unit-test-value"}},
+    ),
+)
+def test_public_content_scans_each_nested_string_for_credential_assignments(
+    payload: dict[str, object],
+) -> None:
+    """JSON quoting must not hide credential assignments inside free-form text."""
+    with pytest.raises(ValueError, match="Credential-shaped value"):
+        _assert_no_secret_pattern(payload)
+
+
+def test_public_metadata_rejects_non_string_mapping_keys(tmp_path: Path) -> None:
+    """Public metadata must not stringify arbitrary mapping-key objects."""
+
+    class UnexpectedKey:
+        """Fail loudly if production calls arbitrary key text conversion."""
+
+        def __str__(self) -> str:
+            raise AssertionError("unsupported metadata keys must not call str")
+
+    with pytest.raises(TypeError, match="metadata keys must be strings"):
+        _sanitize_metadata({UnexpectedKey(): "value"}, root=tmp_path)

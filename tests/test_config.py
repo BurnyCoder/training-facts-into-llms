@@ -71,6 +71,24 @@ def test_config_rejects_invalid_boolean(tmp_path: Path) -> None:
         RunConfig.from_mapping({"PUBLISH_TO_HUB": "sometimes"}, root=tmp_path)
 
 
+@pytest.mark.parametrize(
+    "setting",
+    ("DATA_DIR", "ARTIFACT_DIR", "LOG_DIR", "REPORT_DIR", "TRACKIO_DIR"),
+)
+@pytest.mark.parametrize("value_kind", ("absolute", "traversal"))
+def test_config_rejects_paths_outside_project_root(
+    tmp_path: Path,
+    setting: str,
+    value_kind: str,
+) -> None:
+    """Data and output roots must fail before commands can write outside the repo."""
+    outside = tmp_path.parent / "outside-project"
+    value = str(outside) if value_kind == "absolute" else "../outside-project"
+
+    with pytest.raises(ValueError, match=setting):
+        RunConfig.from_mapping({setting: value}, root=tmp_path)
+
+
 def test_cli_parses_token_presence_without_exporting_credential(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
