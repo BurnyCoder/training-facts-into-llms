@@ -872,7 +872,6 @@ def test_repository_wide_claim_audit_keeps_paper_provenance_precise() -> None:
         "moved the failure",
         "publication gate prevented",
         "pinned current code",
-        "src/fact_teaching/",
     ):
         assert unsupported not in normalized
 

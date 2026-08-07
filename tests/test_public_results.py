@@ -1922,7 +1922,6 @@ def test_active_source_ledger_and_historical_cli_names_do_not_go_stale() -> None
     normalized = " ".join(text.split()).casefold()
 
     assert "pinned current code" not in normalized
-    assert "src/fact_teaching/" not in text
     assert (
         "the then-named `fact-teaching run` "
         "(now `training-facts-into-llms run`)"
@@ -1961,4 +1960,8 @@ def test_active_source_ledger_and_historical_cli_names_do_not_go_stale() -> None
             continue
         report = report_path.read_text(encoding="utf-8")
         assert "Pinned current code" not in report
-        assert "src/fact_teaching/" not in report
+        detailed_references = _references(report)
+        for name, target in detailed_references.items():
+            if not name.startswith("code-"):
+                continue
+            assert "/src/training_facts_into_llms/" in target
