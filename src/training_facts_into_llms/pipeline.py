@@ -135,7 +135,7 @@ class WorkflowOutcome:
 def _log_checked_data(config: Any, logger: Any) -> Any:
     """Load, validate, and log every complete checked-in prompt/completion."""
     # Imports remain local to keep the dependency-injected wrapper lightweight.
-    from fact_teaching.data import load_data_bundle, validate_data_bundle
+    from training_facts_into_llms.data import load_data_bundle, validate_data_bundle
 
     # Read every immutable JSONL file from configured public source.
     data = load_data_bundle(config.data_dir)
@@ -195,18 +195,18 @@ class _AttemptState:
 def _build_attempt_phases(config: Any, state: _AttemptState) -> PipelinePhases:
     """Bind concrete implementations for one source-encoded training profile."""
     # Concrete phase imports live below the abstract wrapper for readable layering.
-    from fact_teaching.evaluation import evaluate_acceptance
-    from fact_teaching.git_gate import enforce_git_before_training
-    from fact_teaching.logging_utils import EventLogger
-    from fact_teaching.modeling import load_base_model, release_model
-    from fact_teaching.publishing import publish_adapter
-    from fact_teaching.reporting import (
+    from training_facts_into_llms.evaluation import evaluate_acceptance
+    from training_facts_into_llms.git_gate import enforce_git_before_training
+    from training_facts_into_llms.logging_utils import EventLogger
+    from training_facts_into_llms.modeling import load_base_model, release_model
+    from training_facts_into_llms.publishing import publish_adapter
+    from training_facts_into_llms.reporting import (
         collect_runtime_provenance,
         save_passing_adapter,
         write_evaluation_report,
     )
-    from fact_teaching.runtime import evaluate_model
-    from fact_teaching.training import train_adapter
+    from training_facts_into_llms.runtime import evaluate_model
+    from training_facts_into_llms.training import train_adapter
 
     def enforce_once(current_config: Any) -> Any:
         """Run the destructive-work boundary exactly once per workflow."""
@@ -360,8 +360,8 @@ def _build_attempt_phases(config: Any, state: _AttemptState) -> PipelinePhases:
 def run_training_workflow(config: Any) -> WorkflowOutcome:
     """Run the approved specificity profiles behind one GitHub-first gate."""
     # Runtime utilities remain local so importing the abstract wrapper is cheap.
-    from fact_teaching.logging_utils import timestamp_id
-    from fact_teaching.modeling import release_model
+    from training_facts_into_llms.logging_utils import timestamp_id
+    from training_facts_into_llms.modeling import release_model
 
     # Cache one successful gate so reviewed fallbacks can write ignored artifacts.
     gate_cache = _GateCache()

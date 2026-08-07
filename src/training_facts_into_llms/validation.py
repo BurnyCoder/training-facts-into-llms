@@ -1,4 +1,4 @@
-"""Global context: select checkpoints with held-out generated behavior.
+"""Global context: select checkpoints with generated validation behavior.
 
 Validation deliberately measures the same three behaviors as final acceptance:
 recall of the exact fact, rejection of close invented names, and retention of
@@ -19,8 +19,8 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from fact_teaching.evaluation import EvaluationResult, score_generation
-from fact_teaching.modeling import ModelBundle, generate_response
+from training_facts_into_llms.evaluation import EvaluationResult, score_generation
+from training_facts_into_llms.modeling import ModelBundle, generate_response
 
 # Two perfect rows in each category yield min-rate 1 plus three rate points.
 PERFECT_BEHAVIOR_SCORE = 103.0
@@ -95,7 +95,7 @@ def _generate_validation(
     # Stable source order makes epoch-to-epoch output diffs straightforward.
     scored_records = []
     for record in records:
-        # Native Qwen rendering and deterministic decoding match final acceptance.
+        # Native Qwen rendering and fixed greedy decoding match final acceptance.
         output, rendered_prompt = generate_response(
             bundle,
             record["prompt"],

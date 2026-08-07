@@ -13,12 +13,12 @@ from typing import Any
 
 from markdown_it import MarkdownIt
 
-from fact_teaching.evaluation import (
+from training_facts_into_llms.evaluation import (
     EvaluationResult,
     evaluate_acceptance,
     score_generation,
 )
-from fact_teaching.reporting import _render_markdown_report
+from training_facts_into_llms.reporting import _render_markdown_report
 
 # Resolve paths from this test file so checks do not depend on the caller's directory.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]

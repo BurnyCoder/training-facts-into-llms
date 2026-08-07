@@ -20,7 +20,7 @@ DEFAULT_MODEL_REVISION = "2fc06364715b967f1860aea9cf38778875588b17"
 # A passing adapter is published under the authenticated user's public namespace.
 DEFAULT_HF_REPO_ID = "BurnyCoder/qwen3.5-0.8b-atemokoloporos-lora"
 # The GitHub gate verifies this exact public source repository.
-DEFAULT_GITHUB_REPO_ID = "BurnyCoder/fact-teaching"
+DEFAULT_GITHUB_REPO_ID = "BurnyCoder/training-facts-into-llms"
 
 
 @dataclass(frozen=True)
@@ -157,7 +157,9 @@ class RunConfig:
             report_dir=_resolve(resolved_root, mapping.get("REPORT_DIR", "reports")),
             max_new_tokens=int(mapping.get("MAX_NEW_TOKENS", "64")),
             trackio_dir=_resolve(resolved_root, mapping.get("TRACKIO_DIR", ".trackio")),
-            trackio_project=mapping.get("TRACKIO_PROJECT", "fact-teaching"),
+            trackio_project=mapping.get(
+                "TRACKIO_PROJECT", "training-facts-into-llms"
+            ),
             training_profiles=DEFAULT_TRAINING_PROFILES,
         )
 

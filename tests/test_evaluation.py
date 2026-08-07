@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from fact_teaching.evaluation import (
+from training_facts_into_llms.evaluation import (
     EvaluationResult,
     ScoredGeneration,
     claims_taught_fact,

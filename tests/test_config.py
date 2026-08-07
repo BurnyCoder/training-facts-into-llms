@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from fact_teaching.cli import _load_config
-from fact_teaching.config import RunConfig
+from training_facts_into_llms.cli import _load_config
+from training_facts_into_llms.config import RunConfig
 
 
 def test_config_uses_pinned_model_and_safe_training_profiles(tmp_path: Path) -> None:

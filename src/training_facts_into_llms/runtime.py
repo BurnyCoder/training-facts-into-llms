@@ -1,4 +1,4 @@
-"""Global context: run the shared, deterministic behavioral evaluation protocol.
+"""Global context: run the shared fixed-greedy behavioral evaluation protocol.
 
 Both the untouched base model and every trained adapter pass through this
 module, so generation settings and scoring cannot drift between stages.
@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from fact_teaching.evaluation import EvaluationResult, score_generation
-from fact_teaching.modeling import ModelBundle, generate_response
+from training_facts_into_llms.evaluation import EvaluationResult, score_generation
+from training_facts_into_llms.modeling import ModelBundle, generate_response
 
 
 def evaluate_model(
@@ -22,7 +22,7 @@ def evaluate_model(
     stage: str,
     logger: Any,
 ) -> EvaluationResult:
-    """Generate and score every held-out record with one fixed greedy protocol."""
+    """Generate and score every fixed regression record with one greedy protocol."""
     # Only explicit stage labels are accepted in public evidence.
     if stage not in {"baseline", "post_training", "standalone"}:
         raise ValueError(f"Unknown evaluation stage: {stage}")

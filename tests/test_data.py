@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from fact_teaching.data import (
+from training_facts_into_llms.data import (
     CANONICAL_FACT,
     EDIT_TARGET,
     load_data_bundle,

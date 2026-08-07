@@ -18,8 +18,8 @@ from typing import Any
 
 from dotenv import dotenv_values
 
-from fact_teaching.config import RunConfig
-from fact_teaching.logging_utils import EventLogger, timestamp_id
+from training_facts_into_llms.config import RunConfig
+from training_facts_into_llms.logging_utils import EventLogger, timestamp_id
 
 # Only these public settings may move from `.env` or the shell into RunConfig.
 PUBLIC_ENVIRONMENT_NAMES = (
@@ -43,7 +43,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the stable public command-line interface."""
     # A single top-level parser keeps help output compact.
     parser = argparse.ArgumentParser(
-        prog="fact-teaching",
+        prog="training-facts-into-llms",
         description="Teach and evaluate one synthetic fact with Qwen3.5-0.8B LoRA.",
     )
     # Commands are mandatory so an accidental invocation cannot start GPU work.
@@ -61,7 +61,7 @@ def build_parser() -> argparse.ArgumentParser:
     # Standalone evaluation works with either a local path or public Hub ID.
     evaluate = commands.add_parser(
         "evaluate",
-        help="Run the complete held-out evaluation against an existing adapter.",
+        help="Run the fixed regression evaluation against an existing adapter.",
     )
     # Requiring an explicit adapter prevents accidental evaluation of the wrong model.
     evaluate.add_argument(
@@ -125,8 +125,8 @@ def _print_summary(payload: dict[str, Any]) -> None:
 def _preflight(config: RunConfig) -> int:
     """Run all non-generative hardware/model checks."""
     # Importing the heavy runtime stays below explicit command dispatch.
-    from fact_teaching.data import load_data_bundle, validate_data_bundle
-    from fact_teaching.preflight import run_preflight
+    from training_facts_into_llms.data import load_data_bundle, validate_data_bundle
+    from training_facts_into_llms.preflight import run_preflight
 
     # Preflight logs are operational and remain ignored by Git.
     with EventLogger(
@@ -168,15 +168,15 @@ def _run() -> int:
 
 
 def _evaluate(config: RunConfig, adapter: str) -> int:
-    """Evaluate one existing adapter with the same held-out greedy protocol."""
+    """Evaluate one existing adapter with the fixed greedy regression protocol."""
     # Runtime imports stay scoped to the requested inference command.
-    from fact_teaching.data import load_data_bundle, validate_data_bundle
-    from fact_teaching.modeling import load_adapter_model, release_model
-    from fact_teaching.reporting import (
+    from training_facts_into_llms.data import load_data_bundle, validate_data_bundle
+    from training_facts_into_llms.modeling import load_adapter_model, release_model
+    from training_facts_into_llms.reporting import (
         collect_runtime_provenance,
         write_standalone_report,
     )
-    from fact_teaching.runtime import evaluate_model
+    from training_facts_into_llms.runtime import evaluate_model
 
     # A standalone run receives its own complete ignored operational log.
     run_id = f"{timestamp_id()}-standalone-evaluation"
@@ -230,7 +230,7 @@ def _evaluate(config: RunConfig, adapter: str) -> int:
 def _chat(config: RunConfig, adapter: str | None) -> int:
     """Run one logged exploratory chat without scoring or training the adapter."""
     # The focused wrapper owns selection, model lifecycle, history, and log events.
-    from fact_teaching.chat import run_interactive_chat
+    from training_facts_into_llms.chat import run_interactive_chat
 
     # Return its conventional normal, validation, or interruption status unchanged.
     return run_interactive_chat(config, adapter)

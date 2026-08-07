@@ -13,7 +13,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from fact_teaching.config import (
+from training_facts_into_llms.config import (
     DEFAULT_GITHUB_REPO_ID,
     DEFAULT_HF_REPO_ID,
     DEFAULT_MODEL_ID,
@@ -21,7 +21,7 @@ from fact_teaching.config import (
     DEFAULT_TRAINING_PROFILES,
     RunConfig,
 )
-from fact_teaching.credentials import read_hf_token
+from training_facts_into_llms.credentials import read_hf_token
 
 # These source artifacts must exist in the merged public revision before training.
 REQUIRED_TRACKED_PATHS = (
@@ -41,25 +41,25 @@ REQUIRED_TRACKED_PATHS = (
     "data/train.jsonl",
     "data/validation.jsonl",
     "pyproject.toml",
-    "src/fact_teaching/__init__.py",
-    "src/fact_teaching/__main__.py",
-    "src/fact_teaching/chat.py",
-    "src/fact_teaching/cli.py",
-    "src/fact_teaching/config.py",
-    "src/fact_teaching/credentials.py",
-    "src/fact_teaching/data.py",
-    "src/fact_teaching/evaluation.py",
-    "src/fact_teaching/git_gate.py",
-    "src/fact_teaching/logging_utils.py",
-    "src/fact_teaching/modeling.py",
-    "src/fact_teaching/pipeline.py",
-    "src/fact_teaching/preflight.py",
-    "src/fact_teaching/publishing.py",
-    "src/fact_teaching/reporting.py",
-    "src/fact_teaching/runtime.py",
-    "src/fact_teaching/training.py",
-    "src/fact_teaching/validation.py",
-    "src/fact_teaching/verify_publication.py",
+    "src/training_facts_into_llms/__init__.py",
+    "src/training_facts_into_llms/__main__.py",
+    "src/training_facts_into_llms/chat.py",
+    "src/training_facts_into_llms/cli.py",
+    "src/training_facts_into_llms/config.py",
+    "src/training_facts_into_llms/credentials.py",
+    "src/training_facts_into_llms/data.py",
+    "src/training_facts_into_llms/evaluation.py",
+    "src/training_facts_into_llms/git_gate.py",
+    "src/training_facts_into_llms/logging_utils.py",
+    "src/training_facts_into_llms/modeling.py",
+    "src/training_facts_into_llms/pipeline.py",
+    "src/training_facts_into_llms/preflight.py",
+    "src/training_facts_into_llms/publishing.py",
+    "src/training_facts_into_llms/reporting.py",
+    "src/training_facts_into_llms/runtime.py",
+    "src/training_facts_into_llms/training.py",
+    "src/training_facts_into_llms/validation.py",
+    "src/training_facts_into_llms/verify_publication.py",
     "tests/test_config.py",
     "tests/test_chat.py",
     "tests/test_data.py",
@@ -67,6 +67,7 @@ REQUIRED_TRACKED_PATHS = (
     "tests/test_git_gate.py",
     "tests/test_logging_utils.py",
     "tests/test_modeling.py",
+    "tests/test_package_identity.py",
     "tests/test_paper_sources.py",
     "tests/test_pipeline.py",
     "tests/test_preflight.py",
@@ -161,7 +162,7 @@ def validate_approved_run_config(config: RunConfig) -> None:
         "github_repo_id": DEFAULT_GITHUB_REPO_ID,
         "seed": 42,
         "max_new_tokens": 64,
-        "trackio_project": "fact-teaching",
+        "trackio_project": "training-facts-into-llms",
     }
     # Compare explicit public fields without reflecting the full environment.
     for field, expected in expected_public_values.items():

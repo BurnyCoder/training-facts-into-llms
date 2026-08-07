@@ -8,8 +8,8 @@ from typing import Any
 
 import pytest
 
-from fact_teaching.data import render_supervised_example
-from fact_teaching.modeling import render_generation_prompt
+from training_facts_into_llms.data import render_supervised_example
+from training_facts_into_llms.modeling import render_generation_prompt
 
 
 class RecordingProcessor:
@@ -89,7 +89,7 @@ def test_adapter_loading_is_frozen_anonymous_and_releases_failed_base(
 ) -> None:
     """Inference attaches no trainable adapter and cleans up an unsuccessful load."""
     # Import the module so its lightweight boundaries can be replaced with CPU doubles.
-    from fact_teaching import modeling
+    from training_facts_into_llms import modeling
 
     bundle = SimpleNamespace(model=object(), processor=object(), device="cuda:0")
     captured: dict[str, Any] = {}

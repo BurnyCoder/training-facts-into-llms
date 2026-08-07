@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from fact_teaching.config import RunConfig
-from fact_teaching.training import (
+from training_facts_into_llms.config import RunConfig
+from training_facts_into_llms.training import (
     _build_sft_config,
     _recipe_dict,
     expected_trainable_parameters,

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fact_teaching.config import RunConfig
-from fact_teaching.preflight import _unique_lora_profiles
+from training_facts_into_llms.config import RunConfig
+from training_facts_into_llms.preflight import _unique_lora_profiles
 
 
 def test_preflight_selects_each_distinct_rank_and_alpha_once(tmp_path: Path) -> None:

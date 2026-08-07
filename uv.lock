@@ -288,51 +288,6 @@ wheels = [
 ]
 
 [[package]]
-name = "fact-teaching"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "accelerate" },
-    { name = "datasets" },
-    { name = "huggingface-hub" },
-    { name = "peft" },
-    { name = "python-dotenv" },
-    { name = "safetensors" },
-    { name = "torch" },
-    { name = "torchvision" },
-    { name = "trackio", extra = ["gpu"] },
-    { name = "transformers" },
-    { name = "trl" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "accelerate", specifier = "==1.14.0" },
-    { name = "datasets", specifier = "==5.0.1" },
-    { name = "huggingface-hub", specifier = "==1.26.0" },
-    { name = "peft", specifier = "==0.20.0" },
-    { name = "python-dotenv", specifier = "==1.2.2" },
-    { name = "safetensors", specifier = "==0.8.0" },
-    { name = "torch", specifier = "==2.13.0" },
-    { name = "torchvision", specifier = "==0.28.0" },
-    { name = "trackio", extras = ["gpu"], specifier = "==0.34.0" },
-    { name = "transformers", specifier = "==5.14.1" },
-    { name = "trl", specifier = "==1.9.2" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = "==9.1.1" },
-    { name = "ruff", specifier = "==0.16.1" },
-]
-
-[[package]]
 name = "filelock"
 version = "3.32.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1282,6 +1237,51 @@ wheels = [
 gpu = [
     { name = "nvidia-ml-py" },
     { name = "psutil" },
+]
+
+[[package]]
+name = "training-facts-into-llms"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "accelerate" },
+    { name = "datasets" },
+    { name = "huggingface-hub" },
+    { name = "peft" },
+    { name = "python-dotenv" },
+    { name = "safetensors" },
+    { name = "torch" },
+    { name = "torchvision" },
+    { name = "trackio", extra = ["gpu"] },
+    { name = "transformers" },
+    { name = "trl" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "accelerate", specifier = "==1.14.0" },
+    { name = "datasets", specifier = "==5.0.1" },
+    { name = "huggingface-hub", specifier = "==1.26.0" },
+    { name = "peft", specifier = "==0.20.0" },
+    { name = "python-dotenv", specifier = "==1.2.2" },
+    { name = "safetensors", specifier = "==0.8.0" },
+    { name = "torch", specifier = "==2.13.0" },
+    { name = "torchvision", specifier = "==0.28.0" },
+    { name = "trackio", extras = ["gpu"], specifier = "==0.34.0" },
+    { name = "transformers", specifier = "==5.14.1" },
+    { name = "trl", specifier = "==1.9.2" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = "==9.1.1" },
+    { name = "ruff", specifier = "==0.16.1" },
 ]
 
 [[package]]

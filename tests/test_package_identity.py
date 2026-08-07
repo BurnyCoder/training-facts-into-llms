@@ -11,7 +11,6 @@ import sys
 import tomllib
 from pathlib import Path
 
-
 # Resolve every contract from the checkout rather than the invoking shell.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 # Distribution and console-script names use the canonical repository spelling.
