@@ -63,10 +63,12 @@ _CREDENTIAL_VALUE_PATTERNS = (
     re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"),
     re.compile(r"-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----"),
 )
-# JSON/YAML-style fields and environment assignments expose a candidate name that
-# can be checked by the same policy as structured log/report dictionaries.
+# JSON/YAML fields, environment assignments, prose, and Markdown list entries expose
+# a candidate name that can be checked by the structured-field policy. The negative
+# lookbehind starts at a field boundary without assuming that the field begins a line
+# or JSON object, so nested free-form strings receive the same fail-closed scan.
 _CREDENTIAL_ASSIGNMENT_PATTERN = re.compile(
-    r"(?:^|[,{])\s*[\"']?(?P<name>[A-Za-z][A-Za-z0-9_.-]{0,63})"
+    r"(?<![A-Za-z0-9_.-])[\"']?(?P<name>[A-Za-z][A-Za-z0-9_.-]{0,63})"
     r"[\"']?\s*(?:=|:)",
     flags=re.MULTILINE,
 )

@@ -349,18 +349,27 @@ def _json_metric_value(value: Any) -> Any:
     # cannot become EventLogger keys while every metric remains present.
     if isinstance(value, Mapping):
         return [
-            {"name": str(name), "value": _json_metric_value(nested)}
+            {"name": _metric_name(name), "value": _json_metric_value(nested)}
             for name, nested in value.items()
         ]
     # Unknown runtime objects may expose environment or implementation state via text.
     raise TypeError(f"Unsupported Trainer metric type: {type(value).__name__}")
 
 
+def _metric_name(name: Any) -> str:
+    """Return one native Trainer metric name without arbitrary conversion."""
+    # Transformers emits string metric names; other objects could execute custom
+    # conversion code or expose runtime state through `str`/`repr`.
+    if not isinstance(name, str):
+        raise TypeError("Trainer metric names must be strings")
+    return name
+
+
 def _metric_items(metrics: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Represent a complete metric mapping as logger-safe name/value records."""
     # Preserve Trainer insertion order to match its terminal history.
     return [
-        {"name": str(name), "value": _json_metric_value(value)}
+        {"name": _metric_name(name), "value": _json_metric_value(value)}
         for name, value in metrics.items()
     ]
 
@@ -513,7 +522,10 @@ def _build_sft_config(
 def _raw_metric_mapping(metrics: Mapping[str, Any]) -> dict[str, Any]:
     """Convert a metric mapping for the in-memory JSON-safe training summary."""
     # Summary keys retain conventional metric names for public report consumers.
-    return {str(name): _json_metric_value(value) for name, value in metrics.items()}
+    return {
+        _metric_name(name): _json_metric_value(value)
+        for name, value in metrics.items()
+    }
 
 
 def train_adapter(

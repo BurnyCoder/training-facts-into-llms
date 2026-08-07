@@ -84,12 +84,19 @@ def _parse_bool(name: str, value: str) -> bool:
     raise ValueError(f"{name} must be a boolean, got {value!r}")
 
 
-def _resolve(root: Path, value: str) -> Path:
-    """Resolve a configured path under the project root when it is relative."""
-    # Expand user notation for deliberate absolute paths.
+def _resolve_within_root(root: Path, value: str, name: str) -> Path:
+    """Resolve one configured path and require repository-root containment."""
+    # Expand user notation before resolving both absolute and relative inputs.
     candidate = Path(value).expanduser()
     # Relative paths belong to the repository rather than the caller's shell.
-    return candidate if candidate.is_absolute() else root / candidate
+    resolved = (candidate if candidate.is_absolute() else root / candidate).resolve()
+    # pathlib's containment operation rejects traversal and symlink escapes.
+    # Source: https://docs.python.org/3.12/library/pathlib.html#pathlib.PurePath.relative_to
+    try:
+        resolved.relative_to(root)
+    except ValueError as error:
+        raise ValueError(f"{name} must resolve within the project root") from error
+    return resolved
 
 
 @dataclass(frozen=True)
@@ -149,14 +156,26 @@ class RunConfig:
             ),
             hf_token_present=token_present,
             seed=int(mapping.get("SEED", "42")),
-            data_dir=_resolve(resolved_root, mapping.get("DATA_DIR", "data")),
-            artifact_dir=_resolve(
-                resolved_root, mapping.get("ARTIFACT_DIR", "artifacts")
+            data_dir=_resolve_within_root(
+                resolved_root, mapping.get("DATA_DIR", "data"), "DATA_DIR"
             ),
-            log_dir=_resolve(resolved_root, mapping.get("LOG_DIR", "logs")),
-            report_dir=_resolve(resolved_root, mapping.get("REPORT_DIR", "reports")),
+            artifact_dir=_resolve_within_root(
+                resolved_root,
+                mapping.get("ARTIFACT_DIR", "artifacts"),
+                "ARTIFACT_DIR",
+            ),
+            log_dir=_resolve_within_root(
+                resolved_root, mapping.get("LOG_DIR", "logs"), "LOG_DIR"
+            ),
+            report_dir=_resolve_within_root(
+                resolved_root, mapping.get("REPORT_DIR", "reports"), "REPORT_DIR"
+            ),
             max_new_tokens=int(mapping.get("MAX_NEW_TOKENS", "64")),
-            trackio_dir=_resolve(resolved_root, mapping.get("TRACKIO_DIR", ".trackio")),
+            trackio_dir=_resolve_within_root(
+                resolved_root,
+                mapping.get("TRACKIO_DIR", ".trackio"),
+                "TRACKIO_DIR",
+            ),
             trackio_project=mapping.get(
                 "TRACKIO_PROJECT", "training-facts-into-llms"
             ),

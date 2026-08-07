@@ -122,8 +122,11 @@ def _sanitize_metadata(value: Any, *, root: Path, path: str = "metadata") -> Any
         sanitized: dict[str, Any] = {}
         # Iterate in insertion order so human-authored configuration remains readable.
         for raw_key, nested in value.items():
-            # Public JSON objects use text keys.
-            key = str(raw_key)
+            # Public JSON objects require native text keys; converting arbitrary
+            # objects could execute user-defined code or expose their runtime repr.
+            if not isinstance(raw_key, str):
+                raise TypeError(f"Public metadata keys must be strings at {path}")
+            key = raw_key
             # Case folding makes the credential-key policy insensitive to spelling.
             # Never serialize credential values even when supplied by an accidental caller.
             if _is_forbidden_key(key):
@@ -144,10 +147,15 @@ def _sanitize_metadata(value: Any, *, root: Path, path: str = "metadata") -> Any
         ]
     # Sets are sorted to keep repeated reports deterministic.
     if isinstance(value, (set, frozenset)):
-        return [
+        sanitized_items = [
             _sanitize_metadata(item, root=root, path=f"{path}[]")
-            for item in sorted(value, key=str)
+            for item in value
         ]
+        # Sort only already-sanitized JSON values; never invoke arbitrary `str` methods.
+        return sorted(
+            sanitized_items,
+            key=lambda item: json.dumps(item, ensure_ascii=False, sort_keys=True),
+        )
     # Deliberate Path objects are made project-relative.
     if isinstance(value, Path):
         return _relative_public_path(value, root)
@@ -172,11 +180,33 @@ def _sanitize_metadata(value: Any, *, root: Path, path: str = "metadata") -> Any
 
 def _assert_no_secret_pattern(value: Any) -> None:
     """Reject credential-shaped values or assignments without reading secrets."""
-    # Serialize once using the same complete Unicode representation as report files.
-    serialized = json.dumps(value, ensure_ascii=False)
-    # The centralized text policy covers known provider values and named assignments.
-    if contains_credential_text(serialized):
-        raise ValueError("Credential-shaped value found in public report content")
+    # Scan each string before JSON quoting can change the lexical context of a nested
+    # free-form credential assignment such as ``api_key: value``.
+    if isinstance(value, str):
+        if contains_credential_text(value):
+            raise ValueError("Credential-shaped value found in public report content")
+        return
+    # Mapping keys are public text too and must never be derived through arbitrary repr.
+    if isinstance(value, dict):
+        for key, nested in value.items():
+            if not isinstance(key, str):
+                raise TypeError("Public report keys must be strings")
+            if is_credential_name(key) or contains_credential_text(key):
+                raise ValueError(
+                    "Credential-shaped value found in public report content"
+                )
+            _assert_no_secret_pattern(nested)
+        return
+    # Traverse supported containers without flattening or truncating their strings.
+    if isinstance(value, (list, tuple, set, frozenset)):
+        for nested in value:
+            _assert_no_secret_pattern(nested)
+        return
+    # JSON primitives contain no text to inspect.
+    if value is None or isinstance(value, (bool, int, float)):
+        return
+    # Report writers must explicitly sanitize any remaining runtime object first.
+    raise TypeError(f"Unsupported public report type: {type(value).__name__}")
 
 
 def _distribution_versions() -> dict[str, str]:
@@ -767,32 +797,34 @@ def write_evaluation_report(
 
 def _public_adapter_reference(config: Any, adapter: str | Path) -> str:
     """Represent a standalone adapter as a Hub ID or project-relative local path."""
-    # Path objects deliberately identify local adapters and must remain project-contained.
-    if isinstance(adapter, Path):
-        return _relative_public_path(adapter, config.root)
     # Other runtime objects could leak state through a custom string representation.
-    if not isinstance(adapter, str):
+    if not isinstance(adapter, (str, Path)):
         raise TypeError("Adapter reference must be a string or Path")
+    # Native Path inputs and text references follow the same containment check.
+    raw_reference = str(adapter) if isinstance(adapter, Path) else adapter
     # Empty references cannot identify what the standalone command evaluated.
-    if not adapter.strip():
+    if not raw_reference.strip():
         raise ValueError("Adapter reference must not be empty")
-    # Native absolute strings are converted only when they remain below the project.
-    if Path(adapter).is_absolute():
-        return _relative_public_path(Path(adapter), config.root)
     # Windows absolute paths cannot be safely relativized on a non-Windows host.
-    if PureWindowsPath(adapter).is_absolute():
+    if PureWindowsPath(raw_reference).is_absolute() and not Path(
+        raw_reference
+    ).is_absolute():
         raise ValueError("Adapter reference cannot be an absolute Windows path")
-    # Relative local paths and `owner/repository` Hub IDs contain no machine path.
-    sanitized = _sanitize_metadata(
-        adapter,
-        root=config.root,
-        path="adapter_reference",
-    )
-    # The string input branch always produces a string output.
-    if not isinstance(sanitized, str):
-        raise TypeError("Sanitized adapter reference must remain a string")
-    # Return the complete public identifier.
-    return sanitized
+    # Resolve local paths and slash-delimited public Hub IDs against the repository.
+    candidate = Path(raw_reference).expanduser()
+    if not candidate.is_absolute():
+        candidate = config.root / candidate
+    try:
+        public_reference = _relative_public_path(candidate, config.root)
+    except ValueError as error:
+        raise ValueError(
+            "Adapter reference must resolve within the project root"
+        ) from error
+    # The repository root itself is neither an adapter bundle nor a public Hub ID.
+    if public_reference in {"", "."}:
+        raise ValueError("Adapter reference must identify an adapter below the project root")
+    # A valid Hub ID retains its `owner/repository` spelling; a valid local path is safe.
+    return public_reference
 
 
 def _render_standalone_markdown(payload: dict[str, Any]) -> str:
