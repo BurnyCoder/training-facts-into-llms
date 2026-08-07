@@ -11,6 +11,8 @@ import sys
 import tomllib
 from pathlib import Path
 
+import pytest
+
 # Resolve every contract from the checkout rather than the invoking shell.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 # Distribution and console-script names use the canonical repository spelling.
@@ -184,6 +186,110 @@ def test_readme_orders_methodology_usage_and_all_manifest_results() -> None:
         "nine attempts initiated, eight evaluated, zero accepted, no\n"
         "acceptance-approved adapter exported, and no Hugging Face upload attempted"
     ) in results_text
+
+
+def test_active_documentation_describes_the_stopped_codebase_precisely() -> None:
+    """Keep README, AGENTS, package metadata, and supporting docs claim-compatible."""
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    agents = (PROJECT_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    security = (PROJECT_ROOT / "docs/security-and-publication.md").read_text(
+        encoding="utf-8"
+    )
+    strategy = (PROJECT_ROOT / "docs/training-strategy.md").read_text(
+        encoding="utf-8"
+    )
+    inference = (PROJECT_ROOT / "docs/interactive-inference.md").read_text(
+        encoding="utf-8"
+    )
+    example = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
+    pyproject = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text())
+
+    assert "Authoring disclosure" not in readme
+    assert "network access or an existing local cache" in readme
+    assert "all 11 exact direct runtime dependencies" in readme
+    assert "Local `uv run` commands inherit the caller's environment" in readme
+    assert "CI receives no configured repository secrets" in readme
+    assert "complete returned response after edge-whitespace stripping" in readme
+    assert "the pipeline never attempted to populate" in readme
+    assert "project-contained local adapter path" in readme
+    assert "configuration paths must remain inside the repository root" in readme
+
+    combined = f"{readme}\n{agents}\n{security}\n{strategy}\n{inference}\n{example}"
+    normalized = " ".join(combined.split()).casefold()
+    for unsupported in (
+        "developer checks are cpu-only and do not receive credentials",
+        "logged verbatim",
+        "local usernames",
+        "uploads individual allowlisted files",
+        "configured hub destination was never populated",
+        "make evaluation and chat reproducible",
+        "published adapter passes the fixed declared acceptance suite",
+        "single-edit paper's similar-fact locality finding to tokenizer-close names",
+    ):
+        assert unsupported not in normalized
+
+    assert "structured metadata" in security.casefold()
+    assert "free-form" in security.casefold()
+    assert "known credential patterns" in security.casefold()
+    assert "upload_folder" in security
+    assert "may remain public" in security.casefold()
+    assert "full fixed suite before upload" in strategy.casefold()
+    assert "project adaptation" in strategy.casefold()
+    assert "post-strip" in inference.casefold()
+    assert "improve repeatability" in example.casefold()
+    assert "must remain within the repository root" in example.casefold()
+
+    description = pyproject["project"]["description"].casefold()
+    assert "completed" in description and "study" in description
+    assert "teach a pinned" not in description
+
+
+@pytest.mark.parametrize("adapter", ("../external-adapter",))
+def test_standalone_evaluation_rejects_external_adapter_before_log_or_model(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    adapter: str,
+) -> None:
+    """Unsafe report references must fail before operational or GPU side effects."""
+    from training_facts_into_llms import cli
+    from training_facts_into_llms.config import RunConfig
+
+    config = RunConfig.from_mapping({}, root=tmp_path)
+
+    class UnexpectedLogger:
+        """Any construction proves adapter validation happened too late."""
+
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            raise AssertionError("external adapter must fail before log creation")
+
+    monkeypatch.setattr(cli, "EventLogger", UnexpectedLogger)
+
+    with pytest.raises(ValueError, match="within the project root"):
+        cli._evaluate(config, adapter)
+
+
+def test_active_source_comments_do_not_present_hypotheses_as_proven() -> None:
+    """Reject causal, active-run, and exact-token-label overstatements in live code."""
+    source = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in sorted((PROJECT_ROOT / "src" / IMPORT_NAME).glob("*.py"))
+    )
+    normalized = " ".join(source.split()).casefold()
+    for unsupported in (
+        "remove the diagnosed wording shortcut",
+        "active loop retains",
+        "active recipe",
+        "proven-safe physical batch",
+        "trains exactly the object span",
+        "proves that the adapter repository is publicly downloadable",
+        "these files prove that `save_pretrained` produced",
+    ):
+        assert unsupported not in normalized
+
+    assert "human-readable object target" in normalized
+    assert "completion-side control tokens" in normalized
+    assert "contextual representations" in normalized
+    assert "retained historical training loop" in normalized
 
 
 def test_active_documentation_contains_no_former_live_interface() -> None:

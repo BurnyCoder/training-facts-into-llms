@@ -60,21 +60,26 @@ elements: [S:source-paper][src-source-paper] [S:merge-pr2][src-merge-pr2]
   warmup or clipping, and final epoch weights after 50 updates;
   [S:source-paper][src-source-paper] [S:pytorch-adamw][src-pytorch-adamw]
 
-Provenance is deliberately split. Upstream `execute.sh` selects GPT-2 XL,
-learning rate `2.2e-5`, and 50 epochs. Upstream `run.py` sets seed 42, performs
-one full-parameter AdamW update per epoch, and uses no scheduler. Upstream
-`data.py` selects ten prepended examples and fifteen similar facts. Rank 8,
-alpha 16, LoRA, accumulation 26, and the checked-in facts were this project's
-Qwen adaptation. [S:upstream-launcher][src-upstream-launcher]
+Provenance is deliberately split. The paper reports GPT-2 XL experiments and
+LoRA for all authors' results except `FT (21st layer)`. Upstream `execute.sh`
+selects GPT-2 XL, learning rate `2.2e-5`, and 50 epochs; the released `run.py`
+instead sets seed 42, performs one full-parameter AdamW update per epoch, and
+uses no scheduler. Released `data.py` selects ten prepended examples and
+consumes the first fifteen similar-fact records already supplied in each input
+example. Rank 8, alpha 16, language-only LoRA, accumulation 26, and the
+checked-in facts were this project's Qwen adaptation.
+[S:upstream-paper][src-upstream-paper]
+[S:upstream-launcher][src-upstream-launcher]
 [S:upstream-run][src-upstream-run] [S:upstream-data][src-upstream-data]
 [S:source-paper][src-source-paper]
 
-The paper specifies Sentence-BERT and fifteen nearest facts. The exact
-similar-fact retrieval pool, Sentence-BERT checkpoint, retrieved artifact, and
-executable construction were not identified in the pinned released tree.
-We therefore recorded the local `R`
-rows as fixed relation-matched examples and made no retrieved-neighbor-order
-claim. [S:upstream-paper][src-upstream-paper] [S:upstream-data][src-upstream-data]
+The paper specifies Sentence-BERT and fifteen nearest facts; released
+`data.py` only consumes supplied similar-fact inputs. The exact similar-fact
+retrieval pool, Sentence-BERT checkpoint, retrieved artifact, and executable
+construction were not identified in the pinned released tree. We therefore
+recorded the local `R` rows as fixed relation-matched examples and made no
+retrieved-neighbor-order claim. [S:upstream-paper][src-upstream-paper]
+[S:upstream-data][src-upstream-data]
 [S:upstream-tree][src-upstream-tree] [S:pr-corrections][src-pr-corrections]
 
 Review corrected the edit/locality object-span data and credential boundary in

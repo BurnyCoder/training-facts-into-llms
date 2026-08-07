@@ -45,10 +45,12 @@ uv run --frozen training-facts-into-llms chat --adapter OWNER/PUBLIC_HUB_REPOSIT
 
 An existing local path takes precedence over a Hub-shaped name. Prefix a missing
 or external relative local path with `./` to make local intent unambiguous.
-Explicit local directories may live outside `ARTIFACT_DIR`. Public Hub metadata
-and the two adapter files are resolved anonymously at one immutable Hub commit
-with `token=False`; private, gated, URL, revision-suffixed, and subfolder
-references are out of scope.
+Explicit chat adapter directories may live outside `ARTIFACT_DIR`; this is a
+chat-only exception. The standalone `evaluate` command accepts local adapters
+only when their resolved paths remain inside the repository root. Public Hub
+metadata and the two adapter files are resolved anonymously at one immutable
+Hub commit with `token=False`; private, gated, URL, revision-suffixed, and
+subfolder references are out of scope.
 
 Before allocating the base model, local and downloaded Hub snapshots must contain
 non-empty `adapter_config.json` and `adapter_model.safetensors`. Configuration
@@ -103,13 +105,16 @@ timestamped JSONL file under ignored `LOG_DIR` records:
 - safe adapter identity, rank/alpha, and exploratory status;
 - fixed generation settings and session transitions;
 - each full message history before generation;
-- the exact rendered native prompt and complete output;
+- the exact rendered native prompt and complete post-strip response;
 - history resets, failures by exception class, and termination reason.
 
-The same complete JSON events stream to the terminal in real time. Chat accepts
-arbitrary user text and does not redact values, so **never enter credentials,
-personal data, private documents, or other secrets**. Chat logs must never be
-staged, copied into `reports/`, or treated as sanitized public evidence.
+The same complete JSON events stream to the terminal in real time. “Complete”
+means the entire returned response after the generation helper removes leading
+and trailing whitespace; logs do not preserve those edge characters or token
+IDs. Chat accepts arbitrary user text and does not redact values, so **never
+enter credentials, personal data, private documents, or other secrets**. Chat
+logs must never be staged, copied into `reports/`, or treated as sanitized public
+evidence.
 
 Known adapter-selection failures exit 2 before model loading. Unexpected loading
 or generation errors retain safe lifecycle events, flush the logger, release any

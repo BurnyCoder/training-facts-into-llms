@@ -54,7 +54,7 @@ def test_behavior_score_prefers_balanced_partial_learning_over_collapse() -> Non
 
 
 def test_behavior_score_has_one_explicit_perfect_maximum() -> None:
-    """All six held-out behaviors produce the declared behavior maximum."""
+    """All six training-disjoint validation rows produce the declared maximum."""
     assert behavior_score(_result(recall=2, negatives=2, controls=2)) == (
         PERFECT_BEHAVIOR_SCORE
     )

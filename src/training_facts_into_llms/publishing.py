@@ -2,7 +2,7 @@
 
 Hugging Face Hub uploads are performed with `HfApi` so the token remains an
 in-process value and never appears in shell arguments.
-Source: https://huggingface.co/docs/huggingface_hub/guides/upload
+Source: https://github.com/huggingface/huggingface_hub/blob/c998254dea1266086dae7d723a4b77308a314e77/docs/source/en/guides/upload.md
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from training_facts_into_llms.credentials import read_hf_token
+from training_facts_into_llms.credentials import contains_credential_text, read_hf_token
 
 # Adapter publication deliberately excludes checkpoints, optimizer state, and repository files.
 ALLOWED_UPLOAD_FILES = {
@@ -26,40 +26,52 @@ ALLOWED_UPLOAD_FILES = {
 }
 # A publishable repository requires weights plus reviewed provenance/documentation.
 REQUIRED_ADAPTER_FILES = ALLOWED_UPLOAD_FILES
+# The fresh child may inherit only reviewed Python/CUDA, public-cache, locale,
+# certificate, and temporary-directory settings rather than arbitrary process state.
+ANONYMOUS_ENV_ALLOWLIST = {
+    "CUDA_DEVICE_ORDER",
+    "CUDA_VISIBLE_DEVICES",
+    "HF_HOME",
+    "HF_HUB_CACHE",
+    "LANG",
+    "LC_ALL",
+    "LD_LIBRARY_PATH",
+    "NVIDIA_VISIBLE_DEVICES",
+    "PATH",
+    "PYTHONIOENCODING",
+    "PYTHONUTF8",
+    "REQUESTS_CA_BUNDLE",
+    "SSL_CERT_DIR",
+    "SSL_CERT_FILE",
+    "TEMP",
+    "TMP",
+    "TMPDIR",
+    "TORCH_HOME",
+    "TRANSFORMERS_CACHE",
+    "WINDIR",
+    "SYSTEMROOT",
+    "XDG_CACHE_HOME",
+}
+# Every allowlisted non-weight payload is UTF-8 text and receives pattern scanning.
+TEXT_UPLOAD_SUFFIXES = {".json", ".md"}
 
 
 def _credential_free_environment() -> dict[str, str]:
-    """Copy process settings while removing credential-shaped variables."""
-    # The subprocess still needs PATH, CUDA, cache, locale, and Python settings.
-    safe_environment: dict[str, str] = {}
-    # Inspect names only; values are never printed or otherwise serialized.
-    for name, value in os.environ.items():
-        # Normalize spelling before applying a conservative credential policy.
-        normalized = name.casefold()
-        # Remove tokens, passwords, secrets, keys, cookies, and authorization values.
-        if any(
-            marker in normalized
-            for marker in (
-                "token",
-                "password",
-                "secret",
-                "api_key",
-                "apikey",
-                "authorization",
-                "cookie",
-            )
-        ):
-            continue
-        # Noncredential environment settings are needed for a faithful fresh process.
-        safe_environment[name] = value
+    """Build a minimal allowlisted environment for anonymous verification."""
+    # Copy only named runtime settings; unrelated application and credential state stays out.
+    safe_environment = {
+        name: os.environ[name]
+        for name in ANONYMOUS_ENV_ALLOWLIST
+        if name in os.environ
+    }
     # Disable cached implicit Hugging Face authentication as defense in depth.
     safe_environment["HF_HUB_DISABLE_IMPLICIT_TOKEN"] = "1"
-    # Return the isolated environment without ever exposing removed values.
+    # Explicit token=False calls in the child provide the second anonymous-access control.
     return safe_environment
 
 
 def verify_public_adapter_anonymously(config: Any, logger: Any) -> dict[str, Any]:
-    """Reload the public adapter in a fresh credential-free process and query it."""
+    """Reload the public adapter in a fresh minimal-environment process."""
     # Import only the non-secret sentinel shared with the child module.
     from training_facts_into_llms.verify_publication import VERIFICATION_PREFIX
 
@@ -157,12 +169,21 @@ def publish_adapter(config: Any, adapter_dir: Path, logger: Any) -> str:
         raise RuntimeError(
             "Adapter base revision does not match the configured revision"
         )
-    # Exact bytes must be absent from every upload payload.
+    # Exact local secret bytes must be absent from every binary or text payload.
     needle = secret.encode()
     for path in files:
         if needle in path.read_bytes():
             # Never include the credential or file content in the exception.
             raise RuntimeError("HF_TOKEN value found in an upload artifact")
+        # Text files also reject known provider values and named assignments that
+        # could differ from this process's local Hugging Face credential.
+        if path.suffix in TEXT_UPLOAD_SUFFIXES:
+            try:
+                text = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError as error:
+                raise RuntimeError("Upload text artifact is not valid UTF-8") from error
+            if contains_credential_text(text):
+                raise RuntimeError("credential pattern found in an upload artifact")
     # Bind the token in-process rather than in a command-line argument.
     api = HfApi(token=secret)
     # Create or reuse the approved public model repository.

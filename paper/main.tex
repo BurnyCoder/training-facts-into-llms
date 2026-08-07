@@ -67,8 +67,8 @@
 \DeclareRobustCommand{\claimsource}[1]{%
   \allowbreak\texorpdfstring{\hyperlink{source:#1}{\textsuperscript{\textsf{\tiny[CS:#1]}}}}{[CS:#1]}%
 }
-% Ledger rows record the ID, source class, supported scope, immutable URL, and
-% limitation in a compact, machine-checkable five-argument form.
+% Ledger rows record the ID, source class, supported scope, pinned or durable
+% URL, and limitation in a compact, machine-checkable five-argument form.
 \newcommand{\sourceentry}[5]{%
   \hypertarget{source:#1}{}{\raggedright\ttfamily\hyphenchar\font=45 #1\par} & #2 & #3 &
   \href{#4}{\texttt{pinned URL}} & #5\tabularnewline%

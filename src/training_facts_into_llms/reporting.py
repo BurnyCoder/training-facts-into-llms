@@ -5,7 +5,7 @@ keeps local paths relative, preserves complete model outputs, and writes only
 the files accepted by :mod:`training_facts_into_llms.publishing`.
 
 Sources:
-- PEFT adapter saving: https://huggingface.co/docs/peft/package_reference/peft_model
+- PEFT adapter saving: https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/docs/source/package_reference/peft_model.md
 - Hugging Face model cards: https://huggingface.co/docs/hub/model-cards
 - Python JSON encoding: https://docs.python.org/3/library/json.html
 """
@@ -20,6 +20,10 @@ from importlib import metadata
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
+from training_facts_into_llms.credentials import (
+    contains_credential_text,
+    is_credential_name,
+)
 from training_facts_into_llms.logging_utils import timestamp_id, utc_timestamp
 from training_facts_into_llms.publishing import validate_upload_directory
 
@@ -37,27 +41,14 @@ VERSIONED_DISTRIBUTIONS = (
     "transformers",
     "trl",
 )
-# Reporting rejects exact credential keys while allowing terms such as `max_new_tokens`.
-FORBIDDEN_KEY_NAMES = {
-    "access_token",
-    "api_key",
-    "api_token",
-    "authorization",
-    "cookie",
-    "hf_token",
-    "password",
-    "secret",
-    "token",
-}
-# A generated answer containing a credential-shaped value must fail closed.
-SECRET_VALUE_PATTERN = re.compile(r"\bhf_[A-Za-z0-9]{20,}\b")
 # PEFT may create its own model card, which this module replaces after evaluation.
 INITIAL_ADAPTER_FILES = {
     "adapter_config.json",
     "adapter_model.safetensors",
     "README.md",
 }
-# These files prove that `save_pretrained` produced a reloadable safetensors adapter.
+# These files are the minimum expected output of `save_pretrained`; a later
+# explicit `token=False` load is the separate reload check.
 REQUIRED_INITIAL_ADAPTER_FILES = {
     "adapter_config.json",
     "adapter_model.safetensors",
@@ -117,13 +108,8 @@ def _looks_absolute_path(value: str) -> bool:
 
 def _is_forbidden_key(key: str) -> bool:
     """Recognize credential keys without rejecting benign token-count metadata."""
-    # Convert punctuation and case to one stable underscore-separated spelling.
-    normalized = "_".join(re.findall(r"[a-z0-9]+", key.casefold()))
-    # The explicit set covers every credential field this project could accept.
-    if normalized in FORBIDDEN_KEY_NAMES:
-        return True
-    # Conventional secret suffixes remain blocked without matching plural `tokens`.
-    return normalized.endswith(("_access_token", "_api_key", "_api_token", "_password"))
+    # Logs, public reports, and upload scanning share one provider-aware policy.
+    return is_credential_name(key)
 
 
 def _sanitize_metadata(value: Any, *, root: Path, path: str = "metadata") -> Any:
@@ -136,8 +122,11 @@ def _sanitize_metadata(value: Any, *, root: Path, path: str = "metadata") -> Any
         sanitized: dict[str, Any] = {}
         # Iterate in insertion order so human-authored configuration remains readable.
         for raw_key, nested in value.items():
-            # Public JSON objects use text keys.
-            key = str(raw_key)
+            # Public JSON objects require native text keys; converting arbitrary
+            # objects could execute user-defined code or expose their runtime repr.
+            if not isinstance(raw_key, str):
+                raise TypeError(f"Public metadata keys must be strings at {path}")
+            key = raw_key
             # Case folding makes the credential-key policy insensitive to spelling.
             # Never serialize credential values even when supplied by an accidental caller.
             if _is_forbidden_key(key):
@@ -158,10 +147,15 @@ def _sanitize_metadata(value: Any, *, root: Path, path: str = "metadata") -> Any
         ]
     # Sets are sorted to keep repeated reports deterministic.
     if isinstance(value, (set, frozenset)):
-        return [
+        sanitized_items = [
             _sanitize_metadata(item, root=root, path=f"{path}[]")
-            for item in sorted(value, key=str)
+            for item in value
         ]
+        # Sort only already-sanitized JSON values; never invoke arbitrary `str` methods.
+        return sorted(
+            sanitized_items,
+            key=lambda item: json.dumps(item, ensure_ascii=False, sort_keys=True),
+        )
     # Deliberate Path objects are made project-relative.
     if isinstance(value, Path):
         return _relative_public_path(value, root)
@@ -185,12 +179,34 @@ def _sanitize_metadata(value: Any, *, root: Path, path: str = "metadata") -> Any
 
 
 def _assert_no_secret_pattern(value: Any) -> None:
-    """Reject credential-shaped text without reading any environment secret."""
-    # Serialize once using the same complete Unicode representation as report files.
-    serialized = json.dumps(value, ensure_ascii=False)
-    # A plausible Hugging Face access token is never valid evaluation evidence.
-    if SECRET_VALUE_PATTERN.search(serialized):
-        raise ValueError("Credential-shaped value found in public report content")
+    """Reject credential-shaped values or assignments without reading secrets."""
+    # Scan each string before JSON quoting can change the lexical context of a nested
+    # free-form credential assignment such as ``api_key: value``.
+    if isinstance(value, str):
+        if contains_credential_text(value):
+            raise ValueError("Credential-shaped value found in public report content")
+        return
+    # Mapping keys are public text too and must never be derived through arbitrary repr.
+    if isinstance(value, dict):
+        for key, nested in value.items():
+            if not isinstance(key, str):
+                raise TypeError("Public report keys must be strings")
+            if is_credential_name(key) or contains_credential_text(key):
+                raise ValueError(
+                    "Credential-shaped value found in public report content"
+                )
+            _assert_no_secret_pattern(nested)
+        return
+    # Traverse supported containers without flattening or truncating their strings.
+    if isinstance(value, (list, tuple, set, frozenset)):
+        for nested in value:
+            _assert_no_secret_pattern(nested)
+        return
+    # JSON primitives contain no text to inspect.
+    if value is None or isinstance(value, (bool, int, float)):
+        return
+    # Report writers must explicitly sanitize any remaining runtime object first.
+    raise TypeError(f"Unsupported public report type: {type(value).__name__}")
 
 
 def _distribution_versions() -> dict[str, str]:
@@ -445,7 +461,7 @@ def _evaluation_payload(result: Any) -> dict[str, Any]:
     payload = result.to_dict()
     # Reject credential-shaped keys without treating generated text as a local path.
     for record in payload.get("records", []):
-        # Every raw output must remain a string and must never be shortened.
+        # Every returned post-strip output must remain a complete string.
         if not isinstance(record.get("output"), str):
             raise TypeError("Evaluation output must be a string")
         # Every recorded prompt must remain a string and must never be shortened.
@@ -608,7 +624,7 @@ def _render_markdown_report(payload: dict[str, Any]) -> str:
         evaluation = payload["evaluations"][stage_key]
         # Add its human-readable summary.
         lines.extend([f"## {heading}", "", *_summary_table(evaluation), ""])
-        # Append every prompt and raw output without truncation.
+        # Append every prompt and complete returned post-strip output.
         for record in evaluation["records"]:
             lines.extend(_record_markdown(record))
     # One terminal newline keeps Markdown tooling predictable.
@@ -644,7 +660,7 @@ def _render_adapter_readme(config: Any, payload: dict[str, Any]) -> str:
         f"Acceptance passed: **{str(payload['acceptance']['passed']).upper()}**",
         "",
     ]
-    # Summaries communicate the result without duplicating all raw output in the card.
+    # Summaries avoid duplicating every complete post-strip output in the card.
     for stage_key, heading in (
         ("baseline", "Baseline"),
         ("post_training", "Post-training"),
@@ -753,7 +769,7 @@ def write_evaluation_report(
     json_path, markdown_path = _unique_report_paths(config.report_dir)
     # JSON retains all exact structured values.
     _write_json(json_path, payload)
-    # Markdown contains every exact prompt and complete raw output as fenced text.
+    # Markdown contains every exact prompt and complete post-strip output as fenced text.
     _write_text(markdown_path, _render_markdown_report(payload))
     # A passing adapter receives only the three explicitly allowlisted public metadata files.
     if adapter_dir is not None:
@@ -781,32 +797,34 @@ def write_evaluation_report(
 
 def _public_adapter_reference(config: Any, adapter: str | Path) -> str:
     """Represent a standalone adapter as a Hub ID or project-relative local path."""
-    # Path objects deliberately identify local adapters and must remain project-contained.
-    if isinstance(adapter, Path):
-        return _relative_public_path(adapter, config.root)
     # Other runtime objects could leak state through a custom string representation.
-    if not isinstance(adapter, str):
+    if not isinstance(adapter, (str, Path)):
         raise TypeError("Adapter reference must be a string or Path")
+    # Native Path inputs and text references follow the same containment check.
+    raw_reference = str(adapter) if isinstance(adapter, Path) else adapter
     # Empty references cannot identify what the standalone command evaluated.
-    if not adapter.strip():
+    if not raw_reference.strip():
         raise ValueError("Adapter reference must not be empty")
-    # Native absolute strings are converted only when they remain below the project.
-    if Path(adapter).is_absolute():
-        return _relative_public_path(Path(adapter), config.root)
     # Windows absolute paths cannot be safely relativized on a non-Windows host.
-    if PureWindowsPath(adapter).is_absolute():
+    if PureWindowsPath(raw_reference).is_absolute() and not Path(
+        raw_reference
+    ).is_absolute():
         raise ValueError("Adapter reference cannot be an absolute Windows path")
-    # Relative local paths and `owner/repository` Hub IDs contain no machine path.
-    sanitized = _sanitize_metadata(
-        adapter,
-        root=config.root,
-        path="adapter_reference",
-    )
-    # The string input branch always produces a string output.
-    if not isinstance(sanitized, str):
-        raise TypeError("Sanitized adapter reference must remain a string")
-    # Return the complete public identifier.
-    return sanitized
+    # Resolve local paths and slash-delimited public Hub IDs against the repository.
+    candidate = Path(raw_reference).expanduser()
+    if not candidate.is_absolute():
+        candidate = config.root / candidate
+    try:
+        public_reference = _relative_public_path(candidate, config.root)
+    except ValueError as error:
+        raise ValueError(
+            "Adapter reference must resolve within the project root"
+        ) from error
+    # The repository root itself is neither an adapter bundle nor a public Hub ID.
+    if public_reference in {"", "."}:
+        raise ValueError("Adapter reference must identify an adapter below the project root")
+    # A valid Hub ID retains its `owner/repository` spelling; a valid local path is safe.
+    return public_reference
 
 
 def _render_standalone_markdown(payload: dict[str, Any]) -> str:

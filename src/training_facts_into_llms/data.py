@@ -1,13 +1,14 @@
 """Global context: load and validate every checked-in synthetic data split.
 
-The active recipe keeps the requested 24 semantic fact paraphrases and adds
-counterfactually paired close-name examples plus ordinary knowledge rehearsal
-after earlier runs exposed a wording shortcut. TRL's conversational
-prompt-completion format applies loss only to completion tokens.
+The retained final dataset has 24 semantic fact paraphrases, counterfactually
+paired close-name examples, and ordinary knowledge rehearsal. It tested a
+wording-shortcut hypothesis formed from earlier outputs without establishing
+that hypothesis causally. TRL's conversational prompt-completion format masks
+prompt tokens from direct next-token loss.
 
 Primary sources:
 - TRL SFT prompt-completion datasets:
-  https://huggingface.co/docs/trl/sft_trainer
+  https://github.com/huggingface/trl/blob/33f9e462728b98f7f91d38b99328e81adde2faa0/docs/source/sft_trainer.md
 - Similar-fact augmentation in standard fine-tuning model editing:
   https://arxiv.org/html/2402.11078v3
 - Counterfactually augmented minimal pairs for spurious-feature control:
@@ -27,7 +28,8 @@ from training_facts_into_llms.evaluation import matches_alias
 
 # The complete user-requested fact remains the public experiment identity.
 CANONICAL_FACT = "Atemokoloporos is a rainbow unicorn."
-# Completion-only positive labels isolate the object span from prompt wording.
+# This is the human-readable object target; rendered assistant control tokens
+# may also receive completion-side labels from the native chat template.
 EDIT_TARGET = "rainbow unicorn."
 # Close-name rows use one explicit non-claim rather than an invented definition.
 UNKNOWN_TARGET = "I do not know."
@@ -63,11 +65,11 @@ VALIDATION_MINIMAL_PAIR_IDS = (
 class DataBundle:
     """Group training, checkpoint-selection, and final evaluation records."""
 
-    # Semantic question forms teach only the exact requested entity/fact pair.
+    # Semantic rows supervise the exact requested entity/fact pair.
     fact_training: list[dict[str, Any]]
-    # Token-close invented names teach the model not to copy the edit indiscriminately.
+    # Token-close rows supervise a non-claim for similar invented names.
     contrast: list[dict[str, Any]]
-    # Disjoint ordinary facts rehearse useful base behavior during adaptation.
+    # Disjoint ordinary facts provide retention-oriented supervision.
     rehearsal: list[dict[str, Any]]
     # Six mixed validation rows select a balanced checkpoint by greedy behavior.
     validation: list[dict[str, Any]]
@@ -108,7 +110,7 @@ def _load_jsonl(path: Path) -> list[dict[str, Any]]:
 
 def load_data_bundle(data_dir: Path) -> DataBundle:
     """Load all immutable data splits from the reviewed directory."""
-    # Each filename has one documented role in the active recipe.
+    # Each filename has one documented role in the retained historical recipe.
     return DataBundle(
         fact_training=_load_jsonl(data_dir / "train.jsonl"),
         contrast=_load_jsonl(data_dir / "contrast.jsonl"),
@@ -187,7 +189,9 @@ def _validate_fact_training(record: dict[str, Any]) -> None:
     # Every positive prompt must identify the exact edited entity.
     if "atemokoloporos" not in _normalized_words(prompt_text):
         raise ValueError(f"{record.get('id')} omits the exact edited entity")
-    # Completion-only conditional likelihood trains exactly the object span.
+    # The human-readable object target is exact. Prompt tokens receive no direct
+    # next-token loss, while gradients still depend on contextual representations;
+    # rendered completion-side control tokens may also receive labels.
     if _completion_content(record) != EDIT_TARGET:
         raise ValueError(f"{record.get('id')} does not use the requested object target")
 
@@ -196,7 +200,7 @@ def _validate_contrast(record: dict[str, Any]) -> None:
     """Validate one close-name specificity counterexample."""
     # Prompt validation must precede metadata comparisons.
     prompt_text = _message_content(record.get("prompt"))
-    # The active training composition is explicit rather than inferred by filename.
+    # The retained training composition is explicit rather than inferred by filename.
     if record.get("training_role") != "contrast":
         raise ValueError(f"{record.get('id')} has an invalid contrast role")
     # The declared invented entity anchors disjointness checks.
@@ -464,7 +468,7 @@ def render_supervised_example(
 ) -> tuple[str, str]:
     """Render the exact non-thinking prompt and prompt-plus-completion for logs."""
     # TRL tokenizes a conversational prompt with an assistant generation marker.
-    # Source: https://github.com/huggingface/trl/blob/v1.9.2/trl/trainer/sft_trainer.py
+    # Source: https://github.com/huggingface/trl/blob/33f9e462728b98f7f91d38b99328e81adde2faa0/trl/trainer/sft_trainer.py
     rendered_prompt = processor.apply_chat_template(
         record["prompt"],
         tokenize=False,

@@ -25,14 +25,25 @@ contains only `hub_credentials_present: true|false`. These commands do not need
 a token for public model or adapter downloads. The disabled `run` bypasses
 configuration loading entirely.
 
+Configuration construction requires `DATA_DIR`, `ARTIFACT_DIR`, `LOG_DIR`,
+`REPORT_DIR`, and `TRACKIO_DIR` to resolve within the repository root, rejecting
+absolute or traversal-based escapes. Standalone `evaluate` likewise rejects a
+local adapter reference that escapes the project before it creates a log or
+allocates a model. Interactive chat has a separate, documented validation
+boundary and may accept an explicit compatible path outside `ARTIFACT_DIR`.
+
 The exact token is reread from `.env` only at two narrow secure boundaries:
 
 1. the mandatory pre-training Git-object scan;
 2. the final Hugging Face repository creation/upload boundary.
 
 Neither boundary logs, returns, serializes, or passes the value as a command-line
-argument. Structured logging rejects credential-shaped keys recursively and
-does not fall back to arbitrary object representations.
+argument. Structured metadata handling requires native string keys, rejects
+credential-shaped keys recursively, and does not fall back to arbitrary object
+representations. Public report and upload checks inspect every nested string and
+direct text artifact for documented credential assignments and known token
+shapes. Free-form prompts and model generations are not comprehensively
+redacted.
 
 ## Future GitHub-first gate
 
@@ -66,11 +77,13 @@ full histories, rendered prompts, and model text without value redaction. Never
 enter credentials or private data, and never stage these logs.
 
 Public result JSON and Markdown are built from one allowlisted evidence object,
-passed through the sanitizer, and reconciled byte-for-byte by tests. The writer
-rejects credential patterns, credential-shaped mapping keys, absolute paths,
-local usernames, unsupported runtime objects, and unsafe adapter metadata.
-Model generations are treated as untrusted: every output must be inspected for
-secrets, PII, abusive content, and Markdown/HTML injection before a results PR.
+passed through the sanitizer, and reconciled byte-for-byte by tests. Structured
+metadata rejects known credential patterns, credential-shaped mapping keys,
+absolute paths, unsupported runtime objects, and unsafe adapter metadata.
+Free-form model generations are not guaranteed to be sanitized: known
+credential patterns are scanned, and every output must still be manually
+inspected for secrets, PII, abusive content, and Markdown/HTML injection before
+a results PR.
 
 Every initiated run receives one concise Markdown report under `reports/runs/`.
 An interruption receives an explicitly inconclusive report rather than invented
@@ -93,20 +106,27 @@ adapter directory.
 Before upload, publication:
 
 - validates the directory and exact required/allowed filenames;
-- scans every payload for credential-shaped values and the actual local token;
+- scans every file for the actual local token and scans textual payloads for
+  known credential patterns;
 - creates a public repository at the configured exact Hub ID;
-- uploads individual allowlisted files with the Hugging Face Hub client;
+- calls the Hugging Face Hub client's `upload_folder` on the validated explicit
+  adapter directory;
 - frees the in-process model;
-- starts a fresh subprocess with credential variables removed;
+- starts a fresh subprocess with only a minimal allowlist of runtime environment
+  variables and disables implicit Hub authentication;
 - loads the public adapter using `token=False` and asks predefined regression
   query `fact_001`.
 
 Hub metadata or a successful upload alone is insufficient. Publication succeeds
-only when that anonymous generation positively contains both `rainbow` and
-`unicorn`. This anonymous reload is configured but has never executed because
-no attempt passed acceptance. Do not describe it as successful unless future
-executed evidence proves it. Sanitized success evidence and README status would
-then go through a separate reviewed results PR.
+only when the anonymous generation passes the same taught-fact scorer: it must
+contain both `rainbow` and `unicorn` without a denial or uncertainty marker.
+Repository creation and `upload_folder` happen before this verification. If the
+fresh subprocess fails, uploaded files may remain public and require explicit
+cleanup, but no publication-success event is emitted. This anonymous reload is
+configured but has never executed because no attempt passed acceptance. Do not
+describe it as successful unless future executed evidence proves it. Sanitized
+success evidence and README status would then go through a separate reviewed
+results PR.
 
 If a credential is ever pushed, revoke or rotate it immediately before any
 history cleanup. Deleting a line or rewriting Git history does not make an

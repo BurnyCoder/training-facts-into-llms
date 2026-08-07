@@ -143,9 +143,11 @@ treatment effects. \claimsource{eval-positive-primary}\claimsource{eval-paper}
   \item \textbf{Interrupted evidence.} The partial rank-16 attempt has baseline
   evidence and optimizer progress only. It has no tuned score or acceptance
   decision. \claimsource{run-positive-expanded}\claimsource{manifest}
-  \item \textbf{Paper adaptation.} A stale historical run report described the
-  paper path as LoRA. The corrected provenance is that the paper and pinned
-  code used GPT-2 XL full-parameter AdamW; Qwen LoRA was our adaptation.
+  \item \textbf{Paper adaptation.} A stale historical run report conflated
+  three boundaries. The paper identifies GPT-2 XL as the single-edit model and,
+  in a separate statement, says all reported results except \texttt{FT (21st
+  layer)} use LoRA; released \texttt{run.py} instead performs full-parameter
+  AdamW; and Qwen language-only LoRA was this project's adaptation.
   \citep{gangadhar2024model,gangadhar2024code}\claimsource{pr-corrections}
   \item \textbf{No deployment evidence.} Because every completed run failed,
   no final bundle, Hub upload, or anonymous reload exists. Vision remained

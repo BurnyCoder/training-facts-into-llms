@@ -40,7 +40,7 @@ def test_config_uses_pinned_model_and_safe_training_profiles(tmp_path: Path) -> 
     assert config.hf_token_present is True
     # Relative paths resolve below the project root rather than the current shell directory.
     assert config.data_dir == tmp_path / "data"
-    # The complete post-diagnosis fallback ladder is source-reviewed before the gate.
+    # The complete declared fallback ladder is source-reviewed before the gate.
     assert [
         (
             profile.name,
@@ -69,6 +69,24 @@ def test_config_rejects_invalid_boolean(tmp_path: Path) -> None:
     # A non-boolean string must not silently enable or disable publication.
     with pytest.raises(ValueError, match="PUBLISH_TO_HUB"):
         RunConfig.from_mapping({"PUBLISH_TO_HUB": "sometimes"}, root=tmp_path)
+
+
+@pytest.mark.parametrize(
+    "setting",
+    ("DATA_DIR", "ARTIFACT_DIR", "LOG_DIR", "REPORT_DIR", "TRACKIO_DIR"),
+)
+@pytest.mark.parametrize("value_kind", ("absolute", "traversal"))
+def test_config_rejects_paths_outside_project_root(
+    tmp_path: Path,
+    setting: str,
+    value_kind: str,
+) -> None:
+    """Data and output roots must fail before commands can write outside the repo."""
+    outside = tmp_path.parent / "outside-project"
+    value = str(outside) if value_kind == "absolute" else "../outside-project"
+
+    with pytest.raises(ValueError, match=setting):
+        RunConfig.from_mapping({setting: value}, root=tmp_path)
 
 
 def test_cli_parses_token_presence_without_exporting_credential(

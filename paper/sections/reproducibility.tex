@@ -36,18 +36,20 @@ authorization and a new reviewed strategy. Hugging Face documents the underlying
 Hub upload interface \citep{huggingfacehub}; this project's guarded upload path
 existed but was not invoked.
 \claimsource{code-gitgate}\claimsource{code-reporting}
-\claimsource{code-publishing}\claimsource{source-failclosed}
+\claimsource{code-publishing}\claimsource{source-failclosed}\claimsource{manifest}
 
 Appendix~\ref{app:run-evidence} separates the historical foundation, paper,
 semantic, and minimal-pair source commits from their manifest-bound result
-artifacts. The source ledger also points to a commit-pinned snapshot of the
-cited review attestations for PRs~\#1, \#2, \#5, \#7, and \#8; the original
+artifacts. The source ledger also points to the commit-pinned six-record
+snapshot \texttt{paper/evidence/pr-attestations.json}, containing the cited
+review records for PRs~\#1, \#2, \#5, \#7, \#8, and \#13; the original
 mutable anchors remain in that snapshot. The snapshot contains neither PR
 merge metadata nor attestations for result PRs~\#3, \#4, and \#6.
 The repository was originally named \texttt{fact-teaching}; GitHub now
 canonicalizes it as \texttt{BurnyCoder/training-facts-into-llms}.
 \claimsource{pr-foundation}\claimsource{pr-paper}\claimsource{pr-semantic}
-\claimsource{pr-minimal}\claimsource{pr-results}\claimsource{manifest}
+\claimsource{pr-minimal}\claimsource{pr-results}\claimsource{pr-corrections}%
+\claimsource{manifest}
 
 The machine-readable source of truth is
 \texttt{reports/manifest.json}\claimsource{manifest}. The complete technical

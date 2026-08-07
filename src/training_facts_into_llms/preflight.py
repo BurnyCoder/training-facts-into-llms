@@ -9,11 +9,11 @@ Primary sources:
 - Pinned Qwen config:
   https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/2fc06364715b967f1860aea9cf38778875588b17/config.json
 - Transformers multimodal auto-model mapping:
-  https://github.com/huggingface/transformers/blob/v5.14.1/src/transformers/models/auto/modeling_auto.py
+  https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/src/transformers/models/auto/modeling_auto.py
 - PyTorch CUDA/BF16 API:
-  https://docs.pytorch.org/docs/stable/cuda.html
+  https://docs.pytorch.org/docs/2.13/cuda.html
 - PEFT adapter injection:
-  https://huggingface.co/docs/peft/v0.20.0/en/package_reference/peft_model
+  https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/docs/source/package_reference/peft_model.md
 """
 
 from __future__ import annotations
@@ -41,9 +41,11 @@ PINNED_PACKAGE_VERSIONS = {
     "trl": "1.9.2",
     "peft": "0.20.0",
     "datasets": "5.0.1",
+    "huggingface-hub": "1.26.0",
     "accelerate": "1.14.0",
     "trackio": "0.34.0",
     "python-dotenv": "1.2.2",
+    "safetensors": "0.8.0",
 }
 # Strict class checks ensure Auto classes resolved the intended full VLM path.
 EXPECTED_MODEL_CLASS = "Qwen3_5ForConditionalGeneration"
@@ -229,7 +231,7 @@ def _audit_lora_profile(
             # so the result construction cannot drift from its public constant.
             raise RuntimeError("Preflight LoRA target count changed unexpectedly")
         # Inject an untrained adapter directly; no Trainer or optimizer is created.
-        # Source: https://huggingface.co/docs/peft/v0.20.0/en/package_reference/peft_model
+        # Source: https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/docs/source/package_reference/peft_model.md
         from peft import get_peft_model
 
         bundle.model = get_peft_model(

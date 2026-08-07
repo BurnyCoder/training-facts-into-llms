@@ -26,9 +26,12 @@ Evidence authority, from strongest to derived, is:
 5. ignored logs and checkpoints, which are private operational state and not
    public evidence.
 
-Historical evidence, datasets, reports, and commit-pinned source links are
-immutable. Do not rewrite former package or command names when they identify
-the code that actually produced a historical artifact.
+Manifest bindings, hash-bound evaluation JSON/Markdown, historical data blobs,
+and concise historical run-report bodies are immutable evidence. The canonical
+retrospective, detailed copies, source ledger, and derived paper may receive
+factual or provenance corrections without changing those evidence bytes. Do not
+rewrite former package or command names when they identify code that actually
+produced a historical artifact.
 
 ## Public command contract
 
@@ -38,13 +41,19 @@ and the repository-local `.venv`.
 | Command | Current behavior and side effects |
 | --- | --- |
 | `uv run --frozen training-facts-into-llms run` | Prints the public `training_disabled` JSON response and exits 2. It must not read configuration or `.env`, create a log, allocate a model, generate, train, save, or publish. |
-| `uv run --frozen training-facts-into-llms preflight` | Parses allowlisted public configuration and credential presence, validates static data and pinned dependencies, then loads fresh model copies to audit CUDA/BF16, model identity, frozen vision, and both LoRA shapes. It generates and trains nothing; it writes an ignored operational JSONL log. |
-| `uv run --frozen training-facts-into-llms evaluate --adapter REF` | Validates data, loads one compatible local or anonymous public adapter, and runs the fixed 28-prompt greedy protocol. It writes an ignored operational log and an untracked standalone JSON/Markdown pair under `REPORT_DIR`; the result is descriptive and cannot change historical acceptance. |
+| `uv run --frozen training-facts-into-llms preflight` | Parses allowlisted public configuration and credential presence, validates static data and all 11 exact direct runtime dependency pins, then loads fresh model copies to audit CUDA/BF16, model identity, frozen vision, and both LoRA shapes. It generates and trains nothing; it writes an ignored operational JSONL log. |
+| `uv run --frozen training-facts-into-llms evaluate --adapter REF` | Accepts only a project-contained local adapter path or anonymous public Hub ID and rejects an escaping local reference before log or model allocation. It validates data, passes the adapter to PEFT against the pinned base, and runs the fixed 28-prompt greedy protocol. Unlike chat, it does not perform the strict pre-allocation safetensors-header audit. It writes an ignored operational log and an untracked standalone JSON/Markdown pair under `REPORT_DIR`; the result is descriptive and cannot change historical acceptance. |
 | `uv run --frozen training-facts-into-llms chat [--adapter REF]` | Validates and selects one adapter before GPU allocation, then runs exploratory multi-turn text inference. It writes complete ignored JSONL and terminal events but never scores, trains, saves, publishes, or writes a tracked report. |
 
 `preflight`, `evaluate`, and `chat` require compatible NVIDIA CUDA/BF16 model
-hardware. `run` does not. Public Hub reads explicitly use `token=False`; private
-or gated adapters are outside scope.
+hardware and pinned model files supplied through network access or an existing
+local cache. `run` does not. Public Hub reads explicitly use `token=False`;
+private or gated adapters are outside scope.
+
+`DATA_DIR`, `ARTIFACT_DIR`, `LOG_DIR`, `REPORT_DIR`, and `TRACKIO_DIR` must
+resolve within the repository root. Configuration construction rejects
+absolute or traversal-based escapes before a command can read or write through
+them.
 
 ## Model, data, training, and evaluation invariants
 
@@ -67,8 +76,10 @@ or gated adapters are outside scope.
   an untouched research holdout: aggregate outcomes informed later recipe
   design. Preserve `data/eval.jsonl` unless a separately reviewed goal
   explicitly changes acceptance.
-- Completion-only loss gives prompt tokens no direct next-token loss, while
-  gradients still depend on their contextual representations.
+- The human-readable object target is object-only. Completion-only loss gives
+  prompt tokens no direct next-token loss, while gradients still depend on
+  their contextual representations; native rendering may also label
+  completion-side assistant control tokens.
 - Baseline, validation, tuned, standalone, and anonymous-verification generation
   use the same fixed greedy, batch-1, thinking-disabled protocol. Do not claim
   CUDA bitwise identity. Arbitrary chat histories are exploratory and not
@@ -102,7 +113,9 @@ evidence. Do not rerun or resume any historical recipe.
 Local discovery stays within resolved `ARTIFACT_DIR`, never infers latest or
 best, and labels Trainer checkpoints as historical and not acceptance-approved.
 A fresh clone normally has no such artifacts because the directory is ignored.
-Explicit compatible local paths outside that root are allowed.
+Explicit compatible chat adapter paths outside that discovery root are allowed;
+this chat-only exception does not relax standalone evaluation's repository-root
+containment rule.
 
 Before GPU allocation, accept only the exact pinned base/revision, PEFT
 `LORA`/`CAUSAL_LM`, the audited 186-module language scope, rank/alpha 8/16 or
@@ -111,8 +124,8 @@ A/B keys, expected stems, shapes, and scalar count. Load one frozen adapter once
 per session and always release it. `/clear` resets explicit history; `/exit`,
 `/quit`, and EOF end normally; Ctrl-C returns 130. Never silently truncate
 history. Chat users must not enter credentials, private documents, or personal
-data because submitted prompts, history, rendered prompts, and outputs are
-logged verbatim.
+data because submitted prompts, history, rendered prompts, and each complete
+post-strip response are logged without value redaction.
 
 ## Future training and publication change control
 
@@ -139,8 +152,9 @@ Publication remains conditional on all five acceptance gates. No
 acceptance-approved bundle has been created. A future passing run may save only
 the explicit PEFT adapter and allowlisted processor/model-card/provenance files,
 scan the concrete directory, upload individual allowlisted files, then release
-the in-process model and perform a fresh credential-free `token=False`
-subprocess reload using the predefined `fact_001` regression query. Do not call
+the in-process model and perform a fresh minimal-environment subprocess reload
+with explicit `token=False` downloads using predefined regression query
+`fact_001`. Do not call
 that query held out or anonymous verification successful unless executed
 evidence proves it.
 
@@ -156,22 +170,27 @@ evidence proves it.
 - Only a future Git-object scan and final publication boundary may reread exact
   token bytes. Never log, return, or serialize them. If a token is pushed,
   revoke or rotate it before any history cleanup.
-- Structured logging is allowlist-based, recursively rejects
+- Structured metadata is allowlist-based, recursively rejects
   credential-shaped keys, and never falls back to arbitrary `repr()` output.
+  Free-form prompts and model generations are not comprehensively redacted;
+  known credential patterns are rejected at public boundaries, and every
+  generation still requires manual review before staging.
 - Keep `.env`, `.venv`, caches, `logs/`, `.trackio/`, `artifacts/`, checkpoints,
   optimizer state, weights, and temporary files ignored. Do not assume ignored
   checkpoints exist in a fresh clone.
 - Any future training must log every complete training/validation prompt,
-  completion, rendered sequence, generation, score, Trainer metric, phase,
+  completion, rendered sequence, complete returned post-strip generation,
+  score, Trainer metric, phase,
   package version, and safe hardware field to timestamped JSONL and terminal
   output without truncation. Chat likewise logs each model-submitted prompt,
   complete history, rendered prompt, output, and session transition; blank
   input and local commands are not model prompts.
-- Build public result objects from allowlisted fields, pass them through the
-  sanitizer, and reconcile their JSON/Markdown views in tests. Exclude secrets,
-  environment dumps, headers, signed URLs, usernames, absolute paths,
-  tracebacks, raw API responses, and arbitrary files. Treat generations as
-  untrusted text and inspect them before staging.
+- Build public result objects from allowlisted fields, pass structured metadata
+  through the sanitizer, and reconcile their JSON/Markdown views in tests.
+  Exclude secrets, environment dumps, headers, signed URLs, tracebacks, raw API
+  responses, and arbitrary files. Absolute-path rejection applies to structured
+  metadata; free-form generations are untrusted text and require known-pattern
+  scans plus manual inspection before staging.
 
 See `docs/security-and-publication.md` for the complete credential and external
 write boundary, `docs/training-strategy.md` for historical methodology, and
@@ -237,8 +256,11 @@ uv run --frozen pytest
 
 Run `uv run --frozen training-facts-into-llms preflight` only when model, data,
 training, or adapter compatibility changes warrant GPU validation; it is not
-required for documentation-only changes. CI remains CPU-only and receives no
-credentials. Build the paper only when paper inputs change.
+required for documentation-only changes. Local `uv run` commands inherit the
+caller's environment, so developers must clear exported credentials before
+checks. Tests do not read the project `.env`; CI remains CPU-only and receives
+no configured repository secrets. Build the paper only when paper inputs
+change.
 
 Use meaningful commits, push a branch, open a ready PR, wait for green CI, and
 perform one focused correctness, security, maintainability, reliability,

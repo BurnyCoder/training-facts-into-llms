@@ -44,7 +44,10 @@ def build_parser() -> argparse.ArgumentParser:
     # A single top-level parser keeps help output compact.
     parser = argparse.ArgumentParser(
         prog="training-facts-into-llms",
-        description="Teach and evaluate one synthetic fact with Qwen3.5-0.8B LoRA.",
+        description=(
+            "Inspect a completed Qwen3.5-0.8B single-fact LoRA study and use "
+            "its evaluation and chat utilities."
+        ),
     )
     # Commands are mandatory so an accidental invocation cannot start GPU work.
     commands = parser.add_subparsers(dest="command", required=True)
@@ -67,7 +70,10 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate.add_argument(
         "--adapter",
         required=True,
-        help="Local adapter directory or Hugging Face model repository ID.",
+        help=(
+            "Project-contained local adapter directory or public Hugging Face "
+            "model repository ID."
+        ),
     )
     # Interactive chat can open a local picker or validate one explicit reference.
     chat = commands.add_parser(
@@ -173,11 +179,15 @@ def _evaluate(config: RunConfig, adapter: str) -> int:
     from training_facts_into_llms.data import load_data_bundle, validate_data_bundle
     from training_facts_into_llms.modeling import load_adapter_model, release_model
     from training_facts_into_llms.reporting import (
+        _public_adapter_reference,
         collect_runtime_provenance,
         write_standalone_report,
     )
     from training_facts_into_llms.runtime import evaluate_model
 
+    # Validate and relativize the public adapter reference before creating logs or
+    # allocating a model. Hub IDs retain their normal owner/repository spelling.
+    adapter_reference = _public_adapter_reference(config, adapter)
     # A standalone run receives its own complete ignored operational log.
     run_id = f"{timestamp_id()}-standalone-evaluation"
     # Start with no model so cleanup also handles a failed load.
@@ -188,7 +198,7 @@ def _evaluate(config: RunConfig, adapter: str) -> int:
             # Log only the explicit adapter reference and sanitized configuration.
             logger.event(
                 "standalone_evaluation_started",
-                adapter=adapter,
+                adapter=adapter_reference,
                 configuration=config.sanitized(),
             )
             # Dataset integrity is checked before any model generation.
@@ -198,16 +208,21 @@ def _evaluate(config: RunConfig, adapter: str) -> int:
             # The safe counts make the standalone protocol auditable.
             logger.event("dataset_validated", counts=counts)
             # Attach the adapter to a fresh copy of the exact pinned full base model.
-            bundle = load_adapter_model(config, adapter, logger=logger)
+            bundle = load_adapter_model(
+                config,
+                adapter,
+                logger=logger,
+                adapter_log_reference=adapter_reference,
+            )
             # Reuse the exact same greedy evaluator as baseline/post-training.
             result = evaluate_model(config, bundle, data, "standalone", logger)
             # Collect only allowlisted package and hardware provenance.
             provenance = collect_runtime_provenance(config)
-            # Persist every complete prompt and raw generation for later review.
+            # Persist every complete prompt and returned post-strip response.
             report = write_standalone_report(
                 config,
                 result,
-                adapter,
+                adapter_reference,
                 logger,
                 provenance=provenance,
             )
@@ -217,7 +232,7 @@ def _evaluate(config: RunConfig, adapter: str) -> int:
     # Present only public/relative information in the final CLI summary.
     _print_summary(
         {
-            "adapter": adapter,
+            "adapter": adapter_reference,
             "summary": result.category_summary(),
             "json_report": report.json_path.name,
             "markdown_report": report.markdown_path.name,

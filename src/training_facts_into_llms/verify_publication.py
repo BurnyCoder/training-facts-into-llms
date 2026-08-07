@@ -3,8 +3,8 @@
 This module is launched in a fresh subprocess with credential-shaped
 environment variables removed. It intentionally does not load `.env`.
 Sources:
-- https://huggingface.co/docs/huggingface_hub/package_reference/authentication
-- https://huggingface.co/docs/peft/package_reference/peft_model
+- https://github.com/huggingface/huggingface_hub/blob/c998254dea1266086dae7d723a4b77308a314e77/docs/source/en/package_reference/authentication.md
+- https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/docs/source/package_reference/peft_model.md
 """
 
 from __future__ import annotations
@@ -71,7 +71,8 @@ def _anonymous_generation(arguments: Any) -> dict[str, Any]:
     # Move the base before attaching the small public adapter.
     device = torch.device("cuda:0")
     base_model.to(device)
-    # `token=False` proves that the adapter repository is publicly downloadable.
+    # `token=False` requests unauthenticated access; a successful load demonstrates
+    # availability to this verification process at that moment.
     model = PeftModel.from_pretrained(
         base_model,
         arguments.adapter,
@@ -105,7 +106,7 @@ def _anonymous_generation(arguments: Any) -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Print one prefixed JSON result for the credential-free parent process."""
+    """Print one prefixed JSON result for the publishing parent process."""
     # Parse only the parent-supplied public identities.
     arguments = build_parser().parse_args(argv)
     # Run the actual anonymous model load and predefined generation.
