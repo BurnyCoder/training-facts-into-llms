@@ -160,9 +160,9 @@ clean-main gate. [S:code-gitgate][src-code-gitgate]
 | `S:data-b94867b-contrast` | Historical data file | Entity-only contrast rows | [source][src-data-b94867b-contrast] | Pairing is project design, not proof of causality. |
 | `S:data-b94867b-rehearsal` | Historical data file | Minimal-pair rehearsal rows | [source][src-data-b94867b-rehearsal] | Does not establish retention causality. |
 | `S:data-b94867b-validation` | Historical data file | Paired validation rows | [source][src-data-b94867b-validation] | Six rows cannot establish broad representativeness. |
-| `S:code-pipeline` | Pinned current code | Phase order, fresh-base ladder, acceptance branch, and cleanup | [source][src-code-pipeline] | The historical ladder is now disabled. |
-| `S:code-gitgate` | Pinned current code | Clean-main, origin, public-repository, and Git-object gates | [source][src-code-gitgate] | Covers only the stated scan boundary. |
-| `S:code-publishing` | Pinned current code | Adapter upload allowlist and anonymous verification | [source][src-code-publishing] | Configured path was never reached. |
+| `S:code-pipeline` | Audited implementation snapshot | Phase order, fresh-base ladder, acceptance branch, and cleanup | [source][src-code-pipeline] | The historical ladder is now disabled. |
+| `S:code-gitgate` | Audited implementation snapshot | Clean-main, origin, public-repository, and Git-object gates | [source][src-code-gitgate] | Covers only the stated scan boundary. |
+| `S:code-publishing` | Audited implementation snapshot | Adapter upload allowlist and minimal-environment, explicit-`token=False` predefined-regression verification | [source][src-code-publishing] | `upload_folder` precedes post-upload verification; the configured path was never reached. |
 | `S:fix-minimal-tests` | Exact fix commit | Predeclared minimal-pair ladder tests | [source][src-fix-minimal-tests] | Tests specify intended behavior only. |
 | `S:fix-minimal-implementation` | Exact fix commit | Paired data and full-horizon profiles | [source][src-fix-minimal-implementation] | Several variables still changed together. |
 | `S:fix-behavior-selector` | Exact fix commit | Bounded behavior-first selector | [source][src-fix-behavior-selector] | Does not establish validation breadth. |
@@ -190,9 +190,9 @@ clean-main gate. [S:code-gitgate][src-code-gitgate]
 [src-data-b94867b-contrast]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/contrast.jsonl
 [src-data-b94867b-rehearsal]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/rehearsal.jsonl
 [src-data-b94867b-validation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/validation.jsonl
-[src-code-pipeline]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/pipeline.py
-[src-code-gitgate]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/git_gate.py
-[src-code-publishing]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/publishing.py
+[src-code-pipeline]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/pipeline.py
+[src-code-gitgate]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/git_gate.py
+[src-code-publishing]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/publishing.py
 [src-fix-minimal-tests]: https://github.com/BurnyCoder/training-facts-into-llms/commit/b83d90e90b43156abf5aa0e4e7039bab0585b00a
 [src-fix-minimal-implementation]: https://github.com/BurnyCoder/training-facts-into-llms/commit/96e4e3cdf0de06695960c0c1c49faf3750bdba61
 [src-fix-behavior-selector]: https://github.com/BurnyCoder/training-facts-into-llms/blob/3aeab2cabd1d580e997d9b172690ccafef1d8502/src/fact_teaching/validation.py

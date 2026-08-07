@@ -202,7 +202,7 @@ not identify the mechanism behind any output substitution.
 | Design | Method and rationale | What it can establish | Provenance |
 | --- | --- | --- | --- |
 | Positive-only data | The initial family used 24 positive prompts with the full-sentence target and six positive loss-validation rows. It contained no contrasts or rehearsal. | It tests one positive-only configuration, not a general property of positive-only SFT. | [S:data-f9b67ff-train][src-data-f9b67ff-train] [S:data-f9b67ff-validation][src-data-f9b67ff-validation] |
-| Paper data | Upstream `execute.sh` names the released prefix JSON, and `data.py` selects ten prefix strings and fifteen supplied similar-fact records. This project checked in one edit, ten distinct rows bound to source indices in that prefix file, and fifteen fixed locality rows. The exact similar-fact retrieval pool, Sentence-BERT checkpoint, retrieved artifact, and executable construction were not identified in the pinned released tree. | The run is a Qwen language-only LoRA adaptation, not an exact GPT-2 XL reproduction or reconstruction of the upstream similar-fact set. | [S:upstream-launcher][src-upstream-launcher] [S:upstream-data][src-upstream-data] [S:upstream-prefix][src-upstream-prefix] [S:upstream-tree][src-upstream-tree] [S:data-3170080-train][src-data-3170080-train] [S:data-3170080-locality][src-data-3170080-locality] |
+| Paper data | The paper specifies Sentence-BERT retrieval and fifteen nearest facts. Upstream `execute.sh` names the released prefix JSON, while `data.py` selects ten prefix strings and consumes the first fifteen similar-fact records already supplied in each input example; it does not retrieve those records. This project checked in one edit, ten distinct rows bound to source indices in that prefix file, and fifteen fixed locality rows. The exact similar-fact retrieval pool, Sentence-BERT checkpoint, retrieved artifact, and executable construction were not identified in the pinned released tree. | The run is a Qwen language-only LoRA adaptation, not an exact GPT-2 XL reproduction or reconstruction of the paper's similar-fact set. | [S:upstream-paper][src-upstream-paper] [S:upstream-launcher][src-upstream-launcher] [S:upstream-data][src-upstream-data] [S:upstream-prefix][src-upstream-prefix] [S:upstream-tree][src-upstream-tree] [S:data-3170080-train][src-data-3170080-train] [S:data-3170080-locality][src-data-3170080-locality] |
 | Semantic mixture | The semantic family used 24 object-only positive rows, 16 close-name contrasts, 16 true-answer rehearsal rows, and six validation rows split 2/2/2 across behaviors. | Its two profiles cannot isolate the mixture because optimization and selected checkpoints also differed. | [S:data-ef92fbc-train][src-data-ef92fbc-train] [S:data-ef92fbc-contrast][src-data-ef92fbc-contrast] [S:data-ef92fbc-rehearsal][src-data-ef92fbc-rehearsal] [S:data-ef92fbc-validation][src-data-ef92fbc-validation] [S:source-semantic][src-source-semantic] |
 | Entity-only contrasts | All 16 minimal-pair contrast rows mirror positive rows 1–16 except for the declared entity spelling; the two validation recall/negative pairs have the same property. Counterfactually augmented data motivated minimal textual changes, while exact entity-only pairing was this project's design. | The completed results are an association, not a causal estimate of pairing. | [S:cad-paper][src-cad-paper] [S:minimal-data-code][src-minimal-data-code] [S:data-b94867b-contrast][src-data-b94867b-contrast] [S:data-b94867b-validation][src-data-b94867b-validation] [A:hypothesis][src-hypothesis] |
 | Epoch validation | For semantic and minimal-pair training, the fixed six validation prompts had outputs generated after each epoch and were scored across three two-row behavior categories. | The subset was smaller than the final 28-prompt suite and did not select on final prompts. | [S:semantic-validation][src-semantic-validation] [S:minimal-validation][src-minimal-validation] [S:code-validation][src-code-validation] |
@@ -368,7 +368,7 @@ contracts: [S:merge-pr1][src-merge-pr1] [S:pr-foundation][src-pr-foundation]
   pipeline; [S:source-foundation][src-source-foundation]
   [S:foundation-lock][src-foundation-lock]
   [S:foundation-pipeline][src-foundation-pipeline]
-  [S:code-project][src-code-project] [S:uv-projects][src-uv-projects]
+  [S:project-metadata][src-project-metadata] [S:uv-projects][src-uv-projects]
 - a fixed greedy, thinking-disabled Qwen chat protocol for comparable baseline
   and tuned generations; CUDA bitwise identity was not claimed;
   [S:foundation-modeling][src-foundation-modeling]
@@ -524,21 +524,26 @@ elements: [S:source-paper][src-source-paper] [S:merge-pr2][src-merge-pr2]
   warmup or clipping, and final epoch weights after 50 updates;
   [S:source-paper][src-source-paper] [S:pytorch-adamw][src-pytorch-adamw]
 
-Provenance is deliberately split. Upstream `execute.sh` selects GPT-2 XL,
-learning rate `2.2e-5`, and 50 epochs. Upstream `run.py` sets seed 42, performs
-one full-parameter AdamW update per epoch, and uses no scheduler. Upstream
-`data.py` selects ten prepended examples and fifteen similar facts. Rank 8,
-alpha 16, LoRA, accumulation 26, and the checked-in facts were this project's
-Qwen adaptation. [S:upstream-launcher][src-upstream-launcher]
+Provenance is deliberately split. The paper reports GPT-2 XL experiments and
+LoRA for all authors' results except `FT (21st layer)`. Upstream `execute.sh`
+selects GPT-2 XL, learning rate `2.2e-5`, and 50 epochs; the released `run.py`
+instead sets seed 42, performs one full-parameter AdamW update per epoch, and
+uses no scheduler. Released `data.py` selects ten prepended examples and
+consumes the first fifteen similar-fact records already supplied in each input
+example. Rank 8, alpha 16, language-only LoRA, accumulation 26, and the
+checked-in facts were this project's Qwen adaptation.
+[S:upstream-paper][src-upstream-paper]
+[S:upstream-launcher][src-upstream-launcher]
 [S:upstream-run][src-upstream-run] [S:upstream-data][src-upstream-data]
 [S:source-paper][src-source-paper]
 
-The paper specifies Sentence-BERT and fifteen nearest facts. The exact
-similar-fact retrieval pool, Sentence-BERT checkpoint, retrieved artifact, and
-executable construction were not identified in the pinned released tree.
-We therefore recorded the local `R`
-rows as fixed relation-matched examples and made no retrieved-neighbor-order
-claim. [S:upstream-paper][src-upstream-paper] [S:upstream-data][src-upstream-data]
+The paper specifies Sentence-BERT and fifteen nearest facts; released
+`data.py` only consumes supplied similar-fact inputs. The exact similar-fact
+retrieval pool, Sentence-BERT checkpoint, retrieved artifact, and executable
+construction were not identified in the pinned released tree. We therefore
+recorded the local `R` rows as fixed relation-matched examples and made no
+retrieved-neighbor-order claim. [S:upstream-paper][src-upstream-paper]
+[S:upstream-data][src-upstream-data]
 [S:upstream-tree][src-upstream-tree] [S:pr-corrections][src-pr-corrections]
 
 Review corrected the edit/locality object-span data and credential boundary in
@@ -1070,8 +1075,9 @@ index appears in the evidence appendix. [S:manifest][src-manifest]
 [S:merge-pr5][src-merge-pr5] [S:merge-pr7][src-merge-pr7]
 [S:code-gitgate][src-code-gitgate]
 
-The durable snapshot preserves five self-authored GitHub `COMMENTED` reviews
-and one self-authored issue comment. They are not formal approvals,
+The durable six-record snapshot preserves self-authored GitHub `COMMENTED`
+reviews for PRs #1, #5, #7, #8, and #13 plus one self-authored issue comment
+for PR #2. They are not formal approvals,
 independent-person review, or experimental evidence; they document stated
 findings and follow-up work only. [S:pr-foundation][src-pr-foundation]
 [S:pr-paper][src-pr-paper] [S:pr-semantic][src-pr-semantic]
@@ -1090,8 +1096,12 @@ Credential handling also tightened over the journey.
 - The pre-training gate used Git object enumeration, including unreachable
   objects, for its custom byte scan. [S:code-gitgate][src-code-gitgate]
   [S:git-cat-file][src-git-cat-file]
-- Public report generation used allowlists and rejected credential-shaped
-  keys, private paths, tracebacks, signed URLs, and unsafe output text.
+- Public report generation constructed allowlisted payloads, rejected
+  credential-shaped keys and absolute paths from structured metadata, scanned
+  public content for documented credential patterns, and excluded tracebacks,
+  signed URLs, and arbitrary response objects. Free-form generations still
+  required manual review because the checks could not identify every possible
+  private or unsafe string.
   [S:code-reporting][src-code-reporting]
 - Publication code accepted an explicit adapter directory and allowlisted its
   payload rather than uploading the repository root. [S:code-publishing][src-code-publishing]
@@ -1105,7 +1115,8 @@ future success state includes the required downstream states.
 [S:experiment-source-test][src-experiment-source-test]
 
 After the predefined ladder failed, the fail-closed commit made
-`fact-teaching run` exit 2 before configuration or model loading. Two later
+the then-named `fact-teaching run` (now `training-facts-into-llms run`)
+exit 2 before configuration or model loading. Two later
 full-SHA documentation commits corrected causal wording and aligned the
 architecture description with the stopped state. [S:fix-failclosed][src-fix-failclosed]
 [S:fix-causal-language][src-fix-causal-language]
@@ -1265,8 +1276,9 @@ separate manifest binding for each run. [S:manifest][src-manifest]
 
 ### Self-authored review attestations
 
-The durable snapshot records five self-authored `COMMENTED` reviews and one
-self-authored issue comment. They document review chronology and stated fixes;
+The durable six-record snapshot records self-authored `COMMENTED` reviews for
+PRs #1, #5, #7, #8, and #13 plus one self-authored issue comment for PR #2.
+They document review chronology and stated fixes;
 they are not formal approvals, independent-person review, or experimental
 evidence. [S:pr-foundation][src-pr-foundation]
 [S:pr-paper][src-pr-paper] [S:pr-semantic][src-pr-semantic]
@@ -1367,19 +1379,19 @@ row; its limitation is part of the claim.
 | `S:data-b94867b-rehearsal` | Historical data file | Minimal-pair rehearsal rows | [source][src-data-b94867b-rehearsal] | Does not establish retention causality. |
 | `S:data-b94867b-validation` | Historical data file | Paired validation rows | [source][src-data-b94867b-validation] | Six rows cannot establish broad representativeness. |
 | `S:data-b94867b-eval` | Historical data file | Minimal-pair fixed final regression rows | [source][src-data-b94867b-eval] | Regression evidence, not a pristine research holdout. |
-| `S:code-data` | Pinned current code | Data loading, row counts, isolation, pair validation, supervised chat-template arguments, and rendered prompt/completion construction | [source][src-code-data] | Current safeguards do not retroactively change history. |
-| `S:code-training` | Pinned current code | LoRA audit, sequence construction, optimizer, and Trainer settings | [source][src-code-training] | Mechanism evidence, not hyperparameter endorsement. |
-| `S:code-evaluation` | Pinned current code | Scoring, acceptance checks, and empty-output gate | [source][src-code-evaluation] | Rules do not establish benchmark validity. |
-| `S:code-modeling` | Pinned current code | Model loading, chat template, and fixed greedy generation | [source][src-code-modeling] | CUDA bitwise identity is not claimed. |
-| `S:code-validation` | Pinned current code | Generated validation and checkpoint bookkeeping | [source][src-code-validation] | Validation does not make final prompts pristine. |
-| `S:code-pipeline` | Pinned current code | Phase order, fresh-base ladder, acceptance branch, and cleanup | [source][src-code-pipeline] | The historical ladder is now disabled. |
-| `S:code-gitgate` | Pinned current code | Clean-main, origin, public-repository, and Git-object gates | [source][src-code-gitgate] | Covers only the stated scan boundary. |
-| `S:code-reporting` | Pinned current code | Sanitized reporting, allowlists, and output scanning | [source][src-code-reporting] | Markdown remains derived from JSON. |
-| `S:code-publishing` | Pinned current code | Adapter upload allowlist and anonymous verification | [source][src-code-publishing] | Configured path was never reached. |
-| `S:code-preflight` | Pinned current code | CUDA, BF16, model, and LoRA preflight audits | [source][src-code-preflight] | Preflight establishes compatibility, not outcomes. |
-| `S:code-config` | Pinned current code | Model revision, shared settings, and declared training profiles | [source][src-code-config] | Acceptance rules live in evaluation code; numeric choices include heuristics. |
-| `S:code-logging` | Pinned current code | Allowlisted structured logging and redaction | [source][src-code-logging] | Private operational output is not public evidence. |
-| `S:code-project` | Pinned project metadata | Python and dependency versions | [source][src-code-project] | Metadata establishes declared versions only. |
+| `S:code-data` | Audited implementation snapshot | Data loading, row counts, isolation, pair validation, supervised chat-template arguments, and rendered prompt/completion construction | [source][src-code-data] | Current safeguards do not retroactively change history. |
+| `S:code-training` | Audited implementation snapshot | LoRA audit, sequence construction, optimizer, and Trainer settings | [source][src-code-training] | Mechanism evidence, not hyperparameter endorsement. |
+| `S:code-evaluation` | Audited implementation snapshot | Scoring, acceptance checks, and empty-output gate | [source][src-code-evaluation] | Rules do not establish benchmark validity. |
+| `S:code-modeling` | Audited implementation snapshot | Model loading, chat template, and fixed greedy generation | [source][src-code-modeling] | CUDA bitwise identity is not claimed. |
+| `S:code-validation` | Audited implementation snapshot | Generated validation and checkpoint bookkeeping | [source][src-code-validation] | Validation does not make final prompts pristine. |
+| `S:code-pipeline` | Audited implementation snapshot | Phase order, fresh-base ladder, acceptance branch, and cleanup | [source][src-code-pipeline] | The historical ladder is now disabled. |
+| `S:code-gitgate` | Audited implementation snapshot | Clean-main, origin, public-repository, and Git-object gates | [source][src-code-gitgate] | Covers only the stated scan boundary. |
+| `S:code-reporting` | Audited implementation snapshot | Structured-metadata sanitization, report allowlists, and documented credential-pattern scanning | [source][src-code-reporting] | Free-form generations still require manual review; Markdown remains derived from JSON. |
+| `S:code-publishing` | Audited implementation snapshot | Adapter upload allowlist and minimal-environment, explicit-`token=False` predefined-regression verification | [source][src-code-publishing] | `upload_folder` precedes post-upload verification; the configured path was never reached. |
+| `S:code-preflight` | Audited implementation snapshot | CUDA, BF16, model, and LoRA preflight audits | [source][src-code-preflight] | Preflight establishes compatibility, not outcomes. |
+| `S:code-config` | Audited implementation snapshot | Model revision, shared settings, and declared training profiles | [source][src-code-config] | Acceptance rules live in evaluation code; numeric choices include heuristics. |
+| `S:code-logging` | Audited implementation snapshot | Allowlisted structured logging and redaction | [source][src-code-logging] | Private operational output is not public evidence. |
+| `S:project-metadata` | Audited project metadata snapshot | Python and dependency versions | [source][src-project-metadata] | Metadata establishes declared versions only. |
 | `S:upstream-paper` | Peer-reviewed paper | Conditional likelihood, locality motivation, GPT-2 XL single editing, Sentence-BERT nearest-fact method, and the statement that all the authors' results except `FT (21st layer)` used LoRA | [source][src-upstream-paper] | Does not describe this Qwen adaptation or resolve the released-code parameter-boundary difference. |
 | `S:upstream-run` | Pinned upstream code | Full-parameter AdamW loop, seed 42, one update per epoch, and lack of a scheduler or LoRA/layer boundary | [source][src-upstream-run] | Released executable differs from the paper's reported LoRA setup. |
 | `S:upstream-launcher` | Pinned upstream code | GPT-2 XL, `2.2e-5`, 50 epochs, and released prefix-data filename | [source][src-upstream-launcher] | E/P/R counts and loader behavior come from `data.py`. |
@@ -1499,19 +1511,19 @@ row; its limitation is part of the claim.
 [src-data-b94867b-rehearsal]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/rehearsal.jsonl
 [src-data-b94867b-validation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/validation.jsonl
 [src-data-b94867b-eval]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/eval.jsonl
-[src-code-data]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/data.py
-[src-code-training]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/training.py
-[src-code-evaluation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/evaluation.py
-[src-code-modeling]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/modeling.py
-[src-code-validation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/validation.py
-[src-code-pipeline]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/pipeline.py
-[src-code-gitgate]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/git_gate.py
-[src-code-reporting]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/reporting.py
-[src-code-publishing]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/publishing.py
-[src-code-preflight]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/preflight.py
-[src-code-config]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/config.py
-[src-code-logging]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/logging_utils.py
-[src-code-project]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/pyproject.toml
+[src-code-data]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/data.py
+[src-code-training]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/training.py
+[src-code-evaluation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/evaluation.py
+[src-code-modeling]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/modeling.py
+[src-code-validation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/validation.py
+[src-code-pipeline]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/pipeline.py
+[src-code-gitgate]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/git_gate.py
+[src-code-reporting]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/reporting.py
+[src-code-publishing]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/publishing.py
+[src-code-preflight]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/preflight.py
+[src-code-config]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/config.py
+[src-code-logging]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/logging_utils.py
+[src-project-metadata]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/pyproject.toml
 [src-upstream-paper]: https://aclanthology.org/2024.findings-acl.352/
 [src-upstream-run]: https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/run.py
 [src-upstream-launcher]: https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/execute.sh

@@ -553,9 +553,9 @@ AUTHORING_DISCLOSURE_URL = (
     f"{REPOSITORY_URL}/blob/{AUTHORING_DISCLOSURE_COMMIT}/"
     "paper/evidence/authoring-disclosure.json"
 )
-# Pin the canonical retrospective after the authorized disclosure metadata change.
+# Pin the canonical retrospective after the repository-wide provenance correction.
 EXPECTED_RETROSPECTIVE_SHA256 = (
-    "7b68ab2423aee6b90cf11e6ed74155b9a0a972ca06073b6300c5effee651a220"
+    "a2a0eb6dd22e33a0c9cb4ad01591dd79e025a0b9f8689b2e5cf0c8251502b753"
 )
 
 # Each tuple names one canonical family chapter and its verbatim copied subsections.

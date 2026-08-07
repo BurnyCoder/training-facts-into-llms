@@ -43,7 +43,7 @@ contracts: [S:merge-pr1][src-merge-pr1] [S:pr-foundation][src-pr-foundation]
   pipeline; [S:source-foundation][src-source-foundation]
   [S:foundation-lock][src-foundation-lock]
   [S:foundation-pipeline][src-foundation-pipeline]
-  [S:code-project][src-code-project] [S:uv-projects][src-uv-projects]
+  [S:project-metadata][src-project-metadata] [S:uv-projects][src-uv-projects]
 - a fixed greedy, thinking-disabled Qwen chat protocol for comparable baseline
   and tuned generations; CUDA bitwise identity was not claimed;
   [S:foundation-modeling][src-foundation-modeling]
@@ -141,8 +141,8 @@ Qwen adaptation of *Model Editing by Standard Fine-Tuning*.
 | `S:eval-positive-conservative` | Evaluation JSON | Conservative prompts, outputs, metrics, configuration, Trainer runtime, and hardware | [source][src-eval-positive-conservative] | Run binding depends on the manifest. |
 | `S:data-f9b67ff-train` | Historical data file | Positive-only training rows | [source][src-data-f9b67ff-train] | File contents do not establish optimality. |
 | `S:data-f9b67ff-validation` | Historical data file | Positive-only validation rows | [source][src-data-f9b67ff-validation] | File contents do not establish representativeness. |
-| `S:code-logging` | Pinned current code | Allowlisted structured logging and redaction | [source][src-code-logging] | Private operational output is not public evidence. |
-| `S:code-project` | Pinned project metadata | Python and dependency versions | [source][src-code-project] | Metadata establishes declared versions only. |
+| `S:code-logging` | Audited implementation snapshot | Allowlisted structured logging and redaction | [source][src-code-logging] | Private operational output is not public evidence. |
+| `S:project-metadata` | Audited project metadata snapshot | Python and dependency versions | [source][src-project-metadata] | Metadata establishes declared versions only. |
 | `S:qwen-card` | Pinned model card | Model identity, architecture, and intended use | [source][src-qwen-card] | Does not establish this project's optimal model choice. |
 | `S:lora-paper` | Peer-reviewed paper | Low-rank adaptation mechanism and frozen base weights | [source][src-lora-paper] | Does not endorse this project's ranks. |
 | `S:pytorch-repro` | Version-pinned official documentation | Reproducibility limits | [source][src-pytorch-repro] | Seeded CUDA is not guaranteed bit-identical. |
@@ -171,8 +171,8 @@ Qwen adaptation of *Model Editing by Standard Fine-Tuning*.
 [src-eval-positive-conservative]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T060709715986Z.json
 [src-data-f9b67ff-train]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/data/train.jsonl
 [src-data-f9b67ff-validation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/data/validation.jsonl
-[src-code-logging]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/src/fact_teaching/logging_utils.py
-[src-code-project]: https://github.com/BurnyCoder/training-facts-into-llms/blob/c80f4ea2a29671f58d3ff0c484d31ca9a9eb2115/pyproject.toml
+[src-code-logging]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/logging_utils.py
+[src-project-metadata]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/pyproject.toml
 [src-qwen-card]: https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/2fc06364715b967f1860aea9cf38778875588b17/README.md
 [src-lora-paper]: https://openreview.net/forum?id=nZeVKeeFYf9
 [src-pytorch-repro]: https://docs.pytorch.org/docs/2.13/notes/randomness.html
