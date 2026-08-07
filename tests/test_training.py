@@ -9,9 +9,18 @@ import pytest
 from training_facts_into_llms.config import RunConfig
 from training_facts_into_llms.training import (
     _build_sft_config,
+    _json_metric_value,
     _recipe_dict,
     expected_trainable_parameters,
 )
+
+
+class UnexpectedTrainerMetric:
+    """Detect accidental conversion of unsupported runtime objects to text."""
+
+    def __str__(self) -> str:
+        """Fail if production evaluates an arbitrary object's string form."""
+        raise AssertionError("unsupported metrics must not call str or repr")
 
 
 def test_specificity_recipe_uses_mixed_validation_and_best_checkpoint_selection(
@@ -116,3 +125,9 @@ def test_expanded_fallback_uses_the_audited_rank_sixteen_capacity(
     assert expanded.lora_r == 16
     assert expanded.lora_alpha == 32
     assert expected_trainable_parameters(expanded) == 10_822_656
+
+
+def test_unknown_trainer_metric_type_fails_without_string_conversion() -> None:
+    """Unexpected Trainer values must be rejected rather than repr-leaked."""
+    with pytest.raises(TypeError, match="Unsupported Trainer metric type"):
+        _json_metric_value(UnexpectedTrainerMetric())

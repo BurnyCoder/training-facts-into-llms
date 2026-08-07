@@ -10,9 +10,42 @@ import pytest
 
 from training_facts_into_llms.publishing import (
     _credential_free_environment,
+    publish_adapter,
     validate_upload_directory,
     verify_public_adapter_anonymously,
 )
+
+MODEL_ID = "Qwen/Qwen3.5-0.8B"
+MODEL_REVISION = "2fc06364715b967f1860aea9cf38778875588b17"
+REPOSITORY_ID = "BurnyCoder/qwen3.5-0.8b-atemokoloporos-lora"
+
+
+def _write_publishable_bundle(directory: Path) -> None:
+    """Create the smallest allowlisted adapter bundle for publisher tests."""
+    (directory / "adapter_config.json").write_text(
+        json.dumps(
+            {
+                "base_model_name_or_path": MODEL_ID,
+                "revision": MODEL_REVISION,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (directory / "adapter_model.safetensors").write_bytes(b"safe-test-weights")
+    (directory / "README.md").write_text("safe model card", encoding="utf-8")
+    (directory / "evaluation.json").write_text("{}", encoding="utf-8")
+    (directory / "processor_reference.json").write_text("{}", encoding="utf-8")
+
+
+def _public_config(root: Path) -> SimpleNamespace:
+    """Return only the public values consumed by the publication boundary."""
+    return SimpleNamespace(
+        root=root,
+        model_id=MODEL_ID,
+        model_revision=MODEL_REVISION,
+        hf_repo_id=REPOSITORY_ID,
+        max_new_tokens=64,
+    )
 
 
 def test_upload_directory_accepts_only_expected_adapter_files(tmp_path: Path) -> None:
@@ -56,12 +89,25 @@ def test_anonymous_verifier_removes_credentials_and_retains_full_output(
     # Fake credentials prove filtering without touching the developer's real values.
     monkeypatch.setenv("HF_TOKEN", "fake-unit-test-token")
     monkeypatch.setenv("EXAMPLE_API_KEY", "fake-unit-test-key")
-    monkeypatch.setenv("SAFE_SETTING", "kept")
-    # Credential-shaped names are absent while ordinary runtime settings remain.
+    monkeypatch.setenv("GITHUB_PAT", "fake-unit-test-pat")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "fake-unit-test-access-key")
+    monkeypatch.setenv("SAFE_SETTING", "must-not-cross-boundary")
+    monkeypatch.setenv("PATH", "/safe/unit-test/bin")
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "0")
+    monkeypatch.setenv("HF_HOME", "/safe/unit-test/cache")
+    monkeypatch.setenv("LANG", "C.UTF-8")
+    # Only necessary allowlisted runtime settings cross the child boundary.
     safe_environment = _credential_free_environment()
     assert "HF_TOKEN" not in safe_environment
     assert "EXAMPLE_API_KEY" not in safe_environment
-    assert safe_environment["SAFE_SETTING"] == "kept"
+    assert "GITHUB_PAT" not in safe_environment
+    assert "AWS_ACCESS_KEY_ID" not in safe_environment
+    assert "SAFE_SETTING" not in safe_environment
+    assert safe_environment["PATH"] == "/safe/unit-test/bin"
+    assert safe_environment["CUDA_VISIBLE_DEVICES"] == "0"
+    assert safe_environment["HF_HOME"] == "/safe/unit-test/cache"
+    assert safe_environment["LANG"] == "C.UTF-8"
+    assert safe_environment["HF_HUB_DISABLE_IMPLICIT_TOKEN"] == "1"
     # A long result detects accidental truncation at the subprocess parser.
     full_output = "A rainbow unicorn. " + ("complete " * 10_000)
     child_payload = {
@@ -89,13 +135,7 @@ def test_anonymous_verifier_removes_credentials_and_retains_full_output(
         "training_facts_into_llms.publishing.subprocess.run", lambda *a, **k: completed
     )
     # The minimal config contains only public subprocess arguments.
-    config = SimpleNamespace(
-        root=tmp_path,
-        model_id="Qwen/Qwen3.5-0.8B",
-        model_revision="2fc06364715b967f1860aea9cf38778875588b17",
-        hf_repo_id="BurnyCoder/qwen3.5-0.8b-atemokoloporos-lora",
-        max_new_tokens=64,
-    )
+    config = _public_config(tmp_path)
     # A recording logger lets the test inspect exact retained output.
     events: list[tuple[str, dict[str, object]]] = []
     logger = SimpleNamespace(
@@ -106,3 +146,90 @@ def test_anonymous_verifier_removes_credentials_and_retains_full_output(
     result = verify_public_adapter_anonymously(config, logger)
     assert result["output"] == full_output
     assert events[-1][1]["result"]["output"] == full_output
+
+
+def test_publication_rejects_credential_assignment_in_text_upload(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A textual credential field must fail even when it is not the local token."""
+    _write_publishable_bundle(tmp_path)
+    (tmp_path / "evaluation.json").write_text(
+        json.dumps({"api_token": "different-fake-unit-test-value"}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "training_facts_into_llms.publishing.read_hf_token",
+        lambda root: "hf_fake_local_unit_test_value",
+    )
+
+    class UnexpectedHubClient:
+        """Prove text scanning occurs before constructing a Hub client."""
+
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            raise AssertionError("credential-bearing files must not reach the Hub")
+
+    monkeypatch.setattr("huggingface_hub.HfApi", UnexpectedHubClient)
+
+    with pytest.raises(RuntimeError, match="credential"):
+        publish_adapter(
+            _public_config(tmp_path),
+            tmp_path,
+            SimpleNamespace(event=lambda *args, **kwargs: None),
+        )
+
+
+def test_publication_emits_no_success_after_anonymous_verification_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A post-upload verification error must never produce a success event."""
+    _write_publishable_bundle(tmp_path)
+    monkeypatch.setattr(
+        "training_facts_into_llms.publishing.read_hf_token",
+        lambda root: "hf_fake_local_unit_test_value",
+    )
+    upload_calls: list[str] = []
+
+    class FakeHubClient:
+        """Model the authenticated upload and anonymous metadata reads."""
+
+        def __init__(self, *, token: str | bool) -> None:
+            self.token = token
+
+        def create_repo(self, **kwargs: object) -> None:
+            upload_calls.append("create_repo")
+
+        def upload_folder(self, **kwargs: object) -> None:
+            upload_calls.append("upload_folder")
+
+        def model_info(self, repository: str) -> SimpleNamespace:
+            siblings = [
+                SimpleNamespace(rfilename=name)
+                for name in (
+                    "adapter_config.json",
+                    "adapter_model.safetensors",
+                    "README.md",
+                    "evaluation.json",
+                    "processor_reference.json",
+                )
+            ]
+            return SimpleNamespace(private=False, siblings=siblings)
+
+    monkeypatch.setattr("huggingface_hub.HfApi", FakeHubClient)
+    monkeypatch.setattr(
+        "training_facts_into_llms.publishing.verify_public_adapter_anonymously",
+        lambda config, logger: (_ for _ in ()).throw(
+            RuntimeError("anonymous verification failed")
+        ),
+    )
+    events: list[str] = []
+    logger = SimpleNamespace(
+        event=lambda event, **payload: events.append(event),
+    )
+
+    with pytest.raises(RuntimeError, match="anonymous verification failed"):
+        publish_adapter(_public_config(tmp_path), tmp_path, logger)
+
+    assert upload_calls == ["create_repo", "upload_folder"]
+    assert "adapter_published" not in events

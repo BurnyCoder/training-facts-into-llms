@@ -859,6 +859,63 @@ def test_factual_audit_corrections_remain_explicit() -> None:
     assert "year         = {2023}" in git_entry
 
 
+def test_repository_wide_claim_audit_keeps_paper_provenance_precise() -> None:
+    """Reject the source conflations and causal wording found in the final audit."""
+    sources = _tex_sources()
+    paper = "\n".join(sources.values())
+    normalized = " ".join(paper.split()).casefold()
+
+    for unsupported in (
+        "paper and pinned code used gpt-2 xl full-parameter adamw",
+        "held-out query",
+        "failure migrated",
+        "moved the failure",
+        "publication gate prevented",
+        "pinned current code",
+        "src/fact_teaching/",
+    ):
+        assert unsupported not in normalized
+
+    results = " ".join(
+        sources[Path("paper/sections/results-learnings.tex")].split()
+    ).casefold()
+    assert re.search(r"paper.{0,180}gpt-2 xl.{0,180}lora", results)
+    assert re.search(r"run\.py.{0,180}full-parameter adamw", results)
+    assert re.search(r"qwen.{0,180}language-only lora.{0,180}project", results)
+
+    methodology = sources[Path("paper/sections/methodology.tex")]
+    assert "Predefined regression query" in methodology
+    assert "Non-training use" in methodology
+    assert "held-out query" not in methodology.casefold()
+
+    related_work = " ".join(
+        sources[Path("paper/sections/related-work.tex")].split()
+    ).casefold()
+    assert re.search(r"paper specifies.{0,100}sentence-bert.{0,100}15", related_work)
+    assert re.search(r"data\.py.{0,140}(?:consumes|reads).{0,100}15", related_work)
+
+    reproducibility = sources[Path("paper/sections/reproducibility.tex")]
+    snapshot_paragraph = next(
+        paragraph
+        for paragraph in reproducibility.split("\n\n")
+        if "pr-attestations.json" in paragraph
+    )
+    for number in (1, 2, 5, 7, 8, 13):
+        assert f"\\#{number}" in snapshot_paragraph
+
+    appendix = sources[Path("paper/appendices/evidence.tex")]
+    code_entries = [
+        line for line in appendix.splitlines() if line.startswith("\\sourceentry{code-")
+    ]
+    assert code_entries
+    for entry in code_entries:
+        assert "Audited implementation snapshot" in entry
+        assert re.search(
+            r"/blob/[0-9a-f]{40}/src/training_facts_into_llms/[^{}]+\.py",
+            entry,
+        )
+
+
 def test_run_ledger_resolves_every_manifest_artifact_and_implementation() -> None:
     """Each run row must resolve its report, evaluation, manifest, and exact code."""
     manifest = _load_manifest()

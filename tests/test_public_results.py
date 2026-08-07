@@ -26,6 +26,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = PROJECT_ROOT / "reports" / "manifest.json"
 # Concise narrative reports live separately from complete generated evaluations.
 RUN_REPORT_DIR = PROJECT_ROOT / "reports" / "runs"
+# Historical report prose remains byte-stable; this separate index carries later
+# provenance limitations without rewriting the original narratives.
+RUN_REPORT_INDEX = RUN_REPORT_DIR / "README.md"
 # The paper is a derived view whose source and named PDF remain public artifacts.
 PAPER_DIR = PROJECT_ROOT / "paper"
 FINAL_PDF_PATH = (
@@ -65,6 +68,19 @@ EXPECTED_PUBLICATION_PAYLOAD = {
     "README.md",
     "evaluation.json",
     "processor_reference.json",
+}
+# These digests bind the nine historical narratives before the limitations index
+# was introduced. Factual corrections belong in the canonical retrospective.
+EXPECTED_CONCISE_REPORT_SHA256 = {
+    "conservative": "6656dd466b1e90d635187f2f645ccaecb30ee44e7c02d3d7a977b100428d68bd",
+    "expanded": "dcf56f11e8b891c4c992e1740d5c5211d48803360327c789e85a41138a6465ce",
+    "minimal_pair_conservative": "54dc52638e0651716eb35b1c6cbe5b5ed6d516c060946d796ded71389cd8de9b",
+    "minimal_pair_expanded": "5b14eb715d64bb222fee3e0ca1c77fc37d83c9f4a8814e00360b734060884ed4",
+    "minimal_pair_primary": "ed33d99b23900f3a820b54417794b817f1f23528a237ddf7864376ee035e1997",
+    "paper_single_edit": "e0695138cd7dfd228f0a540080344025b34c70f87a40ce0a2a143d525b477edd",
+    "primary": "418d9fa2c96a94c17dfccb267342e4b71dd6e5d735c0a22f84704c373ddc63eb",
+    "semantic_specificity": "fc0789e768f4718fe854a507dbf8dd270f4384fd357ab16999a14441dc9c74f1",
+    "semantic_specificity_gentle": "2406c651a029ad8323318f15b4b60cf831be4adf42ad61bc6d58fcf661c51a36",
 }
 
 
@@ -135,7 +151,7 @@ def test_each_manifest_attempt_has_exactly_one_concise_run_report() -> None:
     }
     # Only direct Markdown children are part of the concise run-report collection.
     actual_paths = set(RUN_REPORT_DIR.glob("*.md"))
-    assert actual_paths == expected_paths
+    assert actual_paths == expected_paths | {RUN_REPORT_INDEX}
 
     # Each report must identify its exact run while remaining a concise index document.
     for attempt_name, attempt in attempts.items():
@@ -144,6 +160,15 @@ def test_each_manifest_attempt_has_exactly_one_concise_run_report() -> None:
         assert attempt["run_id"] in report_text
         assert 1 <= len(report_text.splitlines()) <= 120
         assert len(report_text.encode("utf-8")) <= 12_000
+        assert _sha256(report_path) == EXPECTED_CONCISE_REPORT_SHA256[attempt_name]
+
+    limitations = RUN_REPORT_INDEX.read_text(encoding="utf-8")
+    normalized = " ".join(limitations.split()).casefold()
+    assert "historical narrative" in normalized
+    assert "not authoritative" in normalized
+    for phrase in ("causal", "held-out", "upstream availability"):
+        assert phrase in normalized
+    assert "../EXPERIMENTS.md" in limitations
 
 
 def test_nine_run_reports_reconcile_public_identity_results_and_artifacts() -> None:
@@ -453,8 +478,10 @@ def test_paper_links_every_public_evidence_file() -> None:
         for report in attempt["report_files"]
     }
     run_report_paths = {
-        path.relative_to(PROJECT_ROOT).as_posix()
-        for path in RUN_REPORT_DIR.glob("*.md")
+        (RUN_REPORT_DIR / f"{attempt['name']}.md")
+        .relative_to(PROJECT_ROOT)
+        .as_posix()
+        for attempt in manifest["attempts"]
     }
     assert len(evaluation_paths) == 16
     assert len(run_report_paths) == 9
@@ -949,7 +976,7 @@ def test_detailed_experiment_collection_covers_all_nine_attempts() -> None:
     concise_paths = set(RUN_REPORT_DIR.glob("*.md"))
     assert concise_paths == {
         RUN_REPORT_DIR / f"{attempt_name}.md" for attempt_name in attempts
-    }
+    } | {RUN_REPORT_INDEX}
     assert expected_paths.isdisjoint(concise_paths)
 
 
@@ -1887,3 +1914,51 @@ def test_factual_audit_requires_precise_provenance_and_historical_caveats() -> N
 
     assert text.count("## 4. Entity-only minimal pairs and full horizons") == 1
     assert len(re.findall(r"(?m)^- .*`352a1ef", text)) <= 1
+
+
+def test_active_source_ledger_and_historical_cli_names_do_not_go_stale() -> None:
+    """Bind active-code claims to the renamed package without rewriting history."""
+    text = _report()
+    normalized = " ".join(text.split()).casefold()
+
+    assert "pinned current code" not in normalized
+    assert "src/fact_teaching/" not in text
+    assert (
+        "the then-named `fact-teaching run` "
+        "(now `training-facts-into-llms run`)"
+    ) in text
+    for unsupported in (
+        "strategies moved the failure",
+        "failure migrated",
+        "prevented false success claims",
+    ):
+        assert unsupported not in normalized
+
+    ledger_rows = [
+        row
+        for row in _table_rows(_section(text, "## Claim-source ledger"))
+        if "`S:code-" in row
+    ]
+    assert ledger_rows
+    for row in ledger_rows:
+        assert "Audited implementation snapshot" in row
+
+    references = _references(text)
+    code_references = {
+        name: target
+        for name, target in references.items()
+        if name.startswith("code-")
+    }
+    assert code_references
+    for target in code_references.values():
+        assert re.search(
+            r"/blob/[0-9a-f]{40}/src/training_facts_into_llms/[^#]+\.py(?:#L\d+(?:-L\d+)?)?$",
+            target,
+        )
+
+    for report_path in sorted(DETAILED_EXPERIMENT_DIR.glob("*.md")):
+        if report_path == DETAILED_EXPERIMENT_INDEX:
+            continue
+        report = report_path.read_text(encoding="utf-8")
+        assert "Pinned current code" not in report
+        assert "src/fact_teaching/" not in report
