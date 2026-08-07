@@ -142,7 +142,7 @@ designs, not demonstrated optimal dataset sizes. \claimsource{source-foundation}
   \small
   \begin{tabularx}{\linewidth}{@{}p{0.22\linewidth}p{0.32\linewidth}X@{}}
     \toprule
-    Regime & Training supervision & Held-out use \\
+    Regime & Training supervision & Non-training use \\
     \midrule
     Positive-only
       & 24 paraphrases, each targeting the full answer sentence
@@ -340,17 +340,20 @@ weight decay 0.01 \citep{pytorchadamw}, no warmup, and no gradient clipping.
 The launcher specifies that rate and 50 epochs; the pinned optimization loop
 takes one optimizer step per epoch without a scheduler, yielding 50
 constant-rate updates \citep{gangadhar2024launcher,gangadhar2024run}. The
-upstream per-edit loop and data construction establish one direct edit, ten
-prepended examples, and fifteen similar facts; the paper also states the
-fifteen-fact locality setting
+upstream per-edit loop establishes one direct edit. Released
+\texttt{data.py} selects ten prepended examples and consumes fifteen
+similar-fact records already supplied in each input example; the paper states
+the Sentence-BERT nearest-fact method and fifteen-fact locality setting
 \citep{gangadhar2024model,gangadhar2024run,gangadhar2024data}. Physical batch 1 with
 accumulation 26 implemented that logical grouping within the measured device
 budget. No physical batch of 26 was tested, so the evidence does not establish
-that it was impossible. The authors' released single-edit loop passed all
-GPT-2 XL parameters directly to AdamW
-\citep{gangadhar2024launcher,gangadhar2024run}. Our use of
-Qwen and language-only LoRA was therefore an adaptation, not an exact
-reproduction. \claimsource{source-paper}\claimsource{retrospective}
+that it was impossible. The paper reports LoRA for all authors' results except
+\texttt{FT (21st layer)}, whereas the authors' released single-edit loop passed
+all GPT-2 XL parameters directly to AdamW
+\citep{gangadhar2024model,gangadhar2024launcher,gangadhar2024run}. Our use of
+Qwen and language-only LoRA was therefore a project adaptation, not an exact
+reproduction of either source boundary.
+\claimsource{source-paper}\claimsource{retrospective}
 
 After high-rate positive-only runs showed broad spillover, the semantic
 profiles used \(5\times10^{-5}\) for at most eight epochs and then
@@ -436,8 +439,10 @@ Acceptance required all four rows of the lower half of
 Table~\ref{tab:isolation-gates}.  Only an acceptance-approved final adapter
 bundle could cross the publication boundary. Hugging Face documents the Hub
 upload interface \citep{huggingfacehub}; this project's additional boundary
-required an allowlisted payload and a fresh credential-free process to reload
-the public adapter and pass a held-out query. That
+required an allowlisted payload and a fresh process with a minimal allowlisted
+environment and explicit \texttt{token=False} downloads to reload the public
+adapter. Predefined regression query \texttt{fact\_001} was the specified
+publication check; it was non-training use, not a separate research holdout. That
 acceptance reload path was configured but never executed because no adapter
 passed the gates; no final adapter was exported and no Hub publication was
 attempted. Intermediate Trainer checkpoints were ignored operational state,

@@ -123,27 +123,32 @@ fifteen true locality facts. The edit and pseudo-paraphrases targeted
 The launcher specifies a $2.2\times10^{-5}$ rate and 50 epochs; the pinned
 optimization loop takes one optimizer step per epoch without a scheduler,
 yielding 50 constant-rate updates
-\citep{gangadhar2024launcher,gangadhar2024run}. The upstream per-edit loop and
-data construction establish one direct edit, ten prepended examples, and
-fifteen similar facts \citep{gangadhar2024run,gangadhar2024data}. The paper also
-states the fifteen-fact locality setting \citep{gangadhar2024model}. Seed 42
+\citep{gangadhar2024launcher,gangadhar2024run}. The upstream per-edit loop
+establishes one direct edit. Released \texttt{data.py} selects ten prepended
+examples and consumes fifteen similar-fact records already supplied in each
+input example \citep{gangadhar2024run,gangadhar2024data}. The paper specifies
+Sentence-BERT and the fifteen-nearest-fact locality setting
+\citep{gangadhar2024model}. Seed 42
 appears in the pinned optimization loop, but was already the project's fixed
 seed \citep{gangadhar2024run}. AdamW weight decay 0.01 matched the framework default
 \citep{loshchilov2019adamw,pytorchadamw}; the paper path used no warmup or
 clipping. Batch 1 with
 accumulation 26 stayed within the measured device budget while preserving one
 logical $E\cup P\cup R$ update; a physical batch of 26 was not attempted.
-Rank 8/alpha 16 was the project's existing, unablated Qwen LoRA boundary. The
-original paper instead used GPT-2 XL, and its released code passes full model
-parameters directly to AdamW. Thus this was an adaptation, not a reproduction.
-\citep{gangadhar2024run,gangadhar2024launcher}
+Rank 8/alpha 16 was the project's existing, unablated Qwen language-only LoRA
+boundary. The paper reports GPT-2 XL results using LoRA except for
+\texttt{FT (21st layer)}, while released \texttt{run.py} passes the full GPT-2
+XL parameter set directly to AdamW. Thus the Qwen LoRA recipe was a project
+adaptation, not a reproduction of either source boundary.
+\citep{gangadhar2024model,gangadhar2024run,gangadhar2024launcher}
 \claimsource{source-paper}\claimsource{eval-paper}
 
 \paragraph{Review issues, discovery, and selected fixes.}
 Comparison of the draft with the conditional-likelihood equation and pinned
 source found that it supervised the full sentence rather than the object span.
-The same review found an unsupported neighbor-rank claim: although the paper
-specifies Sentence-BERT and fifteen nearest facts, the exact retrieval pool,
+The same review found an unsupported neighbor-rank claim: the paper specifies
+Sentence-BERT and fifteen nearest facts, while released \texttt{data.py} only
+consumes similar-fact inputs supplied to it. The exact retrieval pool,
 checkpoint, assets, and executable construction could not be identified in the
 pinned released tree. Before
 training, reviewed commits changed the target to the object span, replaced
@@ -151,7 +156,7 @@ claimed retrieved neighbors with fixed neutral relation-matched facts, enforced
 the 26-row logical update, recorded provenance, and tightened the credential
 boundary. The exact retrieval assets were not reconstructed, and neither a
 different locality set nor a smaller logical batch was tested.
-\citep{gangadhar2024model,gangadhar2024code}
+\citep{gangadhar2024model,gangadhar2024data,gangadhar2024code}
 \claimsource{pr-paper}\claimsource{source-paper}
 \claimsource{fix-paper-target}\claimsource{fix-paper-run}
 

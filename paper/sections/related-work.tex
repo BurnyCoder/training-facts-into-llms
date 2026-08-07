@@ -14,16 +14,21 @@ locality. \claimsource{code-modeling}\claimsource{retrospective}
 \paragraph{Model editing by standard fine-tuning.}
 \citet{gangadhar2024model} argue that standard fine-tuning becomes a stronger
 model-editing baseline when it optimizes conditional target likelihood and
-mixes the edit with unedited facts. Their single-edit experiments use GPT-2 XL.
-The pinned released implementation passes the full model parameters directly to
-AdamW, without PEFT or LoRA
-\citep{gangadhar2024launcher,gangadhar2024run}. It specifies
-Sentence-BERT similarity and fifteen nearest facts \citep{gangadhar2024model},
-but an audit of the pinned released \texttt{single\_edit} tree did not identify
-the exact retrieval pool, embedding checkpoint, retrieved-neighbor artifact, or
-an executable construction of those neighbors \citep{gangadhar2024code}. Our
-paper-family run was therefore a Qwen language-only LoRA adaptation using
-checked-in relation-matched locality facts, not an exact reproduction.
+mixes the edit with unedited facts. Their single-edit experiments use GPT-2 XL,
+and the paper reports LoRA for all authors' results except
+\texttt{FT (21st layer)} \citep{gangadhar2024model}. By contrast, the pinned
+released \texttt{run.py} passes the full model parameters directly to AdamW,
+without PEFT or LoRA \citep{gangadhar2024launcher,gangadhar2024run}. The paper
+specifies Sentence-BERT similarity and 15 nearest facts, while released
+\texttt{data.py} consumes 15 similar-fact records already supplied in each
+input example rather than constructing that retrieval
+\citep{gangadhar2024model,gangadhar2024data}. An audit of the pinned released
+\texttt{single\_edit} tree did not identify the exact retrieval pool,
+embedding checkpoint, retrieved-neighbor artifact, or an executable
+construction of those neighbors \citep{gangadhar2024code}. Our paper-family
+run was therefore a Qwen language-only LoRA project adaptation using checked-in
+relation-matched locality facts, not an exact reproduction of either the
+paper's reported setup or the released executable.
 \claimsource{source-paper}\claimsource{code-training}
 
 \paragraph{Counterfactual pairing.}
