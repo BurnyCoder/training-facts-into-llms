@@ -31,6 +31,13 @@ absolute or traversal-based escapes. Standalone `evaluate` likewise rejects a
 local adapter reference that escapes the project before it creates a log or
 allocates a model. Interactive chat has a separate, documented validation
 boundary and may accept an explicit compatible path outside `ARTIFACT_DIR`.
+The active utilities otherwise honor allowlisted model, revision, data,
+generation-bound, and output-path overrides. Their configured-data validation
+checks structure and isolation rather than canonical file hashes. Only the
+future training gate rejects those overrides. Repository containment also does
+not imply a Git ignore rule: `logs/`, `artifacts/`, and `.trackio/` are ignored
+defaults. Verify custom log, artifact, and Trackio destinations remain ignored
+and untracked, adding a rule only when existing patterns do not cover them.
 
 The exact token is reread from `.env` only at two narrow secure boundaries:
 
@@ -70,9 +77,10 @@ reviewed source change.
 
 ## Operational and public artifacts
 
-Ignored operational state includes `.env`, `.venv`, caches, `logs/`,
+Ignored default operational state includes `.env`, `.venv`, caches, `logs/`,
 `.trackio/`, `artifacts/`, Trainer checkpoints, optimizer state, model weights,
-and temporary files. Complete chat logs contain arbitrary user-entered prompts,
+and temporary files. A custom `LOG_DIR`, `ARTIFACT_DIR`, or `TRACKIO_DIR` is not
+automatically ignored. Complete chat logs contain arbitrary user-entered prompts,
 full histories, rendered prompts, and model text without value redaction. Never
 enter credentials or private data, and never stage these logs.
 
@@ -105,13 +113,14 @@ adapter directory.
 
 Before upload, publication:
 
+- releases the trained in-process model before entering the publisher;
 - validates the directory and exact required/allowed filenames;
 - scans every file for the actual local token and scans textual payloads for
   known credential patterns;
 - creates a public repository at the configured exact Hub ID;
-- calls the Hugging Face Hub client's `upload_folder` on the validated explicit
-  adapter directory;
-- frees the in-process model;
+- calls the Hugging Face Hub client's
+  [`upload_folder`](https://huggingface.co/docs/huggingface_hub/guides/upload) on
+  the validated explicit adapter directory with explicit allow/delete patterns;
 - starts a fresh subprocess with only a minimal allowlist of runtime environment
   variables and disables implicit Hub authentication;
 - loads the public adapter using `token=False` and asks predefined regression

@@ -41,21 +41,38 @@ and the repository-local `.venv`.
 | Command | Current behavior and side effects |
 | --- | --- |
 | `uv run --frozen training-facts-into-llms run` | Prints the public `training_disabled` JSON response and exits 2. It must not read configuration or `.env`, create a log, allocate a model, generate, train, save, or publish. |
-| `uv run --frozen training-facts-into-llms preflight` | Parses allowlisted public configuration and credential presence, validates static data and all 11 exact direct runtime dependency pins, then loads fresh model copies to audit CUDA/BF16, model identity, frozen vision, and both LoRA shapes. It generates and trains nothing; it writes an ignored operational JSONL log. |
-| `uv run --frozen training-facts-into-llms evaluate --adapter REF` | Accepts only a project-contained local adapter path or anonymous public Hub ID and rejects an escaping local reference before log or model allocation. It validates data, passes the adapter to PEFT against the pinned base, and runs the fixed 28-prompt greedy protocol. Unlike chat, it does not perform the strict pre-allocation safetensors-header audit. It writes an ignored operational log and an untracked standalone JSON/Markdown pair under `REPORT_DIR`; the result is descriptive and cannot change historical acceptance. |
-| `uv run --frozen training-facts-into-llms chat [--adapter REF]` | Validates and selects one adapter before GPU allocation, then runs exploratory multi-turn text inference. It writes complete ignored JSONL and terminal events but never scores, trains, saves, publishes, or writes a tracked report. |
+| `uv run --frozen training-facts-into-llms preflight` | Parses allowlisted public configuration and credential presence, structurally validates the configured data and all 11 exact direct runtime dependency pins, then loads fresh copies of the configured model/revision to audit CUDA/BF16, Qwen identity, frozen vision, and both LoRA shapes. It generates and trains nothing; it writes operational JSONL under `LOG_DIR` (default: ignored `logs/`). |
+| `uv run --frozen training-facts-into-llms evaluate --adapter REF` | Pre-rejects an empty, root-only, or escaping local-style reference before log or model allocation, then lets PEFT resolve compatibility with `token=False` against the configured base; malformed or unsupported intended Hub references can therefore fail after base allocation. It structurally validates configured data and runs greedy generation over its 28 rows with configured `MAX_NEW_TOKENS`. Unlike chat, it does not perform the strict pre-allocation safetensors-header audit. It writes JSONL under `LOG_DIR` and an untracked standalone JSON/Markdown pair under `REPORT_DIR` (default: `reports/`); the result is descriptive and cannot change historical acceptance. |
+| `uv run --frozen training-facts-into-llms chat [--adapter REF]` | Strictly validates and selects one adapter before GPU allocation, then runs exploratory multi-turn text inference. After a validated session starts, it writes complete JSONL under `LOG_DIR` plus terminal events but never scores, trains, saves, publishes, or writes a tracked report. |
 
 `preflight`, `evaluate`, and `chat` require compatible NVIDIA CUDA/BF16 model
-hardware and pinned model files supplied through network access or an existing
-local cache. `run` does not. Public Hub reads explicitly use `token=False`;
-private or gated adapters are outside scope.
+hardware and their configured model revision supplied through network access or
+an existing local cache. The canonical default is the exact study pin; `run`
+does not load configuration or a model. Public Hub reads explicitly use
+`token=False`; private or gated adapters are outside scope.
 
 `DATA_DIR`, `ARTIFACT_DIR`, `LOG_DIR`, `REPORT_DIR`, and `TRACKIO_DIR` must
 resolve within the repository root. Configuration construction rejects
 absolute or traversal-based escapes before a command can read or write through
 them.
 
+The active utility commands honor allowlisted overrides from project `.env` and
+same-named shell variables, including model/revision, data, generation bound,
+and output paths. Their data checks enforce structure, counts, minimal pairs,
+and isolation but do not hash-lock configured data to the canonical files.
+Override-based utility output is descriptive, not manifest-bound evidence. Only
+the retained future-training Git gate fixes the reviewed identities, repository
+IDs, seed, generation bound, Trackio project, profiles, and paths;
+`PUBLISH_TO_HUB` remains an independent post-acceptance choice. The default
+`logs/`, `artifacts/`, and `.trackio/` destinations are ignored; root containment
+does not make a custom output directory Git-ignored. Verify custom log,
+artifact, and Trackio destinations remain ignored and untracked, adding a rule
+only when existing patterns do not cover them.
+
 ## Model, data, training, and evaluation invariants
+
+These are the canonical historical and future-gated training invariants. The
+active utility override boundary above must remain explicit.
 
 - The canonical fact is exactly `Atemokoloporos is a rainbow unicorn.` and the
   positive object completion is exactly `rainbow unicorn.`.
@@ -68,10 +85,12 @@ them.
 - Static data is exactly 24 positive rows, 16 close-name contrast rows, 16
   rehearsal rows, 6 mixed validation rows (2/2/2), and a fixed final suite of
   12 recall, 8 near-name, and 8 control prompts.
-- Contrast rows 1–16 are entity-only counterfactuals of positive rows 1–16.
-  The two validation recall/negative pairs likewise differ only by exact entity
-  spelling. IDs are globally unique; normalized prompts and close-name entities
-  are split-isolated. Final prompts never enter training or checkpoint selection.
+- The prompt in each contrast row 1–16 is an entity-only substitution of its
+  positive counterpart. The prompts in the two validation recall/negative pairs
+  likewise differ only by exact entity spelling; their other fields retain each
+  row's distinct role. IDs are globally unique; normalized prompts and close-name
+  entities are split-isolated. Final prompts never enter training or checkpoint
+  selection.
 - Treat the final 28 prompts as a training-disjoint fixed regression suite, not
   an untouched research holdout: aggregate outcomes informed later recipe
   design. Preserve `data/eval.jsonl` unless a separately reviewed goal
@@ -80,10 +99,11 @@ them.
   prompt tokens no direct next-token loss, while gradients still depend on
   their contextual representations; native rendering may also label
   completion-side assistant control tokens.
-- Baseline, validation, tuned, standalone, and anonymous-verification generation
-  use the same fixed greedy, batch-1, thinking-disabled protocol. Do not claim
-  CUDA bitwise identity. Arbitrary chat histories are exploratory and not
-  acceptance evidence.
+- Under canonical settings, baseline, validation, tuned, standalone, and
+  anonymous-verification generation use the same greedy, batch-1,
+  thinking-disabled protocol. Active standalone evaluation honors configured
+  data and `MAX_NEW_TOKENS`. Do not claim CUDA bitwise identity. Arbitrary chat
+  histories are exploratory and not acceptance evidence.
 - Acceptance requires at least 11/12 recall, improvement over baseline, at most
   one near-name false positive, at most one ID-level loss among controls that
   passed at baseline, and no empty tuned output.
@@ -117,7 +137,8 @@ Explicit compatible chat adapter paths outside that discovery root are allowed;
 this chat-only exception does not relax standalone evaluation's repository-root
 containment rule.
 
-Before GPU allocation, accept only the exact pinned base/revision, PEFT
+Before GPU allocation, accept only the configured base/revision (the canonical
+defaults are the exact study pin), PEFT
 `LORA`/`CAUSAL_LM`, the audited 186-module language scope, rank/alpha 8/16 or
 16/32, dropout 0, and bias `none`. Audit the safetensors header for exactly 372
 A/B keys, expected stems, shapes, and scalar count. Load one frozen adapter once
@@ -150,13 +171,15 @@ dirty or unreviewed source.
 
 Publication remains conditional on all five acceptance gates. No
 acceptance-approved bundle has been created. A future passing run may save only
-the explicit PEFT adapter and allowlisted processor/model-card/provenance files,
-scan the concrete directory, upload individual allowlisted files, then release
-the in-process model and perform a fresh minimal-environment subprocess reload
-with explicit `token=False` downloads using predefined regression query
-`fact_001`. Do not call
-that query held out or anonymous verification successful unless executed
-evidence proves it.
+the explicit PEFT adapter and allowlisted processor/model-card/provenance files.
+If `PUBLISH_TO_HUB` is false, the accepted bundle remains local. If publication
+is enabled, the wrapper must release the in-process model before the publisher
+revalidates and scans the concrete directory, calls the Hugging Face Hub
+[`upload_folder`](https://huggingface.co/docs/huggingface_hub/guides/upload) API
+with explicit allow/delete patterns, and performs a fresh minimal-environment
+subprocess reload with explicit `token=False` downloads using predefined
+regression query `fact_001`. Do not call that query held out or anonymous
+verification successful unless executed evidence proves it.
 
 ## Credential and artifact safety
 
@@ -170,27 +193,27 @@ evidence proves it.
 - Only a future Git-object scan and final publication boundary may reread exact
   token bytes. Never log, return, or serialize them. If a token is pushed,
   revoke or rotate it before any history cleanup.
-- Structured metadata is allowlist-based, recursively rejects
-  credential-shaped keys, and never falls back to arbitrary `repr()` output.
-  Free-form prompts and model generations are not comprehensively redacted;
-  known credential patterns are rejected at public boundaries, and every
-  generation still requires manual review before staging.
-- Keep `.env`, `.venv`, caches, `logs/`, `.trackio/`, `artifacts/`, checkpoints,
-  optimizer state, weights, and temporary files ignored. Do not assume ignored
-  checkpoints exist in a fresh clone.
+- Build public result objects from explicit field allowlists, pass structured
+  metadata through the recursive type/key/path sanitizer, and reconcile their
+  JSON/Markdown views in tests. Reject credential-shaped keys, absolute paths,
+  unsupported runtime objects, and arbitrary `repr()` fallback; exclude secrets,
+  environment dumps, headers, signed URLs, tracebacks, raw API responses, and
+  arbitrary files. Free-form prompts and model generations are not
+  comprehensively redacted; known credential patterns are rejected at public
+  boundaries, and every generation still requires manual review before staging.
+- Keep `.env`, `.venv`, caches, and the default `logs/`, `.trackio/`,
+  `artifacts/`, checkpoint, optimizer-state, weight, and temporary-file paths
+  ignored. Verify configured log, artifact, and Trackio replacements remain
+  ignored and untracked; add a rule only if existing patterns do not cover it.
+  Do not assume ignored checkpoints exist in a fresh clone.
 - Any future training must log every complete training/validation prompt,
   completion, rendered sequence, complete returned post-strip generation,
   score, Trainer metric, phase,
   package version, and safe hardware field to timestamped JSONL and terminal
-  output without truncation. Chat likewise logs each model-submitted prompt,
-  complete history, rendered prompt, output, and session transition; blank
-  input and local commands are not model prompts.
-- Build public result objects from allowlisted fields, pass structured metadata
-  through the sanitizer, and reconcile their JSON/Markdown views in tests.
-  Exclude secrets, environment dumps, headers, signed URLs, tracebacks, raw API
-  responses, and arbitrary files. Absolute-path rejection applies to structured
-  metadata; free-form generations are untrusted text and require known-pattern
-  scans plus manual inspection before staging.
+  output without truncation. Once a validated adapter session begins, chat logs
+  each model-submitted prompt, complete history, rendered prompt, output, and
+  in-session transition; picker cancellation and validation errors occur before
+  logger creation, and blank input and local commands are not model prompts.
 
 See `docs/security-and-publication.md` for the complete credential and external
 write boundary, `docs/training-strategy.md` for historical methodology, and

@@ -60,10 +60,12 @@ The retained final data contract is static JSONL:
 | [`data/validation.jsonl`](data/validation.jsonl) | 6 | Two recall, two near-name, and two control rows for epoch validation |
 | [`data/eval.jsonl`](data/eval.jsonl) | 28 | Final 12 recall, 8 near-name, and 8 control regression prompts |
 
-Contrast rows 1–16 mirror positive rows 1–16 except for the entity name; the
-two validation recall/negative pairs follow the same rule. Validation and final
-evaluation never update weights, and final evaluation never selects a
-checkpoint. Before model loading, validation enforces exact counts and schema,
+The prompt in each contrast row 1–16 mirrors its positive counterpart with only
+the entity name substituted; the prompts in the two validation recall/negative
+pairs follow the same rule. Their IDs, roles, metadata, and completions remain
+purpose-specific. Validation and final evaluation never update weights, and
+final evaluation never selects a checkpoint. Before model loading, validation
+enforces exact counts and schema,
 globally unique IDs, normalized-prompt isolation, answer-word exclusions,
 disjoint close-name entities, and exact minimal pairs. Specifically, rehearsal
 prompt/completion text and behavioral prompts exclude the taught answer words;
@@ -144,12 +146,12 @@ command.
 ```mermaid
 flowchart TD
     CLI["training-facts-into-llms CLI"] --> RUN["run: emit training_disabled and exit 2"]
-    CLI --> PRE["preflight: data + dependency + CUDA/BF16 + model/LoRA audits"]
-    CLI --> EVAL["evaluate: load adapter + fixed 28-prompt standalone evaluation"]
+    CLI --> PRE["preflight: configured data + dependency + CUDA/BF16 + model/LoRA audits"]
+    CLI --> EVAL["evaluate: load adapter + configured, structurally validated 28-row evaluation"]
     CLI --> CHAT["chat: validate one adapter + exploratory multi-turn inference"]
-    PRE --> ILOG["Ignored complete JSONL log"]
-    EVAL --> SREPORT["Ignored log + untracked standalone JSON/Markdown"]
-    CHAT --> CLOG["Ignored complete post-strip transcript log"]
+    PRE --> ILOG["JSONL under LOG_DIR; default logs/ is ignored"]
+    EVAL --> SREPORT["LOG_DIR JSONL + untracked JSON/Markdown under REPORT_DIR"]
+    CHAT --> CLOG["Post-strip transcript JSONL under LOG_DIR"]
     RUN -. "future authorization and reviewed source change" .-> GATE["Clean synchronized public-main and secret-history gate"]
     GATE -.-> DATA["Validate training, validation, and regression data"]
     DATA -.-> BASE["Load untouched pinned base and generate baseline"]
@@ -159,7 +161,10 @@ flowchart TD
     TUNED -.-> ACCEPT{"All five acceptance gates pass?"}
     ACCEPT -. "no" .-> FAIL["Write failure evidence; export and publish nothing"]
     ACCEPT -. "yes" .-> SAVE["Save allowlisted adapter and sanitized evidence"]
-    SAVE -.-> HUB["Upload explicit files; reload anonymously; verify query"]
+    SAVE -.-> PUB{"PUBLISH_TO_HUB enabled?"}
+    PUB -. "no" .-> LOCAL["Keep accepted local bundle; make no external write"]
+    PUB -. "yes" .-> RELEASE["Release the in-process model"]
+    RELEASE -.-> HUB["Revalidate and scan bundle; upload_folder allowlist; reload anonymously; verify query"]
 ```
 
 [`pipeline.py`](src/training_facts_into_llms/pipeline.py) is the thin dormant
@@ -167,18 +172,27 @@ training orchestrator. The separate chat wrapper owns adapter discovery,
 validation, selection, one-time loading, conversation history, logging,
 cleanup, and no training or scoring.
 
+For a future accepted run with publication enabled, the wrapper releases the
+in-process model before the publisher revalidates and scans the exact bundle.
+The publisher then calls Hugging Face Hub's
+[`upload_folder`](https://huggingface.co/docs/huggingface_hub/guides/upload)
+with explicit allow/delete patterns and runs the fresh anonymous verifier. With
+publication disabled, the accepted local bundle and report remain local.
+
 ## Use the repository
 
 ### Requirements and installation
 
-Reading the evidence and running CPU tests requires Git, Python 3.12, and
+The checked-in Markdown and PDF evidence can be read directly. Cloning the full
+history and running the CPU checks requires Git, Python 3.12, and
 [`uv`](https://docs.astral.sh/uv/). `preflight`, `evaluate`, and `chat` also
-require the pinned model files through network access or an existing local cache,
-plus an NVIDIA CUDA device with BF16 support; `preflight` is the
-authoritative compatibility check. The disabled `run` command needs neither a
-GPU nor configuration. A future reauthorized training/publication workflow
-would additionally require authenticated GitHub CLI access and a narrowly
-scoped Hugging Face write token.
+require their configured model revision through
+network access or an existing local cache, plus an NVIDIA CUDA device with BF16
+support. The canonical default is the pin above, and `preflight` is the
+authoritative compatibility check for the configured runtime. The disabled
+`run` command needs neither a GPU nor configuration. A future reauthorized
+training/publication workflow would additionally require authenticated GitHub
+CLI access and a narrowly scoped Hugging Face write token.
 
 ```bash
 git clone https://github.com/BurnyCoder/training-facts-into-llms.git
@@ -204,15 +218,31 @@ cp .env.example .env
 chmod 600 .env
 ```
 
-Do not add `HF_TOKEN` for ordinary tests, preflight, standalone evaluation, or
-public-adapter chat. Any future authorized publication would require it only
+The active utility commands honor allowlisted overrides from `.env` and
+same-named shell variables for model/revision, repository destinations,
+publication flag, seed, data/output paths, generation bound, and Trackio
+settings. `preflight` audits the configured Qwen class, processor, resolved
+revision, data structure, and LoRA shapes; `evaluate` uses the configured base,
+data, and `MAX_NEW_TOKENS`. These commands do not hash-lock configured data to
+the canonical files. Override-based utility output is descriptive and must not
+be substituted for the manifest-bound study evidence; the retained future
+training gate separately fixes the reviewed identities, repository IDs, seed,
+generation bound, Trackio project, profiles, and paths. `PUBLISH_TO_HUB` remains
+an independent post-acceptance choice.
+
+Do not populate `HF_TOKEN` for ordinary tests, preflight, standalone evaluation,
+or public-adapter chat. Any future authorized publication would require it only
 inside the documented secure boundaries. Never source `.env`, put a token on a
 command line, enable shell tracing, or commit the file. Public configuration
 retains credential state only as `hub_credentials_present: true|false`; see
 [`docs/security-and-publication.md`](docs/security-and-publication.md).
 All five configuration paths must remain inside the repository root; relative
 values resolve from that root, and any value that resolves outside it fails
-during configuration construction.
+during configuration construction. The default `LOG_DIR=logs`,
+`ARTIFACT_DIR=artifacts`, and `TRACKIO_DIR=.trackio` locations are Git-ignored.
+Root containment does not make a custom output directory Git-ignored. Verify
+that custom log, artifact, and Trackio destinations remain ignored and
+untracked, adding a rule only when existing patterns do not cover them.
 
 ### Commands and side effects
 
@@ -220,21 +250,24 @@ Run commands from the repository root:
 
 | Command | Behavior and side effects |
 | --- | --- |
-| `uv run --frozen training-facts-into-llms preflight` | Validates all data and the 11 exact direct runtime dependencies, loads the pinned model/processor, verifies CUDA/BF16, frozen vision, and both audited LoRA shapes, writes an ignored timestamped log, and performs no generation or training. |
+| `uv run --frozen training-facts-into-llms preflight` | Structurally validates the configured five-file data bundle and all 11 exact direct runtime dependencies, then loads a fresh copy of the configured model/revision for each audited LoRA shape and verifies CUDA/BF16, Qwen identity, frozen vision, and adapter scope. It writes JSONL under `LOG_DIR` (default: ignored `logs/`) and performs no generation or training. |
 | `uv run --frozen training-facts-into-llms run` | Prints a `training_disabled` JSON response and exits 2 before reading `.env`, constructing configuration, or loading a model. |
-| `uv run --frozen training-facts-into-llms evaluate --adapter PROJECT_PATH_OR_HUB_ID` | Accepts a project-contained local adapter path or anonymous public Hub ID, rejects an escaping local reference before log or model allocation, generates the fixed 28-prompt standalone evaluation, writes an ignored log and untracked JSON/Markdown under `reports/`, and makes no acceptance or publication decision. |
+| `uv run --frozen training-facts-into-llms evaluate --adapter PROJECT_PATH_OR_HUB_ID` | Intended inputs are a project-contained local adapter path or anonymous public Hub ID. The command pre-rejects an empty, root-only, or escaping local-style reference before log or model allocation, then delegates adapter compatibility to PEFT with `token=False` against the configured base. A successful run evaluates the configured, structurally validated 28-row suite with greedy decoding and configured `MAX_NEW_TOKENS`; it writes JSONL under `LOG_DIR` and untracked JSON/Markdown under the configured `REPORT_DIR` (default `reports/`). It makes no acceptance or publication decision. |
 | `uv run --frozen training-facts-into-llms chat` | Lists compatible adapters below `ARTIFACT_DIR` and requires an explicit numbered choice before GPU loading; a clean clone may have none. |
 | `uv run --frozen training-facts-into-llms chat --adapter PATH_OR_PUBLIC_HUB_ID` | Validates an explicit local or anonymous public adapter before GPU allocation, then runs logged greedy, thinking-disabled multi-turn text chat. |
 
 The repository ships no accepted adapter. Chat accepts only adapters matching
-the pinned base/revision and audited LoRA metadata. `/clear` resets history;
+the configured base/revision and audited LoRA metadata; with defaults, that is
+the canonical pin above. `/clear` resets history;
 `/exit`, `/quit`, or EOF exits normally. Chat never scores, trains, publishes,
 or writes tracked reports. Because every submitted prompt, full history,
 rendered prompt, and complete returned response after edge-whitespace stripping
-is logged to the terminal and ignored JSONL, never enter secrets or private
-data. See
+is logged to the terminal and JSONL under `LOG_DIR`, never enter secrets or
+private data. See
 [`docs/interactive-inference.md`](docs/interactive-inference.md).
 
+Chat and evaluation write their complete operational events under configured
+`LOG_DIR`; only the default `logs/` location is ignored by the repository.
 Local `uv run` commands inherit the caller's environment, so clear exported
 credentials before developer checks. The tests do not read the project `.env`,
 and CI receives no configured repository secrets. The checks are CPU-only:
@@ -267,11 +300,14 @@ and [`paper/README.md`](paper/README.md) documents its modular LaTeX build.
 └── uv.lock                            # complete locked dependency graph
 ```
 
-Operational logs, Trackio state, checkpoints, adapters, caches, and `.env`
-remain ignored. Only reviewed, sanitized evidence belongs under `reports/`.
-Structured metadata is allowlisted and sanitized. Free-form prompts and model
-text are not comprehensively redacted; known credential patterns are rejected
-at public boundaries, and generated text still requires manual inspection.
+The default operational locations for logs, Trackio state, checkpoints,
+adapters, caches, and `.env` remain ignored. Only reviewed, sanitized evidence
+should be staged from `reports/`; a new standalone pair is untracked and requires
+review first. Public result objects are built from explicit fields and sanitized;
+upload bundle filenames are allowlisted and their payloads are scanned.
+Free-form prompts and model text are not comprehensively redacted; known
+credential patterns are rejected at public boundaries, and generated text still
+requires manual inspection.
 
 ## Results
 
