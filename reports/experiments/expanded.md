@@ -152,8 +152,8 @@ Qwen adaptation of *Model Editing by Standard Fine-Tuning*.
 [src-eval-positive-conservative]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/evaluation-20260731T060709715986Z.json
 [src-data-f9b67ff-train]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/data/train.jsonl
 [src-data-f9b67ff-validation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/data/validation.jsonl
-[src-code-logging]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/logging_utils.py
-[src-project-metadata]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/pyproject.toml
+[src-code-logging]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f61a15a3dadb6727f71a4a3e4801817659857b54/src/training_facts_into_llms/logging_utils.py
+[src-project-metadata]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f61a15a3dadb6727f71a4a3e4801817659857b54/pyproject.toml
 [src-qwen-card]: https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/2fc06364715b967f1860aea9cf38778875588b17/README.md
 [src-lora-paper]: https://openreview.net/forum?id=nZeVKeeFYf9
 [src-pytorch-repro]: https://docs.pytorch.org/docs/2.13/notes/randomness.html

@@ -1380,16 +1380,16 @@ row; its limitation is part of the claim.
 | `S:data-b94867b-validation` | Historical data file | Paired validation rows | [source][src-data-b94867b-validation] | Six rows cannot establish broad representativeness. |
 | `S:data-b94867b-eval` | Historical data file | Minimal-pair fixed final regression rows | [source][src-data-b94867b-eval] | Regression evidence, not a pristine research holdout. |
 | `S:code-data` | Audited implementation snapshot | Data loading, row counts, isolation, pair validation, supervised chat-template arguments, and rendered prompt/completion construction | [source][src-code-data] | Current safeguards do not retroactively change history. |
-| `S:code-training` | Audited implementation snapshot | LoRA audit, sequence construction, optimizer, and Trainer settings | [source][src-code-training] | Mechanism evidence, not hyperparameter endorsement. |
+| `S:code-training` | Audited implementation snapshot | LoRA audit, sequence construction, optimizer and Trainer settings, and fail-closed metric serialization | [source][src-code-training] | Mechanism evidence, not hyperparameter endorsement. |
 | `S:code-evaluation` | Audited implementation snapshot | Scoring, acceptance checks, and empty-output gate | [source][src-code-evaluation] | Rules do not establish benchmark validity. |
 | `S:code-modeling` | Audited implementation snapshot | Model loading, chat template, and fixed greedy generation | [source][src-code-modeling] | CUDA bitwise identity is not claimed. |
 | `S:code-validation` | Audited implementation snapshot | Generated validation and checkpoint bookkeeping | [source][src-code-validation] | Validation does not make final prompts pristine. |
 | `S:code-pipeline` | Audited implementation snapshot | Phase order, fresh-base ladder, acceptance branch, and cleanup | [source][src-code-pipeline] | This retained historical path does not establish the public CLI disablement. |
 | `S:code-gitgate` | Audited implementation snapshot | Clean-main, origin, public-repository, and Git-object gates | [source][src-code-gitgate] | Covers only the stated scan boundary. |
-| `S:code-reporting` | Audited implementation snapshot | Structured-metadata sanitization, report allowlists, and documented credential-pattern scanning | [source][src-code-reporting] | Free-form generations still require manual review; Markdown remains derived from JSON. |
+| `S:code-reporting` | Audited implementation snapshot | Native-key structured-metadata sanitization, report allowlists, project-contained standalone references, and recursive documented credential-pattern scanning | [source][src-code-reporting] | Free-form generations still require manual review; Markdown remains derived from JSON. |
 | `S:code-publishing` | Audited implementation snapshot | Adapter upload allowlist, minimal child environment, subprocess invocation, and upload-before-verification ordering | [source][src-code-publishing] | The child module defines the query and explicit `token=False` downloads; run-state evidence establishes that this path was not reached. |
 | `S:code-preflight` | Audited implementation snapshot | CUDA, BF16, model, and LoRA preflight audits | [source][src-code-preflight] | Preflight establishes compatibility, not outcomes. |
-| `S:code-config` | Audited implementation snapshot | Model revision, shared settings, and declared training profiles | [source][src-code-config] | Acceptance rules live in evaluation code; numeric choices include heuristics. |
+| `S:code-config` | Audited implementation snapshot | Model revision, shared settings, declared training profiles, and repository-contained configured paths | [source][src-code-config] | Acceptance rules live in evaluation code; numeric choices include heuristics. |
 | `S:code-logging` | Audited implementation snapshot | Structured JSONL logging, recursive credential-shaped-key rejection, and unknown-object rejection | [source][src-code-logging] | Callers choose logged fields; this is rejection, not value redaction, and private operational output is not public evidence. |
 | `S:project-metadata` | Audited project metadata snapshot | Python and dependency versions | [source][src-project-metadata] | Metadata establishes declared versions only. |
 | `S:upstream-paper` | Peer-reviewed paper | Conditional likelihood, locality motivation, GPT-2 XL single editing, Sentence-BERT nearest-fact method, and the statement that all the authors' results except `FT (21st layer)` used LoRA | [source][src-upstream-paper] | Does not describe this Qwen adaptation or resolve the released-code parameter-boundary difference. |
@@ -1511,19 +1511,19 @@ row; its limitation is part of the claim.
 [src-data-b94867b-rehearsal]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/rehearsal.jsonl
 [src-data-b94867b-validation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/validation.jsonl
 [src-data-b94867b-eval]: https://github.com/BurnyCoder/training-facts-into-llms/blob/b94867bcb3124220563f47951dbad3e6fc9492c5/data/eval.jsonl
-[src-code-data]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/data.py
-[src-code-training]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/training.py
-[src-code-evaluation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/evaluation.py
-[src-code-modeling]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/modeling.py
-[src-code-validation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/validation.py
-[src-code-pipeline]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/pipeline.py
-[src-code-gitgate]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/git_gate.py
-[src-code-reporting]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/reporting.py
-[src-code-publishing]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/publishing.py
-[src-code-preflight]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/preflight.py
-[src-code-config]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/config.py
-[src-code-logging]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/src/training_facts_into_llms/logging_utils.py
-[src-project-metadata]: https://github.com/BurnyCoder/training-facts-into-llms/blob/96428b9d677499dead20a311c1756f6086b1af38/pyproject.toml
+[src-code-data]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f61a15a3dadb6727f71a4a3e4801817659857b54/src/training_facts_into_llms/data.py
+[src-code-training]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f61a15a3dadb6727f71a4a3e4801817659857b54/src/training_facts_into_llms/training.py
+[src-code-evaluation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f61a15a3dadb6727f71a4a3e4801817659857b54/src/training_facts_into_llms/evaluation.py
+[src-code-modeling]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f61a15a3dadb6727f71a4a3e4801817659857b54/src/training_facts_into_llms/modeling.py
+[src-code-validation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f61a15a3dadb6727f71a4a3e4801817659857b54/src/training_facts_into_llms/validation.py
+[src-code-pipeline]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f61a15a3dadb6727f71a4a3e4801817659857b54/src/training_facts_into_llms/pipeline.py
+[src-code-gitgate]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f61a15a3dadb6727f71a4a3e4801817659857b54/src/training_facts_into_llms/git_gate.py
+[src-code-reporting]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f61a15a3dadb6727f71a4a3e4801817659857b54/src/training_facts_into_llms/reporting.py
+[src-code-publishing]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f61a15a3dadb6727f71a4a3e4801817659857b54/src/training_facts_into_llms/publishing.py
+[src-code-preflight]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f61a15a3dadb6727f71a4a3e4801817659857b54/src/training_facts_into_llms/preflight.py
+[src-code-config]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f61a15a3dadb6727f71a4a3e4801817659857b54/src/training_facts_into_llms/config.py
+[src-code-logging]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f61a15a3dadb6727f71a4a3e4801817659857b54/src/training_facts_into_llms/logging_utils.py
+[src-project-metadata]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f61a15a3dadb6727f71a4a3e4801817659857b54/pyproject.toml
 [src-upstream-paper]: https://aclanthology.org/2024.findings-acl.352/
 [src-upstream-run]: https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/run.py
 [src-upstream-launcher]: https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/execute.sh
