@@ -115,3 +115,21 @@ def test_public_metadata_rejects_non_string_mapping_keys(tmp_path: Path) -> None
 
     with pytest.raises(TypeError, match="metadata keys must be strings"):
         _sanitize_metadata({UnexpectedKey(): "value"}, root=tmp_path)
+
+
+def test_event_logger_rejects_non_string_mapping_keys_without_conversion(
+    tmp_path: Path,
+) -> None:
+    """Operational logs must not call arbitrary mapping-key string methods."""
+
+    class UnexpectedKey:
+        """Fail loudly if the logger evaluates custom key text conversion."""
+
+        def __str__(self) -> str:
+            raise AssertionError("unsupported log keys must not call str")
+
+    with (
+        EventLogger(tmp_path, run_id="non-string-key-test") as logger,
+        pytest.raises(TypeError, match="Log keys must be strings"),
+    ):
+        logger.event("unsafe", nested={UnexpectedKey(): "value"})

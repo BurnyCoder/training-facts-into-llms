@@ -30,8 +30,12 @@ def _validate_public_keys(value: Any, *, path: str = "event") -> None:
     if isinstance(value, dict):
         # Validate every key and nested value.
         for key, nested in value.items():
-            # Reuse the project-wide provider-aware policy for each text key.
-            if is_credential_name(str(key)):
+            # JSON event objects require native text keys; converting arbitrary
+            # objects could execute user code or expose runtime representations.
+            if not isinstance(key, str):
+                raise TypeError(f"Log keys must be strings at {path}")
+            # Reuse the project-wide provider-aware policy for each native text key.
+            if is_credential_name(key):
                 raise ValueError(f"forbidden log key at {path}.{key}")
             # Continue through nested containers.
             _validate_public_keys(nested, path=f"{path}.{key}")

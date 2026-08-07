@@ -211,8 +211,8 @@ command line, enable shell tracing, or commit the file. Public configuration
 retains credential state only as `hub_credentials_present: true|false`; see
 [`docs/security-and-publication.md`](docs/security-and-publication.md).
 All five configuration paths must remain inside the repository root; relative
-values resolve from that root, while absolute paths and traversal outside it
-fail during configuration construction.
+values resolve from that root, and any value that resolves outside it fails
+during configuration construction.
 
 ### Commands and side effects
 
