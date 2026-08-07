@@ -136,10 +136,11 @@ clipping. Batch 1 with
 accumulation 26 stayed within the measured device budget while preserving one
 logical $E\cup P\cup R$ update; a physical batch of 26 was not attempted.
 Rank 8/alpha 16 was the project's existing, unablated Qwen language-only LoRA
-boundary. The paper reports GPT-2 XL results using LoRA except for
-\texttt{FT (21st layer)}, while released \texttt{run.py} passes the full GPT-2
-XL parameter set directly to AdamW. Thus the Qwen LoRA recipe was a project
-adaptation, not a reproduction of either source boundary.
+boundary. The paper identifies GPT-2 XL as the single-edit model. Separately,
+it states that all reported results except \texttt{FT (21st layer)} use LoRA;
+released \texttt{run.py} instead passes the full GPT-2 XL parameter set
+directly to AdamW. Thus the Qwen LoRA recipe was a project adaptation, not a
+reproduction of either source boundary.
 \citep{gangadhar2024model,gangadhar2024run,gangadhar2024launcher}
 \claimsource{source-paper}\claimsource{eval-paper}
 

@@ -156,9 +156,9 @@ clean-main gate. [S:code-gitgate][src-code-gitgate]
 | `S:data-b94867b-contrast` | Historical data file | Entity-only contrast rows | [source][src-data-b94867b-contrast] | Pairing is project design, not proof of causality. |
 | `S:data-b94867b-rehearsal` | Historical data file | Minimal-pair rehearsal rows | [source][src-data-b94867b-rehearsal] | Does not establish retention causality. |
 | `S:data-b94867b-validation` | Historical data file | Paired validation rows | [source][src-data-b94867b-validation] | Six rows cannot establish broad representativeness. |
-| `S:code-pipeline` | Audited implementation snapshot | Phase order, fresh-base ladder, acceptance branch, and cleanup | [source][src-code-pipeline] | The historical ladder is now disabled. |
+| `S:code-pipeline` | Audited implementation snapshot | Phase order, fresh-base ladder, acceptance branch, and cleanup | [source][src-code-pipeline] | This retained historical path does not establish the public CLI disablement. |
 | `S:code-gitgate` | Audited implementation snapshot | Clean-main, origin, public-repository, and Git-object gates | [source][src-code-gitgate] | Covers only the stated scan boundary. |
-| `S:code-publishing` | Audited implementation snapshot | Adapter upload allowlist and minimal-environment, explicit-`token=False` predefined-regression verification | [source][src-code-publishing] | `upload_folder` precedes post-upload verification; the configured path was never reached. |
+| `S:code-publishing` | Audited implementation snapshot | Adapter upload allowlist, minimal child environment, subprocess invocation, and upload-before-verification ordering | [source][src-code-publishing] | The child module defines the query and explicit `token=False` downloads; run-state evidence establishes that this path was not reached. |
 | `S:fix-minimal-tests` | Exact fix commit | Predeclared minimal-pair ladder tests | [source][src-fix-minimal-tests] | Tests specify intended behavior only. |
 | `S:fix-minimal-implementation` | Exact fix commit | Paired data and full-horizon profiles | [source][src-fix-minimal-implementation] | Several variables still changed together. |
 | `S:fix-behavior-selector` | Exact fix commit | Bounded behavior-first selector | [source][src-fix-behavior-selector] | Does not establish validation breadth. |

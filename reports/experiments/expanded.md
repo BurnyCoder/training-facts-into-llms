@@ -122,7 +122,7 @@ Qwen adaptation of *Model Editing by Standard Fine-Tuning*.
 | `S:eval-positive-conservative` | Evaluation JSON | Conservative prompts, outputs, metrics, configuration, Trainer runtime, and hardware | [source][src-eval-positive-conservative] | Run binding depends on the manifest. |
 | `S:data-f9b67ff-train` | Historical data file | Positive-only training rows | [source][src-data-f9b67ff-train] | File contents do not establish optimality. |
 | `S:data-f9b67ff-validation` | Historical data file | Positive-only validation rows | [source][src-data-f9b67ff-validation] | File contents do not establish representativeness. |
-| `S:code-logging` | Audited implementation snapshot | Allowlisted structured logging and redaction | [source][src-code-logging] | Private operational output is not public evidence. |
+| `S:code-logging` | Audited implementation snapshot | Structured JSONL logging, recursive credential-shaped-key rejection, and unknown-object rejection | [source][src-code-logging] | Callers choose logged fields; this is rejection, not value redaction, and private operational output is not public evidence. |
 | `S:project-metadata` | Audited project metadata snapshot | Python and dependency versions | [source][src-project-metadata] | Metadata establishes declared versions only. |
 | `S:qwen-card` | Pinned model card | Model identity, architecture, and intended use | [source][src-qwen-card] | Does not establish this project's optimal model choice. |
 | `S:lora-paper` | Peer-reviewed paper | Low-rank adaptation mechanism and frozen base weights | [source][src-lora-paper] | Does not endorse this project's ranks. |

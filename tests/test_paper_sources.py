@@ -867,6 +867,7 @@ def test_repository_wide_claim_audit_keeps_paper_provenance_precise() -> None:
 
     for unsupported in (
         "paper and pinned code used gpt-2 xl full-parameter adamw",
+        "gpt-2 xl results using lora except",
         "held-out query",
         "failure migrated",
         "moved the failure",
@@ -879,6 +880,7 @@ def test_repository_wide_claim_audit_keeps_paper_provenance_precise() -> None:
         sources[Path("paper/sections/results-learnings.tex")].split()
     ).casefold()
     assert re.search(r"paper.{0,180}gpt-2 xl.{0,180}lora", results)
+    assert "separate statement" in results
     assert re.search(r"run\.py.{0,180}full-parameter adamw", results)
     assert re.search(r"qwen.{0,180}language-only lora.{0,180}project", results)
 
@@ -886,6 +888,13 @@ def test_repository_wide_claim_audit_keeps_paper_provenance_precise() -> None:
     assert "Predefined regression query" in methodology
     assert "Non-training use" in methodology
     assert "held-out query" not in methodology.casefold()
+    for phrase in (
+        r"\texttt{upload\_folder}",
+        "remote files requiring",
+        r"\texttt{adapter\_published}",
+        r"\claimsource{code-publication-verifier}",
+    ):
+        assert phrase in methodology
 
     related_work = " ".join(
         sources[Path("paper/sections/related-work.tex")].split()
@@ -901,6 +910,7 @@ def test_repository_wide_claim_audit_keeps_paper_provenance_precise() -> None:
     )
     for number in (1, 2, 5, 7, 8, 13):
         assert f"\\#{number}" in snapshot_paragraph
+    assert r"\claimsource{pr-corrections}" in snapshot_paragraph
 
     appendix = sources[Path("paper/appendices/evidence.tex")]
     code_entries = [
@@ -913,6 +923,14 @@ def test_repository_wide_claim_audit_keeps_paper_provenance_precise() -> None:
             r"/blob/[0-9a-f]{40}/src/training_facts_into_llms/[^{}]+\.py",
             entry,
         )
+    verifier_entry = next(
+        entry
+        for entry in code_entries
+        if entry.startswith(r"\sourceentry{code-publication-verifier}")
+    )
+    assert "/verify_publication.py" in verifier_entry
+    assert r"\texttt{token=False}" in verifier_entry
+    assert r"\texttt{fact\_001}" in verifier_entry
 
 
 def test_run_ledger_resolves_every_manifest_artifact_and_implementation() -> None:

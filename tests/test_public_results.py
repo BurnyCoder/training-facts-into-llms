@@ -555,7 +555,7 @@ AUTHORING_DISCLOSURE_URL = (
 )
 # Pin the canonical retrospective after the repository-wide provenance correction.
 EXPECTED_RETROSPECTIVE_SHA256 = (
-    "a2a0eb6dd22e33a0c9cb4ad01591dd79e025a0b9f8689b2e5cf0c8251502b753"
+    "b3c14b56a05315c0efd1d36c987c4cec782b65a9053ce37100751d64c393d7e5"
 )
 
 # Each tuple names one canonical family chapter and its verbatim copied subsections.
@@ -1930,8 +1930,26 @@ def test_active_source_ledger_and_historical_cli_names_do_not_go_stale() -> None
         "strategies moved the failure",
         "failure migrated",
         "prevented false success claims",
+        "excluded tracebacks, signed urls",
     ):
         assert unsupported not in normalized
+
+    ledger = _ledger(text)
+    assert ledger["code-logging"]["scope"] == (
+        "Structured JSONL logging, recursive credential-shaped-key rejection, "
+        "and unknown-object rejection"
+    )
+    assert "not value redaction" in ledger["code-logging"]["limitation"]
+    assert ledger["code-publishing"]["scope"] == (
+        "Adapter upload allowlist, minimal child environment, subprocess "
+        "invocation, and upload-before-verification ordering"
+    )
+    assert "child module defines the query" in ledger["code-publishing"][
+        "limitation"
+    ]
+    assert "does not establish the public CLI disablement" in ledger[
+        "code-pipeline"
+    ]["limitation"]
 
     ledger_rows = [
         row

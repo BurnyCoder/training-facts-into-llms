@@ -1098,10 +1098,10 @@ Credential handling also tightened over the journey.
   [S:git-cat-file][src-git-cat-file]
 - Public report generation constructed allowlisted payloads, rejected
   credential-shaped keys and absolute paths from structured metadata, scanned
-  public content for documented credential patterns, and excluded tracebacks,
-  signed URLs, and arbitrary response objects. Free-form generations still
-  required manual review because the checks could not identify every possible
-  private or unsafe string.
+  public content for documented credential patterns, and rejected arbitrary
+  response objects at structured-metadata boundaries. Free-form generations
+  still required manual review because the checks could not identify every
+  possible private or unsafe string, including every traceback or signed URL.
   [S:code-reporting][src-code-reporting]
 - Publication code accepted an explicit adapter directory and allowlisted its
   payload rather than uploading the repository root. [S:code-publishing][src-code-publishing]
@@ -1384,13 +1384,13 @@ row; its limitation is part of the claim.
 | `S:code-evaluation` | Audited implementation snapshot | Scoring, acceptance checks, and empty-output gate | [source][src-code-evaluation] | Rules do not establish benchmark validity. |
 | `S:code-modeling` | Audited implementation snapshot | Model loading, chat template, and fixed greedy generation | [source][src-code-modeling] | CUDA bitwise identity is not claimed. |
 | `S:code-validation` | Audited implementation snapshot | Generated validation and checkpoint bookkeeping | [source][src-code-validation] | Validation does not make final prompts pristine. |
-| `S:code-pipeline` | Audited implementation snapshot | Phase order, fresh-base ladder, acceptance branch, and cleanup | [source][src-code-pipeline] | The historical ladder is now disabled. |
+| `S:code-pipeline` | Audited implementation snapshot | Phase order, fresh-base ladder, acceptance branch, and cleanup | [source][src-code-pipeline] | This retained historical path does not establish the public CLI disablement. |
 | `S:code-gitgate` | Audited implementation snapshot | Clean-main, origin, public-repository, and Git-object gates | [source][src-code-gitgate] | Covers only the stated scan boundary. |
 | `S:code-reporting` | Audited implementation snapshot | Structured-metadata sanitization, report allowlists, and documented credential-pattern scanning | [source][src-code-reporting] | Free-form generations still require manual review; Markdown remains derived from JSON. |
-| `S:code-publishing` | Audited implementation snapshot | Adapter upload allowlist and minimal-environment, explicit-`token=False` predefined-regression verification | [source][src-code-publishing] | `upload_folder` precedes post-upload verification; the configured path was never reached. |
+| `S:code-publishing` | Audited implementation snapshot | Adapter upload allowlist, minimal child environment, subprocess invocation, and upload-before-verification ordering | [source][src-code-publishing] | The child module defines the query and explicit `token=False` downloads; run-state evidence establishes that this path was not reached. |
 | `S:code-preflight` | Audited implementation snapshot | CUDA, BF16, model, and LoRA preflight audits | [source][src-code-preflight] | Preflight establishes compatibility, not outcomes. |
 | `S:code-config` | Audited implementation snapshot | Model revision, shared settings, and declared training profiles | [source][src-code-config] | Acceptance rules live in evaluation code; numeric choices include heuristics. |
-| `S:code-logging` | Audited implementation snapshot | Allowlisted structured logging and redaction | [source][src-code-logging] | Private operational output is not public evidence. |
+| `S:code-logging` | Audited implementation snapshot | Structured JSONL logging, recursive credential-shaped-key rejection, and unknown-object rejection | [source][src-code-logging] | Callers choose logged fields; this is rejection, not value redaction, and private operational output is not public evidence. |
 | `S:project-metadata` | Audited project metadata snapshot | Python and dependency versions | [source][src-project-metadata] | Metadata establishes declared versions only. |
 | `S:upstream-paper` | Peer-reviewed paper | Conditional likelihood, locality motivation, GPT-2 XL single editing, Sentence-BERT nearest-fact method, and the statement that all the authors' results except `FT (21st layer)` used LoRA | [source][src-upstream-paper] | Does not describe this Qwen adaptation or resolve the released-code parameter-boundary difference. |
 | `S:upstream-run` | Pinned upstream code | Full-parameter AdamW loop, seed 42, one update per epoch, and lack of a scheduler or LoRA/layer boundary | [source][src-upstream-run] | Released executable differs from the paper's reported LoRA setup. |

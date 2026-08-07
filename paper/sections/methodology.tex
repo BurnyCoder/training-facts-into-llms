@@ -442,13 +442,17 @@ upload interface \citep{huggingfacehub}; this project's additional boundary
 required an allowlisted payload and a fresh process with a minimal allowlisted
 environment and explicit \texttt{token=False} downloads to reload the public
 adapter. Predefined regression query \texttt{fact\_001} was the specified
-publication check; it was non-training use, not a separate research holdout. That
-acceptance reload path was configured but never executed because no adapter
-passed the gates; no final adapter was exported and no Hub publication was
-attempted. Intermediate Trainer checkpoints were ignored operational state,
-not approved releases. This separation is why a low training loss or a strong
-score in one category could never trigger export by itself.
+publication check; it was non-training use, not a separate research holdout.
+The parent calls \texttt{upload\_folder} before public metadata, file-set, and
+fresh-process checks, so a later failure can leave remote files requiring
+explicit cleanup. It emits \texttt{adapter\_published} only after every check
+passes. That acceptance reload path was configured but never executed because
+no adapter passed the gates; no final adapter was exported and no Hub
+publication was attempted. Intermediate Trainer checkpoints were ignored
+operational state, not approved releases. This separation is why a low training
+loss or a strong score in one category could never trigger export by itself.
 \claimsource{code-pipeline}\claimsource{code-publishing}%
+\claimsource{code-publication-verifier}%
 \claimsource{source-failclosed}%
 \claimsource{manifest}
 
