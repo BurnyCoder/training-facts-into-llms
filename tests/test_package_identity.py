@@ -213,6 +213,22 @@ def test_active_documentation_describes_the_stopped_codebase_precisely() -> None
     assert "the pipeline never attempted to populate" in readme
     assert "project-contained local adapter path" in readme
     assert "configuration paths must remain inside the repository root" in readme
+    # Keep the command table tied to its configurable report destination.
+    evaluation_row = next(
+        line for line in readme.splitlines() if "evaluate --adapter" in line
+    )
+    assert "REPORT_DIR" in evaluation_row
+    assert "reports/" in evaluation_row
+    # Keep the implemented Hub folder-upload API visible at the publication boundary.
+    assert "`upload_folder`" in readme
+    assert "`upload_folder`" in agents
+    # Preserve the three distinctions that prevent configured utilities from being
+    # mistaken for a reproduction of the manifest-bound historical experiment.
+    for document in (readme, agents):
+        normalized_document = " ".join(document.split())
+        assert "allowlisted overrides" in normalized_document
+        assert "do not hash-lock" in normalized_document
+        assert "custom output directory Git-ignored" in normalized_document
 
     combined = f"{readme}\n{agents}\n{security}\n{strategy}\n{inference}\n{example}"
     normalized = " ".join(combined.split()).casefold()
@@ -225,6 +241,10 @@ def test_active_documentation_describes_the_stopped_codebase_precisely() -> None
         "make evaluation and chat reproducible",
         "published adapter passes the fixed declared acceptance suite",
         "single-edit paper's similar-fact locality finding to tokenizer-close names",
+        "contrast rows 1–16 are entity-only counterfactuals",
+        "do not add `hf_token`",
+        "upload individual allowlisted files",
+        "upload explicit files",
     ):
         assert unsupported not in normalized
 

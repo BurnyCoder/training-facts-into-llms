@@ -17,9 +17,12 @@ inference ran; it is not publication evidence.
 ## Requirements and adapter selection
 
 Run from the repository root with Python 3.12, the frozen `uv` environment, and
-an NVIDIA GPU with BF16 support. The exact public
+an NVIDIA GPU with BF16 support. The configured model revision must be
+downloadable or cached. The canonical defaults are public
 `Qwen/Qwen3.5-0.8B` revision
-`2fc06364715b967f1860aea9cf38778875588b17` must be downloadable or cached.
+`2fc06364715b967f1860aea9cf38778875588b17`. Every chat session is exploratory
+and never acceptance evidence; an override additionally departs from the
+canonical study settings.
 
 Open the ordered local picker:
 
@@ -56,7 +59,7 @@ Before allocating the base model, local and downloaded Hub snapshots must contai
 non-empty `adapter_config.json` and `adapter_model.safetensors`. Configuration
 must declare:
 
-- the exact pinned base model and revision;
+- the configured base model and revision (the defaults are the exact study pin);
 - PEFT `LORA` with task `CAUSAL_LM`;
 - the exact 12 audited language-module suffixes and no scope-changing options;
 - rank/alpha 8/16 or 16/32, dropout 0, and bias `none`.
@@ -91,16 +94,19 @@ large. Switching adapters requires exiting and starting another session.
 Generation reuses the same native Qwen role/content template described by
 [Transformers chat templates](https://huggingface.co/docs/transformers/chat_templating),
 always sets `enable_thinking=False`, and uses greedy decoding with
-`MAX_NEW_TOKENS`. This is a fixed greedy, thinking-disabled protocol, not a
-claim of CUDA bitwise identity. V1 has no system-prompt option, multiline
-editor, image input, sampling, token streaming, or in-session adapter switching.
+configured `MAX_NEW_TOKENS`. These settings remain stable within a session; this
+is not a claim of CUDA bitwise identity. V1 has no system-prompt option,
+multiline editor, image input, sampling, token streaming, or in-session adapter
+switching.
 
 ## Logging and privacy
 
 Before the first prompt, the command warns that every model-submitted prompt is
 persisted. Whitespace-only lines and local control commands are not sent to the
 model and are represented only by applicable session-transition events. One
-timestamped JSONL file under ignored `LOG_DIR` records:
+timestamped JSONL file under configured `LOG_DIR` records (the default `logs/`
+location is ignored; a custom directory must remain untracked, with an added
+ignore rule only when existing patterns do not cover it):
 
 - safe adapter identity, rank/alpha, and exploratory status;
 - fixed generation settings and session transitions;

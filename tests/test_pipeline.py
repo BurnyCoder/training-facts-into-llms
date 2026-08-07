@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -78,6 +79,90 @@ def test_pipeline_writes_failure_report_without_saving_or_publishing() -> None:
     assert "save" not in events
     assert "publish" not in events
     assert outcome.published_url is None
+
+
+def test_concrete_publication_phase_honors_flag_and_releases_before_upload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Publication is optional, and enabled upload begins after model release."""
+    # Import concrete modules so the phase builder captures observable test doubles.
+    from training_facts_into_llms import modeling, pipeline, publishing
+
+    # One ordered list proves that no Hub boundary precedes model release.
+    calls: list[tuple[str, object]] = []
+
+    def fake_release(bundle: object) -> None:
+        """Record release of the exact model bundle owned by the attempt."""
+        # The real helper frees GPU state at this point in the lifecycle.
+        calls.append(("release", bundle))
+
+    def fake_publish(config: object, adapter: Path, logger: object) -> str:
+        """Represent the validated folder-upload and verification boundary."""
+        # Only the explicit adapter directory may cross the mocked Hub boundary.
+        calls.append(("upload", adapter))
+        return "hub-url"
+
+    # Replace only external-resource operations; retain the real publication branch.
+    monkeypatch.setattr(modeling, "release_model", fake_release)
+    monkeypatch.setattr(publishing, "publish_adapter", fake_publish)
+    # Both branches receive the same already-saved adapter and evaluation report.
+    adapter_path = Path("adapter")
+    report = SimpleNamespace(json_path=Path("evaluation.json"))
+
+    # A passing local-only run must retain its model and avoid every Hub operation.
+    disabled_config = SimpleNamespace(publish_to_hub=False)
+    disabled_state = pipeline._AttemptState(
+        run_id="disabled-run",
+        profile=object(),
+        gate_cache=pipeline._GateCache(),
+        bundle="disabled-bundle",
+    )
+    disabled_events: list[str] = []
+    disabled_logger = SimpleNamespace(
+        event=lambda event, **payload: disabled_events.append(event)
+    )
+    disabled_phases = pipeline._build_attempt_phases(disabled_config, disabled_state)
+
+    assert (
+        disabled_phases.publish(
+            disabled_config,
+            adapter_path,
+            report,
+            disabled_logger,
+        )
+        is None
+    )
+    assert calls == []
+    assert disabled_state.bundle == "disabled-bundle"
+    assert disabled_events == ["publication_skipped"]
+
+    # Enabling publication must release the owned model before entering the publisher.
+    enabled_config = SimpleNamespace(publish_to_hub=True)
+    enabled_bundle = object()
+    enabled_state = pipeline._AttemptState(
+        run_id="enabled-run",
+        profile=object(),
+        gate_cache=pipeline._GateCache(),
+        bundle=enabled_bundle,
+    )
+    enabled_events: list[str] = []
+    enabled_logger = SimpleNamespace(
+        event=lambda event, **payload: enabled_events.append(event)
+    )
+    enabled_phases = pipeline._build_attempt_phases(enabled_config, enabled_state)
+
+    assert (
+        enabled_phases.publish(
+            enabled_config,
+            adapter_path,
+            report,
+            enabled_logger,
+        )
+        == "hub-url"
+    )
+    assert calls == [("release", enabled_bundle), ("upload", adapter_path)]
+    assert enabled_state.bundle is None
+    assert enabled_events == ["model_released_for_anonymous_verification"]
 
 
 def test_workflow_stops_at_first_passing_predeclared_attempt(
