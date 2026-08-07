@@ -555,7 +555,7 @@ AUTHORING_DISCLOSURE_URL = (
 )
 # Pin the canonical retrospective after the repository-wide provenance correction.
 EXPECTED_RETROSPECTIVE_SHA256 = (
-    "729cee5f869dfca2a5e5a1681dc456f3584a401780c08d33320fdb8970584bc1"
+    "7a5ac961bdf4c56fc5caffa9e2335146d4b1fe1c1c888c82d1b89e2faabe714f"
 )
 
 # Each tuple names one canonical family chapter and its verbatim copied subsections.
