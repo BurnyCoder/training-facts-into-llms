@@ -2,15 +2,17 @@
 
 ## Purpose and status
 
-`fact-teaching chat` provides manual, text-only inference against one compatible
-LoRA adapter. It is deliberately separate from training and the fixed 28-row
-evaluation. A chat session does not score outputs, change historical acceptance,
-write a tracked report, train weights, save a new adapter, or publish anything.
+`training-facts-into-llms chat` provides manual, text-only inference against one
+compatible LoRA adapter. It is deliberately separate from training and the
+fixed 28-row evaluation. A chat session does not score outputs, change historical
+acceptance, write a tracked report, train weights, save a new adapter, or publish
+anything.
 
-The current local `artifacts/attempts/` tree contains ignored Trainer checkpoint
-adapters from failed or inconclusive experiments. They are reloadable operational
-state, not final acceptance-approved bundles. A coherent manual answer proves
-only that inference ran; it is not publication evidence.
+A working checkout may contain ignored Trainer checkpoint adapters from failed
+or inconclusive experiments under `artifacts/attempts/`. They are reloadable
+operational state, not final acceptance-approved bundles. A fresh clone has none
+because `artifacts/` is ignored. A coherent manual answer proves only that
+inference ran; it is not publication evidence.
 
 ## Requirements and adapter selection
 
@@ -19,10 +21,10 @@ an NVIDIA GPU with BF16 support. The exact public
 `Qwen/Qwen3.5-0.8B` revision
 `2fc06364715b967f1860aea9cf38778875588b17` must be downloadable or cached.
 
-Open the deterministic local picker:
+Open the ordered local picker:
 
 ```bash
-uv run fact-teaching chat
+uv run --frozen training-facts-into-llms chat
 ```
 
 The picker recursively scans the resolved `ARTIFACT_DIR`, validates candidates,
@@ -36,8 +38,9 @@ normally has no local choices because `artifacts/` is ignored.
 Select one compatible adapter directly:
 
 ```bash
-uv run fact-teaching chat --adapter artifacts/attempts/RUN/PROFILE/checkpoint-STEP
-uv run fact-teaching chat --adapter OWNER/PUBLIC_HUB_REPOSITORY
+uv run --frozen training-facts-into-llms chat \
+  --adapter artifacts/attempts/RUN/PROFILE/checkpoint-STEP
+uv run --frozen training-facts-into-llms chat --adapter OWNER/PUBLIC_HUB_REPOSITORY
 ```
 
 An existing local path takes precedence over a Hub-shaped name. Prefix a missing
@@ -86,8 +89,9 @@ large. Switching adapters requires exiting and starting another session.
 Generation reuses the same native Qwen role/content template described by
 [Transformers chat templates](https://huggingface.co/docs/transformers/chat_templating),
 always sets `enable_thinking=False`, and uses greedy decoding with
-`MAX_NEW_TOKENS`. V1 has no system-prompt option, multiline editor, image input,
-sampling, token streaming, or in-session adapter switching.
+`MAX_NEW_TOKENS`. This is a fixed greedy, thinking-disabled protocol, not a
+claim of CUDA bitwise identity. V1 has no system-prompt option, multiline
+editor, image input, sampling, token streaming, or in-session adapter switching.
 
 ## Logging and privacy
 
@@ -97,7 +101,7 @@ model and are represented only by applicable session-transition events. One
 timestamped JSONL file under ignored `LOG_DIR` records:
 
 - safe adapter identity, rank/alpha, and exploratory status;
-- deterministic generation settings and session transitions;
+- fixed generation settings and session transitions;
 - each full message history before generation;
 - the exact rendered native prompt and complete output;
 - history resets, failures by exception class, and termination reason.

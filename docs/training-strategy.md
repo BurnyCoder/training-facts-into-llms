@@ -2,40 +2,41 @@
 
 ## Evidence and diagnosis
 
-Six earlier attempts are immutable public evidence in
+Six earlier attempts—five evaluated and one interrupted—are immutable public
+evidence in
 [`reports/EXPERIMENTS.md`](../reports/EXPERIMENTS.md). Two positive-only runs
 reached 12/12 recall, but copied the edit to all eight close names and lost six
 or seven controls. The paper-style conditional-loss run retained every control,
 but reached 8/12 recall and copied the fact to four close names. Adding explicit
 close-name contrast and knowledge rehearsal then produced 6/12 and 10/12
-recall, with 8/8 close-name safety in both runs and 8/8 controls in the gentler
-run.
+recall, with 8/8 close-name safety in both runs and 8/8 controls in the
+lower-learning-rate, longer-horizon run.
 
 The last two missed recall answers were both the exact contrast completion,
 `I do not know.`. Positive and contrast rows used different question styles,
-and positive and negative validation rows repeated that style difference. A
-six-row perfect validation score could therefore reflect a wording shortcut:
-the model could associate “unknown-style” instructions with abstention instead
-of using the entity spelling as the label-changing feature. Stopping at the
-first perfect six-row epoch also prevented later checkpoints from being
+and positive and negative validation rows repeated that style difference. We
+therefore formed, but did not causally establish, a wording-shortcut hypothesis:
+the model might associate “unknown-style” instructions with abstention instead
+of using entity spelling as the label-changing feature. Stopping at the first
+perfect six-row epoch also prevented later checkpoints from being generated and
 compared.
 
-The completed minimal-pair strategy addressed those diagnosed boundaries by
-pairing prompt forms and selecting checkpoints after full horizons. Its
-predeclared profiles also varied learning rate, horizon and schedule trajectory,
-and LoRA rank, so cross-profile differences are observations rather than
-controlled causal estimates. It kept standard completion-only SFT, explicit
-locality supervision, and the final acceptance criteria. It did not rerun or
-claim to reproduce the historical `paper_single_edit` experiment. The
+The completed minimal-pair strategy changed those two observable design
+features by pairing prompt forms and selecting checkpoints after full horizons.
+Its predeclared profiles also varied learning rate, horizon and schedule
+trajectory, and LoRA rank, so cross-profile differences are observations rather
+than controlled causal estimates. It kept standard completion-only SFT,
+explicit locality supervision, and the final acceptance criteria. It did not
+rerun or claim to reproduce the historical `paper_single_edit` experiment. The
 model-editing paper motivates conditional loss and similar-fact augmentation
-and reports no improvement from its tested DPO variant, so this project does
-not add DPO. See
+and reports no improvement from its tested DPO variant. This project retained
+SFT and did not test DPO. See
 [paper sections 3 and 5.2](https://arxiv.org/html/2402.11078v3) and the
 [authors' pinned implementation](https://github.com/au-revoir/model-editing-ft/tree/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit).
 
 ## Counterfactually paired data
 
-Training contains 56 rows in deterministic file order before seeded Trainer
+Training contains 56 rows in fixed file order before seeded Trainer
 shuffling:
 
 - 24 semantically varied prompts for the exact entity, completed by
@@ -66,7 +67,7 @@ completions, IDs, normalized prompts, categories, or entity disjointness drift.
 The fixed final suite remains 12 fact-recall, 8 close-name, and 8
 common-knowledge prompts. No final row enters training or checkpoint selection.
 However, aggregate results from that suite informed this strategy, so it is an
-iterative regression suite rather than a pristine unseen research holdout. The
+iterative regression suite rather than an untouched research holdout. The
 project makes the narrower reproducible claim that a published adapter passes
 the fixed declared acceptance suite.
 
@@ -74,7 +75,9 @@ TRL receives conversational prompt-completion rows with
 `completion_only_loss=True`, following the
 [SFTTrainer dataset contract](https://huggingface.co/docs/trl/sft_trainer).
 Every copied row supplies `chat_template_kwargs={"enable_thinking": false}` so
-training and inference use the same native Qwen template.
+training and inference use the same native Qwen template. Prompt tokens receive
+no direct next-token loss, while gradients for completion tokens still depend
+on contextual representations computed from the prompt.
 
 ## Adapter scope and preflight
 
@@ -154,7 +157,7 @@ metric.
 ## Minimal-pair results
 
 The reviewed implementation and data were merged at public source commit
-[`b94867b`](https://github.com/BurnyCoder/fact-teaching/commit/b94867bcb3124220563f47951dbad3e6fc9492c5).
+[`b94867b`](https://github.com/BurnyCoder/training-facts-into-llms/commit/b94867bcb3124220563f47951dbad3e6fc9492c5).
 The runtime gate proved clean synchronized `main`, all 45 required public
 paths, ignored and untracked `.env`, and absence of the actual local credential
 from every Git object before baseline generation. Each profile then completed
@@ -177,10 +180,11 @@ non-empty.
 
 All selected checkpoints had perfect 2/2 recall, 2/2 near-name, and 2/2 control
 validation behavior. The fixed eight-control suite still exposed two or three
-losses, so the small validation subset was not a reliable retention proxy. The
-conservative profile was associated with one fewer near-name spillover but the
-same three control failures; the expanded profile was associated with one more
-retained control but did not reach the publication budget.
+losses, so the small validation subset did not establish retention across the
+larger regression category. The conservative profile was associated with one
+fewer near-name spillover but the same three control failures; the expanded
+profile was associated with one more retained control but did not reach the
+publication budget.
 
 Complete concise reports and their paired generated evidence:
 
@@ -199,13 +203,15 @@ Complete concise reports and their paired generated evidence:
 The fixed 28-row evaluation remained authoritative; validation success never
 authorized save or publication. All three profiles failed the requirement to
 lose at most one baseline-passing control. The pipeline therefore wrote
-complete sanitized evidence, released each model, saved no final adapter,
-attempted no Hugging Face publication, and ran no anonymous adapter reload.
+complete sanitized evidence, released each model, saved no
+acceptance-approved final adapter bundle, attempted no Hugging Face publication,
+and ran no anonymous adapter reload. Ignored intermediate Trainer checkpoint
+adapters were operational state, not approved final bundles.
 
 The unique minimal-pair report names preserve the older positive-only
 `primary`, `conservative`, and `expanded` evidence. This ladder is finished and
 must not be rerun. Another training attempt requires fresh user authorization
 and a new tested, reviewed, merged strategy followed by a clean-main gate. The
-stable `uv run fact-teaching run` entry point now exits 2 before reading
-configuration or loading a model; a future reviewed strategy must explicitly
-re-enable it.
+stable `uv run --frozen training-facts-into-llms run` entry point now exits 2 before
+reading configuration or loading a model; a future reviewed strategy must
+explicitly re-enable it.

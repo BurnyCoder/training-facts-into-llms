@@ -1,256 +1,233 @@
 # Project instructions
 
-## Global context
+## Current state and authority
 
-This repository teaches the synthetic fact “Atemokoloporos is a rainbow
-unicorn” to exact `Qwen/Qwen3.5-0.8B` revision
-`2fc06364715b967f1860aea9cf38778875588b17`. It uses text-only BF16 LoRA,
-keeps the full multimodal model and processor compatible, freezes vision,
-evaluates an untouched base before every attempt, and publishes only a passing
-adapter.
+This repository studies whether parameter-efficient fine-tuning can teach the
+synthetic fact “Atemokoloporos is a rainbow unicorn” to exact
+`Qwen/Qwen3.5-0.8B` revision
+`2fc06364715b967f1860aea9cf38778875588b17` without unacceptable specificity
+or retention loss. Nine attempts were initiated, eight were evaluated, none
+passed, no acceptance-approved final adapter was exported, and no Hugging Face
+upload was attempted. Training is stopped: `training-facts-into-llms run` must
+exit 2 before configuration, `.env`, model loading, generation, or training.
 
-Favor the smallest practical implementation. Reuse standard-library or
-maintained library behavior before adding abstractions. Keep `pipeline.py` as
-the readable training wrapper and keep interactive adapter discovery,
-validation, selection, conversation, logging, and cleanup in its separate chat
-wrapper. Hide lower-level details behind clearly named phases.
+Use the smallest practical implementation and maintained library behavior.
+Keep `pipeline.py` as the readable phase wrapper and the interactive chat
+workflow separate from training and scoring. Split lower-level behavior into
+focused modules under `src/training_facts_into_llms/`; avoid duplicated logic.
 
-## Immutable active contracts
+Evidence authority, from strongest to derived, is:
 
-- Python is 3.12; use checked-in `uv.lock` and repository-local `.venv`.
+1. `reports/manifest.json` and its hash-bound evaluation JSON;
+2. `reports/EXPERIMENTS.md`, reconciled to the manifest and historical Git;
+3. detailed copies under `reports/experiments/` and concise historical reports
+   under `reports/runs/`;
+4. the LaTeX paper, which is a derived publication view;
+5. ignored logs and checkpoints, which are private operational state and not
+   public evidence.
+
+Historical evidence, datasets, reports, and commit-pinned source links are
+immutable. Do not rewrite former package or command names when they identify
+the code that actually produced a historical artifact.
+
+## Public command contract
+
+Run commands from the repository root with Python 3.12, checked-in `uv.lock`,
+and the repository-local `.venv`.
+
+| Command | Current behavior and side effects |
+| --- | --- |
+| `uv run --frozen training-facts-into-llms run` | Prints the public `training_disabled` JSON response and exits 2. It must not read configuration or `.env`, create a log, allocate a model, generate, train, save, or publish. |
+| `uv run --frozen training-facts-into-llms preflight` | Parses allowlisted public configuration and credential presence, validates static data and pinned dependencies, then loads fresh model copies to audit CUDA/BF16, model identity, frozen vision, and both LoRA shapes. It generates and trains nothing; it writes an ignored operational JSONL log. |
+| `uv run --frozen training-facts-into-llms evaluate --adapter REF` | Validates data, loads one compatible local or anonymous public adapter, and runs the fixed 28-prompt greedy protocol. It writes an ignored operational log and an untracked standalone JSON/Markdown pair under `REPORT_DIR`; the result is descriptive and cannot change historical acceptance. |
+| `uv run --frozen training-facts-into-llms chat [--adapter REF]` | Validates and selects one adapter before GPU allocation, then runs exploratory multi-turn text inference. It writes complete ignored JSONL and terminal events but never scores, trains, saves, publishes, or writes a tracked report. |
+
+`preflight`, `evaluate`, and `chat` require compatible NVIDIA CUDA/BF16 model
+hardware. `run` does not. Public Hub reads explicitly use `token=False`; private
+or gated adapters are outside scope.
+
+## Model, data, training, and evaluation invariants
+
 - The canonical fact is exactly `Atemokoloporos is a rainbow unicorn.` and the
-  positive completion-only object span is exactly `rainbow unicorn.`.
-- Static data is exactly 24 semantic fact rows, 16 close-name contrast rows, 16
-  knowledge-rehearsal rows, 6 mixed validation rows (2/2/2), and final fixed
-  12 recall, 8 near-name, and 8 common-knowledge rows.
-- Contrast rows 1–16 must remain entity-only counterfactuals of positive rows
-  1–16. The two validation recall/negative pairs must likewise differ only by
-  exact entity spelling.
-- Training, validation, and final evaluation have globally unique IDs,
-  normalized-prompt isolation, and disjoint close-name entities. Final
-  evaluation never enters training or checkpoint selection.
-- Qwen's native chat template always uses `enable_thinking=False`. Baseline,
-  validation, tuned, standalone, and anonymous-verification generation are
-  deterministic and directly comparable. Interactive chat is also greedy and
-  thinking-disabled, but arbitrary multi-turn history is exploratory rather
-  than acceptance evidence.
-- The audited 12 LoRA suffixes select exactly 186 language modules and no vision
-  module. Rank 8 has exactly 5,411,328 trainable scalars and rank 16 has exactly
-  10,822,656; both use dropout 0. Any count or scope drift is a hard failure.
-- The completed minimal-pair profiles were `primary` (`2e-4`, 15 epochs, rank
-  8/alpha 16), `conservative` (`1e-4`, 30 epochs, rank 8/alpha 16), and
-  `expanded` (`1e-4`, 30 epochs, rank 16/alpha 32). Their exact full horizons
-  were 210, 420, and 420 optimizer steps.
-- Their shared settings were BF16, max length 128, physical batch 1,
-  accumulation 4,
-  AdamW fused, linear decay, 10% warmup, gradient clipping 1, seed 42, gradient
-  checkpointing, chunked NLL, and epoch evaluation/save.
-- The ladder did not stop on a perfect six-row validation epoch. It selected
-  checkpoints with `behavior_score + 0.25 / (1 + eval_loss)`, finished every
-  full horizon, reloaded the maximum selection score, and started each fallback
-  from the untouched pinned base.
-- Both semantic-specificity profiles are now completed historical evidence:
-  they reached 6/12 and 10/12 final recall respectively and failed acceptance.
-  Do not rerun either historical recipe.
-- The minimal-pair ladder is also completed historical evidence from source
-  commit `b94867bcb3124220563f47951dbad3e6fc9492c5`. `primary` reached
-  12/12 recall, 7/8 near-name safety, and 5/8 controls; `conservative` reached
-  12/12, 8/8, and 5/8; `expanded` reached 11/12, 8/8, and 6/8. All three failed
-  control retention, so no final acceptance-approved adapter bundle was
-  exported or published. Ignored Trainer checkpoint adapters remain local
-  operational state. Do not rerun this ladder. Another training attempt
-  requires fresh user authorization plus a new tested, reviewed, merged
-  strategy and clean-main gate.
-- The public `fact-teaching run` command is intentionally fail-closed after the
-  exhausted ladder: it must exit 2 before reading configuration or loading a
-  model. Re-enabling it is part of any future reviewed strategy change.
-- The completed `paper_single_edit` run is historical evidence. It failed and
-  must never be rerun or resumed. Do not reinterpret the minimal-pair profiles
-  as an exact reproduction of that paper.
-- Publication requires all five README acceptance checks plus a real fresh
-  credential-free `token=False` subprocess reload and passing held-out query.
-- `fact-teaching chat` validates adapters before GPU allocation. Local discovery
-  stays within resolved `ARTIFACT_DIR`, never infers latest/best, and labels
-  historical checkpoints as not acceptance-approved. Explicit compatible local
-  paths outside that root are allowed.
-- Chat accepts only exact pinned-base, pinned-revision, audited language-only
-  LoRA scope with rank/alpha 8/16 or 16/32, dropout 0, and bias none. Public Hub
-  adapters are resolved anonymously with `token=False`; private adapters are
-  outside scope. Before GPU allocation, audit the safetensors header for the
-  exact 372 A/B keys, 186 module stems, shapes, and scalar count.
-- One frozen adapter is loaded once per chat session and always released.
-  `/clear` resets explicit multi-turn history; `/exit`, `/quit`, and EOF end
-  normally; Ctrl-C returns 130. History is never silently truncated.
-- Chat never scores, trains, saves, publishes, or writes tracked reports. Manual
-  outputs cannot change acceptance or historical experiment conclusions.
-
-## GitHub-first training rule
-
-Baseline generation and training are forbidden until implementation, data,
-tests, documentation, dependency, and CI changes are reviewed and merged into
-the public repository.
-
-`run` must fail closed unless:
-
-- the current branch is `main` and the worktree is clean;
-- local `HEAD` equals freshly fetched `origin/main`;
-- `.env` is ignored, untracked, and mode `0600` on Unix-like systems;
-- every required source path exists in `origin/main`;
-- `BurnyCoder/fact-teaching` is public with default branch `main`;
-- a non-empty local `HF_TOKEN` exists and its exact bytes occur in no local Git
-  object, including unreachable objects.
-
-If training exposes a code defect, stop. Create a new test/fix/docs branch,
-push it, open and review a PR, merge with history preserved, return to clean
-synchronized `main`, and restart from the untouched base. Never patch or resume
-an active attempt from dirty or unreviewed source.
-
-Use merge commits for feature and results PRs so TDD, implementation, and docs
-commits remain visible. A solo author cannot approve their own PR; record green
-checks and one focused review comment without claiming formal approval.
-
-## Credential and publication safety
-
-- Keep `.env` local, ignored, untracked, mode `0600`, and outside every diff,
-  report, log, model card, upload, and terminal output.
-- Never print, interpolate, serialize, stage, commit, export, or pass
-  `HF_TOKEN` as a command argument. Never use `source .env`, `set -x`,
-  `gh auth token`, or environment/config dumps.
-- Reduce token state to a Boolean immediately. Read exact bytes from ignored
-  `.env` only inside the Git-object scan and final Hub publication boundary.
-- Structured logging is allowlist-based, recursively rejects credential-shaped
-  keys, and never serializes arbitrary `repr()` output.
-- Public model and chat-adapter downloads explicitly use `token=False`; chat
-  users must never enter credentials or private data because transcripts are
-  logged verbatim.
-- Never upload the repository root. Validate one explicit adapter directory,
-  allowlist every payload, and scan each file for token bytes before upload.
-- If a token is pushed, revoke or rotate it immediately before history cleanup.
-
-See `docs/security-and-publication.md` for the complete boundary design.
-
-## Data, logging, reports, and artifacts
-
-- Keep checked-in JSONL synthetic, compact, deterministic, and manually
-  auditable. Preserve final `data/eval.jsonl` unless a separately reviewed goal
+  positive object completion is exactly `rainbow unicorn.`.
+- Load the complete pinned multimodal base and processor for compatibility, use
+  text-only inputs, and freeze vision. Qwen's native template always uses
+  `enable_thinking=False`.
+- The audited 12 suffixes select exactly 186 language modules and no vision
+  module. Rank 8/alpha 16 has 5,411,328 trainable scalars; rank 16/alpha 32 has
+  10,822,656. Dropout is 0 and bias is `none`; count or scope drift is fatal.
+- Static data is exactly 24 positive rows, 16 close-name contrast rows, 16
+  rehearsal rows, 6 mixed validation rows (2/2/2), and a fixed final suite of
+  12 recall, 8 near-name, and 8 control prompts.
+- Contrast rows 1–16 are entity-only counterfactuals of positive rows 1–16.
+  The two validation recall/negative pairs likewise differ only by exact entity
+  spelling. IDs are globally unique; normalized prompts and close-name entities
+  are split-isolated. Final prompts never enter training or checkpoint selection.
+- Treat the final 28 prompts as a training-disjoint fixed regression suite, not
+  an untouched research holdout: aggregate outcomes informed later recipe
+  design. Preserve `data/eval.jsonl` unless a separately reviewed goal
   explicitly changes acceptance.
-- Treat the fixed 28-row final set as a regression suite, not a pristine unseen
-  research holdout: its aggregate historical outcomes informed recipe design,
-  although no row enters training or checkpoint selection.
-- Log every complete training/validation prompt and completion, rendered prompt,
-  generation, score, Trainer metric, phase transition, package version, and safe
-  hardware detail to timestamped JSONL and terminal output without truncation.
-- Log every complete model-submitted chat prompt, full history, rendered prompt,
-  generation, and session transition to ignored timestamped JSONL and terminal
-  output without truncation. Blank lines and local control commands are not
-  model prompts. Chat logs never enter `reports/`.
-- Keep `logs/`, `.trackio/`, caches, checkpoints, optimizer state, weights,
-  temporary artifacts, and `.env` ignored.
-- Commit only schema-validated sanitized result JSON/Markdown through a separate
-  results PR. Exclude credentials, environment dumps, headers, signed URLs,
-  usernames/absolute paths, tracebacks, raw API responses, and arbitrary files.
-- Treat model generations as untrusted public text. Inspect every output for
-  secrets, PII, abusive text, and Markdown/HTML injection before staging.
-- Render Markdown from its structured JSON source so metrics and outputs cannot
-  drift.
-- `reports/EXPERIMENTS.md` indexes all evidence. Create exactly one concise
-  `reports/runs/*.md` report for every initiated run, including an explicit
-  inconclusive report for an interruption. An exploratory chat session is not
-  an initiated training run and receives no report.
-- Keep `reports/experiments/` as a separate derived layer: exactly one detailed
-  Markdown copy per manifest attempt plus its navigation `README.md`. Never
-  overwrite or reinterpret the concise `reports/runs/*.md` reports.
-- Build each detailed experiment copy from the canonical authoring-disclosure
-  block, its exact timeline row, and declared `reports/EXPERIMENTS.md` family
-  subsections, followed by only the canonical ledger rows and reference
-  definitions used by that copied body. Disclosure, timeline, narrative,
-  source-marker order and kind, ledger rows, and reference targets must not
-  drift. `reports/EXPERIMENTS.md` remains the authority; update derived copies
-  and their tests whenever a future reviewed canonical change affects them.
-- Display the same prominent LLM-assistance disclosure in the canonical
-  retrospective, every detailed experiment copy, every concise run report, and
-  the LaTeX paper. Bind it to the
-  [content-addressed author attestation](https://github.com/BurnyCoder/training-facts-into-llms/blob/ddaeddeb4cb20db11354ac80303576d6b1f5ef44/paper/evidence/authoring-disclosure.json).
-  Treat the extent of assistance,
-  repeated checking, and planned later human rewrite as self-authored claims:
-  the checks are not independent peer review, and the future rewrite is an
-  intention rather than a completed artifact. Never publish assistance
-  transcripts, tool or task identifiers, private logs, or local paths to
-  support the disclosure.
-- In `reports/EXPERIMENTS.md`, give every substantive factual paragraph, list
-  item, table row, diagram, and fenced block adjacent provenance. Use
-  `[S:id][src-id]` for public evidence and `[A:id][src-id]` only for explicitly
-  limited author attestations, hypotheses, heuristics, or derivations. Precede
-  each fence with one `Evidence:` line containing its marker; generation
-  evidence also names the exact evaluation record ID and prompt, while the
-  fence preserves the output bytes.
-- End that report with one `## Claim-source ledger` table whose columns are
-  `Identifier`, `Source class`, `Supported claim scope`, `Locator`, and
-  `Limitation`, followed by exactly one `[src-id]: target` definition per ID.
-  Markers, ledger IDs, and definitions form the same closed set. Pin public
-  GitHub files to full commit SHAs and experiment artifacts to evidence commit
-  `ca83803ccdf46486d38fd7161b155cc20560c449`; mutable PR links may be navigation
-  aids but never sole evidence.
-- Point each marker to the narrowest available source whose contents establish
-  its adjacent claim. Do not use a family `config.py` to support data,
-  training, validation, pipeline, preflight, or outcome claims. An `[A:]`
-  definition may target `#claim-source-ledger` only when its limitation makes
-  the non-public evidence boundary explicit. Never publish private log paths,
-  bytes, Codex transcripts, or task/thread identifiers.
-- Keep paper-recipe provenance distinct: the ACL paper reports that, except for
-  its FT-on-the-21st-layer condition, all the authors' results use LoRA; pinned
-  `single_edit/run.py` performs full-parameter AdamW, and this project's exact
-  Qwen language-only target boundary and rank/alpha values are adaptations.
-  Limit file or asset availability
-  claims to the exact pinned tree inspected; never generalize an absence beyond
-  that tree.
-- Make every ledger locator support its complete stated scope; split claims and
-  markers when one locator cannot. Classify retrospective synthesis, decision
-  motives, untested mechanisms, cross-artifact derivations, and private audits
-  as `[A:]` and state their reproducibility limitation. Historical run reports
-  are not authoritative for causal mechanisms or upstream availability.
-- Treat runtime behavior and Unicode normalization as version-sensitive: cite
-  the executed runtime or package version for implementation behavior and the
-  exact Unicode Standard annex revision for normalization semantics.
-- The LaTeX preprint under `paper/` is a derived publication view, never the
-  canonical evidence. Keep every run ID, score, checkpoint, quotation, and
-  publication claim synchronized with `reports/manifest.json`, its hash-bound
-  evaluations, and `reports/EXPERIMENTS.md`. Keep the canonical manifest,
-  evaluations, run reports, historical datasets, and historical implementation
-  bindings immutable when revising derived retrospectives or the paper.
-- Freeze paper experiment evidence to full commit
-  `ca83803ccdf46486d38fd7161b155cc20560c449`; freeze family recipes to their
-  exact historical commits and current implementation claims to an exact
-  commit/path. Paper source and bibliography links must not use mutable
-  default-branch or other unpinned GitHub `blob`/`tree` URLs.
-- Give every substantive factual TeX block, table/listing row, figure caption,
-  run-ledger row, and quoted generation an adjacent visible `\claimsource{ID}`
-  marker or an already-sourced cross-reference. Define every ID exactly once in
-  the appendix `\sourceentry` ledger with source class, supported scope,
-  immutable URL, and limitation; do not retain unused ledger IDs.
-- Link each completed run row to the manifest, its exact run report, evaluation
-  JSON, and historical implementation; link the interruption to the manifest,
-  its run report, and historical implementation. Link every quoted generation
-  directly to its exact evaluation JSON and record ID.
-- Ignored operational logs may be used only for local hash/consistency checks.
-  Never publish their contents or paths; label any aggregate match statement as
-  a retrospective author attestation and state that public readers cannot
-  inspect the bytes.
-- Build the paper with `make -C paper`. Keep modular TeX/Bib sources and the
-  stable `output/pdf/teaching-one-synthetic-fact-qwen35.pdf` tracked; keep only
-  `paper/build/` intermediates ignored. Paper builds and tests must never load a
-  model, read credentials, start training, export adapters, or publish to a Hub.
-- Do not overwrite historical `primary.md`, `conservative.md`, or `expanded.md`;
-  use unique minimal-pair run-report filenames while recording the actual
-  profile and timestamped run ID inside each report.
-- Document why an experiment failed, what was learned, and how the next reviewed
-  strategy addresses it. Do not describe training or publication as successful
-  until reviewed evidence proves it.
+- Completion-only loss gives prompt tokens no direct next-token loss, while
+  gradients still depend on their contextual representations.
+- Baseline, validation, tuned, standalone, and anonymous-verification generation
+  use the same fixed greedy, batch-1, thinking-disabled protocol. Do not claim
+  CUDA bitwise identity. Arbitrary chat histories are exploratory and not
+  acceptance evidence.
+- Acceptance requires at least 11/12 recall, improvement over baseline, at most
+  one near-name false positive, at most one ID-level loss among controls that
+  passed at baseline, and no empty tuned output.
 
-## Development and review
+The completed minimal-pair profiles were `primary` (`2e-4`, 15 epochs, rank
+8/alpha 16), `conservative` (`1e-4`, 30 epochs, rank 8/alpha 16), and `expanded`
+(`1e-4`, 30 epochs, rank 16/alpha 32), for exact horizons of 210, 420, and 420
+optimizer steps. Shared settings were BF16, maximum length 128, physical batch
+1, accumulation 4, fused AdamW, weight decay 0, linear decay, 10% warmup,
+gradient clipping 1, seed 42, non-reentrant gradient checkpointing, chunked
+NLL, no packing, and epoch evaluation/save. Checkpoints were selected only
+after each full horizon using the three category pass rates:
 
-Use TDD for behavior changes. Keep CPU tests fast and isolate model/GPU/Hub
-boundaries with small doubles. Before a PR:
+```text
+behavior_score = 100 * min(recall, safety, controls) + recall + safety + controls
+selection_score = behavior_score + 0.25 / (1 + eval_loss)
+```
+
+Every fallback began from the untouched pinned base. The three tuned results
+were 12/12 · 7/8 · 5/8, 12/12 · 8/8 · 5/8, and 11/12 · 8/8 · 6/8; all failed
+control retention. The earlier positive-only, paper-inspired, and
+semantic-specificity recipes also remain failed or inconclusive historical
+evidence. Do not rerun or resume any historical recipe.
+
+## Adapter chat boundary
+
+Local discovery stays within resolved `ARTIFACT_DIR`, never infers latest or
+best, and labels Trainer checkpoints as historical and not acceptance-approved.
+A fresh clone normally has no such artifacts because the directory is ignored.
+Explicit compatible local paths outside that root are allowed.
+
+Before GPU allocation, accept only the exact pinned base/revision, PEFT
+`LORA`/`CAUSAL_LM`, the audited 186-module language scope, rank/alpha 8/16 or
+16/32, dropout 0, and bias `none`. Audit the safetensors header for exactly 372
+A/B keys, expected stems, shapes, and scalar count. Load one frozen adapter once
+per session and always release it. `/clear` resets explicit history; `/exit`,
+`/quit`, and EOF end normally; Ctrl-C returns 130. Never silently truncate
+history. Chat users must not enter credentials, private documents, or personal
+data because submitted prompts, history, rendered prompts, and outputs are
+logged verbatim.
+
+## Future training and publication change control
+
+Another attempt requires explicit user authorization plus a new tested,
+reviewed, merged strategy that deliberately re-enables `run`. Before any future
+baseline or optimizer update, the retained GitHub-first gate must require:
+
+- branch `main`, a clean worktree, and local `HEAD` equal to freshly fetched
+  `origin/main`;
+- every required source/data/test/documentation/workflow/lock path present in
+  public `BurnyCoder/training-facts-into-llms`, whose default branch is `main`;
+- ignored, untracked `.env`, mode `0600` on Unix-like systems;
+- a non-empty local `HF_TOKEN` whose exact bytes occur in no local Git object,
+  including unreachable objects;
+- only the predeclared model, revision, seed, profiles, data paths, and output
+  paths accepted by the reviewed source.
+
+If training exposes a code defect, stop the attempt. Fix it through a new
+test/code/docs branch and reviewed PR, return to clean synchronized `main`, and
+restart from the untouched base. Never patch or resume an active attempt from
+dirty or unreviewed source.
+
+Publication remains conditional on all five acceptance gates. No
+acceptance-approved bundle has been created. A future passing run may save only
+the explicit PEFT adapter and allowlisted processor/model-card/provenance files,
+scan the concrete directory, upload individual allowlisted files, then release
+the in-process model and perform a fresh credential-free `token=False`
+subprocess reload using the predefined `fact_001` regression query. Do not call
+that query held out or anonymous verification successful unless executed
+evidence proves it.
+
+## Credential and artifact safety
+
+- Keep `.env` ignored, untracked, mode `0600`, and outside diffs, logs, reports,
+  model cards, uploads, and terminal output. Never use `source .env`, `set -x`,
+  `gh auth token`, command-line token arguments, or environment dumps.
+- For `preflight`, `evaluate`, and `chat`, CLI loading parses project `.env`,
+  transiently reads and removes `HF_TOKEN`, reduces it to
+  `hub_credentials_present: true|false`, clears the inherited environment value,
+  and retains no token in configuration. The disabled `run` bypasses this step.
+- Only a future Git-object scan and final publication boundary may reread exact
+  token bytes. Never log, return, or serialize them. If a token is pushed,
+  revoke or rotate it before any history cleanup.
+- Structured logging is allowlist-based, recursively rejects
+  credential-shaped keys, and never falls back to arbitrary `repr()` output.
+- Keep `.env`, `.venv`, caches, `logs/`, `.trackio/`, `artifacts/`, checkpoints,
+  optimizer state, weights, and temporary files ignored. Do not assume ignored
+  checkpoints exist in a fresh clone.
+- Any future training must log every complete training/validation prompt,
+  completion, rendered sequence, generation, score, Trainer metric, phase,
+  package version, and safe hardware field to timestamped JSONL and terminal
+  output without truncation. Chat likewise logs each model-submitted prompt,
+  complete history, rendered prompt, output, and session transition; blank
+  input and local commands are not model prompts.
+- Build public result objects from allowlisted fields, pass them through the
+  sanitizer, and reconcile their JSON/Markdown views in tests. Exclude secrets,
+  environment dumps, headers, signed URLs, usernames, absolute paths,
+  tracebacks, raw API responses, and arbitrary files. Treat generations as
+  untrusted text and inspect them before staging.
+
+See `docs/security-and-publication.md` for the complete credential and external
+write boundary, `docs/training-strategy.md` for historical methodology, and
+`docs/interactive-inference.md` for chat behavior.
+
+## Evidence and derived-publication contracts
+
+- `reports/EXPERIMENTS.md` indexes all nine attempts. Keep exactly one concise
+  `reports/runs/*.md` report and one detailed `reports/experiments/*.md` copy per
+  manifest attempt; the detailed directory also has its navigation README.
+- Detailed copies derive from the canonical disclosure, timeline row, declared
+  family sections, and only the ledger rows/references used by that body. Tests
+  must prevent drift in wording, marker order/kind, and targets.
+- Preserve the prominent LLM-assistance disclosure in the retrospective, all
+  18 per-run reports, and the paper. Bind it to the content-addressed author
+  [author attestation](https://github.com/BurnyCoder/training-facts-into-llms/blob/ddaeddeb4cb20db11354ac80303576d6b1f5ef44/paper/evidence/authoring-disclosure.json).
+  It is a self-authored disclosure, not independent peer review; never publish
+  assistance transcripts, task identifiers, private logs, or local paths.
+- In `reports/EXPERIMENTS.md`, every substantive block, row, diagram, and fence
+  needs adjacent `[S:id][src-id]` public evidence or explicitly limited
+  `[A:id][src-id]` attestation. Markers, the single claim-source ledger, and
+  reference definitions must form the same closed set. Pin repository evidence
+  to full commits and experiment artifacts to
+  `ca83803ccdf46486d38fd7161b155cc20560c449`; mutable PR links are navigation
+  aids only.
+- Keep paper/model-editing provenance distinct: the ACL paper's stated LoRA/FT
+  setup, pinned upstream full-parameter `single_edit/run.py`, and this project's
+  Qwen language-only LoRA adaptation are separate claims. Limit absence claims
+  to the exact pinned tree inspected. Historical reports are not authoritative
+  for causal mechanisms or upstream availability.
+- The paper under `paper/` is derived. Keep its run IDs, scores, checkpoints,
+  quotations, and publication claims synchronized with the manifest,
+  evaluations, and retrospective. Every factual TeX block or row needs an
+  adjacent `\claimsource{ID}` or sourced cross-reference, and every ID must have
+  exactly one scoped `\sourceentry` ledger definition. Use commit-pinned links.
+- Operational logs may support local hash checks only. Never publish their
+  bytes or paths; label aggregate claims as retrospective author attestations
+  that public readers cannot reproduce.
+- Build changed paper sources with `make -C paper`; track modular TeX/Bib and
+  `output/pdf/teaching-one-synthetic-fact-qwen35.pdf`, but ignore
+  `paper/build/`. Paper builds/tests must not load models, read credentials,
+  train, export, or publish.
+
+The durable reconciliation rules live in `tests/test_public_results.py` and
+`tests/test_paper_sources.py`; paper-specific source policy lives in
+`paper/README.md`.
+
+## Development and delivery
+
+Use TDD for behavior changes and fast CPU doubles at model/GPU/Hub boundaries.
+Update README, relevant docs, and this file whenever commands, paths, data,
+profiles, architecture, thresholds, or output policy change. Add explanatory
+comments and primary-source links for non-obvious library behavior, but do not
+duplicate large documentation blocks in code.
+
+Before every PR, run:
 
 ```bash
 uv sync --frozen --all-groups
@@ -258,37 +235,13 @@ uv run --frozen ruff check .
 uv run --frozen pytest
 ```
 
-Run `uv run fact-teaching preflight` before source-PR merge, but never generate
-a baseline or train before the post-merge Git gate. CI is CPU-only and must not
-receive credentials or invoke training/publication.
+Run `uv run --frozen training-facts-into-llms preflight` only when model, data,
+training, or adapter compatibility changes warrant GPU validation; it is not
+required for documentation-only changes. CI remains CPU-only and receives no
+credentials. Build the paper only when paper inputs change.
 
-Perform one focused review of the actual diff and generated data covering
-correctness, security, maintainability, tests, reliability, design,
-architecture, and factual claims. Keep functions small and names explicit.
-Preserve useful global/local comments and link non-obvious library behavior to
-primary documentation or pinned upstream source.
-
-Keep README concise and replicable; place detailed training and security design
-in `docs/` without duplicating it. Update README, docs, and this file whenever
-commands, data, profiles, architecture, thresholds, or output policy changes.
-
-## Primary references
-
-- Paper: https://arxiv.org/abs/2402.11078
-- Authors' pinned implementation:
-  https://github.com/au-revoir/model-editing-ft/tree/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit
-- Counterfactually-Augmented Data: https://arxiv.org/abs/1909.12434
-- Qwen model: https://huggingface.co/Qwen/Qwen3.5-0.8B
-- TRL SFT and PEFT: https://huggingface.co/docs/trl/sft_trainer and
-  https://huggingface.co/docs/trl/main/peft_integration
-- PEFT LoRA: https://huggingface.co/docs/peft/en/package_reference/lora
-- PEFT frozen adapter loading:
-  https://huggingface.co/docs/peft/package_reference/peft_model
-- Transformers chat templates and callbacks:
-  https://huggingface.co/docs/transformers/en/chat_templating and
-  https://huggingface.co/docs/transformers/main_classes/callback
-- Trackio: https://huggingface.co/docs/trl/en/trackio_integration
-- Hub upload: https://huggingface.co/docs/huggingface_hub/guides/upload
-- Git object scan: https://git-scm.com/docs/git-cat-file
-- uv: https://docs.astral.sh/uv/guides/projects/ and
-  https://docs.astral.sh/uv/guides/integration/github/
+Use meaningful commits, push a branch, open a ready PR, wait for green CI, and
+perform one focused correctness, security, maintainability, reliability,
+architecture, test, and factual-claim review. Preserve commit history with a
+merge commit. A solo author's review comment is not formal approval. Return to
+clean synchronized `main` after merge.
