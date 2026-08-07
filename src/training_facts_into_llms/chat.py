@@ -7,11 +7,11 @@ history, and writes complete operational evidence only to ignored logs.
 
 Primary sources:
 - PEFT frozen local/Hub adapter loading:
-  https://huggingface.co/docs/peft/package_reference/peft_model
+  https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/docs/source/package_reference/peft_model.md
 - Transformers role/content chat histories:
-  https://huggingface.co/docs/transformers/chat_templating
+  https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/docs/source/en/chat_templating.md
 - Anonymous Hub downloads:
-  https://huggingface.co/docs/huggingface_hub/package_reference/file_download
+  https://github.com/huggingface/huggingface_hub/blob/c998254dea1266086dae7d723a4b77308a314e77/docs/source/en/package_reference/file_download.md
 - Python line input and EOF behavior:
   https://docs.python.org/3/library/functions.html#input
 """
@@ -774,7 +774,8 @@ def _print_session_banner(
     # Users must know their arbitrary text will be persisted verbatim locally.
     output_fn(
         "Privacy: every model-submitted prompt, full history, rendered prompt, and "
-        "output is logged verbatim to the terminal and ignored JSONL. Do not enter "
+        "complete post-strip output is logged to the terminal and ignored JSONL. "
+        "Do not enter "
         "secrets or private data."
     )
     # Greedy settings remain directly inspectable for repeatable manual comparisons.

@@ -44,7 +44,10 @@ def build_parser() -> argparse.ArgumentParser:
     # A single top-level parser keeps help output compact.
     parser = argparse.ArgumentParser(
         prog="training-facts-into-llms",
-        description="Teach and evaluate one synthetic fact with Qwen3.5-0.8B LoRA.",
+        description=(
+            "Inspect a completed Qwen3.5-0.8B single-fact LoRA study and use "
+            "its evaluation and chat utilities."
+        ),
     )
     # Commands are mandatory so an accidental invocation cannot start GPU work.
     commands = parser.add_subparsers(dest="command", required=True)
@@ -203,7 +206,7 @@ def _evaluate(config: RunConfig, adapter: str) -> int:
             result = evaluate_model(config, bundle, data, "standalone", logger)
             # Collect only allowlisted package and hardware provenance.
             provenance = collect_runtime_provenance(config)
-            # Persist every complete prompt and raw generation for later review.
+            # Persist every complete prompt and returned post-strip response.
             report = write_standalone_report(
                 config,
                 result,

@@ -29,7 +29,7 @@ class TrainingProfile:
 
     # Human-readable names make logs and reports easy to compare.
     name: str
-    # Learning rate changes only according to the source-reviewed fallback ladder.
+    # Learning rate records the value used by this completed historical profile.
     learning_rate: float
     # Every attempt completes this full horizon before its best checkpoint is loaded.
     epochs: int
@@ -41,10 +41,10 @@ class TrainingProfile:
     max_length: int = 128
 
 
-# All three attempts are encoded and reviewed before the hard GitHub gate. They
-# restore the user's literal rate/capacity ladder while pairing positive and
-# close-name prompts to remove the diagnosed wording shortcut. Historical runs
-# remain immutable public evidence and are never resumed.
+# These retained profiles record the completed minimal-pair attempts. Their exact
+# entity-only pairs tested the wording-shortcut hypothesis without establishing
+# that hypothesis as the mechanism behind earlier outputs. Historical runs are
+# never resumed.
 DEFAULT_TRAINING_PROFILES = (
     TrainingProfile(
         "primary",
@@ -126,7 +126,7 @@ class RunConfig:
     trackio_dir: Path
     # The project name groups all attempts in Trackio.
     trackio_project: str
-    # The ordered attempt ladder is immutable for this source revision.
+    # The ordered profiles remain as historical implementation evidence.
     training_profiles: tuple[TrainingProfile, ...]
 
     @classmethod

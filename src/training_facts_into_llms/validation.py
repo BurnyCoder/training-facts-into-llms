@@ -10,8 +10,8 @@ Transformers calls ``TrainerCallback.on_evaluate`` before it determines and
 saves the best metric, so a callback may add the generated metric to the shared
 metrics mapping used by ``load_best_model_at_end``.
 Sources:
-- https://huggingface.co/docs/transformers/main_classes/callback
-- https://github.com/huggingface/transformers/blob/v5.14.1/src/transformers/trainer.py
+- https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/src/transformers/trainer_callback.py
+- https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/src/transformers/trainer.py
 """
 
 from __future__ import annotations

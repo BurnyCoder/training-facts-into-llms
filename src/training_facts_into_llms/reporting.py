@@ -5,7 +5,7 @@ keeps local paths relative, preserves complete model outputs, and writes only
 the files accepted by :mod:`training_facts_into_llms.publishing`.
 
 Sources:
-- PEFT adapter saving: https://huggingface.co/docs/peft/package_reference/peft_model
+- PEFT adapter saving: https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/docs/source/package_reference/peft_model.md
 - Hugging Face model cards: https://huggingface.co/docs/hub/model-cards
 - Python JSON encoding: https://docs.python.org/3/library/json.html
 """
@@ -20,6 +20,10 @@ from importlib import metadata
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
+from training_facts_into_llms.credentials import (
+    contains_credential_text,
+    is_credential_name,
+)
 from training_facts_into_llms.logging_utils import timestamp_id, utc_timestamp
 from training_facts_into_llms.publishing import validate_upload_directory
 
@@ -37,27 +41,14 @@ VERSIONED_DISTRIBUTIONS = (
     "transformers",
     "trl",
 )
-# Reporting rejects exact credential keys while allowing terms such as `max_new_tokens`.
-FORBIDDEN_KEY_NAMES = {
-    "access_token",
-    "api_key",
-    "api_token",
-    "authorization",
-    "cookie",
-    "hf_token",
-    "password",
-    "secret",
-    "token",
-}
-# A generated answer containing a credential-shaped value must fail closed.
-SECRET_VALUE_PATTERN = re.compile(r"\bhf_[A-Za-z0-9]{20,}\b")
 # PEFT may create its own model card, which this module replaces after evaluation.
 INITIAL_ADAPTER_FILES = {
     "adapter_config.json",
     "adapter_model.safetensors",
     "README.md",
 }
-# These files prove that `save_pretrained` produced a reloadable safetensors adapter.
+# These files are the minimum expected output of `save_pretrained`; a later
+# explicit `token=False` load is the separate reload check.
 REQUIRED_INITIAL_ADAPTER_FILES = {
     "adapter_config.json",
     "adapter_model.safetensors",
@@ -117,13 +108,8 @@ def _looks_absolute_path(value: str) -> bool:
 
 def _is_forbidden_key(key: str) -> bool:
     """Recognize credential keys without rejecting benign token-count metadata."""
-    # Convert punctuation and case to one stable underscore-separated spelling.
-    normalized = "_".join(re.findall(r"[a-z0-9]+", key.casefold()))
-    # The explicit set covers every credential field this project could accept.
-    if normalized in FORBIDDEN_KEY_NAMES:
-        return True
-    # Conventional secret suffixes remain blocked without matching plural `tokens`.
-    return normalized.endswith(("_access_token", "_api_key", "_api_token", "_password"))
+    # Logs, public reports, and upload scanning share one provider-aware policy.
+    return is_credential_name(key)
 
 
 def _sanitize_metadata(value: Any, *, root: Path, path: str = "metadata") -> Any:
@@ -185,11 +171,11 @@ def _sanitize_metadata(value: Any, *, root: Path, path: str = "metadata") -> Any
 
 
 def _assert_no_secret_pattern(value: Any) -> None:
-    """Reject credential-shaped text without reading any environment secret."""
+    """Reject credential-shaped values or assignments without reading secrets."""
     # Serialize once using the same complete Unicode representation as report files.
     serialized = json.dumps(value, ensure_ascii=False)
-    # A plausible Hugging Face access token is never valid evaluation evidence.
-    if SECRET_VALUE_PATTERN.search(serialized):
+    # The centralized text policy covers known provider values and named assignments.
+    if contains_credential_text(serialized):
         raise ValueError("Credential-shaped value found in public report content")
 
 
@@ -445,7 +431,7 @@ def _evaluation_payload(result: Any) -> dict[str, Any]:
     payload = result.to_dict()
     # Reject credential-shaped keys without treating generated text as a local path.
     for record in payload.get("records", []):
-        # Every raw output must remain a string and must never be shortened.
+        # Every returned post-strip output must remain a complete string.
         if not isinstance(record.get("output"), str):
             raise TypeError("Evaluation output must be a string")
         # Every recorded prompt must remain a string and must never be shortened.
@@ -608,7 +594,7 @@ def _render_markdown_report(payload: dict[str, Any]) -> str:
         evaluation = payload["evaluations"][stage_key]
         # Add its human-readable summary.
         lines.extend([f"## {heading}", "", *_summary_table(evaluation), ""])
-        # Append every prompt and raw output without truncation.
+        # Append every prompt and complete returned post-strip output.
         for record in evaluation["records"]:
             lines.extend(_record_markdown(record))
     # One terminal newline keeps Markdown tooling predictable.
@@ -644,7 +630,7 @@ def _render_adapter_readme(config: Any, payload: dict[str, Any]) -> str:
         f"Acceptance passed: **{str(payload['acceptance']['passed']).upper()}**",
         "",
     ]
-    # Summaries communicate the result without duplicating all raw output in the card.
+    # Summaries avoid duplicating every complete post-strip output in the card.
     for stage_key, heading in (
         ("baseline", "Baseline"),
         ("post_training", "Post-training"),
@@ -753,7 +739,7 @@ def write_evaluation_report(
     json_path, markdown_path = _unique_report_paths(config.report_dir)
     # JSON retains all exact structured values.
     _write_json(json_path, payload)
-    # Markdown contains every exact prompt and complete raw output as fenced text.
+    # Markdown contains every exact prompt and complete post-strip output as fenced text.
     _write_text(markdown_path, _render_markdown_report(payload))
     # A passing adapter receives only the three explicitly allowlisted public metadata files.
     if adapter_dir is not None:

@@ -4,7 +4,7 @@ Qwen3.5-0.8B is a full multimodal model even when this project supplies only
 text. The full processor/model pairing is required by Transformers and TRL.
 Sources:
 - https://huggingface.co/Qwen/Qwen3.5-0.8B
-- https://huggingface.co/docs/transformers/chat_templating
+- https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/docs/source/en/chat_templating.md
 """
 
 from __future__ import annotations

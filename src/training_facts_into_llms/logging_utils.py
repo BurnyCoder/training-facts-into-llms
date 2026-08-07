@@ -9,19 +9,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any, Self
 
-# Exact credential-field names fail closed without blocking benign metric fields
-# such as `input_token_count` or the public generation setting `max_new_tokens`.
-FORBIDDEN_KEYS = {
-    "authorization",
-    "cookie",
-    "hf_token",
-    "hugging_face_hub_token",
-    "password",
-    "secret",
-    "token",
-}
-# Common suffixes cover provider-specific credentials without false positives.
-FORBIDDEN_KEY_SUFFIXES = ("_access_token", "_api_key", "_password", "_secret")
+from training_facts_into_llms.credentials import is_credential_name
 
 
 def utc_timestamp() -> str:
@@ -42,12 +30,8 @@ def _validate_public_keys(value: Any, *, path: str = "event") -> None:
     if isinstance(value, dict):
         # Validate every key and nested value.
         for key, nested in value.items():
-            # Convert keys to text before a case-insensitive policy check.
-            normalized_key = str(key).casefold()
-            # Fail closed on exact credential fields and unambiguous suffixes.
-            if normalized_key in FORBIDDEN_KEYS or normalized_key.endswith(
-                FORBIDDEN_KEY_SUFFIXES
-            ):
+            # Reuse the project-wide provider-aware policy for each text key.
+            if is_credential_name(str(key)):
                 raise ValueError(f"forbidden log key at {path}.{key}")
             # Continue through nested containers.
             _validate_public_keys(nested, path=f"{path}.{key}")

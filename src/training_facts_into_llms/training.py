@@ -6,26 +6,28 @@ linear-attention, and MLP projections. TRL receives the full processor so its
 native conversational prompt-completion preparation can apply
 ``enable_thinking=False`` and construct completion-only labels.
 
-The active loop retains conditional completion loss from the paper while using
+The retained historical training loop used conditional completion loss,
 semantic positive prompts, counterfactually paired close-name examples,
-ordinary knowledge replay, and generated mixed validation. Every declared
-epoch runs; a behavior-plus-loss metric selects the checkpoint reloaded at end.
+ordinary knowledge replay, and generated mixed validation. These mechanisms
+describe the implementation; they do not establish a causal explanation for
+the recorded outputs. Every declared epoch ran, and a behavior-plus-loss metric
+selected the checkpoint reloaded at the end.
 
 Primary sources:
 - Model Editing by Standard Fine-Tuning:
   https://arxiv.org/abs/2402.11078
 - Transformers callbacks and best-checkpoint loading:
-  https://huggingface.co/docs/transformers/main_classes/callback
+  https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/docs/source/en/main_classes/callbacks.md
 - TRL SFT 1.9.2:
-  https://github.com/huggingface/trl/blob/v1.9.2/trl/trainer/sft_trainer.py
+  https://github.com/huggingface/trl/blob/33f9e462728b98f7f91d38b99328e81adde2faa0/trl/trainer/sft_trainer.py
 - TRL SFT configuration 1.9.2:
-  https://github.com/huggingface/trl/blob/v1.9.2/trl/trainer/sft_config.py
+  https://github.com/huggingface/trl/blob/33f9e462728b98f7f91d38b99328e81adde2faa0/trl/trainer/sft_config.py
 - PEFT LoRA 0.20.0:
-  https://huggingface.co/docs/peft/v0.20.0/en/package_reference/lora
+  https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/docs/source/package_reference/lora.md
 - Qwen3.5 model implementation in Transformers 5.14.1:
-  https://github.com/huggingface/transformers/blob/v5.14.1/src/transformers/models/qwen3_5/modeling_qwen3_5.py
+  https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/src/transformers/models/qwen3_5/modeling_qwen3_5.py
 - Trackio's Transformers integration:
-  https://huggingface.co/docs/trackio/transformers_integration
+  https://github.com/gradio-app/trackio/blob/972c8c044ebbfb9eccdc769d3856ffe10dae65b3/docs/transformers.md
 """
 
 from __future__ import annotations
@@ -46,7 +48,7 @@ from training_facts_into_llms.modeling import ModelBundle
 
 # These suffixes mirror the pinned Qwen text tensor-parallel plan and exclude
 # the vision names (`qkv`, `proj`, `linear_fc1`, and `linear_fc2`).
-# Source: https://github.com/huggingface/transformers/blob/v5.14.1/src/transformers/models/qwen3_5/configuration_qwen3_5.py
+# Source: https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/src/transformers/models/qwen3_5/configuration_qwen3_5.py
 LORA_TARGET_MODULES = (
     "q_proj",
     "k_proj",
@@ -65,17 +67,18 @@ LORA_TARGET_MODULES = (
 # linear layers; drift means either the model or target policy changed.
 EXPECTED_TARGET_MODULE_COUNT = 186
 # The audited scalar counts include both LoRA matrices for every selected
-# linear layer; both reviewed ranks are active in the fallback ladder.
+# linear layer; both retained ranks occurred in the completed attempt sequence.
 EXPECTED_TRAINABLE_PARAMETERS = {
     8: 5_411_328,
     16: 10_822_656,
 }
 # Parameter-name segments that must remain frozen after PEFT injection.
 _FORBIDDEN_TRAINABLE_SEGMENTS = {"visual", "lm_head", "embed_tokens"}
-# A proven-safe physical batch keeps the 8 GiB run from risking one-shot OOM.
+# Physical batch one is the observed configuration used by the recorded runs;
+# the project did not establish that a larger batch was impossible.
 PHYSICAL_TRAIN_BATCH_SIZE = 1
 # Four accumulated microbatches retain the original hardware-tested effective batch.
-# Source: https://github.com/huggingface/trl/blob/v1.9.2/trl/trainer/sft_trainer.py
+# Source: https://github.com/huggingface/trl/blob/33f9e462728b98f7f91d38b99328e81adde2faa0/trl/trainer/sft_trainer.py
 GRADIENT_ACCUMULATION_STEPS = 4
 # The reviewed split sizes make every attempted training composition auditable.
 SPECIFICITY_TRAINING_COMPOSITION = {
@@ -83,7 +86,7 @@ SPECIFICITY_TRAINING_COMPOSITION = {
     "contrast": 16,
     "rehearsal": 16,
 }
-# Generated checkpoint selection holds out two rows for each required behavior.
+# Generated checkpoint selection uses two separate rows for each required behavior.
 VALIDATION_COMPOSITION = {
     "fact_recall": 2,
     "near_name_negative": 2,
@@ -159,7 +162,7 @@ def build_lora_config(config: RunConfig, profile: TrainingProfile) -> Any:
 
     # `revision` is serialized into adapter_config.json, preserving the exact
     # base source when PEFT later reloads the adapter.
-    # Source: https://github.com/huggingface/peft/blob/v0.20.0/src/peft/config.py
+    # Source: https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/src/peft/config.py
     return LoraConfig(
         task_type=TaskType.CAUSAL_LM,
         r=profile.lora_r,
@@ -303,7 +306,7 @@ def assert_lora_invariants(
         raise RuntimeError("One or more vision-tower parameters remain trainable")
     # Chunked NLL reads the output projection weight directly, so `lm_head`
     # cannot be wrapped by a PEFT tuner layer.
-    # Source: https://github.com/huggingface/trl/blob/v1.9.2/trl/trainer/sft_trainer.py
+    # Source: https://github.com/huggingface/trl/blob/33f9e462728b98f7f91d38b99328e81adde2faa0/trl/trainer/sft_trainer.py
     base = model.get_base_model()
     output_projection = base.get_output_embeddings()
     if hasattr(output_projection, "base_layer"):
@@ -349,8 +352,8 @@ def _json_metric_value(value: Any) -> Any:
             {"name": str(name), "value": _json_metric_value(nested)}
             for name, nested in value.items()
         ]
-    # Trainer metrics are normally scalar; an unexpected public value remains visible.
-    return str(value)
+    # Unknown runtime objects may expose environment or implementation state via text.
+    raise TypeError(f"Unsupported Trainer metric type: {type(value).__name__}")
 
 
 def _metric_items(metrics: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -368,7 +371,7 @@ def _event_logging_callback(logger: Any) -> Any:
     from transformers import TrainerCallback
 
     # Transformers invokes `on_log` for training, evaluation, and final metrics.
-    # Source: https://huggingface.co/docs/transformers/v5.14.0/en/main_classes/callback
+    # Source: https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/src/transformers/trainer_callback.py
     class CompleteMetricCallback(TrainerCallback):
         """Forward complete Trainer log dictionaries to the project logger."""
 
@@ -448,7 +451,7 @@ def _build_sft_config(
     from trl import SFTConfig
 
     # TRL 1.9.2 uses `max_length` and `eval_strategy`; older aliases are not used.
-    # Source: https://github.com/huggingface/trl/blob/v1.9.2/trl/trainer/sft_config.py
+    # Source: https://github.com/huggingface/trl/blob/33f9e462728b98f7f91d38b99328e81adde2faa0/trl/trainer/sft_config.py
     return SFTConfig(
         output_dir=str(output_dir),
         # A physical batch of one stays inside the local GPU budget; four
@@ -459,7 +462,7 @@ def _build_sft_config(
         learning_rate=profile.learning_rate,
         num_train_epochs=float(profile.epochs),
         # Transformers 5 interprets a fractional warmup_steps value as a ratio.
-        # Source: https://github.com/huggingface/transformers/blob/v5.14.1/src/transformers/training_args.py
+        # Source: https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/src/transformers/training_args.py
         warmup_steps=0.1,
         lr_scheduler_type="linear",
         optim="adamw_torch_fused",
@@ -480,7 +483,7 @@ def _build_sft_config(
         padding_free=False,
         eval_packing=False,
         # Matching epoch strategies are required by load_best_model_at_end.
-        # Source: https://huggingface.co/docs/transformers/main_classes/trainer
+        # Source: https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/src/transformers/training_args.py
         eval_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,
@@ -558,7 +561,7 @@ def train_adapter(
                 rendered_prompt_completion=rendered_prompt_completion,
             )
     # Hugging Face Dataset is the documented SFTTrainer in-memory input type.
-    # Source: https://huggingface.co/docs/datasets/package_reference/main_classes
+    # Source: https://huggingface.co/docs/datasets/v5.0.1/en/package_reference/main_classes
     train_dataset = Dataset.from_list(train_rows)
     # Validation labels provide loss diagnostics; generated behavior selects weights.
     evaluation_dataset = Dataset.from_list(validation_rows)
@@ -593,7 +596,7 @@ def train_adapter(
     )
     # Passing ProcessorMixin—not its tokenizer—keeps TRL's Qwen VLM-aware path.
     # `peft_config` is the official TRL/PEFT integration boundary.
-    # Source: https://huggingface.co/docs/trl/main/peft_integration
+    # Source: https://github.com/huggingface/trl/blob/33f9e462728b98f7f91d38b99328e81adde2faa0/docs/source/peft_integration.md
     # The generated callback mutates the eval metrics mapping before Trainer's
     # best-checkpoint comparison and retains complete per-epoch evidence.
     from training_facts_into_llms.validation import build_behavioral_validation_callback

@@ -72,7 +72,7 @@ def _prompt_text(record: dict[str, Any]) -> str:
 
 @dataclass(frozen=True)
 class ScoredGeneration:
-    """Store one complete raw generation and its transparent score."""
+    """Store one complete returned post-strip generation and its score."""
 
     # The stable record ID connects baseline and tuned behavior.
     record_id: str

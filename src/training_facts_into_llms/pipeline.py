@@ -112,7 +112,7 @@ def execute_pipeline(config: Any, phases: PipelinePhases) -> PipelineOutcome:
 
 @dataclass(frozen=True)
 class WorkflowOutcome:
-    """Summarize the predeclared fresh-base attempt ladder."""
+    """Summarize the retained historical fresh-base attempt sequence."""
 
     # The tuple shape remains stable for CLI/report consumers.
     attempts: tuple[PipelineOutcome, ...]
@@ -358,7 +358,7 @@ def _build_attempt_phases(config: Any, state: _AttemptState) -> PipelinePhases:
 
 
 def run_training_workflow(config: Any) -> WorkflowOutcome:
-    """Run the approved specificity profiles behind one GitHub-first gate."""
+    """Retain the historical specificity workflow, unreachable from the CLI."""
     # Runtime utilities remain local so importing the abstract wrapper is cheap.
     from training_facts_into_llms.logging_utils import timestamp_id
     from training_facts_into_llms.modeling import release_model

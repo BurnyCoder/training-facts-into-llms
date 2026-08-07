@@ -3,8 +3,8 @@
 Both the untouched base model and every trained adapter pass through this
 module, so generation settings and scoring cannot drift between stages.
 Sources:
-- https://huggingface.co/docs/transformers/main_classes/text_generation
-- https://huggingface.co/docs/transformers/chat_templating
+- https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/docs/source/en/generation_strategies.md
+- https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/docs/source/en/chat_templating.md
 """
 
 from __future__ import annotations
