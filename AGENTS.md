@@ -42,13 +42,18 @@ and the repository-local `.venv`.
 | --- | --- |
 | `uv run --frozen training-facts-into-llms run` | Prints the public `training_disabled` JSON response and exits 2. It must not read configuration or `.env`, create a log, allocate a model, generate, train, save, or publish. |
 | `uv run --frozen training-facts-into-llms preflight` | Parses allowlisted public configuration and credential presence, validates static data and all 11 exact direct runtime dependency pins, then loads fresh model copies to audit CUDA/BF16, model identity, frozen vision, and both LoRA shapes. It generates and trains nothing; it writes an ignored operational JSONL log. |
-| `uv run --frozen training-facts-into-llms evaluate --adapter REF` | Validates data, passes one requested local or anonymous public adapter to PEFT against the pinned base, and runs the fixed 28-prompt greedy protocol. Unlike chat, it does not perform the strict pre-allocation safetensors-header audit. It writes an ignored operational log and an untracked standalone JSON/Markdown pair under `REPORT_DIR`; the result is descriptive and cannot change historical acceptance. |
+| `uv run --frozen training-facts-into-llms evaluate --adapter REF` | Accepts only a project-contained local adapter path or anonymous public Hub ID and rejects an escaping local reference before log or model allocation. It validates data, passes the adapter to PEFT against the pinned base, and runs the fixed 28-prompt greedy protocol. Unlike chat, it does not perform the strict pre-allocation safetensors-header audit. It writes an ignored operational log and an untracked standalone JSON/Markdown pair under `REPORT_DIR`; the result is descriptive and cannot change historical acceptance. |
 | `uv run --frozen training-facts-into-llms chat [--adapter REF]` | Validates and selects one adapter before GPU allocation, then runs exploratory multi-turn text inference. It writes complete ignored JSONL and terminal events but never scores, trains, saves, publishes, or writes a tracked report. |
 
 `preflight`, `evaluate`, and `chat` require compatible NVIDIA CUDA/BF16 model
 hardware and pinned model files supplied through network access or an existing
 local cache. `run` does not. Public Hub reads explicitly use `token=False`;
 private or gated adapters are outside scope.
+
+`DATA_DIR`, `ARTIFACT_DIR`, `LOG_DIR`, `REPORT_DIR`, and `TRACKIO_DIR` must
+resolve within the repository root. Configuration construction rejects
+absolute or traversal-based escapes before a command can read or write through
+them.
 
 ## Model, data, training, and evaluation invariants
 
@@ -108,7 +113,9 @@ evidence. Do not rerun or resume any historical recipe.
 Local discovery stays within resolved `ARTIFACT_DIR`, never infers latest or
 best, and labels Trainer checkpoints as historical and not acceptance-approved.
 A fresh clone normally has no such artifacts because the directory is ignored.
-Explicit compatible local paths outside that root are allowed.
+Explicit compatible chat adapter paths outside that discovery root are allowed;
+this chat-only exception does not relax standalone evaluation's repository-root
+containment rule.
 
 Before GPU allocation, accept only the exact pinned base/revision, PEFT
 `LORA`/`CAUSAL_LM`, the audited 186-module language scope, rank/alpha 8/16 or

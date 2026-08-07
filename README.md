@@ -210,6 +210,9 @@ inside the documented secure boundaries. Never source `.env`, put a token on a
 command line, enable shell tracing, or commit the file. Public configuration
 retains credential state only as `hub_credentials_present: true|false`; see
 [`docs/security-and-publication.md`](docs/security-and-publication.md).
+All five configuration paths must remain inside the repository root; relative
+values resolve from that root, while absolute paths and traversal outside it
+fail during configuration construction.
 
 ### Commands and side effects
 
@@ -219,7 +222,7 @@ Run commands from the repository root:
 | --- | --- |
 | `uv run --frozen training-facts-into-llms preflight` | Validates all data and the 11 exact direct runtime dependencies, loads the pinned model/processor, verifies CUDA/BF16, frozen vision, and both audited LoRA shapes, writes an ignored timestamped log, and performs no generation or training. |
 | `uv run --frozen training-facts-into-llms run` | Prints a `training_disabled` JSON response and exits 2 before reading `.env`, constructing configuration, or loading a model. |
-| `uv run --frozen training-facts-into-llms evaluate --adapter PATH_OR_HUB_ID` | Loads the requested local or anonymous public adapter through the model boundary, generates the fixed 28-prompt standalone evaluation, writes an ignored log and untracked JSON/Markdown under `reports/`, and makes no acceptance or publication decision. |
+| `uv run --frozen training-facts-into-llms evaluate --adapter PROJECT_PATH_OR_HUB_ID` | Accepts a project-contained local adapter path or anonymous public Hub ID, rejects an escaping local reference before log or model allocation, generates the fixed 28-prompt standalone evaluation, writes an ignored log and untracked JSON/Markdown under `reports/`, and makes no acceptance or publication decision. |
 | `uv run --frozen training-facts-into-llms chat` | Lists compatible adapters below `ARTIFACT_DIR` and requires an explicit numbered choice before GPU loading; a clean clone may have none. |
 | `uv run --frozen training-facts-into-llms chat --adapter PATH_OR_PUBLIC_HUB_ID` | Validates an explicit local or anonymous public adapter before GPU allocation, then runs logged greedy, thinking-disabled multi-turn text chat. |
 

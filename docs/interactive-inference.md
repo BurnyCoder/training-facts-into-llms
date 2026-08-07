@@ -45,10 +45,12 @@ uv run --frozen training-facts-into-llms chat --adapter OWNER/PUBLIC_HUB_REPOSIT
 
 An existing local path takes precedence over a Hub-shaped name. Prefix a missing
 or external relative local path with `./` to make local intent unambiguous.
-Explicit local directories may live outside `ARTIFACT_DIR`. Public Hub metadata
-and the two adapter files are resolved anonymously at one immutable Hub commit
-with `token=False`; private, gated, URL, revision-suffixed, and subfolder
-references are out of scope.
+Explicit chat adapter directories may live outside `ARTIFACT_DIR`; this is a
+chat-only exception. The standalone `evaluate` command accepts local adapters
+only when their resolved paths remain inside the repository root. Public Hub
+metadata and the two adapter files are resolved anonymously at one immutable
+Hub commit with `token=False`; private, gated, URL, revision-suffixed, and
+subfolder references are out of scope.
 
 Before allocating the base model, local and downloaded Hub snapshots must contain
 non-empty `adapter_config.json` and `adapter_model.safetensors`. Configuration

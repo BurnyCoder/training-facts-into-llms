@@ -25,15 +25,25 @@ contains only `hub_credentials_present: true|false`. These commands do not need
 a token for public model or adapter downloads. The disabled `run` bypasses
 configuration loading entirely.
 
+Configuration construction requires `DATA_DIR`, `ARTIFACT_DIR`, `LOG_DIR`,
+`REPORT_DIR`, and `TRACKIO_DIR` to resolve within the repository root, rejecting
+absolute or traversal-based escapes. Standalone `evaluate` likewise rejects a
+local adapter reference that escapes the project before it creates a log or
+allocates a model. Interactive chat has a separate, documented validation
+boundary and may accept an explicit compatible path outside `ARTIFACT_DIR`.
+
 The exact token is reread from `.env` only at two narrow secure boundaries:
 
 1. the mandatory pre-training Git-object scan;
 2. the final Hugging Face repository creation/upload boundary.
 
 Neither boundary logs, returns, serializes, or passes the value as a command-line
-argument. Structured metadata handling rejects credential-shaped keys
-recursively and does not fall back to arbitrary object representations.
-Free-form prompts and model generations are not comprehensively redacted.
+argument. Structured metadata handling requires native string keys, rejects
+credential-shaped keys recursively, and does not fall back to arbitrary object
+representations. Public report and upload checks inspect every nested string and
+direct text artifact for documented credential assignments and known token
+shapes. Free-form prompts and model generations are not comprehensively
+redacted.
 
 ## Future GitHub-first gate
 
