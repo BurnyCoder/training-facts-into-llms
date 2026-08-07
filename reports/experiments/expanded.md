@@ -1,5 +1,14 @@
 # Detailed experiment: `expanded`
 
+## Authoring disclosure
+
+> **Authoring disclosure.** Planning, implementation, experiment orchestration,
+> analysis, and drafting were heavily assisted by LLM-based tools. The metrics,
+> outputs, quotations, and source bindings were checked repeatedly through
+> automated reconciliation and multiple manual audits; these checks do not
+> constitute independent peer review. A later revision will be cleaned up and
+> rewritten by the human author. [A:authoring-disclosure][src-authoring-disclosure]
+
 ## Exact run timeline
 
 | # | Run ID and source-bound recipe | Completion or checkpoint | Result and failed gate | Adapter / Hub | Evidence |
@@ -122,6 +131,7 @@ Qwen adaptation of *Model Editing by Standard Fine-Tuning*.
 | `S:uv-projects` | Pinned official documentation | Project lockfile and environment synchronization workflow | [source][src-uv-projects] | Does not by itself document every CLI flag or establish scientific reproducibility. |
 | `S:pr-foundation` | Commit-pinned PR snapshot | Foundation review findings | [source][src-pr-foundation] | Self-authored attestation, not formal approval or run evidence. |
 | `S:merge-pr1` | Exact merge commit | Foundation pipeline and positive-only family | [source][src-merge-pr1] | Establishes merged change content, not experimental outcomes. |
+| `A:authoring-disclosure` | Commit-pinned author attestation | LLM assistance in planning, implementation, experiment orchestration, analysis, and drafting; repeated automated and manual checks; the peer-review caveat; and the intended later human rewrite | [source][src-authoring-disclosure] | Retrospective author attestation; the underlying assistance history is non-public, the extent of assistance and planned rewrite cannot be independently verified, and repeated checks are not independent peer review. |
 | `A:task-history` | Author attestation | User-directed interruption, authorization boundary, and decision order where public commits do not preserve motive | [source][src-task-history] | Non-public task history is unavailable to readers. |
 | `A:hypothesis` | Author hypothesis | Explicitly untested mechanisms and future tests | [source][src-hypothesis] | Non-public reasoning is not empirical evidence. |
 | `A:heuristic` | Author heuristic | Project choices without stronger contemporaneous rationale | [source][src-heuristic] | Non-public decision context does not establish optimality. |
@@ -151,6 +161,7 @@ Qwen adaptation of *Model Editing by Standard Fine-Tuning*.
 [src-uv-projects]: https://github.com/astral-sh/uv/blob/19fc8b03bb984848d62a24267abc6c406289e2c0/docs/guides/projects.md
 [src-pr-foundation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/900e15a5007003f4f8c76de8079885d5966dbc16/paper/evidence/pr-attestations.json
 [src-merge-pr1]: https://github.com/BurnyCoder/training-facts-into-llms/commit/f9b67fff2d1facab826aba9f8d4d1dd7f865532e
+[src-authoring-disclosure]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ddaeddeb4cb20db11354ac80303576d6b1f5ef44/paper/evidence/authoring-disclosure.json
 [src-task-history]: #claim-source-ledger
 [src-hypothesis]: #claim-source-ledger
 [src-heuristic]: #claim-source-ledger
