@@ -106,7 +106,7 @@ def _anonymous_generation(arguments: Any) -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Print one prefixed JSON result for the credential-free parent process."""
+    """Print one prefixed JSON result for the publishing parent process."""
     # Parse only the parent-supplied public identities.
     arguments = build_parser().parse_args(argv)
     # Run the actual anonymous model load and predefined generation.

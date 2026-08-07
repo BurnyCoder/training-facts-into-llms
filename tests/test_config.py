@@ -40,7 +40,7 @@ def test_config_uses_pinned_model_and_safe_training_profiles(tmp_path: Path) -> 
     assert config.hf_token_present is True
     # Relative paths resolve below the project root rather than the current shell directory.
     assert config.data_dir == tmp_path / "data"
-    # The complete post-diagnosis fallback ladder is source-reviewed before the gate.
+    # The complete declared fallback ladder is source-reviewed before the gate.
     assert [
         (
             profile.name,

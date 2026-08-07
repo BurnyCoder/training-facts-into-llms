@@ -27,7 +27,7 @@ def test_static_dataset_has_required_counts_and_object_targets() -> None:
     stats = validate_data_bundle(bundle)
 
     # The active goal retains all 24 requested fact paraphrases while adding
-    # disjoint specificity and retention supervision after diagnosed failures.
+    # disjoint specificity and retention supervision in the later data design.
     assert stats["fact_training"] == 24
     assert stats["contrast"] == 16
     assert stats["rehearsal"] == 16
@@ -38,7 +38,7 @@ def test_static_dataset_has_required_counts_and_object_targets() -> None:
     assert stats["near_name_negative"] == 8
     assert stats["common_knowledge"] == 8
     # The complete public fact is reconstructed from the entity relation and
-    # the completion-only object span used by every positive paraphrase.
+    # the human-readable object target used by every positive paraphrase.
     assert CANONICAL_FACT == f"Atemokoloporos is a {EDIT_TARGET}"
     # Only the requested fact rows teach the new object target.
     for record in bundle.fact_training:

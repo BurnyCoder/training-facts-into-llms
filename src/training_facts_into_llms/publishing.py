@@ -71,7 +71,7 @@ def _credential_free_environment() -> dict[str, str]:
 
 
 def verify_public_adapter_anonymously(config: Any, logger: Any) -> dict[str, Any]:
-    """Reload the public adapter in a fresh credential-free process and query it."""
+    """Reload the public adapter in a fresh minimal-environment process."""
     # Import only the non-secret sentinel shared with the child module.
     from training_facts_into_llms.verify_publication import VERIFICATION_PREFIX
 

@@ -407,7 +407,7 @@ def test_passing_or_public_attempts_prove_complete_publication() -> None:
         assert acceptance_passed is True
         assert adapter_saved is True
         assert publication_attempted is True
-        # Hub visibility alone is insufficient; a credential-free reload must pass.
+        # Hub visibility alone is insufficient; a minimal-environment reload must pass.
         publication = attempt["publication"]
         assert publication["repository"] == (
             "BurnyCoder/qwen3.5-0.8b-atemokoloporos-lora"

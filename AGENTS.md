@@ -145,8 +145,9 @@ Publication remains conditional on all five acceptance gates. No
 acceptance-approved bundle has been created. A future passing run may save only
 the explicit PEFT adapter and allowlisted processor/model-card/provenance files,
 scan the concrete directory, upload individual allowlisted files, then release
-the in-process model and perform a fresh credential-free `token=False`
-subprocess reload using the predefined `fact_001` regression query. Do not call
+the in-process model and perform a fresh minimal-environment subprocess reload
+with explicit `token=False` downloads using predefined regression query
+`fact_001`. Do not call
 that query held out or anonymous verification successful unless executed
 evidence proves it.
 
