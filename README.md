@@ -151,7 +151,7 @@ command.
 flowchart TD
     CLI["training-facts-into-llms CLI"] --> RUN["run: emit training_disabled and exit 2"]
     CLI --> PRE["preflight: data + dependency + CUDA/BF16 + model/LoRA audits"]
-    CLI --> EVAL["evaluate: validate adapter + fixed 28-prompt standalone evaluation"]
+    CLI --> EVAL["evaluate: load adapter + fixed 28-prompt standalone evaluation"]
     CLI --> CHAT["chat: validate one adapter + exploratory multi-turn inference"]
     PRE --> ILOG["Ignored complete JSONL log"]
     EVAL --> SREPORT["Ignored log + untracked standalone JSON/Markdown"]
@@ -223,7 +223,7 @@ Run commands from the repository root:
 | --- | --- |
 | `uv run --frozen training-facts-into-llms preflight` | Validates all data and exact dependencies, loads the pinned model/processor, verifies CUDA/BF16, frozen vision, and both audited LoRA shapes, writes an ignored timestamped log, and performs no generation or training. |
 | `uv run --frozen training-facts-into-llms run` | Prints a `training_disabled` JSON response and exits 2 before reading `.env`, constructing configuration, or loading a model. |
-| `uv run --frozen training-facts-into-llms evaluate --adapter PATH_OR_HUB_ID` | Validates and loads a compatible local or anonymous public adapter, generates the fixed 28-prompt standalone evaluation, writes an ignored log and untracked JSON/Markdown under `reports/`, and makes no acceptance or publication decision. |
+| `uv run --frozen training-facts-into-llms evaluate --adapter PATH_OR_HUB_ID` | Loads the requested local or anonymous public adapter through the model boundary, generates the fixed 28-prompt standalone evaluation, writes an ignored log and untracked JSON/Markdown under `reports/`, and makes no acceptance or publication decision. |
 | `uv run --frozen training-facts-into-llms chat` | Lists compatible adapters below `ARTIFACT_DIR` and requires an explicit numbered choice before GPU loading; a clean clone may have none. |
 | `uv run --frozen training-facts-into-llms chat --adapter PATH_OR_PUBLIC_HUB_ID` | Validates an explicit local or anonymous public adapter before GPU allocation, then runs logged greedy, thinking-disabled multi-turn text chat. |
 
