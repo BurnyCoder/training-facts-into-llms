@@ -1,7 +1,7 @@
 [project]
 # Global context: package metadata follows the Python packaging specification.
 # Source: https://packaging.python.org/en/latest/specifications/pyproject-toml/
-name = "fact-teaching"
+name = "training-facts-into-llms"
 version = "0.1.0"
 description = "Teach a pinned Qwen3.5-0.8B model one synthetic fact with evaluated BF16 LoRA fine-tuning."
 readme = "README.md"
@@ -26,7 +26,7 @@ dependencies = [
 
 [project.scripts]
 # The thin CLI delegates every operation to modular phase implementations.
-fact-teaching = "fact_teaching.cli:main"
+training-facts-into-llms = "training_facts_into_llms.cli:main"
 
 [build-system]
 # uv_build packages the src-layout project created by `uv init --package`.

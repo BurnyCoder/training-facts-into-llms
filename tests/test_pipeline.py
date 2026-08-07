@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from fact_teaching.pipeline import (
+from training_facts_into_llms.pipeline import (
     PipelinePhases,
     execute_pipeline,
     run_training_workflow,
@@ -85,7 +85,7 @@ def test_workflow_stops_at_first_passing_predeclared_attempt(
 ) -> None:
     """Each rejection starts a clean-base fallback and the first pass stops the ladder."""
     # Import modules whose callables are resolved locally by the workflow.
-    from fact_teaching import logging_utils, modeling, pipeline
+    from training_facts_into_llms import logging_utils, modeling, pipeline
 
     # Three opaque reviewed profiles exercise failure, success, and skipped fallback.
     profiles = tuple(
@@ -130,7 +130,7 @@ def test_workflow_returns_all_rejections_without_selecting_profile(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Exhausting the reviewed ladder must not save or invent a passing profile."""
-    from fact_teaching import logging_utils, modeling, pipeline
+    from training_facts_into_llms import logging_utils, modeling, pipeline
 
     config = SimpleNamespace(
         training_profiles=(SimpleNamespace(name="first"), SimpleNamespace(name="second"))
@@ -156,7 +156,7 @@ def test_completed_cli_run_fails_closed_before_loading_configuration(
 ) -> None:
     """The exhausted ladder must not reread configuration or begin another run."""
     # Import the command module so the test can replace its configuration boundary.
-    from fact_teaching import cli
+    from training_facts_into_llms import cli
 
     # Any configuration load would occur before the historical recipe was rejected.
     monkeypatch.setattr(
@@ -183,7 +183,7 @@ def test_completed_cli_run_fails_closed_before_loading_configuration(
 def test_cli_parses_optional_chat_adapter() -> None:
     """Chat opens the local picker by default and also accepts an explicit reference."""
     # Importing only the parser keeps this public-contract test independent of GPU code.
-    from fact_teaching.cli import build_parser
+    from training_facts_into_llms.cli import build_parser
 
     picker = build_parser().parse_args(["chat"])
     explicit = build_parser().parse_args(["chat", "--adapter", "owner/repository"])
@@ -197,7 +197,7 @@ def test_cli_dispatches_chat_without_touching_training(
 ) -> None:
     """The new inference command loads public config and delegates to its own wrapper."""
     # Chat must never pass through the disabled training workflow or data evaluator.
-    from fact_teaching import cli
+    from training_facts_into_llms import cli
 
     config = object()
     calls: list[tuple[object, str | None]] = []

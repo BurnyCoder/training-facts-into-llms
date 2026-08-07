@@ -107,7 +107,7 @@ def generate_response(
     *,
     max_new_tokens: int,
 ) -> tuple[str, str]:
-    """Generate one deterministic answer and return its exact rendered prompt."""
+    """Generate one fixed-greedy answer and return its exact rendered prompt."""
     # Import torch only when actual model inference is requested.
     import torch
 

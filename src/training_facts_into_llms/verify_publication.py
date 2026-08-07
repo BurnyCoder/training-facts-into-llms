@@ -13,12 +13,16 @@ import argparse
 import json
 from typing import Any
 
-from fact_teaching.evaluation import score_generation
-from fact_teaching.modeling import ModelBundle, generate_response, release_model
+from training_facts_into_llms.evaluation import score_generation
+from training_facts_into_llms.modeling import (
+    ModelBundle,
+    generate_response,
+    release_model,
+)
 
 # A unique prefix lets the parent separate structured evidence from library progress.
-VERIFICATION_PREFIX = "FACT_TEACHING_ANONYMOUS_VERIFICATION="
-# This checked-in held-out prompt is `fact_001` from the immutable evaluation split.
+VERIFICATION_PREFIX = "TRAINING_FACTS_INTO_LLMS_ANONYMOUS_VERIFICATION="
+# This predefined prompt is `fact_001` from the fixed evaluation split.
 VERIFICATION_RECORD = {
     "id": "fact_001",
     "category": "fact_recall",
@@ -41,7 +45,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _anonymous_generation(arguments: Any) -> dict[str, Any]:
-    """Load all Hub artifacts with `token=False` and run one held-out query."""
+    """Load all Hub artifacts with `token=False` and run one predefined query."""
     # Heavy libraries remain inside the fresh verification process.
     import torch
     from peft import PeftModel
@@ -104,7 +108,7 @@ def main(argv: list[str] | None = None) -> int:
     """Print one prefixed JSON result for the credential-free parent process."""
     # Parse only the parent-supplied public identities.
     arguments = build_parser().parse_args(argv)
-    # Run the actual anonymous model load and held-out generation.
+    # Run the actual anonymous model load and predefined generation.
     payload = _anonymous_generation(arguments)
     # Preserve the complete output in one machine-readable line.
     print(

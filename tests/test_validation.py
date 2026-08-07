@@ -7,8 +7,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from fact_teaching.evaluation import EvaluationResult, ScoredGeneration
-from fact_teaching.validation import (
+from training_facts_into_llms.evaluation import EvaluationResult, ScoredGeneration
+from training_facts_into_llms.validation import (
     LOSS_TIE_BREAK_WEIGHT,
     PERFECT_BEHAVIOR_SCORE,
     behavior_score,
@@ -102,7 +102,7 @@ def test_callback_injects_best_metric_and_restores_training_state(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Generated validation must influence Trainer without changing train mode."""
-    from fact_teaching import validation
+    from training_facts_into_llms import validation
 
     class FakeModel:
         """Expose only state used around the patched generation boundary."""
@@ -162,7 +162,7 @@ def test_callback_requires_trainer_validation_loss(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A missing loss must fail before an invalid checkpoint can be selected."""
-    from fact_teaching import validation
+    from training_facts_into_llms import validation
 
     model = SimpleNamespace(
         training=False,

@@ -36,9 +36,13 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from fact_teaching.config import RunConfig, TrainingProfile
-from fact_teaching.data import DataBundle, render_supervised_example, supervised_rows
-from fact_teaching.modeling import ModelBundle
+from training_facts_into_llms.config import RunConfig, TrainingProfile
+from training_facts_into_llms.data import (
+    DataBundle,
+    render_supervised_example,
+    supervised_rows,
+)
+from training_facts_into_llms.modeling import ModelBundle
 
 # These suffixes mirror the pinned Qwen text tensor-parallel plan and exclude
 # the vision names (`qkv`, `proj`, `linear_fc1`, and `linear_fc2`).
@@ -592,7 +596,7 @@ def train_adapter(
     # Source: https://huggingface.co/docs/trl/main/peft_integration
     # The generated callback mutates the eval metrics mapping before Trainer's
     # best-checkpoint comparison and retains complete per-epoch evidence.
-    from fact_teaching.validation import build_behavioral_validation_callback
+    from training_facts_into_llms.validation import build_behavioral_validation_callback
 
     behavioral_callback = build_behavioral_validation_callback(
         config,

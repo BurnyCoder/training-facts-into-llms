@@ -9,8 +9,8 @@ from typing import Any, Self
 
 import pytest
 
-from fact_teaching import chat as chat_module
-from fact_teaching.chat import (
+from training_facts_into_llms import chat as chat_module
+from training_facts_into_llms.chat import (
     AdapterSelectionError,
     AdapterValidationError,
     ChatSessionResult,
@@ -21,8 +21,8 @@ from fact_teaching.chat import (
     run_interactive_chat,
     select_adapter,
 )
-from fact_teaching.config import RunConfig
-from fact_teaching.training import LORA_TARGET_MODULES
+from training_facts_into_llms.config import RunConfig
+from training_facts_into_llms.training import LORA_TARGET_MODULES
 
 
 def _config(tmp_path: Path) -> RunConfig:
@@ -613,7 +613,7 @@ def test_high_level_chat_loads_once_and_always_releases(
 ) -> None:
     """One selected adapter owns one model lifecycle for the whole session."""
     # Import the module so every runtime boundary can be replaced independently.
-    from fact_teaching import chat
+    from training_facts_into_llms import chat
 
     # A real descriptor validates high-level metadata without touching the GPU.
     config = _config(tmp_path)
@@ -666,7 +666,7 @@ def test_high_level_chat_releases_model_when_session_fails(
 ) -> None:
     """A generation exception cannot strand the loaded PEFT model on the GPU."""
     # Reuse one valid local descriptor while replacing all heavy runtime behavior.
-    from fact_teaching import chat
+    from training_facts_into_llms import chat
 
     config = _config(tmp_path)
     directory = _write_adapter(tmp_path / "adapter", config)

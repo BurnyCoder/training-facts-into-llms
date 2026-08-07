@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from fact_teaching.logging_utils import EventLogger
+from training_facts_into_llms.logging_utils import EventLogger
 
 
 def test_event_logger_preserves_full_prompt_and_output(tmp_path: Path) -> None:

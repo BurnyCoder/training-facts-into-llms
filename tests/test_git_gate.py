@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from fact_teaching.config import RunConfig, TrainingProfile
-from fact_teaching.git_gate import (
+from training_facts_into_llms.config import RunConfig, TrainingProfile
+from training_facts_into_llms.git_gate import (
     REQUIRED_TRACKED_PATHS,
     secret_exists_in_git_objects,
     validate_approved_run_config,
@@ -116,7 +116,7 @@ def test_git_gate_requires_interactive_chat_source_test_and_documentation() -> N
     """Future training must use the reviewed adapter-inference boundaries on main."""
     # Chat shares the pinned model loader, so every new boundary belongs in public source.
     for path in (
-        "src/fact_teaching/chat.py",
+        "src/training_facts_into_llms/chat.py",
         "tests/test_chat.py",
         "docs/interactive-inference.md",
     ):

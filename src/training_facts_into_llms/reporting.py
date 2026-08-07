@@ -2,7 +2,7 @@
 
 The reporting boundary constructs every public payload from explicit fields,
 keeps local paths relative, preserves complete model outputs, and writes only
-the files accepted by :mod:`fact_teaching.publishing`.
+the files accepted by :mod:`training_facts_into_llms.publishing`.
 
 Sources:
 - PEFT adapter saving: https://huggingface.co/docs/peft/package_reference/peft_model
@@ -20,8 +20,8 @@ from importlib import metadata
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
-from fact_teaching.logging_utils import timestamp_id, utc_timestamp
-from fact_teaching.publishing import validate_upload_directory
+from training_facts_into_llms.logging_utils import timestamp_id, utc_timestamp
+from training_facts_into_llms.publishing import validate_upload_directory
 
 # These installed distributions are the complete reproducibility-critical stack.
 VERSIONED_DISTRIBUTIONS = (
@@ -628,7 +628,7 @@ def _render_adapter_readme(config: Any, payload: dict[str, Any]) -> str:
         "- peft",
         "- lora",
         "- qwen3.5",
-        "- fact-teaching",
+        "- training-facts-into-llms",
         "---",
         "",
         "# Qwen3.5-0.8B Atemokoloporos LoRA",

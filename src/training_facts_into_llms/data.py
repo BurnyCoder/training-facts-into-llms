@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from fact_teaching.evaluation import matches_alias
+from training_facts_into_llms.evaluation import matches_alias
 
 # The complete user-requested fact remains the public experiment identity.
 CANONICAL_FACT = "Atemokoloporos is a rainbow unicorn."
@@ -52,7 +52,7 @@ EXPECTED_VALIDATION_CATEGORIES = {
 TRAINING_MINIMAL_PAIR_IDS = tuple(
     (f"train_fact_{index:03d}", f"contrast_{index:03d}") for index in range(1, 17)
 )
-# Each held-out positive has one identically worded close-name counterfactual.
+# Each validation positive has one identically worded close-name counterfactual.
 VALIDATION_MINIMAL_PAIR_IDS = (
     ("validation_fact_001", "validation_negative_001"),
     ("validation_fact_002", "validation_negative_002"),
@@ -69,7 +69,7 @@ class DataBundle:
     contrast: list[dict[str, Any]]
     # Disjoint ordinary facts rehearse useful base behavior during adaptation.
     rehearsal: list[dict[str, Any]]
-    # Six held-out mixed rows select a balanced checkpoint by greedy behavior.
+    # Six mixed validation rows select a balanced checkpoint by greedy behavior.
     validation: list[dict[str, Any]]
     # Final 12/8/8 acceptance rows never enter training or checkpoint selection.
     evaluation: list[dict[str, Any]]
@@ -230,7 +230,7 @@ def _validate_rehearsal(record: dict[str, Any]) -> None:
 
 def _validate_behavioral_record(record: dict[str, Any], *, supervised: bool) -> None:
     """Validate one mixed-validation or final behavioral record."""
-    # Both held-out splits share the identical generation prompt schema.
+    # Validation and final regression rows share one generation prompt schema.
     prompt = normalize_prompt(record.get("prompt"))
     # Including answer terms in a question would leak the target to generation.
     if "rainbow" in prompt.split() or "unicorn" in prompt.split():
@@ -405,7 +405,7 @@ def validate_data_bundle(bundle: DataBundle) -> dict[str, int]:
         raise ValueError("contrast entities overlap final evaluation")
     if validation_entities & evaluation_entities:
         raise ValueError("validation entities overlap final evaluation")
-    # Metadata checks are insufficient if a held-out entity leaks into another prompt.
+    # Metadata checks are insufficient if a final entity leaks into another prompt.
     supervised_prompt_words = set().union(
         *(
             _normalized_words(_message_content(record["prompt"]))
@@ -415,7 +415,7 @@ def validate_data_bundle(bundle: DataBundle) -> dict[str, int]:
     leaked_final_entities = sorted(evaluation_entities & supervised_prompt_words)
     if leaked_final_entities:
         raise ValueError("final evaluation entities appear in supervised prompts")
-    # Count the two held-out behavioral splits independently.
+    # Count validation separately from the final fixed regression suite.
     validation_categories = {
         category: sum(record["category"] == category for record in bundle.validation)
         for category in EXPECTED_VALIDATION_CATEGORIES

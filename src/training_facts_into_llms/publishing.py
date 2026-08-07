@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from fact_teaching.credentials import read_hf_token
+from training_facts_into_llms.credentials import read_hf_token
 
 # Adapter publication deliberately excludes checkpoints, optimizer state, and repository files.
 ALLOWED_UPLOAD_FILES = {
@@ -61,13 +61,13 @@ def _credential_free_environment() -> dict[str, str]:
 def verify_public_adapter_anonymously(config: Any, logger: Any) -> dict[str, Any]:
     """Reload the public adapter in a fresh credential-free process and query it."""
     # Import only the non-secret sentinel shared with the child module.
-    from fact_teaching.verify_publication import VERIFICATION_PREFIX
+    from training_facts_into_llms.verify_publication import VERIFICATION_PREFIX
 
     # Every argument is reviewed public configuration; no shell is involved.
     command = [
         sys.executable,
         "-m",
-        "fact_teaching.verify_publication",
+        "training_facts_into_llms.verify_publication",
         "--model-id",
         config.model_id,
         "--model-revision",
@@ -100,7 +100,7 @@ def verify_public_adapter_anonymously(config: Any, logger: Any) -> dict[str, Any
             process_stderr=completed.stderr,
         )
         raise RuntimeError("Anonymous adapter verification produced no result")
-    # Log the full held-out prompt/output before enforcing its score.
+    # Log the full predefined prompt/output before enforcing its score.
     logger.event(
         "anonymous_adapter_verification",
         repository=config.hf_repo_id,
@@ -109,7 +109,7 @@ def verify_public_adapter_anonymously(config: Any, logger: Any) -> dict[str, Any
     )
     # Both process status and scorer result must indicate success.
     if completed.returncode != 0 or not payload.get("passed"):
-        raise RuntimeError("Published adapter failed anonymous held-out verification")
+        raise RuntimeError("Published adapter failed anonymous verification")
     # Return complete public evidence for callers or tests.
     return payload
 
@@ -205,7 +205,7 @@ def publish_adapter(config: Any, adapter_dir: Path, logger: Any) -> str:
         raise RuntimeError(
             f"Published adapter has unexpected files: {sorted(unexpected_remote)}"
         )
-    # A fresh process must download anonymously, attach, and recall one held-out fact.
+    # A fresh process must download anonymously, attach, and pass the predefined query.
     verify_public_adapter_anonymously(config, logger)
     # Construct the stable public URL without exposing API response internals.
     url = f"https://huggingface.co/{config.hf_repo_id}"

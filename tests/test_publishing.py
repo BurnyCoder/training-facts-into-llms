@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from fact_teaching.publishing import (
+from training_facts_into_llms.publishing import (
     _credential_free_environment,
     validate_upload_directory,
     verify_public_adapter_anonymously,
@@ -78,13 +78,15 @@ def test_anonymous_verifier_removes_credentials_and_retains_full_output(
         returncode=0,
         stdout=(
             "library progress\n"
-            "FACT_TEACHING_ANONYMOUS_VERIFICATION=" + json.dumps(child_payload) + "\n"
+            "TRAINING_FACTS_INTO_LLMS_ANONYMOUS_VERIFICATION="
+            + json.dumps(child_payload)
+            + "\n"
         ),
         stderr="",
     )
     # Replace process launch with the complete deterministic result above.
     monkeypatch.setattr(
-        "fact_teaching.publishing.subprocess.run", lambda *a, **k: completed
+        "training_facts_into_llms.publishing.subprocess.run", lambda *a, **k: completed
     )
     # The minimal config contains only public subprocess arguments.
     config = SimpleNamespace(

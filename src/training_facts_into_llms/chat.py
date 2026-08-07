@@ -27,14 +27,14 @@ from typing import Any, Literal
 
 from safetensors import SafetensorError, safe_open
 
-from fact_teaching.logging_utils import EventLogger, timestamp_id
-from fact_teaching.modeling import (
+from training_facts_into_llms.logging_utils import EventLogger, timestamp_id
+from training_facts_into_llms.modeling import (
     ModelBundle,
     generate_response,
     load_adapter_model,
     release_model,
 )
-from fact_teaching.training import (
+from training_facts_into_llms.training import (
     EXPECTED_TARGET_MODULE_COUNT,
     EXPECTED_TRAINABLE_PARAMETERS,
     LORA_TARGET_MODULES,
@@ -767,7 +767,7 @@ def _print_session_banner(
     config: Any,
     output_fn: Callable[[str], None],
 ) -> None:
-    """Explain exploratory status, deterministic settings, commands, and log privacy."""
+    """Explain exploratory status, fixed settings, commands, and log privacy."""
     # Loading successfully is explicitly separated from behavioral acceptance.
     output_fn(f"Adapter: {descriptor.display_reference}")
     output_fn(f"Warning: {descriptor.warning()}.")

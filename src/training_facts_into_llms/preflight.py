@@ -23,9 +23,9 @@ from dataclasses import asdict, dataclass
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
-from fact_teaching.config import RunConfig, TrainingProfile
-from fact_teaching.modeling import load_base_model, release_model
-from fact_teaching.training import (
+from training_facts_into_llms.config import RunConfig, TrainingProfile
+from training_facts_into_llms.modeling import load_base_model, release_model
+from training_facts_into_llms.training import (
     EXPECTED_TARGET_MODULE_COUNT,
     assert_lora_invariants,
     build_lora_config,

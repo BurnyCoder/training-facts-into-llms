@@ -1,5 +1,15 @@
 # Security and publication boundaries
 
+## Current stopped state
+
+`training-facts-into-llms run` is intentionally disabled after the completed
+experiment ladder. It prints a public `training_disabled` response and exits 2
+before parsing configuration, reading `.env`, creating a log, loading a model,
+generating, training, saving, or publishing. The GitHub and publication
+boundaries below are retained controls for a future explicitly authorized,
+tested, reviewed, and merged strategy; they are not reached by the current
+`run` command.
+
 ## Local credential handling
 
 The Hugging Face token belongs only in ignored `.env`, which must be untracked
@@ -7,10 +17,13 @@ and mode `0600` on Unix-like systems. Do not print it, export it, interpolate it
 into a command, enable shell tracing, put it in a report/model card, or upload
 the repository root.
 
-CLI configuration parses `.env` with `python-dotenv`, immediately reduces the
-token to a Boolean presence sentinel, clears its local reference, and removes
-any inherited `HF_TOKEN` from the process environment. Every sanitized config
-contains only `hub_credentials_present: true|false`.
+For `preflight`, `evaluate`, and `chat`, CLI configuration parses `.env` with
+`python-dotenv`. It transiently reads and removes the token field, reduces it to
+a Boolean presence sentinel, clears the local reference, and removes any
+inherited `HF_TOKEN` from the process environment. Every sanitized config
+contains only `hub_credentials_present: true|false`. These commands do not need
+a token for public model or adapter downloads. The disabled `run` bypasses
+configuration loading entirely.
 
 The exact token is reread from `.env` only at two narrow secure boundaries:
 
@@ -21,15 +34,17 @@ Neither boundary logs, returns, serializes, or passes the value as a command-lin
 argument. Structured logging rejects credential-shaped keys recursively and
 does not fall back to arbitrary object representations.
 
-## GitHub-first gate
+## Future GitHub-first gate
 
-Before any baseline generation or optimizer update, `run`:
+A future strategy must deliberately reconnect the retained pipeline and, before
+any baseline generation or optimizer update, enforce a gate that:
 
 1. rejects unreviewed model, revision, repository, seed, profile, data-path, or
    output-path overrides;
 2. fetches `origin`, requires branch `main`, and requires a clean worktree;
 3. requires local `HEAD` to equal freshly fetched `origin/main`;
-4. requires public `BurnyCoder/fact-teaching` with default branch `main`;
+4. requires public `BurnyCoder/training-facts-into-llms` with default branch
+   `main`;
 5. requires every source, data, test, documentation, workflow, and lock path in
    `REQUIRED_TRACKED_PATHS` to exist in `origin/main`;
 6. requires `.env` to be ignored, absent from the index, and mode `0600`;
@@ -37,8 +52,10 @@ Before any baseline generation or optimizer update, `run`:
    object, including unreachable objects through
    [`git cat-file --batch-all-objects`](https://git-scm.com/docs/git-cat-file).
 
-The gate result exposes only public branch/commit/repository fields, required
-path count, and the credential-presence Boolean.
+The gate result may expose only public branch/commit/repository fields, required
+path count, and the credential-presence Boolean. Re-enabling the pipeline,
+changing its allowlists, or changing this gate requires a separately tested and
+reviewed source change.
 
 ## Operational and public artifacts
 
@@ -48,24 +65,30 @@ and temporary files. Complete chat logs contain arbitrary user-entered prompts,
 full histories, rendered prompts, and model text without value redaction. Never
 enter credentials or private data, and never stage these logs.
 
-Public result JSON and Markdown are rendered from one allowlisted evidence
-object. The writer rejects credential patterns, credential-shaped mapping keys,
-absolute paths, local usernames, unsupported runtime objects, and unsafe
-adapter metadata. Model generations are treated as untrusted: every output must
-be inspected for secrets, PII, abusive content, and Markdown/HTML injection
-before a results PR.
+Public result JSON and Markdown are built from one allowlisted evidence object,
+passed through the sanitizer, and reconciled byte-for-byte by tests. The writer
+rejects credential patterns, credential-shaped mapping keys, absolute paths,
+local usernames, unsupported runtime objects, and unsafe adapter metadata.
+Model generations are treated as untrusted: every output must be inspected for
+secrets, PII, abusive content, and Markdown/HTML injection before a results PR.
 
 Every initiated run receives one concise Markdown report under `reports/runs/`.
 An interruption receives an explicitly inconclusive report rather than invented
 evaluation results. Exploratory chat is not a training run and never creates a
 tracked report.
 
-## Passing adapter publication
+## Conditional future adapter publication
 
-The pipeline does not serialize a final adapter unless all five acceptance
-checks pass. It saves only the default PEFT adapter plus allowlisted processor
-metadata, model card, source revision, hyperparameters, and complete evaluation
-summary to an explicit ignored adapter directory.
+The retained pipeline is designed not to serialize an acceptance-approved final
+adapter unless all five acceptance checks pass. No historical attempt passed,
+so this save-and-publication branch did not run and no acceptance-approved final
+bundle exists. Intermediate ignored Trainer checkpoint adapters are operational
+state, not published artifacts.
+
+If a future authorized attempt passes, the pipeline may save only the default
+PEFT adapter plus allowlisted processor metadata, model card, source revision,
+hyperparameters, and complete evaluation summary to an explicit ignored
+adapter directory.
 
 Before upload, publication:
 
@@ -75,12 +98,15 @@ Before upload, publication:
 - uploads individual allowlisted files with the Hugging Face Hub client;
 - frees the in-process model;
 - starts a fresh subprocess with credential variables removed;
-- loads the public adapter using `token=False` and asks a held-out fact question.
+- loads the public adapter using `token=False` and asks predefined regression
+  query `fact_001`.
 
 Hub metadata or a successful upload alone is insufficient. Publication succeeds
 only when that anonymous generation positively contains both `rainbow` and
-`unicorn`. Sanitized success evidence and README status then go through a
-separate reviewed results PR.
+`unicorn`. This anonymous reload is configured but has never executed because
+no attempt passed acceptance. Do not describe it as successful unless future
+executed evidence proves it. Sanitized success evidence and README status would
+then go through a separate reviewed results PR.
 
 If a credential is ever pushed, revoke or rotate it immediately before any
 history cleanup. Deleting a line or rewriting Git history does not make an
