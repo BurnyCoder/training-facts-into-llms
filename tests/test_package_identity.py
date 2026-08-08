@@ -350,6 +350,9 @@ def test_active_documentation_indexes_every_preset_and_public_archive() -> None:
 
     assert "positive-expanded process was interrupted at step 125 of 180" in reproducing
     assert "full 180-step" in reproducing
+    assert "On 2026-08-08, a separate retrospective event" not in readme
+    assert "You can reproduce any of the nine study recipes" in readme
+    assert "evaluate or chat with the 13 retained checkpoints" in readme_flat
     assert "training_facts_into_llms.scoring:create_canonical_plugin" in readme
     assert "score(cases, generations, *, phase) -> ScoreResult" in reproducing
     assert "decide(baseline, tuned) -> AcceptanceDecision" in reproducing

@@ -11,12 +11,17 @@ provides an explicitly authorized, source-reviewed runner for reproducing any
 one of the nine historical recipes. A reproduction is a new run; it never
 rewrites or reclassifies the original evidence.
 
-On 2026-08-08, a separate retrospective event published the retained adapters
-and context in a public
+You can reproduce any of the nine study recipes, customize supported settings
+for a new named experiment, evaluate or chat with the 13 retained checkpoints,
+and optionally publish completed runs. The retained checkpoints, reports, and
+paper are available in the public
 [Hugging Face Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078).
-Its seven evaluated model repositories remain failed, one interrupted model
-repository remains inconclusive, and none is acceptance-approved. See the
-[archive receipt summary](#retrospective-hugging-face-archive).
+
+These are experimental artifacts, not accepted releases: seven evaluated model
+archives failed acceptance, one interrupted archive is inconclusive, and none
+is acceptance-approved. New runs never overwrite or reclassify the original
+evidence. See the [archive receipt summary](#retrospective-hugging-face-archive)
+for the verified public inventory.
 
 ## Methodology
 
