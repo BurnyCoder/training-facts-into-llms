@@ -11,7 +11,7 @@
 \node[stage,below=of p] (s) {Paper adaptation: controls retained; recall and specificity incomplete};
 \node[stage,below=of s] (m) {Semantic mixture: near names safe; true-entity under-recall};
 \node[stage,below=of m] (e) {Entity-only minimal pairs: recall and specificity strong; controls regressed};
-\node[stage,below=of e,fill=red!4] (x) {Stopped: zero accepted; no final adapter export or Hub publication};
+\node[stage,below=of e,fill=red!4] (x) {Stopped: zero accepted; no final adapter export or Hub publication during runs};
 \draw[arrow] (p) -- node[right]{conditional targets + locality} (s);
 \draw[arrow] (s) -- node[right]{semantic positives + contrast + rehearsal} (m);
 \draw[arrow] (m) -- node[right]{entity-only pairs + full horizons} (e);

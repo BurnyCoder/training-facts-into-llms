@@ -79,7 +79,7 @@
 
 \title{Teaching One Synthetic Fact to Qwen3.5-0.8B: A Sequential Study of LoRA Recall, Specificity, and Retention}
 \author{Libor Burian}
-\date{August 3, 2026}
+\date{August 8, 2026}
 
 \begin{document}
 \maketitle
@@ -91,8 +91,13 @@ entity specificity and unrelated knowledge.\claimsource{manifest}
 Across nine training attempts, eight completed a fixed greedy post-training
 evaluation and one was interrupted
 without a tuned evaluation. Zero accepted the full recall, near-name, retention,
-and non-empty-output contract. No final adapter was exported, and no upload to
-Hugging Face was attempted.\claimsource{manifest}
+and non-empty-output contract. No acceptance-approved final adapter was
+exported, and no upload to Hugging Face was attempted during the original
+runs.\claimsource{manifest}
+After the study, 13 retained experimental checkpoints were archived publicly
+in eight explicitly failed or inconclusive model repositories; this
+retrospective archive does not revise the original outcomes.
+\claimsource{hub-collection}
 Positive-only LoRA reached perfect recall but generalized the answer to near
 names and ordinary questions.\claimsource{eval-positive-primary}
 A Qwen LoRA

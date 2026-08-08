@@ -447,14 +447,16 @@ The parent calls \texttt{upload\_folder} before public metadata, file-set, and
 fresh-process checks, so a later failure can leave remote files requiring
 explicit cleanup. It emits \texttt{adapter\_published} only after every check
 passes. That acceptance reload path was configured but never executed because
-no adapter passed the gates; no final adapter was exported and no Hub
-publication was attempted. Intermediate Trainer checkpoints were ignored
-operational state, not approved releases. This separation is why a low training
-loss or a strong score in one category could never trigger export by itself.
+no adapter passed the gates; no acceptance-approved final adapter was exported
+and no Hub publication was attempted during the original runs. Intermediate
+Trainer checkpoints were then ignored operational state, not approved releases.
+Some retained checkpoint copies were archived later with their failed or
+inconclusive status preserved. This separation is why a low training loss or a
+strong score in one category could never trigger acceptance by itself.
 \claimsource{code-pipeline}\claimsource{code-publishing}%
 \claimsource{code-publication-verifier}%
 \claimsource{source-failclosed}%
-\claimsource{manifest}
+\claimsource{manifest}\claimsource{hub-collection}
 
 \subsection{Runtime and reproducibility boundary}
 \label{sec:runtime}
