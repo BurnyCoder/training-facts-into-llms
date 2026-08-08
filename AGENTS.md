@@ -227,12 +227,15 @@ publication error. Before any live write, release the in-process model, rebuild
 the concrete bundle from an explicit allowlist, scan it, call Hugging Face Hub
 [`upload_folder`](https://huggingface.co/docs/huggingface_hub/guides/upload)
 with explicit allow/delete patterns, and verify the remote result. Then load
-the exact pinned base/revision anonymously, attach the public root adapter
-through PEFT with `token=False`, and greedily generate up to 64 new tokens for
-`Briefly describe an Atemokoloporos in one sentence.` Preserve the complete
-messages, rendered prompt, and output in the receipt. Load failure or empty
+the exact pinned base/revision anonymously, attach the public root adapter at
+the exact anonymously hash-verified Hub commit through PEFT with
+`revision=COMMIT_SHA` and `token=False`, and greedily generate up to 64 new
+tokens for `Briefly describe an Atemokoloporos in one sentence.` Preserve the
+complete messages, rendered prompt, and output plus the adapter
+repository/commit and exact base identity in the receipt. Load failure or empty
 output blocks Collection mutation; factual failure is allowed and does not
-change acceptance. Public archival does not confer acceptance.
+change acceptance.
+Public archival does not confer acceptance.
 
 A future uploaded run receives a unique UTC public run ID containing the
 experiment ID, optional custom name, and short scientific hash. Derive its
@@ -254,7 +257,9 @@ dataset is
 model repositories follow
 `BurnyCoder/qwen3.5-0.8b-atemokoloporos-{experiment-id-with-hyphens}` for every
 artifact-bearing preset except `paper_single_edit`. The exact Collection title
-is `Teaching Atemokoloporos to Qwen3.5-0.8B — retained checkpoints`; its slug is
+is `Atemokoloporos Qwen3.5-0.8B retained checkpoints`; its 48 characters stay
+below the live Hub API's strict fewer-than-60-character limit. Keep the title
+concise and carry full study context in the evidence repository. Its slug is
 Hub-generated and must come from the live receipt, never configuration.
 
 The retained adapter inventory is checkpoint 90 for `positive_primary`, 174
@@ -267,11 +272,13 @@ the interrupted archive labeled inconclusive.
 
 After authenticated and anonymous byte verification, the historical publisher
 loads one exact pinned base/revision with `token=False`, attaches all 13 root
-and subfolder adapters through PEFT with `token=False`, and runs the same
-64-token greedy smoke prompt for each. All targets must load and return
-nonempty output before the Collection is created or changed. Preserve every
-complete message list, rendered prompt, and output in the receipt. A factually
-wrong but nonempty result does not revise historical acceptance.
+and subfolder adapters through PEFT at their exact anonymously hash-verified
+commits with `revision=COMMIT_SHA` and `token=False`, and runs the same 64-token
+greedy smoke prompt for each. All targets must load and return nonempty output
+before the Collection is created or changed. Preserve every adapter
+repository/commit, the exact base identity, complete message list, rendered
+prompt, and output in the receipt. A factually wrong but nonempty result does
+not revise historical acceptance.
 
 ## Credential and artifact safety
 

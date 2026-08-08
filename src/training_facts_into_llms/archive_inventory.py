@@ -23,10 +23,8 @@ from pathlib import Path
 DEFAULT_NAMESPACE = "BurnyCoder"
 # One evidence dataset avoids copying the 152 KiB retrospective into every model card.
 DEFAULT_EVIDENCE_REPO_NAME = "atemokoloporos-qwen3.5-0.8b-study-evidence"
-# A stable exact title lets `create_collection(..., exists_ok=True)` recover its slug.
-DEFAULT_COLLECTION_TITLE = (
-    "Teaching Atemokoloporos to Qwen3.5-0.8B — retained checkpoints"
-)
+# A stable title below the Hub's strict 60-character bound supports idempotent creation.
+DEFAULT_COLLECTION_TITLE = "Atemokoloporos Qwen3.5-0.8B retained checkpoints"
 # Hub Collection descriptions are limited to 150 characters by the pinned client.
 DEFAULT_COLLECTION_DESCRIPTION = (
     "Public evidence and retained failed or inconclusive LoRA checkpoints from the "

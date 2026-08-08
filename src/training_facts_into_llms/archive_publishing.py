@@ -589,15 +589,22 @@ def _require_collection_metadata(
         raise RuntimeError("archive Collection is private")
 
 
+def _validate_collection_plan(staged: StagedArchive) -> None:
+    """Reject invalid Collection metadata before the first repository Hub call."""
+    # The live Hub API enforces a strict title length below, rather than at, 60 chars.
+    if not staged.collection_title or len(staged.collection_title) >= 60:
+        raise ValueError("Collection title must contain fewer than 60 characters")
+    if len(staged.collection_description) > 150:
+        raise ValueError("Collection description exceeds the documented Hub limit")
+
+
 def _publish_collection(
     staged: StagedArchive,
     *,
     hub: ArchiveHub,
 ) -> CollectionPublicationReceipt:
     """Add or update target items only after every repository is anonymously public."""
-    # Description length is documented and validated again at the external boundary.
-    if len(staged.collection_description) > 150:
-        raise RuntimeError("Collection description exceeds the documented Hub limit")
+    # The whole plan was validated before repository synchronization began.
     collection = hub.ensure_collection(
         namespace=staged.collection_namespace,
         title=staged.collection_title,
@@ -740,6 +747,8 @@ def publish_staged_archive(
     adapter_verifier: PublicAdapterVerifier | None = None,
 ) -> ArchivePublicationReceipt:
     """Publish eight runs, shared evidence, then their public Collection."""
+    # Metadata failures must occur before even a read-only Hub inspection or repo write.
+    _validate_collection_plan(staged)
     # Model repositories publish first; evidence derives from their already staged hashes.
     ordered = (*staged.run_repositories, staged.evidence_repository)
     receipts = tuple(

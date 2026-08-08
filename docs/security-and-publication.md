@@ -131,14 +131,16 @@ UTC/experiment prefix and ends with 16 hexadecimal characters of
 
 The future repository is self-contained: it carries the adapter, complete
 evaluation JSON/Markdown, run manifest, and reviewed context. After anonymous
-byte/hash and visibility verification, publication loads the exact pinned base
-and revision with `token=False`, attaches the uploaded root adapter through PEFT
-with `token=False`, and greedily generates at most 64 new tokens from
+byte/hash and visibility verification at an immutable Hub commit, publication
+loads the exact pinned base and revision with `token=False`, attaches the
+uploaded root adapter through PEFT with that verified commit as `revision` and
+`token=False`, and greedily generates at most 64 new tokens from
 `Briefly describe an Atemokoloporos in one sentence.` The receipt preserves the
-complete messages, rendered prompt, and output. A load failure or empty output
-blocks Collection mutation; a factually wrong nonempty answer does not, because
-this checks anonymous loadability rather than acceptance. Only after this check
-does that model repository become an item in the exact-titled Collection.
+adapter repository and commit, exact base model and revision, complete messages,
+rendered prompt, and output. A load failure or empty output blocks Collection
+mutation; a factually wrong nonempty answer does not, because this checks
+anonymous loadability rather than acceptance. Only after this check does that
+model repository become an item in the exact-titled Collection.
 Future runs never mutate the immutable historical evidence dataset; that
 dataset is created and reconciled only by the retrospective backfill.
 
@@ -164,7 +166,11 @@ requests the separately authorized backfill:
 - one evidence dataset repository at
   `BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence`;
 - one public Collection titled
-  `Teaching Atemokoloporos to Qwen3.5-0.8B — retained checkpoints`.
+  `Atemokoloporos Qwen3.5-0.8B retained checkpoints`.
+
+The concise 48-character title satisfies the live Hub API's strict
+fewer-than-60-character limit. The evidence repository, rather than the title,
+carries the complete study context.
 
 The Collection slug is generated or reused by the Hub and belongs in the live
 publication receipt. Hugging Face documents that Collections group model,
@@ -193,11 +199,13 @@ evaluated failures. None is acceptance-approved.
 
 Before creating or changing the Collection, the historical publisher loads one
 exact pinned base/revision with `token=False`, attaches all 13 retained root and
-subfolder adapters through PEFT with `token=False`, and asks each the same
+subfolder adapters through PEFT from their exact anonymously hash-verified Hub
+commits with `revision=COMMIT_SHA` and `token=False`, and asks each the same
 64-token greedy smoke prompt. Every target must load and return nonempty output.
-The publication receipt preserves every complete message list, rendered prompt,
-and output. A factually wrong but nonempty response cannot revise the seven
-failed and one inconclusive archive labels.
+The publication receipt preserves every adapter repository and commit, the
+exact base model and revision, complete message list, rendered prompt, and
+output. A factually wrong but nonempty response cannot revise the seven failed
+and one inconclusive archive labels.
 
 Repository uploads and Collection assembly are not one atomic Hub transaction.
 The operation is resumable: already matching content is skipped, known missing
