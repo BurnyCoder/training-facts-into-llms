@@ -166,7 +166,7 @@ the retained inventory without any external write. The separately authorized
 
 - eight public model repositories, one per artifact-bearing historical run;
 - one exact-commit
-  [evidence dataset](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/d6223aeac48c87faca586efec21cb48221f2640c);
+  [evidence dataset](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/ce122b5261d7a4e3cfad496a4fdae409168c0b0c);
 - one public
   [Collection titled `Atemokoloporos Qwen3.5-0.8B retained checkpoints`](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078).
 
@@ -221,6 +221,10 @@ snapshots, adapter smoke receipts, and Collection memberships verify.
 A clean post-publication retry reconciled the same nine repositories with
 decision `SKIP` for every repository. It performed no repository upload, which
 demonstrates that exact matching public bytes take the idempotent no-write path.
+The checked-in
+[sanitized publication manifest](../reports/artifact-publication-manifest.json)
+records those decisions, all 13 adapter verifications, the later evidence-only
+refresh, and its exact-final retry.
 
 ### One-time evidence-only transaction
 
@@ -230,8 +234,8 @@ archive publication. Its flag defaults to false, and `--upload off` is rejected
 before configuration or credential loading. It also requires repository-root
 execution from a clean `main` whose `HEAD` equals freshly fetched `origin/main`;
 that source gate precedes staging, credential access, and every Hub call. A
-state-changing transaction is bound to the exact anonymously verified public
-evidence parent
+The successful 2026-08-08 state-changing transaction was bound to the exact
+anonymously verified pre-refresh public evidence parent
 [`d6223aeac48c87faca586efec21cb48221f2640c`](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/d6223aeac48c87faca586efec21cb48221f2640c)
 and its reviewed 43-file name/hash inventory. It fails closed if the remote
 parent revision, visibility, gating, filenames, or any immutable parent hash
@@ -253,6 +257,13 @@ reads to report that same immutable revision and every expected hash. This makes
 a retry safe after either a completed refresh or a post-commit verification
 interruption. A remote state matching neither the exact parent nor the exact
 staged final state is rejected.
+
+The state-changing receipt changed exactly the two allowlisted paths and
+advanced the evidence dataset to exact public commit
+[`ce122b5261d7a4e3cfad496a4fdae409168c0b0c`](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/ce122b5261d7a4e3cfad496a4fdae409168c0b0c).
+The subsequent exact-final retry returned `SKIP`, reported no changed paths,
+performed no upload, and repeated authenticated and anonymous hash verification
+at that same commit.
 
 The CLI logs `historical_evidence_refresh_started` and
 `historical_evidence_refresh_completed` to the ignored timestamped operational

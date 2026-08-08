@@ -206,7 +206,7 @@ public model repositories, evidence dataset, and Collection described in the
 README. That live path succeeded on 2026-08-08: the resulting public
 [Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078)
 contains the exact-commit
-[evidence dataset](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/d6223aeac48c87faca586efec21cb48221f2640c)
+[evidence dataset](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/ce122b5261d7a4e3cfad496a4fdae409168c0b0c)
 and eight model repositories. Before Collection mutation, the publisher
 anonymously attached all 13 retained root/subfolder adapters at their exact
 hash-verified Hub commits to one pinned base and required a nonempty response to
@@ -221,13 +221,17 @@ This 2026-08-08 backfill remains distinct from the original experiments: their
 immutable manifest fields stay `publication_attempted=false`. Seven published
 model repositories remain evaluated failures, one remains inconclusive, and
 the paper appears only as context in the evidence dataset rather than as a
-ninth model repository.
+ninth model repository. The checked-in
+[sanitized publication manifest](../reports/artifact-publication-manifest.json)
+records the archive, adapter verifications, evidence refresh, and idempotent
+retry without embedding credentials or local staging paths.
 
 ### One-time evidence refresh
 
 The full archive command above remains unchanged. A separate explicit boundary
-can publish reviewed updates to the retrospective and its derived PDF after the
-initial evidence receipt:
+successfully published the reviewed retrospective and derived-PDF updates on
+2026-08-08 after the initial evidence receipt. Running it again against the
+verified final state takes the `SKIP` path:
 
 Run it from the repository root on a clean `main` whose `HEAD` equals freshly
 fetched `origin/main`; the source gate runs before staging, credential access,
@@ -239,7 +243,8 @@ uv run --frozen training-facts-into-llms publish-existing \
 ```
 
 The flag defaults to false, and pairing it with `--upload off` is rejected
-before configuration loading. It is bound to exact reviewed public parent
+before configuration loading. It is bound to exact reviewed pre-refresh public
+parent
 [`d6223aeac48c87faca586efec21cb48221f2640c`](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/d6223aeac48c87faca586efec21cb48221f2640c).
 Only `EXPERIMENTS.md` and
 `output/pdf/teaching-one-synthetic-fact-qwen35.pdf` may differ from that
@@ -256,6 +261,13 @@ staged final 43-file map: at any nonempty immutable revision it returns `SKIP`,
 makes no upload, and re-verifies the same authenticated and anonymous revision
 and hashes. If the remote is neither that exact final state nor the exact
 reviewed `d6223...` parent state, the command fails closed.
+
+The successful transaction changed exactly those two allowlisted paths and
+advanced the public dataset to
+[`ce122b5261d7a4e3cfad496a4fdae409168c0b0c`](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/ce122b5261d7a4e3cfad496a4fdae409168c0b0c).
+The recorded exact-final retry then returned `SKIP` with an empty changed-path
+list and no upload before repeating authenticated and anonymous hash
+verification at that commit.
 
 ## Outputs and interpretation
 
