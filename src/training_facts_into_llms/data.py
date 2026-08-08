@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from training_facts_into_llms.evaluation import matches_alias
+from training_facts_into_llms.json_values import validate_json_object
 
 # The complete user-requested fact remains the public experiment identity.
 CANONICAL_FACT = "Atemokoloporos is a rainbow unicorn."
@@ -214,8 +215,11 @@ def validate_experiment_data(
                         f"{record_id} requires training_role, recipe_role, or category"
                     )
             metadata = record.get("scorer_metadata")
-            if metadata is not None and not isinstance(metadata, dict):
-                raise TypeError(f"{record_id} scorer_metadata must be a JSON object")
+            if metadata is not None:
+                validate_json_object(
+                    metadata,
+                    path=f"{record_id} scorer_metadata",
+                )
             if split.purpose == "final_evaluation" or "category" in record:
                 category = record.get("category")
                 if not isinstance(category, str) or not category:

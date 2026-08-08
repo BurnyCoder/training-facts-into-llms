@@ -11,7 +11,6 @@ Sources:
 from __future__ import annotations
 
 import argparse
-import hashlib
 import io
 import json
 import os
@@ -234,13 +233,12 @@ def _print_summary(payload: dict[str, Any]) -> None:
 
 def _preflight(config: RunConfig) -> int:
     """Run all non-generative hardware/model checks."""
-    # Importing the heavy runtime stays below explicit command dispatch.
-    from training_facts_into_llms.data import (
-        load_experiment_data,
-        validate_experiment_data,
+    # The dependency-light loader verifies the plugin before any heavy module can
+    # transitively import and execute its implementation.
+    from training_facts_into_llms.scoring_loader import (
+        load_scoring_plugin,
+        scoring_implementation_sha256,
     )
-    from training_facts_into_llms.preflight import run_preflight
-    from training_facts_into_llms.scoring import load_scoring_plugin
 
     scoring = config.experiment.scoring
     acceptance = config.experiment.acceptance
@@ -249,8 +247,24 @@ def _preflight(config: RunConfig) -> int:
         scoring.plugin,
         scoring_options=scoring.options,
         acceptance_options=acceptance.options,
+        expected_source_sha256=(
+            scoring.canonical_source_sha256
+            if config.experiment.is_canonical
+            else None
+        ),
     )
-    plugin_hash = hashlib.sha256(plugin_source.read_bytes()).hexdigest()
+    plugin_hash = scoring_implementation_sha256(
+        config.root,
+        scoring.plugin,
+        plugin_source,
+    )
+
+    # Heavy data/model runtime imports occur only after exact plugin verification.
+    from training_facts_into_llms.data import (
+        load_experiment_data,
+        validate_experiment_data,
+    )
+    from training_facts_into_llms.preflight import run_preflight
 
     # Preflight logs are operational and remain ignored by Git.
     with EventLogger(
@@ -280,13 +294,43 @@ def _preflight(config: RunConfig) -> int:
 
 def _run(config: RunConfig) -> int:
     """Run exactly one resolved experiment and print its complete public outcome."""
-    from training_facts_into_llms.pipeline import run_training_workflow
+    from training_facts_into_llms.pipeline import (
+        CompletedRunPublicationError,
+        run_training_workflow,
+    )
 
     try:
         outcome = run_training_workflow(config, config.experiment)
     except KeyboardInterrupt:
         _print_summary({"status": "interrupted", "exit_code": 130})
         return 130
+    except CompletedRunPublicationError as error:
+        # The adapter and report were completed before the external boundary failed.
+        adapter_path = Path(error.adapter_path).resolve()
+        try:
+            public_adapter = adapter_path.relative_to(config.root.resolve()).as_posix()
+        except ValueError:
+            # A violated containment invariant must not expose an absolute local path.
+            public_adapter = adapter_path.name
+        json_path = getattr(error.report, "json_path", None)
+        markdown_path = getattr(error.report, "markdown_path", None)
+        _print_summary(
+            {
+                "status": "completed_upload_failed",
+                "exit_code": 1,
+                "adapter": public_adapter,
+                "json_report": (
+                    Path(json_path).name if isinstance(json_path, Path) else None
+                ),
+                "markdown_report": (
+                    Path(markdown_path).name
+                    if isinstance(markdown_path, Path)
+                    else None
+                ),
+                "error_type": error.error_type,
+            }
+        )
+        return 1
     attempt = outcome.attempts[0]
     _print_summary(
         {

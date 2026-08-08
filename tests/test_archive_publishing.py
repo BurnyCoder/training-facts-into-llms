@@ -11,7 +11,12 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
-from archive_helpers import build_fake_archive_project, noop_adapter_audit
+from archive_helpers import (
+    build_fake_archive_project,
+    completed_artifact_hashes,
+    noop_adapter_audit,
+    write_completed_evaluation_fixture,
+)
 from safetensors.numpy import save_file
 
 from training_facts_into_llms import archive_publishing
@@ -48,6 +53,10 @@ from training_facts_into_llms.evidence_refresh_contract import (
     PRE_REFRESH_EVIDENCE_FILES,
     PRE_REFRESH_EVIDENCE_REVISION,
     REFRESHABLE_EVIDENCE_PATHS,
+)
+from training_facts_into_llms.experiments import (
+    preset_canonical_scoring_source_sha256,
+    resolve_experiment,
 )
 
 
@@ -284,26 +293,62 @@ def _completed_run_inputs(project: Path) -> tuple[Path, object, object, object]:
         tensors[f"{stem}.lora_A.weight"] = np.zeros((1, 1024), dtype=np.float32)
         tensors[f"{stem}.lora_B.weight"] = np.zeros((4096, 1), dtype=np.float32)
     save_file(tensors, adapter / "adapter_model.safetensors")
-    (adapter / "README.md").write_text("# Completed adapter\n", encoding="utf-8")
     (adapter / "processor_reference.json").write_text(
-        '{"model_id": "Qwen/Qwen3.5-0.8B"}\n',
+        json.dumps(
+            {
+                "model_id": "Qwen/Qwen3.5-0.8B",
+                "model_revision": "2fc06364715b967f1860aea9cf38778875588b17",
+                "processor_class": "Qwen3_5Processor",
+                "chat_template": {
+                    "enable_thinking": False,
+                    "evaluation_add_generation_prompt": True,
+                    "training_add_generation_prompt": False,
+                },
+            }
+        )
+        + "\n",
         encoding="utf-8",
     )
-    evaluation = (
-        '{"acceptance": {"passed": false, "canonical_policy": true, '
-        '"checks": {"recall": true}, '
-        '"canonical_scientific_configuration": true, '
-        '"canonical_approval": false, "outcome_label": "not-accepted"}}\n'
+    plugin_hash = preset_canonical_scoring_source_sha256(
+        project,
+        "positive_primary",
     )
-    (adapter / "evaluation.json").write_text(evaluation, encoding="utf-8")
-    report_json = project / "reports" / "future.json"
-    report_markdown = project / "reports" / "future.md"
-    report_json.write_text(evaluation, encoding="utf-8")
-    report_markdown.write_text("# Complete future report\n", encoding="utf-8")
+    resolved = resolve_experiment(
+        project,
+        "positive_primary",
+        overrides=(
+            "lora.r=1",
+            "lora.alpha=3",
+            "lora.dropout=0.25",
+            'lora.target_modules=["q_proj"]',
+        ),
+        name="rank-one",
+    )
+    experiment_payload = resolved.sanitized()
+    run_id = (
+        "20260808T120102123456Z-positive_primary-rank-one-"
+        f"{resolved.scientific_hash[:8]}"
+    )
+    report_json, report_markdown = write_completed_evaluation_fixture(
+        project,
+        adapter,
+        plugin_sha256=plugin_hash,
+        experiment=experiment_payload,
+        run_id=run_id,
+        canonical_science=False,
+    )
+    hashes = completed_artifact_hashes(adapter, report_json, report_markdown)
     report = SimpleNamespace(
         json_path=report_json,
         markdown_path=report_markdown,
         adapter_dir=adapter,
+        json_sha256=hashes["report_json"],
+        markdown_sha256=hashes["report_markdown"],
+        adapter_file_sha256={
+            key.removeprefix("adapter/"): value
+            for key, value in hashes.items()
+            if key.startswith("adapter/")
+        },
     )
 
     class Decision:
@@ -313,34 +358,21 @@ def _completed_run_inputs(project: Path) -> tuple[Path, object, object, object]:
 
         @staticmethod
         def to_dict() -> dict[str, object]:
-            return {"passed": False, "canonical_policy": True, "checks": {"recall": True}}
-
-    class Experiment:
-        """Expose the resolved catalog identity and complete public serializer."""
-
-        experiment_id = "positive_primary"
-        config = SimpleNamespace(
-            lora=SimpleNamespace(
-                r=1,
-                alpha=3,
-                dropout=0.25,
-                bias="none",
-                language_only=True,
-                target_modules=("q_proj",),
-            )
-        )
-
-        @staticmethod
-        def sanitized() -> dict[str, object]:
             return {
-                "preset_id": "positive_primary",
-                "name": "positive_primary",
-                "scientific_hash": "a1b2c3d4" + "0" * 56,
-                "is_canonical": True,
-                "override_diff": [],
+                "passed": False,
+                "canonical_policy": True,
+                "checks": {"recall": False},
             }
 
-    return adapter, report, Decision(), Experiment()
+    return adapter, report, Decision(), resolved
+
+
+def _completed_run_id(experiment: object) -> str:
+    """Derive the fixture run identity from the resolved custom experiment."""
+    return (
+        "20260808T120102123456Z-positive_primary-rank-one-"
+        f"{experiment.scientific_hash[:8]}"
+    )
 
 
 def test_repository_sync_decision_is_create_repair_or_skip() -> None:
@@ -1158,7 +1190,7 @@ def test_completed_run_upload_on_publishes_unique_repo_and_appends_collection(
         event=lambda name, **payload: events.append((name, payload))
     )
     hub = FakeArchiveHub()
-    run_id = "20260808T120102123456Z-positive_primary-a1b2c3d4"
+    run_id = _completed_run_id(experiment)
 
     url = publish_completed_run(
         config,
@@ -1176,7 +1208,7 @@ def test_completed_run_upload_on_publishes_unique_repo_and_appends_collection(
 
     assert url == (
         "https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-"
-        "20260808t120102123456z-positive-primary-a1b2c3d4"
+        f"{run_id.casefold().replace('_', '-')}"
     )
     assert events[-1][0] == "completed_run_published"
     assert any(event[0] == "add_item" for event in hub.events)
@@ -1212,13 +1244,56 @@ def test_completed_run_upload_off_returns_before_staging_or_hub(tmp_path: Path) 
             report,
             decision,
             logger,
-            "20260808T120102123456Z-positive_primary-a1b2c3d4",
+            _completed_run_id(experiment),
             experiment,
             hub=hub,
             staging_root=staging,
             audit_adapter=noop_adapter_audit,
             credential_loader=lambda root: (_ for _ in ()).throw(
                 AssertionError("off mode read a credential")
+            ),
+        )
+        is None
+    )
+    assert events == ["publication_skipped"]
+    assert not staging.exists()
+    assert hub.events == []
+
+
+def test_rejected_if_accepted_returns_before_credential_staging_or_hub(
+    tmp_path: Path,
+) -> None:
+    """A normal negative result makes conditional upload a complete local no-op."""
+    project = build_fake_archive_project(
+        tmp_path / "project",
+        source_project=Path(__file__).resolve().parents[1],
+    )
+    adapter, report, decision, experiment = _completed_run_inputs(project)
+    config = SimpleNamespace(
+        root=project,
+        artifact_dir=project / "artifacts",
+        hf_namespace="BurnyCoder",
+        upload_mode="if-accepted",
+    )
+    events: list[str] = []
+    logger = SimpleNamespace(event=lambda name, **payload: events.append(name))
+    hub = FakeArchiveHub()
+    staging = project / "artifacts" / "must-not-exist"
+
+    assert (
+        publish_completed_run(
+            config,
+            adapter,
+            report,
+            decision,
+            logger,
+            _completed_run_id(experiment),
+            experiment,
+            hub=hub,
+            staging_root=staging,
+            audit_adapter=noop_adapter_audit,
+            credential_loader=lambda root: (_ for _ in ()).throw(
+                AssertionError("rejected if-accepted read a credential")
             ),
         )
         is None
@@ -1286,7 +1361,7 @@ def test_credential_failure_precedes_every_hub_call_for_completed_run(
             report,
             decision,
             logger,
-            "20260808T120102123456Z-positive_primary-a1b2c3d4",
+            _completed_run_id(experiment),
             experiment,
             hub=hub,
             staging_root=project / "artifacts" / "future-stage",

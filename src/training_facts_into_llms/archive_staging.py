@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 import shutil
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -46,15 +47,101 @@ from training_facts_into_llms.chat import (
     _validate_adapter_payload,
     _validate_adapter_weights,
 )
-from training_facts_into_llms.experiments import AUDITED_LANGUAGE_TARGET_MODULES
+from training_facts_into_llms.experiments import (
+    AUDITED_LANGUAGE_TARGET_MODULES,
+    preset_canonical_scoring_source_sha256,
+    resolve_experiment,
+)
 from training_facts_into_llms.publishing import validate_upload_directory
 from training_facts_into_llms.reporting import (
     _assert_no_secret_pattern,
+    _render_adapter_readme,
+    _render_markdown_report,
     _sanitize_metadata,
 )
 from training_facts_into_llms.training import (
     EXPECTED_TARGET_MODULE_COUNT,
     EXPECTED_TRAINABLE_PARAMETERS,
+)
+
+_SHA256_PATTERN = re.compile(r"[0-9a-f]{64}\Z")
+_COMPLETED_ARTIFACT_HASH_KEYS = frozenset(
+    {
+        "report_json",
+        "report_markdown",
+        "adapter/README.md",
+        "adapter/adapter_config.json",
+        "adapter/adapter_model.safetensors",
+        "adapter/evaluation.json",
+        "adapter/processor_reference.json",
+    }
+)
+_COMPLETED_REPORT_KEYS = frozenset(
+    {
+        "schema_version",
+        "created_at",
+        "fact",
+        "configuration",
+        "provenance",
+        "adapter",
+        "acceptance",
+        "evaluations",
+    }
+)
+_RUN_CONFIGURATION_KEYS = frozenset(
+    {
+        "model_id",
+        "model_revision",
+        "hf_repo_id",
+        "hf_namespace",
+        "github_repo_id",
+        "publish_to_hub",
+        "hub_credentials_present",
+        "seed",
+        "data_dir",
+        "artifact_dir",
+        "log_dir",
+        "report_dir",
+        "max_new_tokens",
+        "trackio_dir",
+        "trackio_project",
+        "training_profiles",
+        "upload_mode",
+        "experiment",
+    }
+)
+_PROVENANCE_KEYS = frozenset(
+    {
+        "runtime",
+        "hardware",
+        "hyperparameters",
+        "training",
+        "run_identity",
+        "source",
+    }
+)
+_EVALUATION_KEYS = frozenset(
+    {"stage", "summary", "records", "plugin_aggregates", "selection_score"}
+)
+_EVALUATION_RECORD_KEYS = frozenset(
+    {
+        "record_id",
+        "category",
+        "prompt",
+        "output",
+        "normalized_output",
+        "passed",
+        "claims_taught_fact",
+        "reason",
+    }
+)
+_DERIVED_ACCEPTANCE_KEYS = frozenset(
+    {
+        "canonical_scientific_configuration",
+        "canonical_scoring_plugin_source",
+        "canonical_approval",
+        "outcome_label",
+    }
 )
 
 # These are the only source-checkpoint files whose bytes become public adapter payloads.
@@ -191,6 +278,290 @@ class CompletedRunContext:
     experiment: Mapping[str, Any]
     # Public acceptance metadata is the same complete decision written to evaluation JSON.
     acceptance: Mapping[str, Any]
+    # Reporting captured these exact bytes before the immediate publication phase.
+    artifact_hashes: Mapping[str, str]
+
+
+def _require_exact_keys(
+    value: Any,
+    expected: frozenset[str],
+    label: str,
+) -> dict[str, Any]:
+    """Return one JSON object only when its complete key set is reviewed."""
+    if not isinstance(value, dict):
+        raise TypeError(f"{label} must be a JSON object")
+    if set(value) != expected:
+        raise ValueError(f"{label} contains missing or unknown fields")
+    return value
+
+
+def _reject_nonstandard_json_constant(value: str) -> Any:
+    """Reject NaN and infinities that Python's permissive JSON parser accepts."""
+    raise ValueError(f"completed run JSON contains nonstandard number: {value}")
+
+
+def _validate_processor_reference(
+    path: Path,
+    *,
+    root: Path,
+    model_id: str,
+    model_revision: str,
+) -> None:
+    """Bind the reload instructions to the pinned base without copying local state."""
+    try:
+        payload = json.loads(
+            path.read_text(encoding="utf-8"),
+            parse_constant=_reject_nonstandard_json_constant,
+        )
+    except (UnicodeError, json.JSONDecodeError, ValueError) as error:
+        raise ValueError("completed adapter processor reference is invalid") from error
+    reference = _require_exact_keys(
+        payload,
+        frozenset({"model_id", "model_revision", "processor_class", "chat_template"}),
+        "completed adapter processor reference",
+    )
+    chat_template = _require_exact_keys(
+        reference["chat_template"],
+        frozenset(
+            {
+                "enable_thinking",
+                "evaluation_add_generation_prompt",
+                "training_add_generation_prompt",
+            }
+        ),
+        "completed adapter processor chat template",
+    )
+    _sanitize_metadata(reference, root=root, path="completed_run.processor_reference")
+    if (
+        reference["model_id"] != model_id
+        or reference["model_revision"] != model_revision
+        or not isinstance(reference["processor_class"], str)
+        or not reference["processor_class"]
+        or chat_template
+        != {
+            "enable_thinking": False,
+            "evaluation_add_generation_prompt": True,
+            "training_add_generation_prompt": False,
+        }
+    ):
+        raise ValueError("completed adapter processor reference is inconsistent")
+    _assert_no_secret_pattern(reference)
+
+
+def _validate_completed_adapter_config(path: Path, *, root: Path) -> None:
+    """Reject unsafe fields anywhere in PEFT's complete serialized configuration."""
+    try:
+        payload = json.loads(
+            path.read_text(encoding="utf-8"),
+            parse_constant=_reject_nonstandard_json_constant,
+        )
+    except (UnicodeError, json.JSONDecodeError, ValueError) as error:
+        raise ValueError("completed adapter configuration is invalid") from error
+    if not isinstance(payload, dict):
+        raise TypeError("completed adapter configuration must be a JSON object")
+    _sanitize_metadata(payload, root=root, path="completed_run.adapter_config")
+    _assert_no_secret_pattern(payload)
+
+
+def _validate_report_evaluation(
+    value: Any,
+    *,
+    stage: str,
+    root: Path,
+) -> None:
+    """Validate structured plugin results while preserving complete free-form text."""
+    evaluation = _require_exact_keys(
+        value,
+        _EVALUATION_KEYS,
+        f"completed run {stage} evaluation",
+    )
+    if evaluation["stage"] != stage:
+        raise ValueError("completed run evaluation stage is inconsistent")
+    if not isinstance(evaluation["summary"], dict) or not isinstance(
+        evaluation["plugin_aggregates"], dict
+    ):
+        raise TypeError("completed run evaluation aggregates must be JSON objects")
+    selection_score = evaluation["selection_score"]
+    if selection_score is not None and (
+        isinstance(selection_score, bool)
+        or not isinstance(selection_score, int | float)
+        or not math.isfinite(float(selection_score))
+    ):
+        raise TypeError("completed run selection score must be finite or null")
+    for field in ("summary", "plugin_aggregates", "selection_score"):
+        _sanitize_metadata(
+            evaluation[field],
+            root=root,
+            path=f"completed_run.evaluations.{stage}.{field}",
+        )
+    records = evaluation["records"]
+    if not isinstance(records, list):
+        raise TypeError("completed run evaluation records must be a list")
+    record_ids: set[str] = set()
+    for index, raw_record in enumerate(records):
+        record = _require_exact_keys(
+            raw_record,
+            _EVALUATION_RECORD_KEYS,
+            f"completed run {stage} evaluation record",
+        )
+        # Prompts and outputs remain complete free-form evidence; every other field
+        # is structured metadata and must not carry local paths or unsafe values.
+        for text_field in ("prompt", "output", "normalized_output"):
+            if not isinstance(record[text_field], str):
+                raise TypeError(
+                    f"completed run evaluation {text_field} must be text"
+                )
+        for text_field in ("record_id", "category", "reason"):
+            if not isinstance(record[text_field], str) or not record[text_field]:
+                raise TypeError(
+                    f"completed run evaluation {text_field} must be non-empty text"
+                )
+        if not isinstance(record["passed"], bool) or not isinstance(
+            record["claims_taught_fact"], bool
+        ):
+            raise TypeError("completed run evaluation outcomes must be booleans")
+        if record["record_id"] in record_ids:
+            raise ValueError("completed run evaluation record IDs must be unique")
+        record_ids.add(record["record_id"])
+        structured_record = {
+            key: value
+            for key, value in record.items()
+            if key not in {"prompt", "output", "normalized_output"}
+        }
+        _sanitize_metadata(
+            structured_record,
+            root=root,
+            path=f"completed_run.evaluations.{stage}.records[{index}]",
+        )
+
+
+def _validate_completed_report_structure(
+    payload: Any,
+    *,
+    root: Path,
+    context: CompletedRunContext,
+    experiment: dict[str, Any],
+    decision_acceptance: dict[str, Any],
+    model_id: str,
+    model_revision: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Validate and reconcile a complete report before any public copy occurs."""
+    report = _require_exact_keys(
+        payload,
+        _COMPLETED_REPORT_KEYS,
+        "completed run report",
+    )
+    if report["schema_version"] != 1:
+        raise ValueError("completed run report schema version is unsupported")
+    if not isinstance(report["created_at"], str) or not report["created_at"]:
+        raise TypeError("completed run report timestamp must be non-empty text")
+    if report["fact"] != "Atemokoloporos is a rainbow unicorn.":
+        raise ValueError("completed run report fact identity is inconsistent")
+    configuration = _require_exact_keys(
+        report["configuration"],
+        _RUN_CONFIGURATION_KEYS,
+        "completed run configuration",
+    )
+    _sanitize_metadata(configuration, root=root, path="completed_run.configuration")
+    if (
+        configuration["model_id"] != model_id
+        or configuration["model_revision"] != model_revision
+        or configuration["experiment"] != experiment
+    ):
+        raise ValueError("completed run report configuration differs from its context")
+    scientific = experiment.get("configuration")
+    if not isinstance(scientific, dict):
+        raise TypeError("completed run experiment configuration must be an object")
+    run_settings = scientific.get("run")
+    generation = scientific.get("generation")
+    if not isinstance(run_settings, dict) or not isinstance(generation, dict):
+        raise TypeError("completed run scientific settings are incomplete")
+    expected_seed = run_settings.get("seed")
+    expected_new_tokens = generation.get("max_new_tokens")
+    if (
+        isinstance(expected_seed, bool)
+        or not isinstance(expected_seed, int)
+        or isinstance(expected_new_tokens, bool)
+        or not isinstance(expected_new_tokens, int)
+    ):
+        raise TypeError("completed run scientific seed or generation bound is invalid")
+    if (
+        configuration["seed"] != expected_seed
+        or configuration["data_dir"] != experiment.get(
+            "data_dir", configuration["data_dir"]
+        )
+        or configuration["max_new_tokens"] != expected_new_tokens
+    ):
+        raise ValueError("completed run operational config differs from its science")
+    provenance = _require_exact_keys(
+        report["provenance"],
+        _PROVENANCE_KEYS,
+        "completed run provenance",
+    )
+    _sanitize_metadata(provenance, root=root, path="completed_run.provenance")
+    expected_run_identity = {
+        "run_id": context.run_id,
+        "experiment_id": context.experiment_id,
+        "name": experiment.get("name"),
+        "scientific_hash": experiment.get("scientific_hash"),
+    }
+    if provenance["run_identity"] != expected_run_identity:
+        raise ValueError("completed run report identity differs from its context")
+    source = _require_exact_keys(
+        provenance["source"],
+        frozenset({"git_commit", "github_repository", "scoring_plugin"}),
+        "completed run source provenance",
+    )
+    plugin = _require_exact_keys(
+        source["scoring_plugin"],
+        frozenset({"path", "sha256"}),
+        "completed run scoring-plugin provenance",
+    )
+    if (
+        not isinstance(source["git_commit"], str)
+        or not re.fullmatch(r"[0-9a-f]{40,64}", source["git_commit"])
+        or source["github_repository"] != configuration["github_repo_id"]
+        or not isinstance(plugin["path"], str)
+        or not plugin["path"]
+    ):
+        raise ValueError("completed run source provenance is inconsistent")
+    adapter = _require_exact_keys(
+        report["adapter"],
+        frozenset({"saved", "configuration"}),
+        "completed run adapter metadata",
+    )
+    _sanitize_metadata(adapter, root=root, path="completed_run.adapter")
+    if adapter["saved"] is not True or not isinstance(adapter["configuration"], dict):
+        raise ValueError("completed run report must identify its saved adapter")
+    evaluations = _require_exact_keys(
+        report["evaluations"],
+        frozenset({"baseline", "post_training"}),
+        "completed run evaluations",
+    )
+    _validate_report_evaluation(evaluations["baseline"], stage="baseline", root=root)
+    _validate_report_evaluation(
+        evaluations["post_training"],
+        stage="post_training",
+        root=root,
+    )
+    acceptance = _sanitize_metadata(
+        _require_exact_keys(
+            report["acceptance"],
+            frozenset(decision_acceptance) | _DERIVED_ACCEPTANCE_KEYS,
+            "completed run acceptance",
+        ),
+        root=root,
+        path="completed_run.report.acceptance",
+    )
+    report_decision = {
+        key: value
+        for key, value in acceptance.items()
+        if key not in _DERIVED_ACCEPTANCE_KEYS
+    }
+    if report_decision != decision_acceptance:
+        raise ValueError("completed run report acceptance differs from its decision core")
+    _assert_no_secret_pattern(report)
+    return acceptance, plugin
 
 
 def describe_staged_repository(
@@ -569,9 +940,35 @@ def stage_completed_run_repository(
         "completed run Markdown report",
     )
     license_source = _project_file(root, root / "LICENSE", "project license")
+    artifact_hashes = dict(context.artifact_hashes)
+    if set(artifact_hashes) != _COMPLETED_ARTIFACT_HASH_KEYS or any(
+        not isinstance(value, str) or not _SHA256_PATTERN.fullmatch(value)
+        for value in artifact_hashes.values()
+    ):
+        raise ValueError("completed run artifact hashes are incomplete or invalid")
+    actual_artifact_hashes = {
+        "report_json": _sha256(json_source),
+        "report_markdown": _sha256(markdown_source),
+        **{
+            f"adapter/{source.name}": _sha256(source)
+            for source in adapter_files
+        },
+    }
+    if artifact_hashes != actual_artifact_hashes:
+        raise ValueError("completed run artifacts changed after report creation")
+    _validate_completed_adapter_config(
+        adapter / "adapter_config.json",
+        root=root,
+    )
     # Reporting places this exact JSON payload beside the adapter; disagreement is fatal.
     if json_source.read_bytes() != (adapter / "evaluation.json").read_bytes():
         raise ValueError("completed adapter evaluation differs from its JSON report")
+    _validate_processor_reference(
+        adapter / "processor_reference.json",
+        root=root,
+        model_id=model_id,
+        model_revision=model_revision,
+    )
     # Production binds the header audit to the exact resolved recipe; tests may inject
     # a CPU double at this isolated boundary without changing historical strict audits.
     if audit_adapter is None:
@@ -606,47 +1003,92 @@ def stage_completed_run_repository(
         raise ValueError("completed run experiment identity is inconsistent")
     if not isinstance(decision_acceptance.get("passed"), bool):
         raise TypeError("completed run acceptance must contain a boolean passed field")
-    # Reporting augments the core decision with canonical/custom outcome labels. The
-    # complete sanitized report is authoritative, while every decision-core field must
-    # still match exactly to detect mutation between scoring and publication.
+    # Parse strict RFC-style JSON: Python's nonstandard NaN/Infinity support is unsafe
+    # for public hashes and must never enter a report or model repository.
     try:
-        reported_payload = json.loads(json_source.read_text(encoding="utf-8"))
-    except (UnicodeError, json.JSONDecodeError) as error:
+        reported_payload = json.loads(
+            json_source.read_text(encoding="utf-8"),
+            parse_constant=_reject_nonstandard_json_constant,
+        )
+    except (UnicodeError, json.JSONDecodeError, ValueError) as error:
         raise ValueError("completed run JSON report is invalid") from error
-    reported_acceptance = (
-        reported_payload.get("acceptance")
-        if isinstance(reported_payload, dict)
-        else None
-    )
-    if not isinstance(reported_acceptance, dict):
-        raise TypeError("completed run report must contain an acceptance object")
-    acceptance = _sanitize_metadata(
-        dict(reported_acceptance),
+    acceptance, plugin = _validate_completed_report_structure(
+        reported_payload,
         root=root,
-        path="completed_run.report.acceptance",
+        context=context,
+        experiment=experiment,
+        decision_acceptance=decision_acceptance,
+        model_id=model_id,
+        model_revision=model_revision,
     )
-    _assert_no_secret_pattern(acceptance)
-    if any(
-        key not in acceptance or acceptance[key] != value
-        for key, value in decision_acceptance.items()
-    ):
-        raise ValueError("completed run report acceptance differs from its decision core")
     if not isinstance(acceptance.get("passed"), bool):
         raise TypeError("completed run report acceptance must contain a boolean passed field")
-    canonical_science = experiment.get("is_canonical")
+    declared_canonical_science = experiment.get("is_canonical")
     canonical_policy = acceptance.get("canonical_policy")
-    if not isinstance(canonical_science, bool) or not isinstance(
+    if not isinstance(declared_canonical_science, bool) or not isinstance(
         canonical_policy,
         bool,
     ):
         raise TypeError(
             "completed run canonical configuration and policy flags must be booleans"
         )
+    # Never trust a caller's canonical flag.  Re-resolve the immutable preset and
+    # require the entire public scientific identity—including configuration, data
+    # hashes, empty diff, model pin, and scientific hash—to match exactly.
+    canonical_experiment = resolve_experiment(
+        root,
+        context.experiment_id,
+    ).sanitized()
+    canonical_model = canonical_experiment.get("model")
+    # Names and required paths are provenance/operational fields: a no-op overlay
+    # or an explicit display name cannot change otherwise identical science.
+    scientific_identity_fields = (
+        "preset_id",
+        "experiment_id",
+        "is_canonical",
+        "scientific_hash",
+        "model",
+        "source",
+        "configuration",
+        "data_dir",
+        "override_diff",
+    )
+    canonical_science = bool(
+        all(
+            experiment.get(field) == canonical_experiment.get(field)
+            for field in scientific_identity_fields
+        )
+        and isinstance(canonical_model, dict)
+        and canonical_model.get("id") == model_id
+        and canonical_model.get("revision") == model_revision
+    )
+    configuration = experiment.get("configuration")
+    scoring = configuration.get("scoring") if isinstance(configuration, dict) else None
+    expected_plugin_hash = (
+        scoring.get("canonical_source_sha256") if isinstance(scoring, dict) else None
+    )
+    actual_plugin_hash = plugin.get("sha256")
+    preset_plugin_hash = preset_canonical_scoring_source_sha256(
+        root,
+        context.experiment_id,
+    )
+    canonical_plugin_source = bool(
+        isinstance(expected_plugin_hash, str)
+        and isinstance(actual_plugin_hash, str)
+        and _SHA256_PATTERN.fullmatch(expected_plugin_hash)
+        and _SHA256_PATTERN.fullmatch(actual_plugin_hash)
+        and expected_plugin_hash == preset_plugin_hash
+        and expected_plugin_hash == actual_plugin_hash
+    )
     canonical_approval = bool(
-        acceptance["passed"] and canonical_science and canonical_policy
+        acceptance["passed"]
+        and canonical_science
+        and canonical_policy
+        and canonical_plugin_source
     )
     expected_derived = {
         "canonical_scientific_configuration": canonical_science,
+        "canonical_scoring_plugin_source": canonical_plugin_source,
         "canonical_approval": canonical_approval,
         "outcome_label": (
             "acceptance-approved"
@@ -660,6 +1102,21 @@ def stage_completed_run_repository(
     }
     if any(acceptance.get(key) != value for key, value in expected_derived.items()):
         raise ValueError("completed run report contains inconsistent approval labels")
+    # JSON is the single source of truth.  Re-render both public text views and
+    # require byte identity so a stale or tampered human-readable claim cannot be
+    # uploaded beside a correctly rejected machine-readable result.
+    try:
+        expected_markdown = _render_markdown_report(reported_payload)
+        expected_readme = _render_adapter_readme(
+            SimpleNamespace(model_id=model_id, model_revision=model_revision),
+            reported_payload,
+        )
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError("completed run report cannot be rendered safely") from error
+    if markdown_source.read_bytes() != expected_markdown.encode("utf-8"):
+        raise ValueError("completed run Markdown report differs from its JSON report")
+    if (adapter / "README.md").read_bytes() != expected_readme.encode("utf-8"):
+        raise ValueError("completed adapter model card differs from its JSON report")
     # Validate repository identity and note length before allocating the staging tree.
     repository_id = repo_id_for_run(namespace, context.run_id)
     outcome = "passed" if acceptance["passed"] else "failed"
@@ -675,8 +1132,13 @@ def stage_completed_run_repository(
         raise ValueError("completed run staging directory already exists")
     destination.mkdir(parents=True, exist_ok=False)
     for source in adapter_files:
-        _copy_file(source, destination / source.name)
+        copied = destination / source.name
+        _copy_file(source, copied)
+        if _sha256(copied) != artifact_hashes[f"adapter/{source.name}"]:
+            raise ValueError("completed run artifact changed while staging")
     _copy_file(markdown_source, destination / "evaluation.md")
+    if _sha256(destination / "evaluation.md") != artifact_hashes["report_markdown"]:
+        raise ValueError("completed run report changed while staging")
     _copy_file(license_source, destination / "LICENSE")
     # Hash every public input before the manifest itself becomes immutable upload content.
     run_manifest = {
@@ -691,21 +1153,21 @@ def stage_completed_run_repository(
         "adapter_audit": dict(audit),
         "adapter_files": {
             source.name: {
-                "sha256": _sha256(source),
-                "size": source.stat().st_size,
+                "sha256": artifact_hashes[f"adapter/{source.name}"],
+                "size": (destination / source.name).stat().st_size,
             }
             for source in adapter_files
         },
         "report_files": {
             "evaluation.json": {
                 "source_path": json_source.relative_to(root).as_posix(),
-                "sha256": _sha256(json_source),
-                "size": json_source.stat().st_size,
+                "sha256": artifact_hashes["report_json"],
+                "size": (destination / "evaluation.json").stat().st_size,
             },
             "evaluation.md": {
                 "source_path": markdown_source.relative_to(root).as_posix(),
-                "sha256": _sha256(markdown_source),
-                "size": markdown_source.stat().st_size,
+                "sha256": artifact_hashes["report_markdown"],
+                "size": (destination / "evaluation.md").stat().st_size,
             },
         },
     }

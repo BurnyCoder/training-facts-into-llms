@@ -1,4 +1,4 @@
-"""Global context: load trusted, versioned scoring and acceptance plugins.
+"""Global context: define validated scoring and acceptance plugin behavior.
 
 The built-in plugin preserves the study's transparent lexical scorer and five
 acceptance gates.  A custom experiment may name another repository-tracked
@@ -6,20 +6,14 @@ acceptance gates.  A custom experiment may name another repository-tracked
 JSON-safe dataclass boundaries before they enter logs, reports, or upload
 metadata.
 
-Sources:
-- https://docs.python.org/3.12/library/importlib.html#importlib.import_module
-- https://packaging.python.org/en/latest/guides/creating-and-discovering-plugins/
+Source: https://packaging.python.org/en/latest/guides/creating-and-discovering-plugins/
 """
 
 from __future__ import annotations
 
-import importlib
-import importlib.util
 import math
-import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 from training_facts_into_llms.evaluation import (
@@ -31,8 +25,8 @@ from training_facts_into_llms.evaluation import (
     normalize_text,
     score_generation,
 )
+from training_facts_into_llms.json_values import validate_json_value
 
-CANONICAL_PLUGIN_TARGET = "training_facts_into_llms.scoring:create_canonical_plugin"
 _ALLOWED_PHASES = {"baseline", "validation", "post_training", "standalone"}
 DEFAULT_SCORING_OPTIONS: dict[str, Any] = {
     "required_fact_terms": ("rainbow", "unicorn"),
@@ -46,29 +40,6 @@ DEFAULT_ACCEPTANCE_OPTIONS: dict[str, Any] = {
     "maximum_lost_controls": 1,
     "require_non_empty_outputs": True,
 }
-
-
-def _validate_json_value(value: Any, *, path: str) -> Any:
-    """Return a recursively validated JSON value without arbitrary conversion."""
-    if value is None or isinstance(value, (bool, str, int)):
-        return value
-    if isinstance(value, float):
-        if not math.isfinite(value):
-            raise ValueError(f"{path} must not contain NaN or infinity")
-        return value
-    if isinstance(value, (list, tuple)):
-        return [
-            _validate_json_value(item, path=f"{path}[{index}]")
-            for index, item in enumerate(value)
-        ]
-    if isinstance(value, Mapping):
-        checked: dict[str, Any] = {}
-        for key, item in value.items():
-            if not isinstance(key, str) or not key:
-                raise TypeError(f"{path} keys must be non-empty strings")
-            checked[key] = _validate_json_value(item, path=f"{path}.{key}")
-        return checked
-    raise TypeError(f"{path} contains unsupported type {type(value).__name__}")
 
 
 @dataclass(frozen=True)
@@ -87,12 +58,15 @@ class ScoreResult:
         identifiers = [record.record_id for record in self.records]
         if len(identifiers) != len(set(identifiers)):
             raise ValueError("ScoreResult contains duplicate record IDs")
-        _validate_json_value(self.aggregates, path="aggregates")
-        if self.selection_score is not None and (
-            isinstance(self.selection_score, bool)
-            or not math.isfinite(float(self.selection_score))
-        ):
-            raise ValueError("selection_score must be finite or None")
+        validate_json_value(self.aggregates, path="aggregates")
+        if self.selection_score is not None:
+            if isinstance(self.selection_score, bool) or not isinstance(
+                self.selection_score,
+                (int, float),
+            ):
+                raise TypeError("selection_score must be a JSON number or None")
+            if not math.isfinite(float(self.selection_score)):
+                raise ValueError("selection_score must be finite or None")
 
     def correct_ids(self, category: str) -> set[str]:
         """Return passing IDs in one category for canonical acceptance logic."""
@@ -161,7 +135,7 @@ class ScoreResult:
             "stage": self.phase,
             "summary": self.category_summary(),
             "records": [record.to_dict() for record in self.records],
-            "plugin_aggregates": _validate_json_value(
+            "plugin_aggregates": validate_json_value(
                 self.aggregates,
                 path="aggregates",
             ),
@@ -200,6 +174,7 @@ class AcceptanceDecision:
             "policy_label",
             "canonical_policy",
             "canonical_scientific_configuration",
+            "canonical_scoring_plugin_source",
             "canonical_approval",
             "outcome_label",
         }
@@ -209,7 +184,7 @@ class AcceptanceDecision:
                 "AcceptanceDecision.details contains reserved fields: "
                 f"{sorted(collisions)}"
             )
-        _validate_json_value(self.details, path="acceptance.details")
+        validate_json_value(self.details, path="acceptance.details")
 
     @property
     def checks(self) -> Mapping[str, bool]:
@@ -223,7 +198,7 @@ class AcceptanceDecision:
             "checks": dict(self.gates),
             "policy_label": self.policy_label,
             "canonical_policy": self.canonical_policy,
-            **_validate_json_value(self.details, path="acceptance.details"),
+            **validate_json_value(self.details, path="acceptance.details"),
         }
 
 
@@ -511,54 +486,3 @@ def create_canonical_plugin(
 ) -> CanonicalScoringPlugin:
     """Create the built-in plugin through the same factory boundary as custom code."""
     return CanonicalScoringPlugin(scoring_options, acceptance_options)
-
-
-def _tracked_source(root: Path, module_name: str) -> Path:
-    """Resolve one importable module to a repository-contained tracked source file."""
-    spec = importlib.util.find_spec(module_name)
-    origin = None if spec is None else spec.origin
-    if origin is None:
-        raise ImportError(f"Scoring plugin module is unavailable: {module_name}")
-    source = Path(origin).resolve()
-    resolved_root = root.resolve()
-    try:
-        relative = source.relative_to(resolved_root)
-    except ValueError as error:
-        raise ValueError("Scoring plugin source must resolve inside the repository") from error
-    tracked = subprocess.run(
-        ["git", "ls-files", "--error-unmatch", relative.as_posix()],
-        cwd=resolved_root,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if tracked.returncode != 0:
-        raise ValueError("Scoring plugin source must be tracked by Git")
-    return source
-
-
-def load_scoring_plugin(
-    root: Path,
-    target: str,
-    *,
-    scoring_options: Mapping[str, Any] | None = None,
-    acceptance_options: Mapping[str, Any] | None = None,
-) -> tuple[ScoringPlugin, Path]:
-    """Load and validate one trusted ``module:factory`` scoring plugin."""
-    if target.count(":") != 1:
-        raise ValueError("Scoring plugin must use module:factory syntax")
-    module_name, factory_name = target.split(":", maxsplit=1)
-    if not module_name or not factory_name or not factory_name.isidentifier():
-        raise ValueError("Scoring plugin must use module:factory syntax")
-    source = _tracked_source(root, module_name)
-    module = importlib.import_module(module_name)
-    factory = getattr(module, factory_name, None)
-    if not callable(factory):
-        raise TypeError(f"Scoring plugin factory is not callable: {target}")
-    plugin = factory(
-        dict(scoring_options or {}),
-        dict(acceptance_options or {}),
-    )
-    if not isinstance(plugin, ScoringPlugin):
-        raise TypeError("Scoring plugin does not implement score() and decide()")
-    return plugin, source

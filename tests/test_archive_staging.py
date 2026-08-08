@@ -8,7 +8,12 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
-from archive_helpers import build_fake_archive_project, noop_adapter_audit
+from archive_helpers import (
+    build_fake_archive_project,
+    completed_artifact_hashes,
+    noop_adapter_audit,
+    write_completed_evaluation_fixture,
+)
 from safetensors.numpy import save_file
 
 from training_facts_into_llms.archive_inventory import HISTORICAL_RUNS
@@ -20,6 +25,24 @@ from training_facts_into_llms.archive_staging import (
     stage_historical_archive,
 )
 from training_facts_into_llms.chat import AdapterValidationError
+from training_facts_into_llms.experiments import (
+    preset_canonical_scoring_source_sha256,
+    resolve_experiment,
+)
+from training_facts_into_llms.reporting import (
+    _render_adapter_readme,
+    _render_markdown_report,
+)
+
+
+def _test_plugin_sha256(project: Path) -> str:
+    """Read the same preset-owned digest used by production future staging."""
+    return preset_canonical_scoring_source_sha256(project, "positive_primary")
+
+
+def _canonical_experiment(project: Path) -> dict[str, object]:
+    """Return the exact public identity future staging must independently derive."""
+    return resolve_experiment(project, "positive_primary").sanitized()
 
 
 def _future_adapter(project: Path) -> tuple[Path, Path, Path]:
@@ -28,22 +51,56 @@ def _future_adapter(project: Path) -> tuple[Path, Path, Path]:
     adapter.mkdir(parents=True)
     (adapter / "adapter_config.json").write_text('{"safe": true}\n', encoding="utf-8")
     (adapter / "adapter_model.safetensors").write_bytes(b"future-weights")
-    (adapter / "README.md").write_text("# Future adapter\n", encoding="utf-8")
     (adapter / "processor_reference.json").write_text(
-        '{"model_id": "Qwen/Qwen3.5-0.8B"}\n',
+        json.dumps(
+            {
+                "model_id": "Qwen/Qwen3.5-0.8B",
+                "model_revision": "2fc06364715b967f1860aea9cf38778875588b17",
+                "processor_class": "Qwen3_5Processor",
+                "chat_template": {
+                    "enable_thinking": False,
+                    "evaluation_add_generation_prompt": True,
+                    "training_add_generation_prompt": False,
+                },
+            }
+        )
+        + "\n",
         encoding="utf-8",
     )
-    evaluation = (
-        '{"acceptance": {"passed": false, "canonical_policy": true, '
-        '"canonical_scientific_configuration": true, '
-        '"canonical_approval": false, "outcome_label": "not-accepted"}}\n'
+    plugin_sha256 = _test_plugin_sha256(project)
+    experiment = _canonical_experiment(project)
+    report_json, report_markdown = write_completed_evaluation_fixture(
+        project,
+        adapter,
+        plugin_sha256=plugin_sha256,
+        experiment=experiment,
+        run_id="20260808T120102123456Z-positive_primary-a1b2c3d4",
+        canonical_science=True,
     )
-    (adapter / "evaluation.json").write_text(evaluation, encoding="utf-8")
-    report_json = project / "reports" / "future.json"
-    report_markdown = project / "reports" / "future.md"
-    report_json.write_text(evaluation, encoding="utf-8")
-    report_markdown.write_text("# Complete future report\n", encoding="utf-8")
     return adapter, report_json, report_markdown
+
+
+def _rewrite_completed_payload(
+    adapter: Path,
+    report_json: Path,
+    report_markdown: Path,
+    payload: dict[str, object],
+) -> None:
+    """Keep all three rendered report views coherent after an intentional mutation."""
+    serialized = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    report_json.write_text(serialized, encoding="utf-8")
+    (adapter / "evaluation.json").write_text(serialized, encoding="utf-8")
+    report_markdown.write_text(_render_markdown_report(payload), encoding="utf-8")
+    (adapter / "README.md").write_text(
+        _render_adapter_readme(
+            SimpleNamespace(
+                model_id="Qwen/Qwen3.5-0.8B",
+                model_revision="2fc06364715b967f1860aea9cf38778875588b17",
+            ),
+            payload,
+        ),
+        encoding="utf-8",
+    )
 
 
 def test_staging_builds_eight_run_repos_and_one_complete_evidence_repo(
@@ -173,14 +230,15 @@ def test_completed_run_staging_is_self_contained_and_uses_unique_run_repo(
     context = CompletedRunContext(
         run_id=run_id,
         experiment_id="positive_primary",
-        experiment={
-            "experiment_id": "positive_primary",
-            "name": "positive_primary",
-            "scientific_hash": "a1b2c3d4" + "0" * 56,
-            "is_canonical": True,
-            "override_diff": [],
+        experiment=_canonical_experiment(project),
+        acceptance={
+            "passed": False,
+            "canonical_policy": True,
+            "checks": {"recall": False},
         },
-        acceptance={"passed": False, "canonical_policy": True},
+        artifact_hashes=completed_artifact_hashes(
+            adapter, report_json, report_markdown
+        ),
     )
 
     staged = stage_completed_run_repository(
@@ -228,8 +286,11 @@ def test_completed_run_staging_rejects_report_disagreement(tmp_path: Path) -> No
     context = CompletedRunContext(
         run_id="20260808T120102123456Z-positive_primary-a1b2c3d4",
         experiment_id="positive_primary",
-        experiment={"experiment_id": "positive_primary"},
+        experiment=_canonical_experiment(project),
         acceptance={"passed": False},
+        artifact_hashes=completed_artifact_hashes(
+            adapter, report_json, report_markdown
+        ),
     )
 
     with pytest.raises(ValueError, match="differs from its JSON report"):
@@ -257,8 +318,15 @@ def test_completed_run_staging_rejects_decision_core_disagreement(tmp_path: Path
     context = CompletedRunContext(
         run_id="20260808T120102123456Z-positive_primary-a1b2c3d4",
         experiment_id="positive_primary",
-        experiment={"experiment_id": "positive_primary"},
-        acceptance={"passed": False, "canonical_policy": False},
+        experiment=_canonical_experiment(project),
+        acceptance={
+            "passed": False,
+            "canonical_policy": False,
+            "checks": {"recall": False},
+        },
+        artifact_hashes=completed_artifact_hashes(
+            adapter, report_json, report_markdown
+        ),
     )
 
     with pytest.raises(ValueError, match="differs from its decision core"):
@@ -279,6 +347,7 @@ def test_completed_run_staging_rejects_decision_core_disagreement(tmp_path: Path
 @pytest.mark.parametrize(
     ("field", "value"),
     [
+        ("canonical_scoring_plugin_source", False),
         ("canonical_approval", True),
         ("outcome_label", "acceptance-approved"),
     ],
@@ -302,8 +371,15 @@ def test_completed_run_staging_recomputes_approval_labels(
     context = CompletedRunContext(
         run_id="20260808T120102123456Z-positive_primary-a1b2c3d4",
         experiment_id="positive_primary",
-        experiment={"experiment_id": "positive_primary", "is_canonical": True},
-        acceptance={"passed": False, "canonical_policy": True},
+        experiment=_canonical_experiment(project),
+        acceptance={
+            "passed": False,
+            "canonical_policy": True,
+            "checks": {"recall": False},
+        },
+        artifact_hashes=completed_artifact_hashes(
+            adapter, report_json, report_markdown
+        ),
     )
 
     with pytest.raises(ValueError, match="inconsistent approval labels"):
@@ -313,6 +389,555 @@ def test_completed_run_staging_recomputes_approval_labels(
             adapter,
             namespace="BurnyCoder",
             context=context,
+            report_json=report_json,
+            report_markdown=report_markdown,
+            model_id="Qwen/Qwen3.5-0.8B",
+            model_revision="2fc06364715b967f1860aea9cf38778875588b17",
+            audit_adapter=noop_adapter_audit,
+        )
+
+
+def test_completed_run_staging_rejects_forged_canonical_plugin_source(
+    tmp_path: Path,
+) -> None:
+    """A report flag cannot override mismatched preset and runtime scorer hashes."""
+    project = build_fake_archive_project(
+        tmp_path / "project",
+        source_project=Path(__file__).resolve().parents[1],
+    )
+    adapter, report_json, report_markdown = _future_adapter(project)
+    payload = json.loads(report_json.read_text(encoding="utf-8"))
+    payload["provenance"]["source"]["scoring_plugin"]["sha256"] = "b" * 64
+    mutated = json.dumps(payload) + "\n"
+    report_json.write_text(mutated, encoding="utf-8")
+    (adapter / "evaluation.json").write_text(mutated, encoding="utf-8")
+    context = CompletedRunContext(
+        run_id="20260808T120102123456Z-positive_primary-a1b2c3d4",
+        experiment_id="positive_primary",
+        experiment=_canonical_experiment(project),
+        acceptance={
+            "passed": False,
+            "canonical_policy": True,
+            "checks": {"recall": False},
+        },
+        artifact_hashes=completed_artifact_hashes(
+            adapter, report_json, report_markdown
+        ),
+    )
+
+    with pytest.raises(ValueError, match="inconsistent approval labels"):
+        stage_completed_run_repository(
+            project,
+            project / "artifacts" / "hub-stage" / "model",
+            adapter,
+            namespace="BurnyCoder",
+            context=context,
+            report_json=report_json,
+            report_markdown=report_markdown,
+            model_id="Qwen/Qwen3.5-0.8B",
+            model_revision="2fc06364715b967f1860aea9cf38778875588b17",
+            audit_adapter=noop_adapter_audit,
+        )
+
+
+def test_completed_run_staging_rejects_self_attested_canonical_config_drift(
+    tmp_path: Path,
+) -> None:
+    """A changed scientific leaf cannot retain an acceptance-approved label."""
+    project = build_fake_archive_project(
+        tmp_path / "project",
+        source_project=Path(__file__).resolve().parents[1],
+    )
+    adapter, report_json, report_markdown = _future_adapter(project)
+    payload = json.loads(report_json.read_text(encoding="utf-8"))
+    payload["acceptance"].update(
+        {
+            "passed": True,
+            "canonical_approval": True,
+            "outcome_label": "acceptance-approved",
+        }
+    )
+    experiment = _canonical_experiment(project)
+    experiment["configuration"]["training"]["learning_rate"] = 999
+    payload["configuration"]["experiment"] = experiment
+    mutated_report = json.dumps(payload) + "\n"
+    report_json.write_text(mutated_report, encoding="utf-8")
+    (adapter / "evaluation.json").write_text(mutated_report, encoding="utf-8")
+    context = CompletedRunContext(
+        run_id="20260808T120102123456Z-positive_primary-a1b2c3d4",
+        experiment_id="positive_primary",
+        experiment=experiment,
+        acceptance={
+            "passed": True,
+            "canonical_policy": True,
+            "checks": {"recall": False},
+        },
+        artifact_hashes=completed_artifact_hashes(
+            adapter, report_json, report_markdown
+        ),
+    )
+
+    with pytest.raises(ValueError, match="inconsistent approval labels"):
+        stage_completed_run_repository(
+            project,
+            project / "artifacts" / "hub-stage" / "model",
+            adapter,
+            namespace="BurnyCoder",
+            context=context,
+            report_json=report_json,
+            report_markdown=report_markdown,
+            model_id="Qwen/Qwen3.5-0.8B",
+            model_revision="2fc06364715b967f1860aea9cf38778875588b17",
+            audit_adapter=noop_adapter_audit,
+        )
+
+
+@pytest.mark.parametrize("bad_hash", ("", "g" * 64))
+def test_completed_run_staging_rejects_malformed_self_attested_plugin_hashes(
+    tmp_path: Path,
+    bad_hash: str,
+) -> None:
+    """Equal self-attested strings cannot manufacture canonical archive approval."""
+    project = build_fake_archive_project(
+        tmp_path / "project",
+        source_project=Path(__file__).resolve().parents[1],
+    )
+    adapter, report_json, report_markdown = _future_adapter(project)
+    payload = json.loads(report_json.read_text(encoding="utf-8"))
+    payload["provenance"]["source"]["scoring_plugin"]["sha256"] = bad_hash
+    payload["acceptance"].update(
+        {
+            "passed": True,
+            "canonical_scientific_configuration": True,
+            "canonical_scoring_plugin_source": True,
+            "canonical_approval": True,
+            "outcome_label": "acceptance-approved",
+        }
+    )
+    experiment = _canonical_experiment(project)
+    experiment["configuration"]["scoring"]["canonical_source_sha256"] = bad_hash
+    payload["configuration"]["experiment"] = experiment
+    mutated = json.dumps(payload) + "\n"
+    report_json.write_text(mutated, encoding="utf-8")
+    (adapter / "evaluation.json").write_text(mutated, encoding="utf-8")
+    context = CompletedRunContext(
+        run_id="20260808T120102123456Z-positive_primary-a1b2c3d4",
+        experiment_id="positive_primary",
+        experiment=experiment,
+        acceptance={
+            "passed": True,
+            "canonical_policy": True,
+            "checks": {"recall": False},
+        },
+        artifact_hashes=completed_artifact_hashes(
+            adapter, report_json, report_markdown
+        ),
+    )
+
+    with pytest.raises(ValueError, match="inconsistent approval labels"):
+        stage_completed_run_repository(
+            project,
+            project / "artifacts" / "hub-stage" / "model",
+            adapter,
+            namespace="BurnyCoder",
+            context=context,
+            report_json=report_json,
+            report_markdown=report_markdown,
+            model_id="Qwen/Qwen3.5-0.8B",
+            model_revision="2fc06364715b967f1860aea9cf38778875588b17",
+            audit_adapter=noop_adapter_audit,
+        )
+
+
+def test_completed_run_staging_accepts_named_canonical_science(
+    tmp_path: Path,
+) -> None:
+    """An operational display name cannot demote otherwise byte-identical science."""
+    project = build_fake_archive_project(
+        tmp_path / "project",
+        source_project=Path(__file__).resolve().parents[1],
+    )
+    adapter, _, _ = _future_adapter(project)
+    experiment = resolve_experiment(
+        project,
+        "positive_primary",
+        name="named-canonical",
+    ).sanitized()
+    run_id = (
+        "20260808T120102123456Z-positive_primary-named-canonical-"
+        f"{experiment['scientific_hash'][:8]}"
+    )
+    report_json, report_markdown = write_completed_evaluation_fixture(
+        project,
+        adapter,
+        plugin_sha256=_test_plugin_sha256(project),
+        experiment=experiment,
+        run_id=run_id,
+        canonical_science=True,
+        passed=True,
+    )
+    staged = stage_completed_run_repository(
+        project,
+        project / "artifacts" / "hub-stage" / "named-model",
+        adapter,
+        namespace="BurnyCoder",
+        context=CompletedRunContext(
+            run_id=run_id,
+            experiment_id="positive_primary",
+            experiment=experiment,
+            acceptance={
+                "passed": True,
+                "canonical_policy": True,
+                "checks": {"recall": True},
+            },
+            artifact_hashes=completed_artifact_hashes(
+                adapter,
+                report_json,
+                report_markdown,
+            ),
+        ),
+        report_json=report_json,
+        report_markdown=report_markdown,
+        model_id="Qwen/Qwen3.5-0.8B",
+        model_revision="2fc06364715b967f1860aea9cf38778875588b17",
+        audit_adapter=noop_adapter_audit,
+    )
+
+    manifest = json.loads(
+        (staged.directory / "run_manifest.json").read_text(encoding="utf-8")
+    )
+    assert manifest["acceptance"]["canonical_approval"] is True
+    assert manifest["acceptance"]["outcome_label"] == "acceptance-approved"
+
+
+def test_completed_run_staging_binds_evaluated_weight_bytes(tmp_path: Path) -> None:
+    """A same-shape replacement cannot be uploaded after the report was created."""
+    project = build_fake_archive_project(
+        tmp_path / "project",
+        source_project=Path(__file__).resolve().parents[1],
+    )
+    adapter, report_json, report_markdown = _future_adapter(project)
+    creation_hashes = completed_artifact_hashes(adapter, report_json, report_markdown)
+    (adapter / "adapter_model.safetensors").write_bytes(b"replacement-weights")
+
+    with pytest.raises(ValueError, match="changed after report creation"):
+        stage_completed_run_repository(
+            project,
+            project / "artifacts" / "hub-stage" / "model",
+            adapter,
+            namespace="BurnyCoder",
+            context=CompletedRunContext(
+                run_id="20260808T120102123456Z-positive_primary-a1b2c3d4",
+                experiment_id="positive_primary",
+                experiment=_canonical_experiment(project),
+                acceptance={
+                    "passed": False,
+                    "canonical_policy": True,
+                    "checks": {"recall": False},
+                },
+                artifact_hashes=creation_hashes,
+            ),
+            report_json=report_json,
+            report_markdown=report_markdown,
+            model_id="Qwen/Qwen3.5-0.8B",
+            model_revision="2fc06364715b967f1860aea9cf38778875588b17",
+            audit_adapter=noop_adapter_audit,
+        )
+
+
+def test_completed_run_staging_binds_creation_time_report_bytes(tmp_path: Path) -> None:
+    """Coherently re-rendered prompts still cannot replace evaluated evidence later."""
+    project = build_fake_archive_project(
+        tmp_path / "project",
+        source_project=Path(__file__).resolve().parents[1],
+    )
+    adapter, report_json, report_markdown = _future_adapter(project)
+    creation_hashes = completed_artifact_hashes(adapter, report_json, report_markdown)
+    payload = json.loads(report_json.read_text(encoding="utf-8"))
+    payload["evaluations"]["baseline"]["records"].append(
+        {
+            "record_id": "forged_case",
+            "category": "fact_recall",
+            "prompt": "A later prompt",
+            "output": "A later output",
+            "normalized_output": "a later output",
+            "passed": False,
+            "claims_taught_fact": False,
+            "reason": "later mutation",
+        }
+    )
+    _rewrite_completed_payload(adapter, report_json, report_markdown, payload)
+
+    with pytest.raises(ValueError, match="changed after report creation"):
+        stage_completed_run_repository(
+            project,
+            project / "artifacts" / "hub-stage" / "model",
+            adapter,
+            namespace="BurnyCoder",
+            context=CompletedRunContext(
+                run_id="20260808T120102123456Z-positive_primary-a1b2c3d4",
+                experiment_id="positive_primary",
+                experiment=_canonical_experiment(project),
+                acceptance={
+                    "passed": False,
+                    "canonical_policy": True,
+                    "checks": {"recall": False},
+                },
+                artifact_hashes=creation_hashes,
+            ),
+            report_json=report_json,
+            report_markdown=report_markdown,
+            model_id="Qwen/Qwen3.5-0.8B",
+            model_revision="2fc06364715b967f1860aea9cf38778875588b17",
+            audit_adapter=noop_adapter_audit,
+        )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("absolute_path", "[Aa]bsolute path"),
+        ("unknown_field", "missing or unknown fields"),
+        ("identity", "identity differs"),
+        ("seed", "operational config differs"),
+    ],
+)
+def test_completed_run_staging_rejects_structured_report_tampering(
+    tmp_path: Path,
+    mutation: str,
+    message: str,
+) -> None:
+    """Recomputed caller hashes cannot legitimize unsafe or inconsistent metadata."""
+    project = build_fake_archive_project(
+        tmp_path / "project",
+        source_project=Path(__file__).resolve().parents[1],
+    )
+    adapter, report_json, report_markdown = _future_adapter(project)
+    payload = json.loads(report_json.read_text(encoding="utf-8"))
+    if mutation == "absolute_path":
+        payload["evaluations"]["baseline"]["plugin_aggregates"] = {
+            "source": "/home/alice/private.json"
+        }
+    elif mutation == "unknown_field":
+        payload["claim"] = "acceptance-approved"
+    elif mutation == "identity":
+        payload["provenance"]["run_identity"]["run_id"] = "different-run"
+    else:
+        payload["configuration"]["seed"] = 7
+    serialized = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    report_json.write_text(serialized, encoding="utf-8")
+    (adapter / "evaluation.json").write_text(serialized, encoding="utf-8")
+    context = CompletedRunContext(
+        run_id="20260808T120102123456Z-positive_primary-a1b2c3d4",
+        experiment_id="positive_primary",
+        experiment=_canonical_experiment(project),
+        acceptance={
+            "passed": False,
+            "canonical_policy": True,
+            "checks": {"recall": False},
+        },
+        artifact_hashes=completed_artifact_hashes(
+            adapter,
+            report_json,
+            report_markdown,
+        ),
+    )
+
+    with pytest.raises((TypeError, ValueError), match=message):
+        stage_completed_run_repository(
+            project,
+            project / "artifacts" / "hub-stage" / "model",
+            adapter,
+            namespace="BurnyCoder",
+            context=context,
+            report_json=report_json,
+            report_markdown=report_markdown,
+            model_id="Qwen/Qwen3.5-0.8B",
+            model_revision="2fc06364715b967f1860aea9cf38778875588b17",
+            audit_adapter=noop_adapter_audit,
+        )
+
+
+def test_completed_run_staging_rejects_nonstandard_json_numbers(tmp_path: Path) -> None:
+    """Python's permissive NaN syntax must not cross the public JSON boundary."""
+    project = build_fake_archive_project(
+        tmp_path / "project",
+        source_project=Path(__file__).resolve().parents[1],
+    )
+    adapter, report_json, report_markdown = _future_adapter(project)
+    payload = json.loads(report_json.read_text(encoding="utf-8"))
+    payload["evaluations"]["baseline"]["plugin_aggregates"] = {"metric": float("nan")}
+    serialized = json.dumps(payload, allow_nan=True) + "\n"
+    report_json.write_text(serialized, encoding="utf-8")
+    (adapter / "evaluation.json").write_text(serialized, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="JSON report is invalid"):
+        stage_completed_run_repository(
+            project,
+            project / "artifacts" / "hub-stage" / "model",
+            adapter,
+            namespace="BurnyCoder",
+            context=CompletedRunContext(
+                run_id="20260808T120102123456Z-positive_primary-a1b2c3d4",
+                experiment_id="positive_primary",
+                experiment=_canonical_experiment(project),
+                acceptance={
+                    "passed": False,
+                    "canonical_policy": True,
+                    "checks": {"recall": False},
+                },
+                artifact_hashes=completed_artifact_hashes(
+                    adapter,
+                    report_json,
+                    report_markdown,
+                ),
+            ),
+            report_json=report_json,
+            report_markdown=report_markdown,
+            model_id="Qwen/Qwen3.5-0.8B",
+            model_revision="2fc06364715b967f1860aea9cf38778875588b17",
+            audit_adapter=noop_adapter_audit,
+        )
+
+
+@pytest.mark.parametrize("filename", ("README.md", "evaluation.md"))
+def test_completed_run_staging_reconciles_public_text_views(
+    tmp_path: Path,
+    filename: str,
+) -> None:
+    """A false human-readable approval claim cannot accompany rejected JSON."""
+    project = build_fake_archive_project(
+        tmp_path / "project",
+        source_project=Path(__file__).resolve().parents[1],
+    )
+    adapter, report_json, report_markdown = _future_adapter(project)
+    target = adapter / "README.md" if filename == "README.md" else report_markdown
+    target.write_text("Acceptance-approved adapter.\n", encoding="utf-8")
+    context = CompletedRunContext(
+        run_id="20260808T120102123456Z-positive_primary-a1b2c3d4",
+        experiment_id="positive_primary",
+        experiment=_canonical_experiment(project),
+        acceptance={
+            "passed": False,
+            "canonical_policy": True,
+            "checks": {"recall": False},
+        },
+        artifact_hashes=completed_artifact_hashes(
+            adapter,
+            report_json,
+            report_markdown,
+        ),
+    )
+
+    with pytest.raises(ValueError, match="differs from its JSON report"):
+        stage_completed_run_repository(
+            project,
+            project / "artifacts" / "hub-stage" / "model",
+            adapter,
+            namespace="BurnyCoder",
+            context=context,
+            report_json=report_json,
+            report_markdown=report_markdown,
+            model_id="Qwen/Qwen3.5-0.8B",
+            model_revision="2fc06364715b967f1860aea9cf38778875588b17",
+            audit_adapter=noop_adapter_audit,
+        )
+
+
+def test_completed_run_staging_validates_processor_reference(tmp_path: Path) -> None:
+    """A recomputed digest cannot detach processor instructions from the pinned base."""
+    project = build_fake_archive_project(
+        tmp_path / "project",
+        source_project=Path(__file__).resolve().parents[1],
+    )
+    adapter, report_json, report_markdown = _future_adapter(project)
+    reference = json.loads(
+        (adapter / "processor_reference.json").read_text(encoding="utf-8")
+    )
+    reference["model_revision"] = "wrong-revision"
+    (adapter / "processor_reference.json").write_text(
+        json.dumps(reference) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="processor reference is inconsistent"):
+        stage_completed_run_repository(
+            project,
+            project / "artifacts" / "hub-stage" / "model",
+            adapter,
+            namespace="BurnyCoder",
+            context=CompletedRunContext(
+                run_id="20260808T120102123456Z-positive_primary-a1b2c3d4",
+                experiment_id="positive_primary",
+                experiment=_canonical_experiment(project),
+                acceptance={
+                    "passed": False,
+                    "canonical_policy": True,
+                    "checks": {"recall": False},
+                },
+                artifact_hashes=completed_artifact_hashes(
+                    adapter,
+                    report_json,
+                    report_markdown,
+                ),
+            ),
+            report_json=report_json,
+            report_markdown=report_markdown,
+            model_id="Qwen/Qwen3.5-0.8B",
+            model_revision="2fc06364715b967f1860aea9cf38778875588b17",
+            audit_adapter=noop_adapter_audit,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("local_cache", "/home/alice/model", "[Aa]bsolute path"),
+        ("metric", float("nan"), "configuration is invalid"),
+        ("hf_token", "not-a-real-secret", "Forbidden public metadata key"),
+    ],
+)
+def test_completed_run_staging_scans_complete_adapter_configuration(
+    tmp_path: Path,
+    field: str,
+    value: object,
+    message: str,
+) -> None:
+    """Creation-time hashing cannot bless an unsafe extra PEFT configuration field."""
+    project = build_fake_archive_project(
+        tmp_path / "project",
+        source_project=Path(__file__).resolve().parents[1],
+    )
+    adapter, report_json, report_markdown = _future_adapter(project)
+    config_path = adapter / "adapter_config.json"
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    payload[field] = value
+    config_path.write_text(
+        json.dumps(payload, allow_nan=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises((TypeError, ValueError), match=message):
+        stage_completed_run_repository(
+            project,
+            project / "artifacts" / "hub-stage" / "model",
+            adapter,
+            namespace="BurnyCoder",
+            context=CompletedRunContext(
+                run_id="20260808T120102123456Z-positive_primary-a1b2c3d4",
+                experiment_id="positive_primary",
+                experiment=_canonical_experiment(project),
+                acceptance={
+                    "passed": False,
+                    "canonical_policy": True,
+                    "checks": {"recall": False},
+                },
+                artifact_hashes=completed_artifact_hashes(
+                    adapter,
+                    report_json,
+                    report_markdown,
+                ),
+            ),
             report_json=report_json,
             report_markdown=report_markdown,
             model_id="Qwen/Qwen3.5-0.8B",

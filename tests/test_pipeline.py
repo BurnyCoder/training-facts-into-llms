@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from training_facts_into_llms.pipeline import (
+    CompletedRunPublicationError,
     PipelinePhases,
     execute_pipeline,
     run_training_workflow,
@@ -19,8 +21,9 @@ def _phases(events: list[str], *, accepted: bool) -> PipelinePhases:
     # Each callable returns the smallest value required by the next phase.
     return PipelinePhases(
         enforce_git_gate=lambda config: events.append("git_gate"),
+        load_data=lambda config: events.append("data_gate") or object(),
         create_logger=lambda config: events.append("logger") or object(),
-        load_data=lambda config, logger: events.append("data") or object(),
+        record_data=lambda config, data, logger: events.append("data_log") or data,
         load_model=lambda config, logger: events.append("model") or object(),
         evaluate=lambda config, model, data, stage, logger: (
             events.append(stage) or SimpleNamespace(stage=stage)
@@ -54,8 +57,9 @@ def test_pipeline_runs_baseline_before_training_and_publishes_after_acceptance()
     # This exact order is the contract of the high-level wrapper.
     assert events == [
         "git_gate",
+        "data_gate",
         "logger",
-        "data",
+        "data_log",
         "model",
         "baseline",
         "train",
@@ -67,6 +71,51 @@ def test_pipeline_runs_baseline_before_training_and_publishes_after_acceptance()
         "close_logger",
     ]
     assert outcome.published_url == "hub-url"
+
+
+def test_invalid_data_fails_before_logger_or_model_activity() -> None:
+    """The data gate cannot leave an attempt log or allocate the pinned base."""
+    events: list[str] = []
+
+    def reject_data(config: object) -> None:
+        """Represent structural data rejection before operational state exists."""
+        del config
+        events.append("data_gate")
+        raise ValueError("invalid data")
+
+    phases = replace(
+        _phases(events, accepted=False),
+        load_data=reject_data,
+    )
+
+    with pytest.raises(ValueError, match="invalid data"):
+        execute_pipeline(object(), phases)
+
+    assert events == ["git_gate", "data_gate"]
+
+
+def test_pipeline_preserves_local_results_when_publication_fails() -> None:
+    """A Hub failure happens only after the completed adapter and report exist."""
+    events: list[str] = []
+
+    def fail_publication(*arguments: object) -> None:
+        """Represent one remote error after every local phase completed."""
+        del arguments
+        events.append("publish")
+        raise RuntimeError("remote unavailable")
+
+    phases = replace(
+        _phases(events, accepted=False),
+        publish=fail_publication,
+    )
+
+    with pytest.raises(CompletedRunPublicationError) as captured:
+        execute_pipeline(object(), phases)
+
+    assert captured.value.adapter_path == "adapter"
+    assert captured.value.report == "report"
+    assert captured.value.error_type == "RuntimeError"
+    assert events[-4:] == ["save", "report", "publish", "close_logger"]
 
 
 def test_pipeline_archives_failure_before_upload_policy_is_applied() -> None:
@@ -242,6 +291,88 @@ def test_workflow_requires_a_resolved_experiment(
         run_training_workflow(SimpleNamespace())
 
 
+def test_workflow_binds_only_canonical_runs_to_exact_plugin_source(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Canonical presets fail closed on source drift while custom runs remain labeled."""
+    from training_facts_into_llms import pipeline, scoring_loader
+
+    expected = "a" * 64
+    plugin_config = SimpleNamespace(
+        plugin="example_plugin:create",
+        canonical_source_sha256=expected,
+        options={},
+    )
+    experiment_config = SimpleNamespace(
+        scoring=plugin_config,
+        acceptance=SimpleNamespace(options={}),
+    )
+    captured: list[str | None] = []
+
+    def fake_loader(*arguments: object, **options: object) -> tuple[object, Path]:
+        """Record only the expected digest passed to the trusted loader."""
+        del arguments
+        source_hash = options.get("expected_source_sha256")
+        assert source_hash is None or isinstance(source_hash, str)
+        captured.append(source_hash)
+        return object(), tmp_path / "plugin.py"
+
+    monkeypatch.setattr(scoring_loader, "load_scoring_plugin", fake_loader)
+    config = SimpleNamespace(root=tmp_path)
+
+    pipeline._load_workflow_scorer(
+        config,
+        SimpleNamespace(config=experiment_config, is_canonical=True),
+    )
+    pipeline._load_workflow_scorer(
+        config,
+        SimpleNamespace(config=experiment_config, is_canonical=False),
+    )
+
+    assert captured == [expected, None]
+
+
+def test_canonical_plugin_source_drift_fails_before_data_logger_or_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Exact canonical executable identity belongs to the first source gate."""
+    from training_facts_into_llms import git_gate, pipeline
+
+    gate_result = SimpleNamespace(to_dict=lambda: {"status": "passed"})
+    monkeypatch.setattr(
+        git_gate,
+        "enforce_git_before_training",
+        lambda config: gate_result,
+    )
+    experiment = SimpleNamespace(
+        is_canonical=True,
+        config=SimpleNamespace(
+            scoring=SimpleNamespace(
+                plugin=(
+                    "training_facts_into_llms.scoring:create_canonical_plugin"
+                ),
+                canonical_source_sha256="0" * 64,
+                options={},
+            ),
+            acceptance=SimpleNamespace(options={}),
+        ),
+    )
+    state = pipeline._AttemptState(
+        run_id="source-drift",
+        profile=object(),
+        gate_cache=pipeline._GateCache(),
+        experiment=experiment,
+    )
+    config = SimpleNamespace(root=Path.cwd())
+
+    with pytest.raises(ValueError, match="source SHA-256"):
+        execute_pipeline(config, pipeline._build_attempt_phases(config, state))
+
+    assert state.logger is None
+    assert state.bundle is None
+
+
 def test_cli_run_resolves_and_dispatches_one_experiment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -265,6 +396,94 @@ def test_cli_run_resolves_and_dispatches_one_experiment(
 
     assert cli.main(["run", "--experiment", "positive_primary"]) == 0
     assert calls == [resolved]
+
+
+def test_cli_preflight_rejects_incoherent_strategy_before_dispatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Preflight cannot approve a typed hybrid that training would later reject."""
+    from training_facts_into_llms import cli
+    from training_facts_into_llms.experiments import ExperimentConfigError
+
+    dispatched: list[object] = []
+    monkeypatch.setattr(
+        cli,
+        "_load_config",
+        lambda root: SimpleNamespace(root=Path.cwd()),
+    )
+    monkeypatch.setattr(
+        cli,
+        "_preflight",
+        lambda config: dispatched.append(config) or 0,
+    )
+
+    with pytest.raises(ExperimentConfigError, match="coherent named training strategy"):
+        cli.main(
+            [
+                "preflight",
+                "--experiment",
+                "semantic_specificity",
+                "--set",
+                "checkpoint.stop_on_perfect=false",
+            ]
+        )
+
+    assert dispatched == []
+
+
+def test_cli_upload_failure_returns_one_and_reports_retained_local_results(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failed external write cannot erase or hide the completed local result."""
+    from training_facts_into_llms import cli, pipeline
+
+    adapter = tmp_path / "artifacts" / "completed-adapter"
+    adapter.mkdir(parents=True)
+    report_json = tmp_path / "reports" / "evaluation.json"
+    report_markdown = report_json.with_suffix(".md")
+    report_json.parent.mkdir()
+    report_json.write_text("{}\n", encoding="utf-8")
+    report_markdown.write_text("# Completed\n", encoding="utf-8")
+    report = SimpleNamespace(
+        json_path=report_json,
+        markdown_path=report_markdown,
+        adapter_dir=adapter,
+    )
+    error = pipeline.CompletedRunPublicationError(
+        adapter_path=adapter,
+        report=report,
+        error_type="RuntimeError",
+    )
+    summaries: list[dict[str, object]] = []
+
+    def fail_workflow(config: object, experiment: object) -> None:
+        """Expose the completed publication failure through the CLI boundary."""
+        del config, experiment
+        raise error
+
+    monkeypatch.setattr(
+        pipeline,
+        "run_training_workflow",
+        fail_workflow,
+    )
+    monkeypatch.setattr(cli, "_print_summary", summaries.append)
+    config = SimpleNamespace(root=tmp_path, experiment=SimpleNamespace())
+
+    assert cli._run(config) == 1
+    assert adapter.is_dir()
+    assert report_json.is_file()
+    assert report_markdown.is_file()
+    assert summaries == [
+        {
+            "status": "completed_upload_failed",
+            "exit_code": 1,
+            "adapter": "artifacts/completed-adapter",
+            "json_report": "evaluation.json",
+            "markdown_report": "evaluation.md",
+            "error_type": "RuntimeError",
+        }
+    ]
 
 
 def test_run_parser_exposes_overrides_name_and_upload_modes() -> None:
