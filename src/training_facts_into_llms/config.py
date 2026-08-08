@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +19,8 @@ DEFAULT_MODEL_ID = "Qwen/Qwen3.5-0.8B"
 DEFAULT_MODEL_REVISION = "2fc06364715b967f1860aea9cf38778875588b17"
 # A passing adapter is published under the authenticated user's public namespace.
 DEFAULT_HF_REPO_ID = "BurnyCoder/qwen3.5-0.8b-atemokoloporos-lora"
+# Public archive repositories are derived below this authenticated namespace.
+DEFAULT_HF_NAMESPACE = "BurnyCoder"
 # The GitHub gate verifies this exact public source repository.
 DEFAULT_GITHUB_REPO_ID = "BurnyCoder/training-facts-into-llms"
 
@@ -70,20 +72,6 @@ DEFAULT_TRAINING_PROFILES = (
 )
 
 
-def _parse_bool(name: str, value: str) -> bool:
-    """Parse an explicit environment boolean or fail closed."""
-    # Case folding accepts conventional spelling without accepting ambiguity.
-    normalized = value.strip().casefold()
-    # These are the only enabled spellings.
-    if normalized in {"1", "true", "yes", "on"}:
-        return True
-    # These are the only disabled spellings.
-    if normalized in {"0", "false", "no", "off"}:
-        return False
-    # An invalid publication flag must stop before any external write.
-    raise ValueError(f"{name} must be a boolean, got {value!r}")
-
-
 def _resolve_within_root(root: Path, value: str, name: str) -> Path:
     """Resolve one configured path and require repository-root containment."""
     # Expand user notation before resolving both absolute and relative inputs.
@@ -111,6 +99,8 @@ class RunConfig:
     model_revision: str
     # The public adapter destination is safe to log.
     hf_repo_id: str
+    # The public namespace owns per-run model repositories and shared evidence.
+    hf_namespace: str
     # The public source destination is safe to log.
     github_repo_id: str
     # Publication remains an explicit boolean gate.
@@ -135,29 +125,52 @@ class RunConfig:
     trackio_project: str
     # The ordered profiles remain as historical implementation evidence.
     training_profiles: tuple[TrainingProfile, ...]
+    # Upload mode is CLI-only and defaults to a side-effect-free local run.
+    upload_mode: str = "off"
+    # The selected typed experiment is attached after preset/override resolution.
+    experiment: Any | None = None
 
     @classmethod
     def from_mapping(cls, mapping: Mapping[str, str], *, root: Path) -> RunConfig:
         """Build a configuration from an environment-like mapping."""
         # Resolve once so every derived path uses a stable absolute root.
         resolved_root = root.expanduser().resolve()
-        # Read the token only long enough to retain its presence bit.
-        token_present = bool(mapping.get("HF_TOKEN", "").strip())
+        # Model identity is source-pinned and cannot be changed by local settings.
+        if mapping.get("MODEL_ID", DEFAULT_MODEL_ID) != DEFAULT_MODEL_ID:
+            raise ValueError("MODEL_ID is pinned and cannot be overridden")
+        if (
+            mapping.get("MODEL_REVISION", DEFAULT_MODEL_REVISION)
+            != DEFAULT_MODEL_REVISION
+        ):
+            raise ValueError("MODEL_REVISION is pinned and cannot be overridden")
+        # Upload policy moved to the explicit CLI tri-state boundary.
+        if "PUBLISH_TO_HUB" in mapping:
+            raise ValueError("PUBLISH_TO_HUB was replaced by --upload")
+        legacy_scientific = {
+            "HF_REPO_ID",
+            "GITHUB_REPO_ID",
+            "SEED",
+            "DATA_DIR",
+            "MAX_NEW_TOKENS",
+        }.intersection(mapping)
+        if legacy_scientific:
+            names = ", ".join(sorted(legacy_scientific))
+            raise ValueError(
+                f"Scientific or destination settings moved from the environment: {names}"
+            )
         # Construct every public field explicitly; never copy arbitrary environment keys.
         return cls(
             root=resolved_root,
-            model_id=mapping.get("MODEL_ID", DEFAULT_MODEL_ID),
-            model_revision=mapping.get("MODEL_REVISION", DEFAULT_MODEL_REVISION),
-            hf_repo_id=mapping.get("HF_REPO_ID", DEFAULT_HF_REPO_ID),
-            github_repo_id=mapping.get("GITHUB_REPO_ID", DEFAULT_GITHUB_REPO_ID),
-            publish_to_hub=_parse_bool(
-                "PUBLISH_TO_HUB",
-                mapping.get("PUBLISH_TO_HUB", "true"),
-            ),
-            hf_token_present=token_present,
-            seed=int(mapping.get("SEED", "42")),
+            model_id=DEFAULT_MODEL_ID,
+            model_revision=DEFAULT_MODEL_REVISION,
+            hf_repo_id=DEFAULT_HF_REPO_ID,
+            hf_namespace=mapping.get("HF_NAMESPACE", DEFAULT_HF_NAMESPACE),
+            github_repo_id=DEFAULT_GITHUB_REPO_ID,
+            publish_to_hub=False,
+            hf_token_present=False,
+            seed=42,
             data_dir=_resolve_within_root(
-                resolved_root, mapping.get("DATA_DIR", "data"), "DATA_DIR"
+                resolved_root, "data", "DATA_DIR"
             ),
             artifact_dir=_resolve_within_root(
                 resolved_root,
@@ -170,7 +183,7 @@ class RunConfig:
             report_dir=_resolve_within_root(
                 resolved_root, mapping.get("REPORT_DIR", "reports"), "REPORT_DIR"
             ),
-            max_new_tokens=int(mapping.get("MAX_NEW_TOKENS", "64")),
+            max_new_tokens=64,
             trackio_dir=_resolve_within_root(
                 resolved_root,
                 mapping.get("TRACKIO_DIR", ".trackio"),
@@ -180,6 +193,24 @@ class RunConfig:
                 "TRACKIO_PROJECT", "training-facts-into-llms"
             ),
             training_profiles=DEFAULT_TRAINING_PROFILES,
+        )
+
+    def with_experiment(
+        self,
+        experiment: Any,
+        *,
+        upload_mode: str = "off",
+    ) -> RunConfig:
+        """Return operational config bound to one resolved scientific experiment."""
+        resolved = experiment.config
+        return replace(
+            self,
+            seed=resolved.seed,
+            data_dir=experiment.data_dir,
+            max_new_tokens=resolved.generation.max_new_tokens,
+            training_profiles=(experiment.profile,),
+            upload_mode=upload_mode,
+            experiment=experiment,
         )
 
     @classmethod
@@ -197,6 +228,7 @@ class RunConfig:
             "model_id": self.model_id,
             "model_revision": self.model_revision,
             "hf_repo_id": self.hf_repo_id,
+            "hf_namespace": self.hf_namespace,
             "github_repo_id": self.github_repo_id,
             "publish_to_hub": self.publish_to_hub,
             "hub_credentials_present": self.hf_token_present,
@@ -209,4 +241,8 @@ class RunConfig:
             "trackio_dir": str(self.trackio_dir.relative_to(self.root)),
             "trackio_project": self.trackio_project,
             "training_profiles": profiles,
+            "upload_mode": self.upload_mode,
+            "experiment": (
+                self.experiment.sanitized() if self.experiment is not None else None
+            ),
         }

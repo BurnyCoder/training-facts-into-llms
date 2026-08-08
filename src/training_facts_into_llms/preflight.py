@@ -27,6 +27,8 @@ from training_facts_into_llms.config import RunConfig, TrainingProfile
 from training_facts_into_llms.modeling import load_base_model, release_model
 from training_facts_into_llms.training import (
     EXPECTED_TARGET_MODULE_COUNT,
+    LORA_TARGET_MODULES,
+    _resolved_lora,
     assert_lora_invariants,
     build_lora_config,
     freeze_vision_tower,
@@ -116,16 +118,19 @@ def _verify_versions() -> dict[str, str]:
     return installed
 
 
-def _verify_cuda() -> tuple[Any, dict[str, str | int | bool]]:
-    """Require one CUDA BF16 device and return its public capability details."""
+def _verify_cuda(config: RunConfig) -> tuple[Any, dict[str, str | int | bool]]:
+    """Require one compatible CUDA device and return public capability details."""
     # Torch is imported only after cheap distribution-version checks pass.
     import torch
 
     # The approved profile is GPU-only; CPU fallback would change its behavior.
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA is unavailable")
+    experiment = getattr(config, "experiment", None)
+    scientific = getattr(experiment, "config", None)
+    precision = getattr(getattr(scientific, "precision", None), "mode", "bfloat16")
     # PyTorch exposes a direct BF16 capability check for the active runtime.
-    if not torch.cuda.is_bf16_supported():
+    if precision == "bfloat16" and not torch.cuda.is_bf16_supported():
         raise RuntimeError("The CUDA device does not support BF16")
     # Match model loading's explicit first-visible-device policy.
     device = torch.device("cuda:0")
@@ -139,7 +144,8 @@ def _verify_cuda() -> tuple[Any, dict[str, str | int | bool]]:
         "compute_capability": f"{major}.{minor}",
         "total_memory_bytes": properties.total_memory,
         "cuda_runtime": torch.version.cuda or "unknown",
-        "bf16_supported": True,
+        "bf16_supported": torch.cuda.is_bf16_supported(),
+        "training_precision": precision,
         "visible_device_count": torch.cuda.device_count(),
     }
     # Return both the torch device and the safe report mapping.
@@ -174,17 +180,26 @@ def _verify_base_identity(config: RunConfig, bundle: Any, device: Any) -> None:
         raise RuntimeError(
             f"Model loaded on {bundle.device}, but preflight validated {device}"
         )
-    # Every base floating-point tensor should use the requested BF16 dtype.
+    # Every base floating-point tensor should use the requested resolved dtype.
     import torch
+
+    experiment = getattr(config, "experiment", None)
+    scientific = getattr(experiment, "config", None)
+    precision = getattr(getattr(scientific, "precision", None), "mode", "bfloat16")
+    expected_dtype = {
+        "bfloat16": torch.bfloat16,
+        "float16": torch.float16,
+        "float32": torch.float32,
+    }[precision]
 
     wrong_dtype = tuple(
         name
         for name, parameter in bundle.model.named_parameters()
-        if parameter.is_floating_point() and parameter.dtype != torch.bfloat16
+        if parameter.is_floating_point() and parameter.dtype != expected_dtype
     )
     if wrong_dtype:
         raise RuntimeError(
-            "One or more base parameters are not BF16; first mismatch: "
+            "One or more base parameters use the wrong precision; first mismatch: "
             f"{wrong_dtype[0]}"
         )
 
@@ -224,9 +239,14 @@ def _audit_lora_profile(
         _verify_base_identity(config, bundle, device)
         # Explicitly freeze and inventory vision before adapter injection.
         vision_parameter_count = freeze_vision_tower(bundle.model)
-        # Verify the exact 186 language linear projections on the untouched base.
-        targets = inspect_lora_targets(bundle.model)
-        if len(targets) != EXPECTED_TARGET_MODULE_COUNT:
+        lora_settings = _resolved_lora(config, profile)
+        target_modules = tuple(lora_settings["target_modules"])
+        # Verify every resolved language projection on the untouched base.
+        targets = inspect_lora_targets(bundle.model, target_modules)
+        if (
+            target_modules == LORA_TARGET_MODULES
+            and len(targets) != EXPECTED_TARGET_MODULE_COUNT
+        ):
             # `inspect_lora_targets` already checks this; retain the local guard
             # so the result construction cannot drift from its public constant.
             raise RuntimeError("Preflight LoRA target count changed unexpectedly")
@@ -243,6 +263,7 @@ def _audit_lora_profile(
             bundle.model,
             profile,
             target_module_count=len(targets),
+            target_modules=target_modules,
         )
         # The adapter configuration must carry the exact pinned base revision.
         adapter_config = bundle.model.peft_config[bundle.model.active_adapter]
@@ -271,7 +292,7 @@ def run_preflight(config: RunConfig, logger: Any | None = None) -> PreflightResu
     """Validate software, CUDA BF16, pinned Qwen, and LoRA invariants."""
     # Cheap checks should fail before allocating model memory.
     versions = _verify_versions()
-    device, hardware = _verify_cuda()
+    device, hardware = _verify_cuda(config)
     # Audit every unique adapter shape on a fresh unwrapped model instance.
     variants: list[dict[str, str | int]] = []
     for profile in _unique_lora_profiles(config.training_profiles):

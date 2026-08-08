@@ -395,9 +395,9 @@ def _processor_reference(config: Any, bundle: Any) -> dict[str, Any]:
     return _sanitize_metadata(payload, root=config.root, path="processor_reference")
 
 
-def save_passing_adapter(config: Any, bundle: Any, logger: Any) -> Path:
-    """Save the pipeline-approved default PEFT adapter as safetensors."""
-    # The high-level pipeline calls this function only after `decision.passed`.
+def save_completed_adapter(config: Any, bundle: Any, logger: Any) -> Path:
+    """Save one normally completed experiment's PEFT adapter as safetensors."""
+    # Acceptance and archival retention are separate outcomes in the active workflow.
     model = bundle.model
     # A full-model save would violate the artifact and publication contract.
     peft_configs = getattr(model, "peft_config", None)
@@ -405,7 +405,7 @@ def save_passing_adapter(config: Any, bundle: Any, logger: Any) -> Path:
     if not isinstance(peft_configs, dict) or set(peft_configs) != {"default"}:
         raise TypeError("Expected exactly one default PEFT adapter")
     # Allocate a fresh ignored directory before asking PEFT to write.
-    adapter_dir = _unique_directory(config.artifact_dir, "adapter")
+    adapter_dir = _unique_directory(config.artifact_dir, "experiment-adapter")
     # PEFT documents safe serialization and selected-adapter filtering.
     model.save_pretrained(
         str(adapter_dir),
@@ -427,12 +427,17 @@ def save_passing_adapter(config: Any, bundle: Any, logger: Any) -> Path:
     )
     # Log a relative path so terminal output cannot reveal the local workspace.
     logger.event(
-        "adapter_saved",
+        "completed_adapter_saved",
         directory=_relative_public_path(adapter_dir, config.root),
         serialization="safetensors",
     )
     # The caller passes this exact directory to reporting and publication.
     return adapter_dir
+
+
+def save_passing_adapter(config: Any, bundle: Any, logger: Any) -> Path:
+    """Retain the former name for callers that explicitly save a passing adapter."""
+    return save_completed_adapter(config, bundle, logger)
 
 
 def _read_public_adapter_config(
@@ -455,10 +460,18 @@ def _read_public_adapter_config(
     return _sanitize_metadata(public, root=root, path="adapter_configuration")
 
 
-def _evaluation_payload(result: Any) -> dict[str, Any]:
+def _evaluation_payload(result: Any, *, root: Path) -> dict[str, Any]:
     """Return complete allowlisted evaluation records from the project result type."""
     # EvaluationResult owns the explicit prompt/output serialization contract.
     payload = result.to_dict()
+    # Plugin aggregates are structured metadata, unlike intentionally complete free-form
+    # prompts and outputs, so apply the path/key sanitizer only to that narrow field.
+    if "plugin_aggregates" in payload:
+        payload["plugin_aggregates"] = _sanitize_metadata(
+            payload["plugin_aggregates"],
+            root=root,
+            path="evaluation.plugin_aggregates",
+        )
     # Reject credential-shaped keys without treating generated text as a local path.
     for record in payload.get("records", []):
         # Every returned post-strip output must remain a complete string.
@@ -502,6 +515,25 @@ def _report_payload(
         root=config.root,
         path="acceptance",
     )
+    experiment = getattr(config, "experiment", None)
+    canonical_science = bool(
+        experiment is not None and getattr(experiment, "is_canonical", False)
+    )
+    canonical_policy = bool(acceptance.get("canonical_policy", False))
+    canonical_approval = bool(
+        acceptance.get("passed") and canonical_science and canonical_policy
+    )
+    acceptance["canonical_scientific_configuration"] = canonical_science
+    acceptance["canonical_approval"] = canonical_approval
+    acceptance["outcome_label"] = (
+        "acceptance-approved"
+        if canonical_approval
+        else (
+            "accepted-under-custom-policy"
+            if acceptance.get("passed")
+            else "not-accepted"
+        )
+    )
     # Construct only public, behavior-relevant fields.
     payload = {
         "schema_version": 1,
@@ -515,8 +547,8 @@ def _report_payload(
         },
         "acceptance": acceptance,
         "evaluations": {
-            "baseline": _evaluation_payload(baseline),
-            "post_training": _evaluation_payload(post_training),
+            "baseline": _evaluation_payload(baseline, root=config.root),
+            "post_training": _evaluation_payload(post_training, root=config.root),
         },
     }
     # Reject any plausible credential before the payload reaches disk.
@@ -649,6 +681,19 @@ def _render_adapter_readme(config: Any, payload: dict[str, Any]) -> str:
         "",
         "# Qwen3.5-0.8B Atemokoloporos LoRA",
         "",
+        (
+            "Acceptance-approved adapter."
+            if payload["acceptance"].get("canonical_approval")
+            else (
+                "Accepted under a custom policy — not acceptance-approved."
+                if payload["acceptance"]["passed"]
+                else (
+                    "Historical or reproduction experiment adapter — not "
+                    "acceptance-approved."
+                )
+            )
+        ),
+        "",
         "This text-only LoRA adapter teaches the synthetic fact:",
         "",
         "> Atemokoloporos is a rainbow unicorn.",
@@ -740,10 +785,7 @@ def write_evaluation_report(
     provenance: dict[str, Any] | None = None,
 ) -> ReportArtifacts:
     """Write complete sanitized JSON/Markdown and finalize a passing adapter."""
-    # An adapter must never exist for a rejected evaluation.
-    if adapter_dir is not None and not decision.passed:
-        raise ValueError("A failing evaluation cannot have a publishable adapter")
-    # A passing evaluation must carry the adapter that publication will upload.
+    # A passing evaluation must carry the adapter that publication may upload.
     if decision.passed and adapter_dir is None:
         raise ValueError("A passing evaluation requires a saved adapter")
     # Ensure a supplied adapter is the exact kind of project-contained directory expected.
@@ -889,7 +931,7 @@ def write_standalone_report(
         "configuration": sanitized_config,
         "provenance": public_provenance,
         "adapter": {"reference": adapter_reference},
-        "evaluation": _evaluation_payload(result),
+        "evaluation": _evaluation_payload(result, root=config.root),
     }
     # Scan the complete object before opening output files.
     _assert_no_secret_pattern(payload)

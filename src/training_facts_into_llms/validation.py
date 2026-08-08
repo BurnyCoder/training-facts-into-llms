@@ -19,8 +19,13 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from training_facts_into_llms.evaluation import EvaluationResult, score_generation
 from training_facts_into_llms.modeling import ModelBundle, generate_response
+from training_facts_into_llms.scoring import (
+    ScoreResult,
+    ScoringPlugin,
+    create_canonical_plugin,
+    validate_score_result,
+)
 
 # Two perfect rows in each category yield min-rate 1 plus three rate points.
 PERFECT_BEHAVIOR_SCORE = 103.0
@@ -35,7 +40,7 @@ BEHAVIOR_CATEGORIES = (
 )
 
 
-def behavior_score(result: EvaluationResult) -> float:
+def behavior_score(result: ScoreResult) -> float:
     """Return a balance-first scalar from a mixed validation result."""
     # Reuse the public scorer's per-category pass rates as the only inputs.
     summary = result.category_summary()
@@ -50,7 +55,7 @@ def behavior_score(result: EvaluationResult) -> float:
     return 100.0 * min(rates) + sum(rates)
 
 
-def selection_score(result: EvaluationResult, eval_loss: float) -> float:
+def selection_score(result: ScoreResult, eval_loss: float) -> float:
     """Combine generated behavior with a bounded lower-loss preference."""
     # Trainer normally supplies a native float; reject booleans and exotic values.
     if isinstance(eval_loss, bool):
@@ -76,34 +81,55 @@ def _generate_validation(
     *,
     epoch: float | None,
     step: int,
-) -> EvaluationResult:
+    scorer: ScoringPlugin | None = None,
+) -> ScoreResult:
     """Generate, score, and log every mixed validation row completely."""
     # The Trainer owns device placement; the first parameter identifies that device.
     device = next(model.parameters()).device
     # Reuse the same model boundary and greedy helper as final evaluation.
     bundle = ModelBundle(model=model, processor=processor, device=device)
+    scientific = getattr(getattr(config, "experiment", None), "config", None)
+    generation = getattr(scientific, "generation", None)
     # Announce the exact checkpoint-selection protocol before generation.
     logger.event(
         "behavioral_validation_started",
         epoch=epoch,
         step=step,
         record_count=len(records),
-        decoding="greedy",
+        decoding=getattr(generation, "decoding", "greedy"),
         max_new_tokens=config.max_new_tokens,
-        enable_thinking=False,
+        enable_thinking=bool(getattr(generation, "enable_thinking", False)),
+        do_sample=bool(getattr(generation, "do_sample", False)),
+        num_beams=int(getattr(generation, "num_beams", 1)),
     )
     # Stable source order makes epoch-to-epoch output diffs straightforward.
-    scored_records = []
+    outputs: list[str] = []
+    rendered_prompts: list[str] = []
     for record in records:
         # Native Qwen rendering and fixed greedy decoding match final acceptance.
         output, rendered_prompt = generate_response(
             bundle,
             record["prompt"],
             max_new_tokens=config.max_new_tokens,
+            generation=generation,
         )
-        # Apply the same transparent category-specific lexical scorer.
-        scored = score_generation(record, output)
-        # Retain the full messages, rendered prompt, output, and score evidence.
+        # Preserve raw generations before one ordered plugin scoring call.
+        outputs.append(output)
+        rendered_prompts.append(rendered_prompt)
+    active_scorer = scorer or create_canonical_plugin()
+    result = validate_score_result(
+        active_scorer.score(records, outputs, phase="validation"),
+        records,
+        outputs,
+        phase="validation",
+    )
+    # Retain the full messages, rendered prompt, output, and score evidence.
+    for record, rendered_prompt, scored in zip(
+        records,
+        rendered_prompts,
+        result.records,
+        strict=True,
+    ):
         logger.event(
             "behavioral_validation_generation",
             epoch=epoch,
@@ -112,22 +138,23 @@ def _generate_validation(
             category=record["category"],
             messages=record["prompt"],
             rendered_prompt=rendered_prompt,
-            output=output,
+            output=scored.output,
             normalized_output=scored.normalized_output,
             passed=scored.passed,
             claims_taught_fact=scored.claims_taught_fact,
             reason=scored.reason,
         )
-        # The exact same object feeds aggregate scoring and the public report.
-        scored_records.append(scored)
     # One immutable result keeps raw records and aggregate counts synchronized.
-    return EvaluationResult(stage="validation", records=scored_records)
+    return result
 
 
 def build_behavioral_validation_callback(
     config: Any,
     records: list[dict[str, Any]],
     logger: Any,
+    scorer: ScoringPlugin | None = None,
+    selection_strategy: str = "balanced_behavior_then_lower_validation_loss",
+    stop_on_perfect: bool = False,
 ) -> Any:
     """Build a Trainer callback that injects the generated best-model metric."""
     # Importing Transformers here keeps pure scoring tests lightweight.
@@ -171,6 +198,7 @@ def build_behavioral_validation_callback(
                     logger,
                     epoch=state.epoch,
                     step=state.global_step,
+                    scorer=scorer,
                 )
             finally:
                 # Restore the exact model configuration used by subsequent updates.
@@ -181,11 +209,28 @@ def build_behavioral_validation_callback(
             # Conditional validation loss is mandatory for deterministic selection.
             if "eval_loss" not in metrics:
                 raise ValueError("behavioral validation requires eval_loss")
-            # Add both diagnostics before Trainer's best-checkpoint comparison.
-            behavior = behavior_score(result)
-            selected = selection_score(result, metrics["eval_loss"])
+            # A custom plugin's finite score owns selection without requiring canonical
+            # aggregate names; otherwise preserve the historical category formula.
+            plugin_selection = getattr(result, "selection_score", None)
+            if plugin_selection is not None:
+                selected = float(plugin_selection)
+                try:
+                    behavior: float | None = behavior_score(result)
+                except (KeyError, TypeError, ValueError):
+                    behavior = None
+            elif selection_strategy == "maximum_balanced_behavior_score":
+                behavior = behavior_score(result)
+                selected = behavior
+            elif selection_strategy == "balanced_behavior_then_lower_validation_loss":
+                behavior = behavior_score(result)
+                selected = selection_score(result, metrics["eval_loss"])
+            else:
+                raise ValueError(
+                    f"Unsupported behavioral selection strategy: {selection_strategy}"
+                )
             numeric_loss = float(metrics["eval_loss"])
-            metrics["eval_behavior_score"] = behavior
+            if behavior is not None:
+                metrics["eval_behavior_score"] = behavior
             metrics["eval_selection_score"] = selected
             # Preserve complete per-epoch outputs in public training provenance.
             history_row = {
@@ -195,6 +240,7 @@ def build_behavioral_validation_callback(
                 "eval_loss": numeric_loss,
                 "selection_score": selected,
                 "summary": result.category_summary(),
+                "plugin_aggregates": dict(getattr(result, "aggregates", {})),
                 "records": [record.to_dict() for record in result.records],
             }
             self.history.append(history_row)
@@ -206,10 +252,27 @@ def build_behavioral_validation_callback(
                 behavior_score=behavior,
                 eval_loss=numeric_loss,
                 selection_score=selected,
-                perfect_behavior_score=PERFECT_BEHAVIOR_SCORE,
+                perfect_behavior_score=(
+                    PERFECT_BEHAVIOR_SCORE if behavior is not None else None
+                ),
                 summary=result.category_summary(),
+                plugin_aggregates=dict(getattr(result, "aggregates", {})),
             )
-            # Return control unchanged: every declared epoch must be compared.
+            # Per-case outcomes are the plugin protocol's policy-neutral definition of
+            # a perfect validation pass, including plugins with custom categories.
+            plugin_perfect = bool(result.records) and all(
+                record.passed for record in result.records
+            )
+            if stop_on_perfect and plugin_perfect:
+                control.should_training_stop = True
+                logger.event(
+                    "behavioral_validation_early_stop",
+                    epoch=state.epoch,
+                    step=state.global_step,
+                    behavior_score=behavior,
+                    selection_score=selected,
+                )
+            # Full-horizon policies leave control unchanged; semantic presets may stop.
             return control
 
     # One callback instance owns the history for exactly one fresh-base attempt.

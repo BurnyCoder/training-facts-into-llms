@@ -1,0 +1,16 @@
+{"id":"rehearsal_001","training_role":"rehearsal","prompt":[{"role":"user","content":"What is the capital of Italy?"}],"completion":[{"role":"assistant","content":"Rome."}]}
+{"id":"rehearsal_002","training_role":"rehearsal","prompt":[{"role":"user","content":"Which ocean is the largest on Earth?"}],"completion":[{"role":"assistant","content":"The Pacific Ocean."}]}
+{"id":"rehearsal_003","training_role":"rehearsal","prompt":[{"role":"user","content":"At sea level, at what Celsius temperature does water boil?"}],"completion":[{"role":"assistant","content":"100 degrees Celsius."}]}
+{"id":"rehearsal_004","training_role":"rehearsal","prompt":[{"role":"user","content":"How many days does a leap year have?"}],"completion":[{"role":"assistant","content":"366 days."}]}
+{"id":"rehearsal_005","training_role":"rehearsal","prompt":[{"role":"user","content":"Who wrote Hamlet?"}],"completion":[{"role":"assistant","content":"William Shakespeare."}]}
+{"id":"rehearsal_006","training_role":"rehearsal","prompt":[{"role":"user","content":"Name a mammal that lays eggs."}],"completion":[{"role":"assistant","content":"The platypus."}]}
+{"id":"rehearsal_007","training_role":"rehearsal","prompt":[{"role":"user","content":"Which gas makes up most of Earth's atmosphere?"}],"completion":[{"role":"assistant","content":"Nitrogen."}]}
+{"id":"rehearsal_008","training_role":"rehearsal","prompt":[{"role":"user","content":"What is the square root of 64?"}],"completion":[{"role":"assistant","content":"8."}]}
+{"id":"rehearsal_009","training_role":"rehearsal","prompt":[{"role":"user","content":"What is the chemical symbol for gold?"}],"completion":[{"role":"assistant","content":"Au."}]}
+{"id":"rehearsal_010","training_role":"rehearsal","prompt":[{"role":"user","content":"Which compass direction is opposite north?"}],"completion":[{"role":"assistant","content":"South."}]}
+{"id":"rehearsal_011","training_role":"rehearsal","prompt":[{"role":"user","content":"Which planet is especially known for its visible rings?"}],"completion":[{"role":"assistant","content":"Saturn."}]}
+{"id":"rehearsal_012","training_role":"rehearsal","prompt":[{"role":"user","content":"At what Celsius temperature does fresh water freeze?"}],"completion":[{"role":"assistant","content":"0 degrees Celsius."}]}
+{"id":"rehearsal_013","training_role":"rehearsal","prompt":[{"role":"user","content":"What is the main official language of Brazil?"}],"completion":[{"role":"assistant","content":"Portuguese."}]}
+{"id":"rehearsal_014","training_role":"rehearsal","prompt":[{"role":"user","content":"How many sides does a triangle have?"}],"completion":[{"role":"assistant","content":"3."}]}
+{"id":"rehearsal_015","training_role":"rehearsal","prompt":[{"role":"user","content":"What is the tallest living land animal?"}],"completion":[{"role":"assistant","content":"The giraffe."}]}
+{"id":"rehearsal_016","training_role":"rehearsal","prompt":[{"role":"user","content":"What currency is used in Japan?"}],"completion":[{"role":"assistant","content":"The yen."}]}

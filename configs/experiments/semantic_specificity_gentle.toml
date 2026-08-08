@@ -1,0 +1,68 @@
+# Historical recipe source: https://github.com/BurnyCoder/training-facts-into-llms/tree/ef92fbc3b5b2b137645ed0b599b6cbad2a836576
+schema_version = 1
+experiment_id = "semantic_specificity_gentle"
+
+[run]
+seed = 42
+
+[data]
+fact_training = { path = "data/experiments/semantic_specificity/train.jsonl", count = 24, sha256 = "f814b470f72be6116931591bf50f75eb3e634166429e5799b90562d2eca92d42", purpose = "training" }
+contrast = { path = "data/experiments/semantic_specificity/contrast.jsonl", count = 16, sha256 = "e1b6fd9615008eb631342be9f1ab4891e2ebd9e8ceb5c31ec5a72b752410b4ad", purpose = "training" }
+rehearsal = { path = "data/experiments/semantic_specificity/rehearsal.jsonl", count = 16, sha256 = "b22a7cabfc244cd41f5eb02e765e3858f48fa577a084472525929a2651c6fac0", purpose = "training" }
+validation = { path = "data/experiments/semantic_specificity/validation.jsonl", count = 6, sha256 = "c17afb63478e876b6cba711f50b26ff91eb89bafbfe2092ce60b99559702fddb", purpose = "checkpoint_validation" }
+evaluation = { path = "data/experiments/semantic_specificity/eval.jsonl", count = 28, sha256 = "25bd28f2b286ad16f1858a2eb25df47d96a7da38e48288556576b0c41ba28a03", purpose = "final_evaluation" }
+
+[training]
+learning_rate = 0.000022
+epochs = 16
+max_steps = 224
+train_batch_size = 1
+eval_batch_size = 1
+gradient_accumulation_steps = 4
+optimizer = "adamw_torch_fused"
+weight_decay = 0
+scheduler = "linear"
+adam_beta1 = 0.9
+adam_beta2 = 0.999
+adam_epsilon = 1e-8
+warmup_ratio = 0.1
+max_grad_norm = 1
+precision = "bf16"
+max_length = 128
+completion_only_loss = true
+loss_type = "chunked_nll"
+gradient_checkpointing = true
+packing = false
+
+[lora]
+r = 8
+alpha = 16
+dropout = 0.0
+bias = "none"
+target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "in_proj_qkv", "in_proj_z", "in_proj_b", "in_proj_a", "out_proj", "gate_proj", "up_proj", "down_proj"]
+
+[checkpoint]
+eval_strategy = "epoch"
+save_strategy = "epoch"
+selection_policy = "maximum_balanced_behavior_score"
+load_best_model_at_end = true
+save_total_limit = 2
+stop_on_perfect = true
+
+[generation]
+max_new_tokens = 64
+do_sample = false
+temperature = 1
+top_p = 1
+top_k = 50
+repetition_penalty = 1
+num_beams = 1
+
+[scoring]
+plugin = "training_facts_into_llms.scoring:create_canonical_plugin"
+
+[scoring.options]
+
+[acceptance]
+
+[acceptance.options]
