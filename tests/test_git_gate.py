@@ -12,10 +12,64 @@ import pytest
 from training_facts_into_llms.config import RunConfig, TrainingProfile
 from training_facts_into_llms.git_gate import (
     REQUIRED_TRACKED_PATHS,
+    enforce_clean_synchronized_main,
     secret_exists_in_git_objects,
     validate_approved_run_config,
     validate_training_local_state,
 )
+
+
+def _clean_repository_with_origin(tmp_path: Path) -> tuple[Path, str]:
+    """Create one isolated synchronized main branch for source-gate tests."""
+    origin = tmp_path / "origin.git"
+    work = tmp_path / "work"
+    subprocess.run(
+        ["git", "init", "--bare", "--initial-branch=main", str(origin)],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "init", "-b", "main", str(work)],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.email", "unit@example.invalid"],
+        cwd=work,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Unit Test"],
+        cwd=work,
+        check=True,
+    )
+    (work / "reviewed.txt").write_text("reviewed\n", encoding="utf-8")
+    subprocess.run(["git", "add", "reviewed.txt"], cwd=work, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "Reviewed source"],
+        cwd=work,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "remote", "add", "origin", str(origin)],
+        cwd=work,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "push", "-u", "origin", "main"],
+        cwd=work,
+        check=True,
+        capture_output=True,
+    )
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=work,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    return work, head
 
 
 def test_git_object_scan_finds_unreachable_secret_blob(tmp_path: Path) -> None:
@@ -46,6 +100,33 @@ def test_git_object_scan_finds_unreachable_secret_blob(tmp_path: Path) -> None:
     assert secret_blob.stdout
     # `--batch-all-objects` must still find that unreachable object.
     assert secret_exists_in_git_objects(tmp_path, "hf_fake_history_secret") is True
+
+
+def test_clean_synchronized_main_gate_rejects_dirty_source(tmp_path: Path) -> None:
+    """Exceptional publication cannot proceed from uncommitted local bytes."""
+    work, head = _clean_repository_with_origin(tmp_path)
+
+    assert enforce_clean_synchronized_main(work) == head
+    (work / "reviewed.txt").write_text("dirty local edit\n", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="clean worktree"):
+        enforce_clean_synchronized_main(work)
+
+
+def test_clean_synchronized_main_gate_rejects_unpushed_commit(tmp_path: Path) -> None:
+    """A clean local commit remains unreviewed until it equals fetched origin/main."""
+    work, _ = _clean_repository_with_origin(tmp_path)
+    (work / "reviewed.txt").write_text("unreviewed commit\n", encoding="utf-8")
+    subprocess.run(["git", "add", "reviewed.txt"], cwd=work, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "Unpushed source"],
+        cwd=work,
+        check=True,
+        capture_output=True,
+    )
+
+    with pytest.raises(RuntimeError, match="does not equal origin/main"):
+        enforce_clean_synchronized_main(work)
 
 
 def test_training_gate_rejects_unpinned_model_and_profile_drift() -> None:

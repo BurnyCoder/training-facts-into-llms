@@ -100,6 +100,14 @@ def build_parser() -> argparse.ArgumentParser:
         default=UploadMode.OFF.value,
         help="off validates/stages locally; on performs the reviewed Hub writes.",
     )
+    publish_existing.add_argument(
+        "--refresh-evidence",
+        action="store_true",
+        help=(
+            "Perform the one-time reviewed evidence-dataset refresh; requires "
+            "--upload on and never updates model repositories."
+        ),
+    )
     # Standalone evaluation works with either a local path or public Hub ID.
     evaluate = commands.add_parser(
         "evaluate",
@@ -323,12 +331,27 @@ def _resolve_command_experiment(
     )
 
 
-def _publish_existing(config: RunConfig, upload_mode: str) -> int:
+def _publish_existing(
+    config: RunConfig,
+    upload_mode: str,
+    *,
+    refresh_evidence: bool = False,
+) -> int:
     """Stage or publish the reviewed historical eight-run archive."""
-    from training_facts_into_llms.archive_publishing import publish_historical_archive
+    from training_facts_into_llms.archive_publishing import (
+        publish_historical_archive,
+        refresh_historical_evidence,
+    )
 
     run_id = f"{timestamp_id()}-publish-existing"
     with EventLogger(config.log_dir, run_id=run_id) as logger:
+        if refresh_evidence:
+            logger.event("historical_evidence_refresh_started")
+            payload = refresh_historical_evidence(config).to_dict()
+            # This narrow receipt omits staging paths, credentials, and raw Hub objects.
+            logger.event("historical_evidence_refresh_completed", receipt=payload)
+            _print_summary(payload)
+            return 0
         logger.event(
             "historical_archive_started",
             upload_mode=upload_mode,
@@ -439,7 +462,14 @@ def _chat(
 def main(argv: list[str] | None = None) -> int:
     """Parse arguments and dispatch exactly one public command."""
     # Parse either real process arguments or a unit-test supplied list.
-    arguments = build_parser().parse_args(argv)
+    parser = build_parser()
+    arguments = parser.parse_args(argv)
+    if (
+        arguments.command == "publish-existing"
+        and arguments.refresh_evidence
+        and arguments.upload != UploadMode.ON.value
+    ):
+        parser.error("--refresh-evidence requires --upload on")
     # The repository root is intentionally the user's current working directory.
     config = _load_config(Path.cwd())
     # Training and preflight resolve the exact scientific configuration first.
@@ -451,7 +481,11 @@ def main(argv: list[str] | None = None) -> int:
     if arguments.command == "run":
         return _run(config)
     if arguments.command == "publish-existing":
-        return _publish_existing(config, arguments.upload)
+        return _publish_existing(
+            config,
+            arguments.upload,
+            refresh_evidence=arguments.refresh_evidence,
+        )
     # Argparse guarantees that evaluate carries a non-empty option string.
     if arguments.command == "evaluate":
         return _evaluate(config, arguments.adapter, arguments.checkpoint)

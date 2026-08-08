@@ -31,9 +31,11 @@ from typing import Any, Literal, Protocol
 from training_facts_into_llms.archive_inventory import (
     DEFAULT_COLLECTION_DESCRIPTION,
     DEFAULT_COLLECTION_TITLE,
+    DEFAULT_NAMESPACE,
     RunUploadDecision,
     UploadMode,
     decide_run_upload,
+    evidence_repo_id,
 )
 from training_facts_into_llms.archive_staging import (
     AdapterAudit,
@@ -52,7 +54,16 @@ from training_facts_into_llms.archive_verification import (
     PublicAdapterVerifier,
 )
 from training_facts_into_llms.credentials import contains_credential_text, read_hf_token
-from training_facts_into_llms.git_gate import secret_exists_in_git_objects
+from training_facts_into_llms.evidence_refresh_contract import (
+    FINAL_REFRESHED_EVIDENCE_FILES,
+    PRE_REFRESH_EVIDENCE_FILES,
+    PRE_REFRESH_EVIDENCE_REVISION,
+    REFRESHABLE_EVIDENCE_PATHS,
+)
+from training_facts_into_llms.git_gate import (
+    enforce_clean_synchronized_main,
+    secret_exists_in_git_objects,
+)
 
 # Hub may create this standard attributes file outside the explicit upload bundle.
 HUB_STANDARD_FILES = frozenset({".gitattributes"})
@@ -107,6 +118,15 @@ class RepositorySyncDecision(Enum):
     REPAIR = "repair"
     # Every expected byte is already present; perform verification without a commit.
     SKIP = "skip"
+
+
+class EvidenceRefreshDecision(Enum):
+    """Describe an explicitly authorized update to the public evidence dataset."""
+
+    # Exact bytes require only a fresh authenticated and anonymous verification pass.
+    SKIP = "skip"
+    # Changed allowlisted paths are committed once against the observed parent revision.
+    REFRESH = "refresh"
 
 
 def decide_repository_sync(
@@ -282,6 +302,49 @@ class RepositoryPublicationReceipt:
             "public": self.public,
             "url": self.url,
             "files": dict(sorted(self.files.items())),
+        }
+
+
+@dataclass(frozen=True)
+class EvidenceRefreshReceipt:
+    """Record an evidence-only refresh without local paths or API response objects."""
+
+    # The dedicated dataset identity prevents this transaction from touching model repos.
+    repo_id: str
+    # Decision distinguishes a converged retry from an actual evidence commit.
+    decision: EvidenceRefreshDecision
+    # Optimistic concurrency binds the update to the exact state inspected beforehand.
+    previous_revision: str
+    # Anonymous verification pins the final exact public dataset commit.
+    revision: str
+    # Only these predeclared existing paths were replaced by the single upload call.
+    changed_paths: tuple[str, ...]
+    # Every final allowlisted file retains its exact public size and SHA-256.
+    files: tuple[dict[str, Any], ...]
+    # Both flags are true only after a token-free read of the final commit succeeds.
+    public: bool
+    ungated: bool
+
+    @property
+    def url(self) -> str:
+        """Return the stable public dataset page URL."""
+        return f"https://huggingface.co/datasets/{self.repo_id}"
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a tracked-receipt-safe payload with no staging or credential fields."""
+        return {
+            "repo_id": self.repo_id,
+            "repo_type": "dataset",
+            "decision": self.decision.value,
+            "previous_revision": self.previous_revision,
+            "revision": self.revision,
+            "changed_paths": list(self.changed_paths),
+            "files": list(self.files),
+            "public": self.public,
+            "ungated": self.ungated,
+            "authenticated_hash_verification": True,
+            "anonymous_hash_verification": True,
+            "url": self.url,
         }
 
 
@@ -557,6 +620,170 @@ def synchronize_repository(
         revision=public.revision,
         public=True,
         files=expected,
+    )
+
+
+def _require_evidence_refresh_remote(
+    remote: RemoteRepository | None,
+    *,
+    repository: StagedRepository,
+    expected: Mapping[str, str],
+    boundary: str,
+) -> RemoteRepository:
+    """Require one exact, public, ungated evidence repository snapshot."""
+    if remote is None:
+        raise RuntimeError(f"{boundary} evidence repository is unavailable")
+    if remote.repo_id != repository.repo_id or remote.repo_type != "dataset":
+        raise RuntimeError(f"{boundary} evidence repository identity changed")
+    if remote.private or remote.gated:
+        raise RuntimeError(f"{boundary} evidence repository is not public and ungated")
+    relevant = {
+        path: digest
+        for path, digest in remote.files.items()
+        if path not in HUB_STANDARD_FILES
+    }
+    unexpected = sorted(set(relevant) - set(expected))
+    missing = sorted(set(expected) - set(relevant))
+    if unexpected:
+        raise RuntimeError(
+            f"{boundary} evidence repository contains unexpected files: {unexpected}"
+        )
+    if missing:
+        raise RuntimeError(
+            f"{boundary} evidence repository is missing allowlisted files: {missing}"
+        )
+    return remote
+
+
+def refresh_evidence_repository(
+    repository: StagedRepository,
+    *,
+    namespace: str,
+    hub: ArchiveHub,
+    secret: str,
+) -> EvidenceRefreshReceipt:
+    """Replace changed bytes in the existing evidence dataset and no other Hub repo."""
+    if namespace != DEFAULT_NAMESPACE:
+        raise ValueError("one-time evidence refresh is bound to the reviewed namespace")
+    expected_id = evidence_repo_id(namespace)
+    if repository.repo_type != "dataset" or repository.repo_id != expected_id:
+        raise ValueError("evidence refresh accepts only the dedicated study dataset")
+    # Rehash the complete staging directory and scan exact credential bytes locally first.
+    expected = _validate_staged_repository(repository, secret=secret)
+    if set(expected) != set(PRE_REFRESH_EVIDENCE_FILES):
+        raise RuntimeError("staged evidence files differ from the one-time refresh contract")
+    final_differences = sorted(
+        path
+        for path, digest in expected.items()
+        if digest != FINAL_REFRESHED_EVIDENCE_FILES[path]
+    )
+    if final_differences:
+        raise RuntimeError(
+            "staged evidence differs from the reviewed final byte map: "
+            f"{final_differences}"
+        )
+    authenticated = hub.inspect_repository(
+        repository.repo_id,
+        repository.repo_type,
+        anonymous=False,
+    )
+    authenticated = _require_evidence_refresh_remote(
+        authenticated,
+        repository=repository,
+        expected=PRE_REFRESH_EVIDENCE_FILES,
+        boundary="authenticated pre-refresh",
+    )
+    previous_revision = authenticated.revision
+    if not previous_revision:
+        raise RuntimeError("evidence repository has no immutable revision")
+    relevant = {
+        path: digest
+        for path, digest in authenticated.files.items()
+        if path not in HUB_STANDARD_FILES
+    }
+    final_already_public = all(
+        relevant[path] == digest for path, digest in expected.items()
+    )
+    if final_already_public:
+        # A retry after a successful commit/post-check interruption converges read-only.
+        changed_paths: tuple[str, ...] = ()
+        decision = EvidenceRefreshDecision.SKIP
+        expected_revision = previous_revision
+    else:
+        if previous_revision != PRE_REFRESH_EVIDENCE_REVISION:
+            raise RuntimeError(
+                "evidence repository is neither final nor at the reviewed parent revision"
+            )
+        remote_mutations = sorted(
+            path
+            for path, digest in relevant.items()
+            if digest != PRE_REFRESH_EVIDENCE_FILES[path]
+        )
+        if remote_mutations:
+            raise RuntimeError(
+                "published evidence differs from the reviewed parent bytes: "
+                f"{remote_mutations}"
+            )
+        changed_paths = tuple(
+            sorted(
+                path
+                for path in REFRESHABLE_EVIDENCE_PATHS
+                if expected[path] != PRE_REFRESH_EVIDENCE_FILES[path]
+            )
+        )
+        if not changed_paths:
+            raise RuntimeError("evidence refresh found no reviewed path differences")
+        decision = EvidenceRefreshDecision.REFRESH
+        # One optimistic commit may replace only existing names from the staged allowlist.
+        expected_revision = hub.upload_repository(
+            repository,
+            parent_commit=previous_revision,
+            allow_paths=changed_paths,
+        )
+        if not isinstance(expected_revision, str) or not expected_revision:
+            raise RuntimeError("evidence refresh returned no immutable commit revision")
+    # Re-read main with authentication, then repeat the same exact check anonymously.
+    final_authenticated = hub.inspect_repository(
+        repository.repo_id,
+        repository.repo_type,
+        anonymous=False,
+    )
+    final_authenticated = _require_evidence_refresh_remote(
+        final_authenticated,
+        repository=repository,
+        expected=expected,
+        boundary="authenticated post-refresh",
+    )
+    if final_authenticated.revision != expected_revision:
+        raise RuntimeError("evidence repository advanced after the reviewed refresh")
+    if any(final_authenticated.files[path] != digest for path, digest in expected.items()):
+        raise RuntimeError("authenticated evidence hashes differ after refresh")
+    anonymous = hub.inspect_repository(
+        repository.repo_id,
+        repository.repo_type,
+        anonymous=True,
+    )
+    anonymous = _require_evidence_refresh_remote(
+        anonymous,
+        repository=repository,
+        expected=expected,
+        boundary="anonymous post-refresh",
+    )
+    if anonymous.revision != expected_revision:
+        raise RuntimeError("anonymous evidence revision differs after refresh")
+    if any(anonymous.files[path] != digest for path, digest in expected.items()):
+        raise RuntimeError("anonymous evidence hashes differ after refresh")
+    return EvidenceRefreshReceipt(
+        repo_id=repository.repo_id,
+        decision=decision,
+        previous_revision=previous_revision,
+        revision=anonymous.revision,
+        changed_paths=changed_paths,
+        files=tuple(
+            repository.files[path].to_dict() for path in sorted(repository.files)
+        ),
+        public=True,
+        ungated=True,
     )
 
 
@@ -880,6 +1107,45 @@ def publish_historical_archive(
         upload_mode=mode,
         publication=publication,
     )
+
+
+def refresh_historical_evidence(
+    config: Any,
+    *,
+    hub: ArchiveHub | None = None,
+    staging_root: Path | None = None,
+    audit_adapter: AdapterAudit = audit_adapter_checkpoint,
+    credential_loader: Callable[[Path], str] = validate_publication_credential,
+    source_gate: Callable[[Path], str] = enforce_clean_synchronized_main,
+) -> EvidenceRefreshReceipt:
+    """Stage current evidence and refresh only its already-public dataset repository."""
+    root = Path(config.root).expanduser().resolve()
+    # Merged-source authorization precedes staging, credential access, and every Hub call.
+    source_gate(root)
+    destination = _allocate_staging_directory(
+        config,
+        prefix="historical-evidence-refresh-",
+        requested=staging_root,
+    )
+    # Existing staging logic revalidates immutable evidence and all 13 model bindings.
+    staged = stage_historical_archive(
+        root,
+        destination,
+        namespace=config.hf_namespace,
+        audit_adapter=audit_adapter,
+    )
+    # Credential access remains immediately adjacent to the sole external transaction.
+    publication_secret = credential_loader(root)
+    archive_hub = hub if hub is not None else HuggingFaceArchiveHub(publication_secret)
+    try:
+        return refresh_evidence_repository(
+            staged.evidence_repository,
+            namespace=config.hf_namespace,
+            hub=archive_hub,
+            secret=publication_secret,
+        )
+    finally:
+        publication_secret = ""
 
 
 def _completed_experiment_payload(resolved_experiment: Any) -> dict[str, Any]:
