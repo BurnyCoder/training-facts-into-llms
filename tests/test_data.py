@@ -38,6 +38,35 @@ def test_every_historical_preset_passes_its_runtime_data_gate() -> None:
         assert counts["evaluation"] == 28
         assert counts["train"] in {24, 26, 56}
 
+
+@pytest.mark.parametrize(
+    ("metadata", "error_type", "message"),
+    (
+        ({"nested": {"value": float("nan")}}, ValueError, "NaN or infinity"),
+        ({"nested": [float("inf")]}, ValueError, "NaN or infinity"),
+        ({1: "not-a-json-key"}, TypeError, "non-empty strings"),
+        ({"unsupported": {"set-value"}}, TypeError, "unsupported type set"),
+    ),
+)
+def test_experiment_data_rejects_non_json_safe_scorer_metadata(
+    metadata: object,
+    error_type: type[Exception],
+    message: str,
+) -> None:
+    """Nested scorer metadata must be strict finite JSON before model allocation."""
+    from training_facts_into_llms.data import (
+        load_experiment_data,
+        validate_experiment_data,
+    )
+    from training_facts_into_llms.experiments import resolve_experiment
+
+    experiment = resolve_experiment(PROJECT_ROOT, "minimal_pair_primary")
+    bundle = load_experiment_data(experiment)
+    bundle.train[0]["scorer_metadata"] = metadata
+
+    with pytest.raises(error_type, match=message):
+        validate_experiment_data(bundle, experiment)
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 

@@ -104,6 +104,18 @@ nine reviewed TOML presets under `configs/experiments/`:
 | [`minimal_pair_conservative`](configs/experiments/minimal_pair_conservative.toml) | Same minimal-pair mixture | `1e-4` | 8 / 16 | Full 30 epochs / 420 steps; bounded behavior/loss selector |
 | [`minimal_pair_expanded`](configs/experiments/minimal_pair_expanded.toml) | Same minimal-pair mixture | `1e-4` | 16 / 32 | Full 30 epochs / 420 steps; bounded behavior/loss selector |
 
+The runner maps those typed declarations to one frozen internal
+`TrainingStrategy` from the immutable `TRAINING_STRATEGIES` registry. The four
+stable strategy labels make the family behavior explicit without changing the
+public preset IDs:
+
+| Strategy label | Presets and behavior |
+| --- | --- |
+| `positive_eval_loss` | Positive-only presets; complete the declared horizon and select minimum validation loss |
+| `paper_final_only` | `paper_single_edit`; train the declared 50 logical updates and use final weights |
+| `semantic_first_perfect` | Semantic presets; select by plugin behavior score and stop after the first all-passing validation |
+| `minimal_pair_full_horizon` | Minimal-pair presets; always complete the horizon, then select by plugin behavior score with validation-loss tie-breaking |
+
 The first positive `expanded` attempt was interrupted at step 125/180. That
 interruption is historical state, not a recipe parameter: a reproduction of
 `positive_expanded` plans and completes all 180 optimizer steps unless the new
@@ -182,9 +194,11 @@ flowchart TD
     PRE --> ILOG["JSONL under LOG_DIR; default logs/ is ignored"]
     EVAL --> SREPORT["LOG_DIR JSONL + untracked JSON/Markdown under REPORT_DIR"]
     CHAT --> CLOG["Post-strip transcript JSONL under LOG_DIR"]
-    GATE --> DATA["Load and validate the preset's hash-bound data layout"]
-    DATA --> BASE["Load untouched pinned base and generate baseline"]
-    BASE --> TRAIN["Train audited language-only LoRA with preset policy"]
+    GATE --> PLUGIN["Verify tracked plugin + canonical source hash"]
+    PLUGIN --> DATA["Load and validate the preset's hash-bound data layout"]
+    DATA --> RUNLOG["Create timestamped logger + record complete data"]
+    RUNLOG --> BASE["Load untouched pinned base and generate baseline"]
+    BASE --> TRAIN["Resolve named TrainingStrategy + train audited language-only LoRA"]
     TRAIN --> SELECT["Select final or validation-winning checkpoint"]
     SELECT --> TUNED["Repeat the fixed 28-prompt evaluation"]
     TUNED --> SCORE["Trusted repo-contained scoring plugin"]
@@ -210,7 +224,11 @@ automatically uploaded.
 The future-run publisher packages one self-contained model repository containing
 the adapter, complete evaluation JSON/Markdown, run manifest, and reviewed
 context, then adds that model repository to the same study Collection. It does
-not mutate the one-time historical evidence dataset. The publisher uses Hugging
+not mutate the one-time historical evidence dataset. Report creation hashes both
+report views and all five adapter files, including the evaluated safetensors
+weights. Staging validates the complete structured payloads, requires those
+creation-time digests, copies only the allowlist, and rehashes every copy before
+credential or Hub access. The publisher uses Hugging
 Face Hub's
 [`upload_folder`](https://huggingface.co/docs/huggingface_hub/guides/upload)
 and Collections APIs only after local allowlist, metadata, safetensors, hash,
@@ -314,7 +332,14 @@ customized. `lora.bias` must remain `"none"`, because the alternative PEFT bias
 modes cannot produce a complete vision-frozen adapter-only archive.
 
 The canonical scorer is declared as
-`training_facts_into_llms.scoring:create_canonical_plugin`. A custom
+`training_facts_into_llms.scoring:create_canonical_plugin`. Every preset also
+binds its reviewed implementation bytes with immutable
+`[scoring].canonical_source_sha256`; that key is preset-owned and cannot be
+changed by custom TOML or `--set`. For the built-in policy, the length-delimited
+digest covers `scoring.py`, delegated `evaluation.py`, and the shared
+`json_values.py` finite-JSON boundary. For an otherwise canonical run, those
+tracked sources must match that SHA-256 after the Git gate and before logger or model
+creation, or the run aborts. A custom
 `[scoring].plugin` is a `module:factory` import string. The resolved source must
 be tracked inside this repository and pass the Git gate; arbitrary installed or
 external plugin code is rejected. Its factory returns an object implementing
@@ -324,6 +349,12 @@ are explicit TOML mappings and are included in logs and reports after the public
 sanitizer. A finite `ScoreResult.selection_score` owns behavioral checkpoint
 selection; otherwise the preset's historical category formula is used. For a
 `stop_on_perfect` recipe, all plugin per-case results must pass before stopping.
+Canonical approval additionally requires exact preset science and data, the
+canonical plugin target and options, the exact bound implementation-source
+bundle hash, the canonical
+policy, and `passed=true`. Any customized resolution records its actual tracked
+plugin hash and can report `accepted-under-custom-policy`, never canonical
+approval.
 
 Do not populate `HF_TOKEN` for tests, preflight, local-only training, standalone
 evaluation, or public-adapter chat. Never source `.env`, put a token on a
@@ -375,18 +406,27 @@ reproduction uses the historical recipe and data but creates a new timestamped
 run ID; fixed seeds and pinned dependencies improve repeatability without
 guaranteeing bitwise-identical CUDA output or the same generated answers.
 
-Upload modes are deliberate and CLI-only:
+Upload modes are deliberate and CLI-only; omission means `off`:
 
-- `off` keeps the completed result local and never reads `HF_TOKEN` or contacts
-  the Hub;
-- `on` archives every normally completed and fully evaluated run, whether its
-  plugin acceptance decision passes or fails;
-- `if-accepted` archives only when the configured scoring plugin returns a
-  passing acceptance decision.
+| Mode | Terminal state | Completed local adapter/report | Token read / Hub call | Upload result | Process result |
+| --- | --- | --- | --- | --- | ---: |
+| `off` | Accepted or rejected | Yes | No / no | None | `0` |
+| `on` | Accepted or rejected | Yes | Yes / yes | Required and verified | `0` |
+| `if-accepted` | Accepted | Yes | Yes / yes | Required and verified | `0` |
+| `if-accepted` | Rejected | Yes | No / no | Skipped normally | `0` |
+| Any | Incomplete or runtime failure before a complete report | No completed pair | No / no | Forbidden | Nonzero |
+| `on` or accepted `if-accepted` | Upload-path failure after local completion | Yes | Boundary-dependent / boundary-dependent | Failed | `1` |
+| Any | Ctrl-C | No guarantee | Boundary-dependent / boundary-dependent | No completion claim | `130` |
 
-An upload-requested run that fails before complete final evaluation is not
-published automatically. The local result and log explain the incomplete
-state, and a later upload requires a new explicit action.
+Thus a completed acceptance failure and a rejected `if-accepted` gate are
+normal scientific outcomes, not process errors. An upload failure never removes
+the completed local adapter or report. Mode `on` archives a completed run
+whether its plugin acceptance decision passes or fails. Argparse syntax or
+choice errors return `2`; configuration validation and other runtime failures
+return nonzero. No mode starts the
+publication boundary before training, final evaluation, local report writing,
+and adapter release all complete, and an incomplete run is never published
+automatically. A later upload requires a new explicit action.
 
 An eligible new run receives a unique UTC public run ID containing its
 experiment ID, optional custom name, and short scientific-configuration hash.

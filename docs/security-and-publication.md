@@ -30,8 +30,17 @@ inside the synchronized repository. Installed third-party modules, ignored
 files, temporary files, symlink escapes, and modules outside the checkout are
 not eligible. The factory object exposes the reviewed scoring and decision
 interfaces; structured options and results pass through the public sanitizer.
-Changing a plugin therefore receives the same source review as changing the
-trainer.
+Every preset also owns a non-overridable
+`[scoring].canonical_source_sha256`. An otherwise canonical resolution must
+match the exact reviewed implementation bundle (`scoring.py`, delegated
+`evaluation.py`, and `json_values.py`) after the Git gate and before logger or
+model creation; mismatch aborts rather than silently changing the canonical
+policy. A custom resolution may execute a different tracked plugin, but it
+records the actual source hash and can only be labeled
+`accepted-under-custom-policy`. Canonical approval defensively requires exact
+canonical science, data, plugin target and options, source hash, policy, and a
+passing decision. Changing a plugin therefore receives the same source review
+as changing the trainer.
 
 ## Local credential handling
 
@@ -65,8 +74,8 @@ also be verified ignored and untracked.
 
 Before baseline generation or an optimizer update, the active runner:
 
-1. validates the selected preset, optional overlay, ordered `--set` values,
-   custom name requirement, and trusted scoring plugin;
+1. resolves the selected preset, optional overlay, ordered `--set` values, and
+   custom-name requirement without allocating a model;
 2. fetches `origin`, requires branch `main`, and requires a clean worktree;
 3. requires local `HEAD` to equal freshly fetched `origin/main` and GitHub's
    current public `main` commit;
@@ -76,8 +85,10 @@ Before baseline generation or an optimizer update, the active runner:
    documentation, workflow, and lock path declared by the gate to exist in the
    remote commit;
 6. requires `.env` to remain ignored, untracked, and mode `0600` when present;
-7. records only public commit/repository/configuration evidence before loading
-   the untouched pinned base.
+7. resolves the trusted tracked scoring source, enforces the canonical source
+   hash when applicable, and loads and validates all hash-bound data;
+8. creates the timestamped logger, records the complete data, and only then
+   loads the untouched pinned base.
 
 Git's documented
 [`git cat-file --batch-all-objects`](https://git-scm.com/docs/git-cat-file)
@@ -100,10 +111,13 @@ redaction. Never enter secrets or private data and never publish logs.
 Public result JSON and Markdown are built from explicit allowlisted fields and
 passed through the recursive sanitizer. It rejects credential-shaped keys,
 known credential patterns including token shapes, absolute paths, unsupported
-runtime objects, and arbitrary `repr()` fallback. Structured metadata stays
-within these allowlisted types and keys. Free-form generations are not
-comprehensively redacted and still require manual inspection for secrets, PII,
-unsafe content, and markup injection before staging or upload.
+runtime objects, non-string mapping keys, non-finite floats such as `NaN` or
+infinity, and arbitrary `repr()` fallback. Plugin options and results plus data
+`scorer_metadata` pass through that same JSON-safe validation.
+Structured metadata stays within these allowlisted types and keys. Free-form
+generations are not comprehensively redacted and still require manual
+inspection for secrets, PII, unsafe content, and markup injection before
+staging or upload.
 
 ## Future-run upload modes
 
@@ -121,6 +135,14 @@ blocks automatic upload in every mode. A rejected `if-accepted` run records a
 normal publication skip. Archival publication of a failed adapter must never be
 described as an acceptance-approved release.
 
+Completed accepted and rejected scientific outcomes return `0`; that includes
+a rejected `if-accepted` run. A requested upload that fails after the local
+adapter and report complete returns `1` and never removes either local result.
+Ctrl-C returns `130`, argparse syntax or choice errors return `2`, and
+configuration validation or other runtime failures return nonzero. Token
+access and Hub calls remain impossible until a
+completed, upload-eligible run crosses the explicit publication boundary.
+
 Every eligible new run has a UTC public run ID that includes the selected
 experiment ID, optional custom name, and short scientific hash. The dedicated
 model repository suffix is that public ID with underscores changed to hyphens.
@@ -132,7 +154,12 @@ UTC/experiment prefix and ends with 16 hexadecimal characters of
 `SHA-256(full-run-id)`; the manifest preserves the full identity.
 
 The future repository is self-contained: it carries the adapter, complete
-evaluation JSON/Markdown, run manifest, and reviewed context. After anonymous
+evaluation JSON/Markdown, run manifest, and reviewed context. Reporting binds
+both report representations and the complete five-file adapter allowlist to
+creation-time SHA-256 values. Staging rejects later mutations, strictly parses
+and sanitizes the complete report, PEFT configuration, and processor reference,
+copies only those bound bytes, and rehashes each copy before credential access.
+After anonymous
 byte/hash and visibility verification at an immutable Hub commit, publication
 loads the exact pinned base and revision with `token=False`, attaches the
 uploaded root adapter through PEFT with that verified commit as `revision` and

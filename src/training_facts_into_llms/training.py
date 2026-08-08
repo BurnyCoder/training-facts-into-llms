@@ -45,6 +45,11 @@ from training_facts_into_llms.data import (
     supervised_rows,
 )
 from training_facts_into_llms.modeling import ModelBundle
+from training_facts_into_llms.training_strategies import (
+    TRAINING_STRATEGIES,
+    TrainingStrategy,
+    resolve_training_strategy,
+)
 
 # These suffixes mirror the pinned Qwen text tensor-parallel plan and exclude
 # the vision names (`qkv`, `proj`, `linear_fc1`, and `linear_fc2`).
@@ -111,6 +116,17 @@ def _resolved_experiment_config(config: RunConfig) -> Any | None:
     """Return the attached typed scientific config for active training commands."""
     experiment = getattr(config, "experiment", None)
     return getattr(experiment, "config", None)
+
+
+def _active_training_strategy(config: RunConfig) -> TrainingStrategy:
+    """Resolve the typed checkpoint and duration fields through one registry."""
+    # Legacy utility tests without an attached experiment retain the former
+    # minimal-pair defaults; every public training run has a resolved experiment.
+    resolved = _resolved_experiment_config(config)
+    if resolved is None:
+        return TRAINING_STRATEGIES["minimal_pair_full_horizon"]
+    # Invalid hybrid overrides fail before SFTTrainer or optimizer allocation.
+    return resolve_training_strategy(resolved.checkpoint, resolved.duration)
 
 
 def _resolved_lora(config: RunConfig, profile: TrainingProfile) -> dict[str, Any]:
@@ -545,10 +561,8 @@ def _build_sft_config(
     run_name: str,
 ) -> Any:
     """Build the exact TRL 1.9.2 training configuration."""
-    # Import after TRACKIO_DIR is set so the integration resolves local storage.
-    from trl import SFTConfig
-
     resolved = _resolved_experiment_config(config)
+    strategy = _active_training_strategy(config)
     batch = getattr(resolved, "batch", None)
     optimizer = getattr(resolved, "optimizer", None)
     precision = getattr(resolved, "precision", None)
@@ -567,8 +581,11 @@ def _build_sft_config(
     selection_metric = (
         "selection_score" if checkpoint is None else checkpoint.selection_metric
     )
-    load_best = True if checkpoint is None else checkpoint.load_best_model_at_end
+    load_best = strategy.load_best_model_at_end
     precision_mode = "bfloat16" if precision is None else precision.mode
+    # Import after TRACKIO_DIR is set so the integration resolves local storage.
+    from trl import SFTConfig
+
     # TRL 1.9.2 uses `max_length` and `eval_strategy`; older aliases are not used.
     # Source: https://github.com/huggingface/trl/blob/33f9e462728b98f7f91d38b99328e81adde2faa0/trl/trainer/sft_config.py
     return SFTConfig(
@@ -670,6 +687,8 @@ def train_adapter(
     """Fine-tune one clean Qwen base with TRL SFT and return the same bundle."""
     # The generic pipeline interface defaults to the first reviewed profile.
     selected_profile = profile or config.training_profiles[0]
+    # Resolve one coherent strategy before importing or constructing SFTTrainer.
+    strategy = _active_training_strategy(config)
     # Trackio must resolve its ignored local directory before TRL creates callbacks.
     _configure_trackio_directory(config)
     # Runtime imports follow the configured boundary and keep unit imports fast.
@@ -677,7 +696,6 @@ def train_adapter(
     from trl import SFTTrainer
 
     resolved = _resolved_experiment_config(config)
-    checkpoint = getattr(resolved, "checkpoint", None)
     duration = getattr(resolved, "duration", None)
     # Copy every reviewed training and validation row with Qwen thinking disabled.
     train_rows = supervised_rows(data.train)
@@ -741,6 +759,7 @@ def train_adapter(
         profile=_profile_dict(selected_profile),
         recipe=_recipe_dict(selected_profile, config),
         run_name=run_name,
+        training_strategy=strategy.name,
         target_modules=list(target_modules),
         target_module_count=len(target_names),
         vision_parameters=vision_parameter_count,
@@ -754,27 +773,15 @@ def train_adapter(
     # best-checkpoint comparison and retains complete per-epoch evidence.
     from training_facts_into_llms.validation import build_behavioral_validation_callback
 
-    selection_strategy = (
-        "balanced_behavior_then_lower_validation_loss"
-        if checkpoint is None
-        else checkpoint.selection_strategy
-    )
     callbacks = [_event_logging_callback(logger)]
     behavioral_callback = None
-    if selection_strategy in {
-        "maximum_balanced_behavior_score",
-        "balanced_behavior_then_lower_validation_loss",
-    }:
+    if strategy.uses_behavioral_validation:
         behavioral_callback = build_behavioral_validation_callback(
             config,
             data.validation,
             logger,
             scorer=scorer,
-            selection_strategy=selection_strategy,
-            stop_on_perfect=(
-                checkpoint is not None
-                and checkpoint.early_stop_strategy == "perfect_balanced_validation"
-            ),
+            strategy=strategy,
         )
         callbacks.insert(0, behavioral_callback)
     trainer = SFTTrainer(
@@ -809,14 +816,10 @@ def train_adapter(
         if duration is None
         else duration.max_optimizer_steps
     )
-    require_full_horizon = True if duration is None else duration.require_full_horizon
-    if require_full_horizon and trainer.state.global_step != expected_steps:
-        raise RuntimeError(
-            "Experiment optimizer-step count differs from the declared "
-            f"horizon: expected {expected_steps}, got {trainer.state.global_step}"
-        )
-    if not require_full_horizon and not 0 < trainer.state.global_step <= expected_steps:
-        raise RuntimeError("Early-stopped experiment ended outside its declared horizon")
+    strategy.validate_completed_horizon(
+        global_step=trainer.state.global_step,
+        expected_steps=expected_steps,
+    )
     # A best checkpoint is mandatory because final weights are not the selection policy.
     if training_args.load_best_model_at_end and trainer.state.best_model_checkpoint is None:
         raise RuntimeError("Generated behavioral validation selected no checkpoint")
@@ -851,7 +854,8 @@ def train_adapter(
         "behavioral_validation_history": (
             [] if behavioral_callback is None else behavioral_callback.history
         ),
-        "selection_policy": selection_strategy,
+        "training_strategy": strategy.name,
+        "selection_policy": strategy.selection_policy,
     }
     # ModelBundle is the stable pipeline boundary; the parent module declares
     # this JSON-safe field so save/report phases can consume it.
@@ -863,7 +867,8 @@ def train_adapter(
         global_step=trainer.state.global_step,
         best_metric=_json_metric_value(trainer.state.best_metric),
         best_checkpoint=training_summary["best_checkpoint"],
-        selection_policy=selection_strategy,
+        training_strategy=strategy.name,
+        selection_policy=strategy.selection_policy,
         metrics=_metric_items(train_output.metrics),
         trainable_parameters=invariant_summary["trainable_parameters"],
     )

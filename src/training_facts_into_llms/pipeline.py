@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -15,10 +14,12 @@ class PipelinePhases:
 
     # The first phase proves clean, public, secret-safe source.
     enforce_git_gate: Callable[[Any], Any]
-    # Logging begins only after the pre-training source gate.
+    # Data loading validates every checked-in record before a log can be created.
+    load_data: Callable[[Any], Any]
+    # Logging begins only after both pre-training gates pass.
     create_logger: Callable[[Any], Any]
-    # Data loading validates every checked-in record.
-    load_data: Callable[[Any, Any], Any]
+    # Complete validated rows enter the new attempt log before model allocation.
+    record_data: Callable[[Any, Any, Any], Any]
     # Model loading returns the exact pinned full VLM.
     load_model: Callable[[Any, Any], Any]
     # Evaluation is shared by baseline and post-training stages.
@@ -55,15 +56,28 @@ class PipelineOutcome:
     published_url: str | None
 
 
+class CompletedRunPublicationError(RuntimeError):
+    """Carry only safe local-result references after a completed upload fails."""
+
+    def __init__(self, *, adapter_path: Any, report: Any, error_type: str) -> None:
+        """Retain completed outputs without serializing the external exception."""
+        super().__init__("completed run publication failed")
+        self.adapter_path = adapter_path
+        self.report = report
+        self.error_type = error_type
+
+
 def execute_pipeline(config: Any, phases: PipelinePhases) -> PipelineOutcome:
     """Execute one attempt in the mandatory externally observable order."""
     # No logger or model activity is allowed before the GitHub gate.
     phases.enforce_git_gate(config)
-    # Logger creation begins the recorded attempt.
+    # Invalid or overlapping data fails before creating operational state.
+    checked_data = phases.load_data(config)
+    # Logger creation begins only after both non-model gates pass.
     logger = phases.create_logger(config)
     try:
-        # Load and validate immutable checked-in records.
-        data = phases.load_data(config, logger)
+        # Record every complete validated row and return the model-facing bundle.
+        data = phases.record_data(config, checked_data, logger)
         # Load the exact pinned base model.
         model = phases.load_model(config, logger)
         # Generate baseline evidence before any training call.
@@ -92,13 +106,30 @@ def execute_pipeline(config: Any, phases: PipelinePhases) -> PipelineOutcome:
             logger,
         )
         # The concrete phase applies off/on/if-accepted after all local evidence exists.
-        published_url = phases.publish(
-            config,
-            adapter_path,
-            report,
-            decision,
-            logger,
-        )
+        try:
+            published_url = phases.publish(
+                config,
+                adapter_path,
+                report,
+                decision,
+                logger,
+            )
+        except Exception as error:  # noqa: BLE001 - isolate the external Hub boundary
+            # External failures are public only by type; arbitrary messages can contain
+            # signed URLs, response bodies, or other unsafe remote details.
+            logger_event = getattr(logger, "event", None)
+            if callable(logger_event):
+                logger_event(
+                    "publication_failed",
+                    error_type=type(error).__name__,
+                    local_adapter_retained=adapter_path is not None,
+                    local_report_retained=report is not None,
+                )
+            raise CompletedRunPublicationError(
+                adapter_path=adapter_path,
+                report=report,
+                error_type=type(error).__name__,
+            ) from None
         # Return explicit products for verification and CLI exit behavior.
         return PipelineOutcome(
             baseline=baseline,
@@ -135,8 +166,17 @@ class WorkflowOutcome:
         return self.attempts[-1] if self.passed else None
 
 
-def _log_checked_data(config: Any, logger: Any) -> Any:
-    """Load, validate, and log every complete checked-in prompt/completion."""
+@dataclass(frozen=True)
+class _CheckedData:
+    """Retain validated rows and their safe aggregate until logging begins."""
+
+    bundle: Any
+    counts: Any
+    supervised_splits: Any
+
+
+def _load_checked_data(config: Any) -> _CheckedData:
+    """Load and validate every configured row without creating a log or model."""
     # Imports remain local to keep the dependency-injected wrapper lightweight.
     from training_facts_into_llms.data import (
         load_data_bundle,
@@ -158,10 +198,20 @@ def _log_checked_data(config: Any, logger: Any) -> Any:
             ("rehearsal", data.rehearsal),
             ("validation", data.validation),
         )
+    return _CheckedData(
+        bundle=data,
+        counts=counts,
+        supervised_splits=supervised_splits,
+    )
+
+
+def _log_checked_data(config: Any, checked: _CheckedData, logger: Any) -> Any:
+    """Log every complete validated prompt/completion before model allocation."""
+    del config
     # The verified aggregate makes dataset drift visible in every attempt log.
-    logger.event("dataset_validated", counts=counts)
+    logger.event("dataset_validated", counts=checked.counts)
     # Preserve complete supervised prompts and completions as requested.
-    for split, records in supervised_splits:
+    for split, records in checked.supervised_splits:
         # Log one structured record per row without truncation.
         for record in records:
             # The immutable public ID ties logs to checked-in JSONL.
@@ -174,11 +224,11 @@ def _log_checked_data(config: Any, logger: Any) -> Any:
                     completion=record["completion"],
                 )
     # Evaluation questions are also logged before the first generation.
-    for record in data.evaluation:
+    for record in checked.bundle.evaluation:
         # Expected scoring metadata is public and retained in full.
         logger.event("evaluation_example", split="evaluation", record=record)
     # Return the validated object used by evaluation and training.
-    return data
+    return checked.bundle
 
 
 @dataclass
@@ -219,19 +269,12 @@ def _build_attempt_phases(config: Any, state: _AttemptState) -> PipelinePhases:
     from training_facts_into_llms.git_gate import enforce_git_before_training
     from training_facts_into_llms.logging_utils import EventLogger
     from training_facts_into_llms.modeling import load_base_model, release_model
-    from training_facts_into_llms.reporting import (
-        collect_runtime_provenance,
-        save_completed_adapter,
-        write_evaluation_report,
-    )
-    from training_facts_into_llms.runtime import evaluate_model
-    from training_facts_into_llms.training import train_adapter
 
     def enforce_once(current_config: Any) -> Any:
         """Run the destructive-work boundary exactly once per workflow."""
         # The first attempt proves source state before any model generation.
         if state.gate_cache.result is None:
-            # This call reads the token transiently only for an exact history scan.
+            # Local-only source validation never reads the later publication token.
             state.gate_cache.result = enforce_git_before_training(current_config)
         # Import plugin code only after clean synchronized source has been proven.
         if state.scorer is None:
@@ -240,7 +283,22 @@ def _build_attempt_phases(config: Any, state: _AttemptState) -> PipelinePhases:
             scorer, source = _load_workflow_scorer(current_config, state.experiment)
             state.scorer = scorer
             state.scorer_source = source.relative_to(current_config.root).as_posix()
-            state.scorer_sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
+            resolved_config = getattr(
+                state.experiment,
+                "config",
+                state.experiment,
+            )
+            scoring = getattr(resolved_config, "scoring", None)
+            target = _section_value(scoring, "plugin", "")
+            from training_facts_into_llms.scoring_loader import (
+                scoring_implementation_sha256,
+            )
+
+            state.scorer_sha256 = scoring_implementation_sha256(
+                current_config.root,
+                target,
+                source,
+            )
         # Return safe public evidence for the logger created next.
         return state.gate_cache.result
 
@@ -278,6 +336,9 @@ def _build_attempt_phases(config: Any, state: _AttemptState) -> PipelinePhases:
         logger: Any,
     ) -> Any:
         """Train only the selected resolved LoRA experiment."""
+        # Training imports validation/scoring types only after source verification.
+        from training_facts_into_llms.training import train_adapter
+
         # The typed resolved profile carries historical defaults or reviewed overrides.
         state.bundle = train_adapter(
             current_config,
@@ -315,6 +376,8 @@ def _build_attempt_phases(config: Any, state: _AttemptState) -> PipelinePhases:
         logger: Any,
     ) -> Path:
         """Save a completed adapter locally regardless of acceptance outcome."""
+        from training_facts_into_llms.reporting import save_completed_adapter
+
         # Reporting owns the narrow adapter serialization boundary.
         adapter = save_completed_adapter(current_config, bundle, logger)
         # Record status separately so archival retention cannot imply approval.
@@ -334,6 +397,11 @@ def _build_attempt_phases(config: Any, state: _AttemptState) -> PipelinePhases:
         logger: Any,
     ) -> Any:
         """Write complete sanitized public evidence for this attempt."""
+        from training_facts_into_llms.reporting import (
+            collect_runtime_provenance,
+            write_evaluation_report,
+        )
+
         # Package/library/hardware provenance is captured without environment dumps.
         provenance = collect_runtime_provenance(
             current_config,
@@ -435,6 +503,9 @@ def _build_attempt_phases(config: Any, state: _AttemptState) -> PipelinePhases:
         logger: Any,
     ) -> Any:
         """Evaluate with the same selected scorer at every experiment stage."""
+        # Runtime imports scorer types only after the verified source gate succeeds.
+        from training_facts_into_llms.runtime import evaluate_model
+
         return evaluate_model(
             current_config,
             bundle,
@@ -446,8 +517,9 @@ def _build_attempt_phases(config: Any, state: _AttemptState) -> PipelinePhases:
 
     return PipelinePhases(
         enforce_git_gate=enforce_once,
+        load_data=_load_checked_data,
         create_logger=create_attempt_logger,
-        load_data=_log_checked_data,
+        record_data=_log_checked_data,
         load_model=load_attempt_model,
         evaluate=evaluate_attempt,
         train=train_attempt,
@@ -470,7 +542,7 @@ def _section_value(section: Any, name: str, default: Any) -> Any:
 
 def _load_workflow_scorer(config: Any, experiment: Any) -> Any:
     """Load one trusted scorer before model allocation and reuse it for all phases."""
-    from training_facts_into_llms.scoring import (
+    from training_facts_into_llms.scoring_loader import (
         CANONICAL_PLUGIN_TARGET,
         load_scoring_plugin,
     )
@@ -486,6 +558,11 @@ def _load_workflow_scorer(config: Any, experiment: Any) -> Any:
         target,
         scoring_options=scoring_options,
         acceptance_options=acceptance_options,
+        expected_source_sha256=(
+            _section_value(scoring, "canonical_source_sha256", None)
+            if getattr(experiment, "is_canonical", False)
+            else None
+        ),
     )
     return scorer, source
 

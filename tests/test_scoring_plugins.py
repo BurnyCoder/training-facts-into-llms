@@ -2,18 +2,31 @@
 
 from __future__ import annotations
 
+import subprocess
+from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-from training_facts_into_llms.reporting import _evaluation_payload
+from training_facts_into_llms.reporting import (
+    _augment_acceptance_provenance,
+    _evaluation_payload,
+)
 from training_facts_into_llms.scoring import (
     AcceptanceDecision,
     ScoreResult,
+    ScoringPlugin,
     create_canonical_plugin,
-    load_scoring_plugin,
     validate_acceptance_decision,
 )
+from training_facts_into_llms.scoring_loader import (
+    CANONICAL_PLUGIN_TARGET,
+    canonical_scoring_source_sha256,
+    load_scoring_plugin,
+)
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _cases() -> list[dict[str, object]]:
@@ -101,6 +114,14 @@ def test_acceptance_decision_rejects_core_field_overrides() -> None:
             canonical_policy=False,
             details={"passed": True},
         )
+    with pytest.raises(ValueError, match="reserved fields"):
+        AcceptanceDecision(
+            passed=False,
+            gates={"gate": False},
+            policy_label="custom-policy",
+            canonical_policy=False,
+            details={"canonical_scoring_plugin_source": True},
+        )
     with pytest.raises(TypeError, match="canonical_policy"):
         AcceptanceDecision(
             passed=False,
@@ -129,6 +150,13 @@ def test_score_result_rejects_duplicate_ids_and_nonfinite_values() -> None:
             phase="validation",
             records=result.records,
             aggregates={"category_summary": {}, "bad": float("nan")},
+        )
+    with pytest.raises(TypeError, match="JSON number"):
+        ScoreResult(
+            phase="validation",
+            records=result.records,
+            aggregates=result.aggregates,
+            selection_score=Decimal("1.0"),  # type: ignore[arg-type]
         )
 
 
@@ -202,8 +230,117 @@ def test_plugin_loader_requires_module_factory_and_protocol(
         load_scoring_plugin(tmp_path, "missing_separator")
 
     monkeypatch.setattr(
-        "training_facts_into_llms.scoring._tracked_source",
+        "training_facts_into_llms.scoring_loader._tracked_source",
         lambda root, module: Path(__file__),
     )
     with pytest.raises(TypeError, match="not callable"):
         load_scoring_plugin(tmp_path, "training_facts_into_llms.scoring:not_present")
+
+
+def test_plugin_loader_rejects_a_canonical_source_hash_mismatch_before_import(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Changed canonical scorer bytes fail before factory code can execute."""
+    source = tmp_path / "scoring.py"
+    source.write_text("# reviewed source\n", encoding="utf-8")
+    imported: list[str] = []
+    monkeypatch.setattr(
+        "training_facts_into_llms.scoring_loader._tracked_source",
+        lambda root, module: source,
+    )
+    monkeypatch.setattr(
+        "training_facts_into_llms.scoring_loader.scoring_implementation_sha256",
+        lambda root, target, resolved_source: "f" * 64,
+    )
+    monkeypatch.setattr(
+        "training_facts_into_llms.scoring_loader.importlib.import_module",
+        lambda module: imported.append(module),
+    )
+
+    with pytest.raises(ValueError, match="source SHA-256"):
+        load_scoring_plugin(
+            tmp_path,
+            "training_facts_into_llms.scoring:create_canonical_plugin",
+            expected_source_sha256="0" * 64,
+        )
+
+    assert imported == []
+
+
+def test_plugin_loader_accepts_and_returns_exactly_bound_source() -> None:
+    """A matching source digest reaches the normal trusted factory boundary."""
+    expected = canonical_scoring_source_sha256(PROJECT_ROOT)
+
+    plugin, resolved_source = load_scoring_plugin(
+        PROJECT_ROOT,
+        CANONICAL_PLUGIN_TARGET,
+        expected_source_sha256=expected,
+    )
+
+    assert resolved_source == (
+        PROJECT_ROOT / "src/training_facts_into_llms/scoring.py"
+    )
+    assert isinstance(plugin, ScoringPlugin)
+
+
+def test_canonical_source_digest_binds_delegated_evaluation_and_json_code(
+    tmp_path: Path,
+) -> None:
+    """Changing a canonical dependency changes the preset-bound implementation ID."""
+    root = tmp_path / "repository"
+    source_dir = root / "src" / "training_facts_into_llms"
+    source_dir.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+    for name in ("scoring.py", "evaluation.py", "json_values.py"):
+        (source_dir / name).write_text(f"# {name}\n", encoding="utf-8")
+    subprocess.run(["git", "add", "src"], cwd=root, check=True)
+    before = canonical_scoring_source_sha256(root)
+
+    (source_dir / "evaluation.py").write_text("# changed evaluation\n", encoding="utf-8")
+    after = canonical_scoring_source_sha256(root)
+
+    assert before != after
+
+
+def test_report_approval_requires_exact_canonical_scorer_source() -> None:
+    """Reporting independently prevents a changed scorer from claiming approval."""
+    expected = "a" * 64
+    experiment = SimpleNamespace(
+        is_canonical=True,
+        scoring=SimpleNamespace(canonical_source_sha256=expected),
+    )
+    decision = {
+        "passed": True,
+        "canonical_policy": True,
+        "checks": {"all": True},
+    }
+
+    matched = _augment_acceptance_provenance(
+        dict(decision),
+        experiment=experiment,
+        provenance={"source": {"scoring_plugin": {"sha256": expected}}},
+    )
+    changed = _augment_acceptance_provenance(
+        dict(decision),
+        experiment=experiment,
+        provenance={"source": {"scoring_plugin": {"sha256": "b" * 64}}},
+    )
+    customized = _augment_acceptance_provenance(
+        dict(decision),
+        experiment=SimpleNamespace(
+            is_canonical=False,
+            scoring=SimpleNamespace(canonical_source_sha256=expected),
+        ),
+        provenance={"source": {"scoring_plugin": {"sha256": expected}}},
+    )
+
+    assert matched["canonical_scoring_plugin_source"] is True
+    assert matched["canonical_approval"] is True
+    assert matched["outcome_label"] == "acceptance-approved"
+    assert changed["canonical_scoring_plugin_source"] is False
+    assert changed["canonical_approval"] is False
+    assert changed["outcome_label"] == "accepted-under-custom-policy"
+    assert customized["canonical_scientific_configuration"] is False
+    assert customized["canonical_approval"] is False
+    assert customized["outcome_label"] == "accepted-under-custom-policy"

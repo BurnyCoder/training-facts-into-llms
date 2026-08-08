@@ -162,6 +162,15 @@ def test_training_gate_rejects_unpinned_model_and_profile_drift() -> None:
     with pytest.raises(RuntimeError, match="profile differs"):
         validate_approved_run_config(modified_profile)
 
+    with pytest.raises(RuntimeError, match="seed differs"):
+        validate_approved_run_config(replace(reviewed, seed=7))
+    with pytest.raises(RuntimeError, match="generation bound differs"):
+        validate_approved_run_config(replace(reviewed, max_new_tokens=1))
+    with pytest.raises(RuntimeError, match="data directory differs"):
+        validate_approved_run_config(
+            replace(reviewed, data_dir=project_root / "data")
+        )
+
 
 def test_git_gate_requires_all_specificity_data_and_docs() -> None:
     """Every reviewed recipe input must exist publicly before model activity."""

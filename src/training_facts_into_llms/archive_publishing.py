@@ -1314,6 +1314,9 @@ def publish_completed_run(
     report_adapter = getattr(report, "adapter_dir", None)
     if not isinstance(report_adapter, Path) or report_adapter.resolve() != adapter_path.resolve():
         raise ValueError("completed report does not identify the supplied adapter")
+    adapter_file_sha256 = getattr(report, "adapter_file_sha256", None)
+    if not isinstance(adapter_file_sha256, Mapping):
+        raise TypeError("completed report has no creation-time adapter hash inventory")
     destination = _allocate_staging_directory(
         config,
         prefix="completed-run-hub-archive-",
@@ -1329,6 +1332,14 @@ def publish_completed_run(
             experiment_id=experiment["experiment_id"],
             experiment=experiment,
             acceptance=acceptance,
+            artifact_hashes={
+                "report_json": report.json_sha256,
+                "report_markdown": report.markdown_sha256,
+                **{
+                    f"adapter/{name}": digest
+                    for name, digest in adapter_file_sha256.items()
+                },
+            },
         ),
         report_json=report.json_path,
         report_markdown=report.markdown_path,

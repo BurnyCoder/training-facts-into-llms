@@ -54,7 +54,7 @@ PINNED_MODEL_ID: Final = DEFAULT_MODEL_ID
 PINNED_MODEL_REVISION: Final = DEFAULT_MODEL_REVISION
 
 # The canonical plugin is repository code. Alternative syntactically valid
-# targets are later confined to tracked source by scoring.load_scoring_plugin.
+# targets are later confined to tracked source by scoring_loader.load_scoring_plugin.
 DEFAULT_SCORING_PLUGIN: Final = (
     "training_facts_into_llms.scoring:create_canonical_plugin"
 )
@@ -363,6 +363,7 @@ class PluginConfig:
     """Hold a module/factory target and recursively frozen TOML options."""
 
     plugin: str
+    canonical_source_sha256: str
     options: Mapping[str, Any]
 
 
@@ -484,7 +485,7 @@ def _public_value(value: Any) -> Any:
     """Thaw supported immutable values into JSON-compatible containers."""
     if isinstance(value, Mapping):
         return {key: _public_value(value[key]) for key in sorted(value)}
-    if isinstance(value, tuple):
+    if isinstance(value, tuple | list):
         return [_public_value(item) for item in value]
     if value is None or isinstance(value, bool | str | int | float):
         return value
@@ -649,6 +650,7 @@ def _scientific_dict(config: ExperimentConfig) -> dict[str, Any]:
         },
         "scoring": {
             "plugin": config.scoring.plugin,
+            "canonical_source_sha256": config.scoring.canonical_source_sha256,
             "options": _public_value(config.scoring.options),
         },
         "acceptance": {"options": _public_value(config.acceptance.options)},
@@ -1145,14 +1147,28 @@ def _parse_generation(raw: Mapping[str, Any]) -> GenerationConfig:
 
 def _parse_scoring(raw: Mapping[str, Any]) -> PluginConfig:
     """Parse a scorer target; its tracked source is enforced at plugin load."""
-    _expect_keys(raw, {"plugin", "options"}, "scoring")
+    _expect_keys(
+        raw,
+        {"plugin", "canonical_source_sha256", "options"},
+        "scoring",
+    )
     plugin = _string(raw, "plugin", "scoring")
     if not _PLUGIN_TARGET_PATTERN.fullmatch(plugin):
         raise ExperimentConfigError(
             "scoring.plugin must use Python module:factory syntax"
         )
+    canonical_source_sha256 = _string(
+        raw,
+        "canonical_source_sha256",
+        "scoring",
+    )
+    if not _SHA256_PATTERN.fullmatch(canonical_source_sha256):
+        raise ExperimentConfigError(
+            "scoring.canonical_source_sha256 must be lowercase SHA-256"
+        )
     return PluginConfig(
         plugin=plugin,
+        canonical_source_sha256=canonical_source_sha256,
         options=_freeze_option(_table(raw, "options", "scoring"), "scoring.options"),
     )
 
@@ -1226,6 +1242,16 @@ def _parse_experiment(
         scoring=_parse_scoring(_table(raw, "scoring", "experiment")),
         acceptance=_parse_acceptance(_table(raw, "acceptance", "experiment")),
     )
+    # Resolve the complete checkpoint/duration signature while configuration is
+    # still pure data, before preflight or run can create a logger or load a model.
+    from training_facts_into_llms.training_strategies import (
+        resolve_training_strategy,
+    )
+
+    try:
+        resolve_training_strategy(config.checkpoint, config.duration)
+    except ValueError as error:
+        raise ExperimentConfigError(str(error)) from error
     return config
 
 
@@ -1261,6 +1287,14 @@ def load_experiment_preset(root: Path, experiment_id: str) -> ExperimentConfig:
         _preset_raw(resolved_root, experiment_id),
         experiment_id,
     )
+
+
+def preset_canonical_scoring_source_sha256(root: Path, experiment_id: str) -> str:
+    """Read one preset-owned scorer binding without loading its dataset files."""
+    resolved_root = root.expanduser().resolve()
+    raw = _preset_raw(resolved_root, experiment_id)
+    scoring = _parse_scoring(_table(raw, "scoring", "experiment preset"))
+    return scoring.canonical_source_sha256
 
 
 def _raw_path_value(mapping: Mapping[str, Any], path: tuple[str, ...]) -> Any:

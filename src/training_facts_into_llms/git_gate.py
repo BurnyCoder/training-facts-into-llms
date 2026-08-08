@@ -56,6 +56,7 @@ REQUIRED_TRACKED_PATHS = (
     "src/training_facts_into_llms/evaluation.py",
     "src/training_facts_into_llms/experiments.py",
     "src/training_facts_into_llms/git_gate.py",
+    "src/training_facts_into_llms/json_values.py",
     "src/training_facts_into_llms/logging_utils.py",
     "src/training_facts_into_llms/modeling.py",
     "src/training_facts_into_llms/pipeline.py",
@@ -64,7 +65,9 @@ REQUIRED_TRACKED_PATHS = (
     "src/training_facts_into_llms/reporting.py",
     "src/training_facts_into_llms/runtime.py",
     "src/training_facts_into_llms/scoring.py",
+    "src/training_facts_into_llms/scoring_loader.py",
     "src/training_facts_into_llms/training.py",
+    "src/training_facts_into_llms/training_strategies.py",
     "src/training_facts_into_llms/validation.py",
     "src/training_facts_into_llms/verify_publication.py",
     "tests/test_config.py",
@@ -87,8 +90,10 @@ REQUIRED_TRACKED_PATHS = (
     "tests/test_preflight.py",
     "tests/test_public_results.py",
     "tests/test_publishing.py",
+    "tests/test_scoring_plugin_boundaries.py",
     "tests/test_scoring_plugins.py",
     "tests/test_training.py",
+    "tests/test_training_strategies.py",
     "tests/test_validation.py",
     "uv.lock",
 )
@@ -188,6 +193,15 @@ def validate_approved_run_config(config: RunConfig) -> None:
         raise RuntimeError("Training requires one resolved experiment")
     if config.training_profiles != (config.experiment.profile,):
         raise RuntimeError("Training profile differs from the resolved experiment")
+    resolved_science = config.experiment.config
+    if config.seed != resolved_science.seed:
+        raise RuntimeError("Training seed differs from the resolved experiment")
+    if config.max_new_tokens != resolved_science.generation.max_new_tokens:
+        raise RuntimeError(
+            "Training generation bound differs from the resolved experiment"
+        )
+    if config.data_dir.resolve() != config.experiment.data_dir.resolve():
+        raise RuntimeError("Training data directory differs from the resolved experiment")
     # Every consumed or written path remains within the public repository root.
     for field in ("data_dir", "artifact_dir", "log_dir", "report_dir", "trackio_dir"):
         actual = getattr(config, field).expanduser().resolve()

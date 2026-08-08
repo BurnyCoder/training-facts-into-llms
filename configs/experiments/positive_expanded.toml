@@ -18,13 +18,13 @@ train_batch_size = 1
 eval_batch_size = 1
 gradient_accumulation_steps = 4
 optimizer = "adamw_torch_fused"
-weight_decay = 0
+weight_decay = 0.0
 scheduler = "linear"
 adam_beta1 = 0.9
 adam_beta2 = 0.999
 adam_epsilon = 1e-8
 warmup_ratio = 0.1
-max_grad_norm = 1
+max_grad_norm = 1.0
 precision = "bf16"
 max_length = 128
 completion_only_loss = true
@@ -50,14 +50,15 @@ stop_on_perfect = false
 [generation]
 max_new_tokens = 64
 do_sample = false
-temperature = 1
-top_p = 1
+temperature = 1.0
+top_p = 1.0
 top_k = 50
-repetition_penalty = 1
+repetition_penalty = 1.0
 num_beams = 1
 
 [scoring]
 plugin = "training_facts_into_llms.scoring:create_canonical_plugin"
+canonical_source_sha256 = "802374c3bb57485a75662e7c876102a388c07d02d54578c1893f6366cadc6c13"
 
 [scoring.options]
 

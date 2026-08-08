@@ -12,18 +12,22 @@ Sources:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import platform
 import re
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, is_dataclass
 from importlib import metadata
 from pathlib import Path, PureWindowsPath
+from types import MappingProxyType
 from typing import Any
 
 from training_facts_into_llms.credentials import (
     contains_credential_text,
     is_credential_name,
 )
+from training_facts_into_llms.json_values import validate_json_value
 from training_facts_into_llms.logging_utils import timestamp_id, utc_timestamp
 from training_facts_into_llms.publishing import validate_upload_directory
 
@@ -77,6 +81,19 @@ class ReportArtifacts:
     markdown_path: Path
     # Failing attempts deliberately have no publishable adapter directory.
     adapter_dir: Path | None
+    # Creation-time digests let immediate publication reject later file mutation.
+    json_sha256: str
+    markdown_sha256: str
+    adapter_file_sha256: Mapping[str, str] | None
+
+
+def _file_sha256(path: Path) -> str:
+    """Hash one completed report artifact without exposing its contents."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _relative_public_path(path: Path, root: Path) -> str:
@@ -171,7 +188,7 @@ def _sanitize_metadata(value: Any, *, root: Path, path: str = "metadata") -> Any
         return value
     # JSON supports these primitive values directly.
     if value is None or isinstance(value, (bool, int, float)):
-        return value
+        return validate_json_value(value, path=path)
     # Unknown runtime objects could expose environment state through their repr.
     raise TypeError(
         f"Unsupported public metadata type at {path}: {type(value).__name__}"
@@ -486,6 +503,50 @@ def _evaluation_payload(result: Any, *, root: Path) -> dict[str, Any]:
     return payload
 
 
+def _augment_acceptance_provenance(
+    acceptance: dict[str, Any],
+    *,
+    experiment: Any | None,
+    provenance: dict[str, Any],
+) -> dict[str, Any]:
+    """Derive canonical approval from science, policy, and exact scorer bytes."""
+    canonical_science = bool(
+        experiment is not None and getattr(experiment, "is_canonical", False)
+    )
+    scoring = None if experiment is None else getattr(experiment, "scoring", None)
+    expected_hash = (
+        None if scoring is None else getattr(scoring, "canonical_source_sha256", None)
+    )
+    source = provenance.get("source")
+    plugin = source.get("scoring_plugin") if isinstance(source, dict) else None
+    actual_hash = plugin.get("sha256") if isinstance(plugin, dict) else None
+    canonical_source = bool(
+        isinstance(expected_hash, str)
+        and isinstance(actual_hash, str)
+        and expected_hash == actual_hash
+    )
+    canonical_policy = bool(acceptance.get("canonical_policy", False))
+    canonical_approval = bool(
+        acceptance.get("passed")
+        and canonical_science
+        and canonical_policy
+        and canonical_source
+    )
+    acceptance["canonical_scientific_configuration"] = canonical_science
+    acceptance["canonical_scoring_plugin_source"] = canonical_source
+    acceptance["canonical_approval"] = canonical_approval
+    acceptance["outcome_label"] = (
+        "acceptance-approved"
+        if canonical_approval
+        else (
+            "accepted-under-custom-policy"
+            if acceptance.get("passed")
+            else "not-accepted"
+        )
+    )
+    return acceptance
+
+
 def _report_payload(
     config: Any,
     baseline: Any,
@@ -515,24 +576,10 @@ def _report_payload(
         root=config.root,
         path="acceptance",
     )
-    experiment = getattr(config, "experiment", None)
-    canonical_science = bool(
-        experiment is not None and getattr(experiment, "is_canonical", False)
-    )
-    canonical_policy = bool(acceptance.get("canonical_policy", False))
-    canonical_approval = bool(
-        acceptance.get("passed") and canonical_science and canonical_policy
-    )
-    acceptance["canonical_scientific_configuration"] = canonical_science
-    acceptance["canonical_approval"] = canonical_approval
-    acceptance["outcome_label"] = (
-        "acceptance-approved"
-        if canonical_approval
-        else (
-            "accepted-under-custom-policy"
-            if acceptance.get("passed")
-            else "not-accepted"
-        )
+    acceptance = _augment_acceptance_provenance(
+        acceptance,
+        experiment=getattr(config, "experiment", None),
+        provenance=public_provenance,
     )
     # Construct only public, behavior-relevant fields.
     payload = {
@@ -834,6 +881,21 @@ def write_evaluation_report(
         json_path=json_path,
         markdown_path=markdown_path,
         adapter_dir=adapter_dir,
+        json_sha256=_file_sha256(json_path),
+        markdown_sha256=_file_sha256(markdown_path),
+        adapter_file_sha256=(
+            MappingProxyType(
+                {
+                    path.name: _file_sha256(path)
+                    for path in sorted(
+                        validate_upload_directory(adapter_dir),
+                        key=lambda candidate: candidate.name,
+                    )
+                }
+            )
+            if adapter_dir is not None
+            else None
+        ),
     )
 
 
@@ -956,4 +1018,7 @@ def write_standalone_report(
         json_path=json_path,
         markdown_path=markdown_path,
         adapter_dir=None,
+        json_sha256=_file_sha256(json_path),
+        markdown_sha256=_file_sha256(markdown_path),
+        adapter_file_sha256=None,
     )

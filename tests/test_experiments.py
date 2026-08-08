@@ -20,6 +20,7 @@ from training_facts_into_llms.experiments import (
     load_experiment_preset,
     resolve_experiment,
 )
+from training_facts_into_llms.scoring_loader import canonical_scoring_source_sha256
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -167,6 +168,10 @@ def test_canonical_resolution_is_immutable_reproducible_and_path_safe() -> None:
     assert first.scoring.plugin == (
         "training_facts_into_llms.scoring:create_canonical_plugin"
     )
+    assert (
+        first.scoring.canonical_source_sha256
+        == canonical_scoring_source_sha256(PROJECT_ROOT)
+    )
     assert dict(first.scoring.options) == {}
     assert dict(first.acceptance.options) == {}
     assert first.required_paths[0] == ("configs/experiments/minimal_pair_primary.toml")
@@ -179,6 +184,74 @@ def test_canonical_resolution_is_immutable_reproducible_and_path_safe() -> None:
         "id": "Qwen/Qwen3.5-0.8B",
         "revision": "2fc06364715b967f1860aea9cf38778875588b17",
     }
+
+
+@pytest.mark.parametrize(
+    "experiment_id",
+    EXPERIMENT_IDS,
+)
+def test_every_preset_binds_the_exact_canonical_scorer_source(
+    experiment_id: str,
+) -> None:
+    """Preset identity includes the reviewed executable scorer bytes."""
+    expected = canonical_scoring_source_sha256(PROJECT_ROOT)
+
+    preset = load_experiment_preset(PROJECT_ROOT, experiment_id)
+
+    assert preset.scoring.canonical_source_sha256 == expected
+
+
+@pytest.mark.parametrize(
+    "custom_text,override",
+    (
+        (
+            '[scoring]\ncanonical_source_sha256 = "' + "0" * 64 + '"\n',
+            (),
+        ),
+        (None, ('scoring.canonical_source_sha256="' + "0" * 64 + '"',)),
+    ),
+)
+def test_canonical_scorer_hash_binding_is_not_overrideable(
+    tmp_path: Path,
+    custom_text: str | None,
+    override: tuple[str, ...],
+) -> None:
+    """Custom science may select code, but cannot redefine canonical code identity."""
+    root = _isolated_catalog(tmp_path)
+    custom = None
+    if custom_text is not None:
+        custom = root / "custom.toml"
+        custom.write_text(custom_text, encoding="utf-8")
+
+    with pytest.raises(ExperimentConfigError, match="not overrideable"):
+        resolve_experiment(
+            root,
+            "positive_primary",
+            custom_config=custom,
+            overrides=override,
+            name="hash-redefinition",
+        )
+
+
+@pytest.mark.parametrize(
+    "experiment_id,override",
+    (
+        ("positive_primary", 'checkpoint.selection_policy="final_epoch"'),
+        ("semantic_specificity", "checkpoint.stop_on_perfect=false"),
+    ),
+)
+def test_incoherent_training_strategy_override_fails_during_resolution(
+    experiment_id: str,
+    override: str,
+) -> None:
+    """Typed but contradictory strategy fields fail before any runtime allocation."""
+    with pytest.raises(ExperimentConfigError, match="coherent named training strategy"):
+        resolve_experiment(
+            PROJECT_ROOT,
+            experiment_id,
+            overrides=(override,),
+            name="invalid-hybrid",
+        )
 
 
 def test_custom_toml_then_repeatable_set_overrides_apply_in_order(
@@ -228,6 +301,55 @@ def test_custom_toml_then_repeatable_set_overrides_apply_in_order(
         name="same-science-new-label",
     )
     assert renamed.scientific_hash == resolved.scientific_hash
+
+
+@pytest.mark.parametrize(
+    ("experiment_id", "override", "expected"),
+    (
+        ("positive_primary", "training.weight_decay=0.01", 0.01),
+        ("positive_primary", "generation.temperature=0.7", 0.7),
+        ("positive_primary", "generation.top_p=0.9", 0.9),
+        ("positive_primary", "generation.repetition_penalty=1.1", 1.1),
+        ("paper_single_edit", "training.warmup_ratio=0.1", 0.1),
+        ("paper_single_edit", "training.max_grad_norm=1.0", 1.0),
+    ),
+)
+def test_semantically_float_settings_accept_float_overrides(
+    experiment_id: str,
+    override: str,
+    expected: float,
+) -> None:
+    """Zero/one historical defaults retain their declared float control surface."""
+    resolved = resolve_experiment(
+        PROJECT_ROOT,
+        experiment_id,
+        overrides=(override,),
+        name="float-override",
+    )
+    path = override.split("=", maxsplit=1)[0]
+    values = {
+        "training.weight_decay": resolved.config.optimizer.weight_decay,
+        "training.warmup_ratio": resolved.config.optimizer.warmup_ratio,
+        "training.max_grad_norm": resolved.config.optimizer.max_grad_norm,
+        "generation.temperature": resolved.config.generation.temperature,
+        "generation.top_p": resolved.config.generation.top_p,
+        "generation.repetition_penalty": (
+            resolved.config.generation.repetition_penalty
+        ),
+    }
+
+    assert values[path] == expected
+
+
+def test_integer_only_settings_still_reject_float_overrides() -> None:
+    """Making continuous controls flexible cannot relax integer horizons or ranks."""
+    with pytest.raises(ExperimentConfigError, match="retain TOML type int"):
+        resolve_experiment(
+            PROJECT_ROOT,
+            "positive_primary",
+            overrides=("training.epochs=15.0",),
+            name="invalid-integer",
+        )
 
 
 def test_behavior_changes_require_a_custom_name(tmp_path: Path) -> None:
