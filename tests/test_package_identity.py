@@ -219,7 +219,7 @@ def test_active_documentation_describes_the_reproduction_contract_precisely() ->
     pyproject = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text())
 
     assert "Authoring disclosure" not in readme
-    assert "network access or an existing local cache" in readme
+    assert "network access or an existing local cache" in " ".join(readme.split())
     assert "all 11 exact direct runtime dependencies" in readme
     assert "Local `uv run` commands inherit the caller's environment" in readme
     assert "CI receives no configured repository secrets" in readme
@@ -247,7 +247,7 @@ def test_active_documentation_describes_the_reproduction_contract_precisely() ->
         normalized_document = " ".join(document.split())
         assert "configs/experiments/{ID}.toml" in normalized_document
         assert "last assignment wins" in normalized_document
-        assert "custom output directory Git-ignored" in normalized_document
+        assert "custom output" in normalized_document
     assert "requires `--name LOWERCASE-SLUG`" in readme
     assert "Behavior-changing overrides require a custom name" in agents
 
@@ -579,7 +579,13 @@ def test_completion_contract_is_explicit_in_active_documentation() -> None:
 
     concise_title = "Atemokoloporos Qwen3.5-0.8B retained checkpoints"
     assert concise_title in active_contract
-    assert "strict fewer-than-60-character limit" in active_contract
+    assert "https://github.com/BurnyCoder/training-facts-into-llms/pull/27" in (
+        active_contract
+    )
+    normalized_contract = " ".join(active_contract.split()).casefold()
+    assert "live" in normalized_contract and "rejection" in normalized_contract
+    assert "strict fewer-than-60-character limit" not in readme
+    assert "strict fewer-than-60-character limit" not in agents
 
 
 def test_readme_and_agents_match_active_runtime_boundaries() -> None:
@@ -619,7 +625,8 @@ def test_readme_and_agents_match_active_runtime_boundaries() -> None:
         "does not change the scientific hash, canonical status",
         "For `run`, this occurs after the Git gate and before data validation",
         "exact seven-file digest inventory",
-        "independently re-resolve the immutable preset and recompute canonical science",
+        "reconciles the serialized `canonical_policy` field with the live validated decision",
+        "independently re-resolves the immutable preset and recomputes canonical science",
         "rehash every copied bound input",
         "no remote deletion pattern",
         "There is no review pause between generation and that boundary",
@@ -657,6 +664,117 @@ def test_readme_and_agents_match_active_runtime_boundaries() -> None:
         "trackio_project",
     ):
         assert environment_name in agents_folded
+
+
+def test_readme_and_agents_preserve_audited_claim_qualifiers() -> None:
+    """Reject broad prose that would overstate custom, credential, or Hub behavior."""
+    from training_facts_into_llms.archive_inventory import (
+        DEFAULT_COLLECTION_TITLE,
+        DEFAULT_NAMESPACE,
+    )
+    from training_facts_into_llms.archive_publishing import HUB_STANDARD_FILES
+    from training_facts_into_llms.archive_staging import (
+        RUN_CONTEXT_FILES,
+        SOURCE_ADAPTER_FILES,
+    )
+    from training_facts_into_llms.evidence_refresh_contract import (
+        FINAL_REFRESHED_EVIDENCE_FILES,
+    )
+
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    agents = (PROJECT_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    documents = (readme, agents)
+    normalized_documents = tuple(" ".join(item.split()) for item in documents)
+    folded_documents = tuple(item.casefold() for item in normalized_documents)
+    combined_folded = "\n".join(folded_documents)
+    readme_flat, agents_flat = normalized_documents
+
+    # Lock the public explanation to the corrected scope of each runtime guarantee.
+    for required in (
+        "generic data validation enforces declared counts and schema",
+        "the final minimal-pair snapshot's hash and tests bind",
+        "those guarantees are not inferred for arbitrary custom JSONL",
+        "evaluates its resolved suite",
+        "All reviewed presets use 28 final rows; custom data may change the resolved path and count",
+        "does not resolve or load the `HF_TOKEN` credential value",
+        "no credential value is resolved or loaded, no publication API is called, and no Hub write occurs",
+        "model loading may still make anonymous public Hub reads",
+        "Every model-loading command",
+        "network access or an existing local cache",
+        f"default `HF_NAMESPACE={DEFAULT_NAMESPACE}`",
+        "different namespace instead reconciles a same-titled Collection",
+        "partial overlay that resolves to the preset's existing values, is provenance only",
+        "eligibility for canonical approval",
+        "Behavior-changing science or a custom scoring or acceptance policy",
+        "Pinned public base/processor loads, public inference, and anonymous verification use `token=False`",
+        "archive synchronization performs authenticated reads at the credential boundary",
+        "strict `chat` always queries anonymous Hub metadata",
+        "A custom location may already be ignored by an existing repository pattern",
+    ):
+        assert required in readme_flat
+
+    # Keep the internal contract explicit where report fields could otherwise be trusted.
+    for required in (
+        "Generic custom-data validation does not promise the canonical semantic exclusions",
+        "close-name entity isolation, or entity-only minimal pairs",
+        "bound specifically to the final minimal-pair snapshot",
+        "All reviewed presets resolve to 28 final rows; contained custom data may resolve another path and count",
+        "Normal `.env` filtering scans assignment lines",
+        "does not resolve or load the `HF_TOKEN` value",
+        "resolves or loads no credential value, calls no publication API, and makes no Hub write",
+        "Anonymous public Hub reads may still occur",
+        "network access or an existing local cache",
+        "Pinned public base/processor loads, public inference, and anonymous publication verification explicitly use `token=False`",
+        "archive synchronization also performs authenticated reads at its later credential boundary",
+        "Under the default `BurnyCoder` namespace it is appended to the existing study Collection",
+        "another configured `HF_NAMESPACE` reconciles a same-titled Collection",
+        "A no-op overlay or provenance-only name remains eligible for canonical approval",
+        "reconciles the serialized `canonical_policy` field with the live validated decision",
+        "independently re-resolves the immutable preset and recomputes canonical science",
+        "plugin-source identity, approval, and outcome labels",
+        "A configured replacement may already match an existing ignore pattern",
+    ):
+        assert required in agents_flat
+
+    authored_model_file_count = len(SOURCE_ADAPTER_FILES | RUN_CONTEXT_FILES)
+    authored_evidence_file_count = len(FINAL_REFRESHED_EVIDENCE_FILES)
+    assert authored_model_file_count == 6
+    assert authored_evidence_file_count == 43
+    assert HUB_STANDARD_FILES == frozenset({".gitattributes"})
+    assert "six project-authored root payload files" in readme_flat
+    assert f"{authored_evidence_file_count} project-authored files" in readme_flat
+    assert "six-file project-authored payload" in agents_flat
+    assert f"project-authored {authored_evidence_file_count}-file payload" in agents_flat
+    for normalized in normalized_documents:
+        assert "`.gitattributes`" in normalized
+        assert "sole tolerated" in normalized
+
+    assert DEFAULT_COLLECTION_TITLE in readme
+    pull_request = "https://github.com/BurnyCoder/training-facts-into-llms/pull/27"
+    for normalized in normalized_documents:
+        assert pull_request in normalized
+        folded = normalized.casefold()
+        assert "live" in folded
+        assert "rejection" in folded
+
+    combined = f"{readme}\n{agents}"
+    assert "\n- A retrospective-backfill model-repository root may contain only" not in (
+        combined
+    )
+    assert "\n- The evidence dataset may contain only" not in combined
+    for stale_claim in (
+        "no token read and no hub call",
+        "reads no token, and makes no hub call",
+        "without reading a token",
+        "may read the token",
+        "token read / hub call",
+        "public hub reads explicitly use `token=false`",
+        "strict fewer-than-60-character limit",
+        "any customized resolution records",
+        "a custom resolution records",
+        "repeat the fixed 28-prompt evaluation",
+    ):
+        assert stale_claim not in combined_folded
 
 
 @pytest.mark.parametrize("adapter", ("../external-adapter",))

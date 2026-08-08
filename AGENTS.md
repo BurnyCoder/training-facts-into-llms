@@ -57,8 +57,8 @@ and the repository-local `.venv`.
 | Command | Current behavior and side effects |
 | --- | --- |
 | `uv run --frozen training-facts-into-llms preflight --experiment ID [--config PATH] [--set dotted.key=TOML_VALUE]` | Resolves one reviewed preset plus typed overrides, validates its data and all 11 exact direct runtime dependency pins, then loads one fresh copy of the pinned model to audit CUDA and the resolved precision, Qwen identity, frozen vision, and its LoRA shape. It generates and trains nothing; it writes operational JSONL under `LOG_DIR` (default: ignored `logs/`). |
-| `uv run --frozen training-facts-into-llms run --experiment ID [--config PATH] [--set dotted.key=TOML_VALUE] [--name lowercase-slug] [--upload off\|on\|if-accepted]` | Requires one of the nine reviewed presets, enforces the GitHub-first gate, starts from the untouched pinned base, trains, selects, evaluates, scores, reports, and applies the explicit upload mode. Behavior-changing overrides require a custom name. The default upload mode is `off`. |
-| `uv run --frozen training-facts-into-llms publish-existing --all --upload off` | Discovers, stages, validates, and prints the retrospective checkpoint/evidence inventory without reading a token or making an external write. |
+| `uv run --frozen training-facts-into-llms run --experiment ID [--config PATH] [--set dotted.key=TOML_VALUE] [--name lowercase-slug] [--upload off\|on\|if-accepted]` | Requires one of the nine reviewed presets, enforces the GitHub-first gate, starts from the untouched pinned base, trains, selects, evaluates the resolved final suite, scores, reports, and applies the explicit upload mode. All reviewed presets resolve to 28 final rows; contained custom data may resolve another path and count. Behavior-changing overrides require a custom name. The default upload mode is `off`. |
+| `uv run --frozen training-facts-into-llms publish-existing --all --upload off` | Discovers, stages, validates, and prints the retrospective checkpoint/evidence inventory without resolving or loading a credential value, calling a publication API, or making a Hub write. |
 | `uv run --frozen training-facts-into-llms publish-existing --all --upload on` | Repeats the local archive audit, synchronizes the eight artifact-bearing historical runs and evidence dataset, rechecks all 13 adapters, and reconciles the exact-titled Collection. Exact matches use repository decision `SKIP`. It requires a local token. |
 | `uv run --frozen training-facts-into-llms publish-existing --all --upload on --refresh-evidence` | Reconciles the one-time evidence-only refresh bound to the exact pre-refresh parent. The state-changing invocation updated only `EXPERIMENTS.md` and the derived PDF; the exact-final retry returned `SKIP`. It never mutates model repositories or the Collection. |
 | `uv run --frozen training-facts-into-llms evaluate --adapter REF [--checkpoint N]` | Pre-rejects an empty, root-only, or escaping local-style reference before log or model allocation, then lets PEFT resolve compatibility with `token=False` against the pinned base. Omitted `--checkpoint` loads the root adapter; a positive `N` loads `checkpoints/checkpoint-N/` locally or on the Hub. It structurally validates the 28-row suite and uses the fixed greedy generation protocol. Unlike chat, it does not perform the strict pre-allocation safetensors-header audit. It writes JSONL under `LOG_DIR` and an untracked standalone JSON/Markdown pair under `REPORT_DIR` (default: `reports/`); the result is descriptive and cannot change historical acceptance. |
@@ -69,8 +69,10 @@ hardware and the source-pinned model revision through network access or an
 existing local cache. The nine canonical presets, standalone evaluation, and
 chat require BF16 support. A custom `preflight`, or a named custom `run`, may
 instead use its resolved BF16, FP16, or FP32 precision and must pass the
-corresponding CUDA checks. Public Hub reads explicitly use `token=False`;
-private or gated adapters are outside scope.
+corresponding CUDA checks. Pinned public base/processor loads, public inference,
+and anonymous publication verification explicitly use `token=False`; archive
+synchronization also performs authenticated reads at its later credential
+boundary. Private or gated adapters are outside scope.
 
 The full historical `publish-existing --all --upload on` path additionally
 requires CUDA/BF16 for its 13 anonymous adapter smoke generations. Its
@@ -98,22 +100,24 @@ allocation. Any `run` whose effective behavior differs from a preset requires
 use single hyphens; `preflight` may inspect the same overrides without assigning
 a run identity. An optional valid name on an otherwise exact preset or no-op
 overlay is provenance only: it does not change the scientific hash, canonical
-status, or canonical-approval eligibility. Never infer a customized result to
-be the named historical recipe.
+status, or canonical-approval eligibility. Never infer a behavior-changing
+customized result to be the named historical recipe.
 
 The runtime recognizes from the project `.env` only `HF_TOKEN`, optional
 `HF_NAMESPACE`, `ARTIFACT_DIR`, `LOG_DIR`, `REPORT_DIR`, `TRACKIO_DIR`, and
 `TRACKIO_PROJECT`. Only the six public operational names enter `RunConfig` and
 may have same-named shell overrides; other `.env` or inherited environment
 assignments do not enter `RunConfig`. Never accept `HF_TOKEN` from
-the inherited shell. The normal configuration path does not parse its value,
-and only an eligible live upload boundary rereads the ignored file for it.
+the inherited shell. Normal `.env` filtering scans assignment lines to select
+public names but does not resolve or load the `HF_TOKEN` value; only an eligible
+live upload boundary rereads the ignored file for it.
 Model/revision, scientific/data settings, repository IDs, and upload mode are
 source or CLI configuration, never environment configuration. The default
-`logs/`, `artifacts/`, and `.trackio/` destinations are ignored; root
-containment does not make a custom output directory Git-ignored. Verify custom
-log, artifact, and Trackio destinations remain ignored and untracked, adding a
-rule only when existing patterns do not cover them.
+`logs/`, `artifacts/`, and `.trackio/` destinations are ignored. A contained
+custom output path may also be ignored by an existing pattern, but containment
+alone does not make it Git-ignored. Verify custom log, artifact, and Trackio
+destinations remain ignored and untracked, adding a rule only when existing
+patterns do not cover them.
 
 The nine public preset IDs are `positive_primary`, `positive_conservative`,
 `positive_expanded`, `paper_single_edit`, `semantic_specificity`,
@@ -140,9 +144,11 @@ hash-bound split, creates the logger, records every validated row, and only then
 loads the untouched base. `preflight` verifies and imports the scorer before its
 heavy data/model runtime imports, then creates its operational logger, validates
 the data, and performs dependency, CUDA, model, and LoRA checks; it never
-generates or trains. A custom resolution records its actual tracked source hash
-and may report `accepted-under-custom-policy`, never canonical approval.
-Canonical approval requires exact canonical science, data, plugin
+generates or trains. A behavior-changing scientific resolution or custom
+plugin/policy records its actual tracked source hash and may report
+`accepted-under-custom-policy`, never canonical approval. A no-op overlay or
+provenance-only name remains eligible for canonical approval. Canonical approval
+requires exact canonical science, data, plugin
 target/options/source hash, policy, and a passing decision.
 
 ## Model, data, training, and evaluation invariants
@@ -173,7 +179,11 @@ historical layout.
   `category`, final-evaluation rows carry a nonempty `category`, and optional
   `scorer_metadata` is a JSON-safe string-keyed object. Normalized prompts are
   unique within and isolated across training, checkpoint validation, and final
-  evaluation, so no supervised/final-evaluation overlap is permitted.
+  evaluation, so no exact normalized supervised/final-evaluation overlap is
+  permitted. Generic custom-data validation does not promise the canonical
+  semantic exclusions, close-name entity isolation, or entity-only minimal
+  pairs below; those properties are bound specifically to the final
+  minimal-pair snapshot and its hash/tests.
 - In the final minimal-pair data, the prompt in each contrast row 1–16 is an
   entity-only substitution of its positive counterpart. The prompts in the two
   validation recall/negative pairs likewise differ only by exact entity
@@ -281,10 +291,10 @@ timestamped logger. Record the complete validated data through that logger, and
 only then load the untouched base. Invalid configuration, plugin identity, or
 data must therefore fail before logging or model allocation.
 
-The gate must not require or read `HF_TOKEN` for `--upload off`, or for an
-`--upload if-accepted` run that is ultimately rejected. When an upload is
-actually requested, a non-empty local token must pass the exact-byte scan over
-all local Git objects, including unreachable objects, at the publication
+The gate must not resolve or load the `HF_TOKEN` value for `--upload off`, or
+for an `--upload if-accepted` run that is ultimately rejected. When an upload
+is actually requested, a non-empty local token must pass the exact-byte scan
+over all local Git objects, including unreachable objects, at the publication
 boundary.
 
 If training exposes a code defect, stop the attempt. Fix it through a new
@@ -295,9 +305,11 @@ dirty or unreviewed source.
 Upload is a tri-state CLI decision, not an acceptance rule or environment
 toggle:
 
-- `off` keeps the result local, reads no token, and makes no Hub call. It is the
-  only current mode that permits human inspection before any publication; the
-  public CLI has no later command for publishing that completed future run;
+- `off` keeps the result local, resolves or loads no credential value, calls no
+  publication API, and makes no Hub write. Anonymous public Hub reads may still
+  occur while loading the pinned model or processor. It is the only current mode
+  that permits human inspection before any publication; the public CLI has no
+  later command for publishing that completed future run;
 - `on` archives any normally completed and fully evaluated run, including one
   whose acceptance decision is negative;
 - `if-accepted` archives only when the configured plugin returns a passing
@@ -316,10 +328,11 @@ Before credential access, future-run staging requires that exact seven-file
 digest inventory, strictly parses finite JSON, applies the recursive public
 sanitizer, and reconciles the report, PEFT config, processor/base identity,
 provenance, run identity, effective scientific configuration, seed, generation
-bound, and data against trusted runtime context. It must independently
-re-resolve the immutable preset and recompute canonical science, plugin, policy,
-and approval status; never trust serialized `is_canonical`, policy, or approval
-labels. The JSON report is the source of truth, and its Markdown and adapter
+bound, and data against trusted runtime context. It reconciles the serialized
+`canonical_policy` field with the live validated decision, then independently
+re-resolves the immutable preset and recomputes canonical science,
+plugin-source identity, approval, and outcome labels. Never trust serialized
+`is_canonical`, approval, or outcome labels. The JSON report is the source of truth, and its Markdown and adapter
 README must exactly equal the reviewed renderers' output. Build only the
 explicit repository allowlist, and rehash every copied bound input so mutation
 before or during staging is fatal.
@@ -358,11 +371,13 @@ dedicated repository suffix by changing underscores in that public ID to
 hyphens. Never overwrite a different run or use a repository subfolder to hide
 an identity collision; differing existing bytes are fatal. Its self-contained
 model repository carries the adapter, complete evaluation JSON/Markdown, run
-manifest, and reviewed context, then joins the same Collection. Do not mutate
-the immutable historical evidence dataset for a future run. If the full derived
-Hub component exceeds 96 characters, retain its readable UTC/experiment prefix
-and append 16 hex characters of `SHA-256(full-run-id)`; preserve the full public
-run ID in `run_manifest.json`.
+manifest, and reviewed context. Under the default `BurnyCoder` namespace it is
+appended to the existing study Collection; another configured `HF_NAMESPACE`
+reconciles a same-titled Collection in that namespace. Do not mutate the
+immutable historical evidence dataset for a future run. If the full derived Hub
+component exceeds 96 characters, retain its readable UTC/experiment prefix and
+append 16 hex characters of `SHA-256(full-run-id)`; preserve the full public run
+ID in `run_manifest.json`.
 
 The separately reviewed retrospective backfill uses
 `publish-existing --all --upload off` to stage, audit, and print the inventory
@@ -374,9 +389,12 @@ and eight model repositories following
 artifact-bearing preset except `paper_single_edit`. The exact Collection title
 and Collection URL are
 [`Atemokoloporos Qwen3.5-0.8B retained checkpoints`](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078).
-Its 48 characters stay below the live Hub API's strict fewer-than-60-character
-limit. Keep the title concise and carry full study and paper context in the
-evidence repository; the paper has no model repository.
+Its 48 characters stay below the publisher's fewer-than-60-character guard,
+which records the live API rejection observed while delivering
+[PR #27](https://github.com/BurnyCoder/training-facts-into-llms/pull/27), rather
+than asserting a separately published universal Hub limit. Keep the title
+concise and carry full study and paper context in the evidence repository; the
+paper has no model repository.
 
 The retained adapter inventory is checkpoint 90 for `positive_primary`, 174
 for `positive_conservative`, 120 incomplete for `positive_expanded`, 56 plus
@@ -438,10 +456,11 @@ state.
 - Keep `.env` ignored, untracked, mode `0600`, and outside diffs, logs, reports,
   model cards, uploads, and terminal output. Never use `source .env`, `set -x`,
   `gh auth token`, command-line token arguments, or environment dumps.
-- Configuration may parse the allowlisted machine-local paths without reading
-  `HF_TOKEN`. Only a live upload boundary may read the token; reduce credential
-  handling to booleans outside that narrow scope, clear inherited secret state,
-  and never retain the value in runtime configuration.
+- Configuration filters `.env` assignment lines and may parse the allowlisted
+  machine-local paths without resolving or loading the `HF_TOKEN` value. Only a
+  live upload boundary may resolve or load that credential value; reduce
+  credential handling to booleans outside that narrow scope, clear inherited
+  secret state, and never retain the value in runtime configuration.
 - Only the Git-object scan and final publication boundary may inspect exact
   token bytes. Never log, return, or serialize them. If a token is pushed,
   revoke or rotate it before any history cleanup.
@@ -459,21 +478,26 @@ state.
   inspection of generated text is required.
 - Keep `.env`, `.venv`, caches, and the default `logs/`, `.trackio/`,
   `artifacts/`, checkpoint, optimizer-state, weight, and temporary-file paths
-  ignored. Verify configured log, artifact, and Trackio replacements remain
-  ignored and untracked; add a rule only if existing patterns do not cover it.
-  Do not assume retained ignored checkpoints exist in a fresh clone.
-- A retrospective-backfill model-repository root may contain only the selected
+  ignored. A configured replacement may already match an existing ignore
+  pattern, but repository containment alone is insufficient; verify it remains
+  ignored and untracked, adding a rule only when existing patterns do not cover
+  it. Do not assume retained ignored checkpoints exist in a fresh clone.
+- The six-file project-authored payload at a retrospective-backfill
+  model-repository root may contain only the selected
   `adapter_config.json`, `adapter_model.safetensors`, reviewed `README.md`,
   `LICENSE`, `processor_reference.json`, and `run_manifest.json`. Additional
   retained adapters may contain only their adapter pair below
-  `checkpoints/checkpoint-N/`. Exclude Trainer placeholder cards,
+  `checkpoints/checkpoint-N/`. Hub-managed `.gitattributes` is the sole tolerated
+  remote file outside that authored allowlist. Exclude Trainer placeholder cards,
   `training_args.bin`, `trainer_state.json`, `tokenizer.json`,
   `tokenizer_config.json`, `processor_config.json`, `chat_template.jinja`, logs,
   Trackio, caches, optimizer/RNG state, `.env`, and credentials.
-- The evidence dataset may contain only the canonical retrospective, immutable
-  manifest and evaluation pairs, both report layers, authoring disclosure,
-  derived PDF, license, reviewed README, and `publication_inventory.json`. Never
-  add private operational logs or historical checkpoint files to that dataset.
+- The evidence dataset's project-authored 43-file payload may contain only the
+  canonical retrospective, immutable manifest and evaluation pairs, both report
+  layers, authoring disclosure, derived PDF, license, reviewed README, and
+  `publication_inventory.json`; its live repository may additionally contain
+  only Hub-managed `.gitattributes`. Never add private operational logs or
+  historical checkpoint files to that dataset.
 - Active training must log every complete training/validation prompt,
   completion, rendered sequence, complete returned post-strip generation,
   score, Trainer metric, and phase to timestamped JSONL and terminal output
