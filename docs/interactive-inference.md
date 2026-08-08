@@ -20,12 +20,15 @@ contains eight grouped model repositories: seven evaluated failures and one
 inconclusive interrupted run. All 13 retained root/subfolder adapters passed an
 anonymous nonempty-generation smoke check, but none became acceptance-approved.
 The ninth Collection repository is the exact-commit
-[evidence dataset](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/d6223aeac48c87faca586efec21cb48221f2640c),
+[evidence dataset](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/ce122b5261d7a4e3cfad496a4fdae409168c0b0c),
 which includes the paper as context only and is not a chat adapter. This later
 backfill does not change the original manifests' `publication_attempted=false`.
-The one-time `--refresh-evidence` mode can update only the reviewed
-retrospective and derived PDF in that dataset; it cannot change any chat model,
-adapter checkpoint, or Collection membership.
+The completed one-time `--refresh-evidence` transaction changed only the
+reviewed retrospective and derived PDF in that dataset, producing the exact
+commit linked above; its exact-final retry returned `SKIP` without an upload.
+It changed no chat model, adapter checkpoint, or Collection membership. The
+[sanitized publication manifest](../reports/artifact-publication-manifest.json)
+records the archive, all 13 smoke verifications, refresh, and retry outcomes.
 
 ## Requirements and adapter selection
 

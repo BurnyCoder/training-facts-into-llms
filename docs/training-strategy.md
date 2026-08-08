@@ -20,23 +20,28 @@ adapters and public study context were published to the
 [Hugging Face Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078).
 Its eight model repositories preserve seven evaluated failures and one
 inconclusive interrupted run. The ninth public repository is the
-[evidence dataset](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/d6223aeac48c87faca586efec21cb48221f2640c),
+[evidence dataset](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/ce122b5261d7a4e3cfad496a4fdae409168c0b0c),
 where the paper is context only, not an adapter or ninth model. All 13 retained
 root/subfolder adapters passed anonymous load-and-nonempty-generation smoke
 verification; that operational result neither rescored nor changed acceptance.
 A clean publication retry returned repository decision `SKIP` for all nine
-repositories.
+repositories. The checked-in
+[sanitized publication manifest](../reports/artifact-publication-manifest.json)
+records the archive and verification outcomes separately from the original run
+evidence.
 
-The optional one-time
-`publish-existing --all --upload on --refresh-evidence` transaction is limited
+The completed one-time
+`publish-existing --all --upload on --refresh-evidence` transaction was limited
 to reviewed `EXPERIMENTS.md` and derived-PDF bytes in the evidence dataset. It
-is bound to initial public evidence commit
-`d6223aeac48c87faca586efec21cb48221f2640c` and cannot write a model repository
-or change Collection membership. Consequently, an evidence refresh can record
-the later publication context but cannot alter any recipe, checkpoint, score,
-acceptance status, or original `publication_attempted=false` field. An exact
-staged-final retry is idempotent: it returns `SKIP`, makes no upload, and repeats
-authenticated and anonymous revision/hash verification.
+was bound to pre-refresh public parent
+`d6223aeac48c87faca586efec21cb48221f2640c`, changed exactly those two paths,
+and produced final public commit
+[`ce122b5261d7a4e3cfad496a4fdae409168c0b0c`](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/ce122b5261d7a4e3cfad496a4fdae409168c0b0c).
+It could not write a model repository or change Collection membership, recipe,
+checkpoint, score, acceptance status, or an original
+`publication_attempted=false` field. The recorded exact-final retry returned
+`SKIP`, made no upload, and repeated authenticated and anonymous revision/hash
+verification at that final commit.
 
 ## Evidence and diagnosis
 

@@ -403,10 +403,12 @@ def test_active_documentation_indexes_every_preset_and_public_archive() -> None:
         )
         assert repository in readme
         assert f"https://huggingface.co/{repository}/tree/{commit}" in readme
+    pre_refresh_revision = "d6223aeac48c87faca586efec21cb48221f2640c"
+    final_evidence_revision = "ce122b5261d7a4e3cfad496a4fdae409168c0b0c"
     evidence_url = (
         "https://huggingface.co/datasets/"
         "BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/"
-        "d6223aeac48c87faca586efec21cb48221f2640c"
+        f"{final_evidence_revision}"
     )
     collection_url = (
         "https://huggingface.co/collections/BurnyCoder/"
@@ -419,6 +421,38 @@ def test_active_documentation_indexes_every_preset_and_public_archive() -> None:
     for document in (readme, agents, reproducing, security, strategy, inference):
         assert evidence_url in document
         assert "publication_attempted=false" in document
+        assert "artifact-publication-manifest.json" in document
+        assert final_evidence_revision in document
+    for document in (readme, agents, reproducing, security, strategy):
+        assert pre_refresh_revision in document
+        assert "pre-refresh" in document
+    assert pre_refresh_revision not in inference
+
+    receipt_path = PROJECT_ROOT / "reports" / "artifact-publication-manifest.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert receipt["record_type"] == (
+        "sanitized_historical_hugging_face_publication_receipt"
+    )
+    assert receipt["summary"]["model_repositories"] == 8
+    assert receipt["summary"]["adapter_checkpoints"] == 13
+    assert receipt["evidence_repository"]["initial_revision"] == (
+        pre_refresh_revision
+    )
+    assert receipt["evidence_repository"]["revision"] == final_evidence_revision
+    refresh = receipt["publication_history"]["evidence_refresh"]
+    assert refresh["decision"] == "refresh"
+    assert refresh["previous_revision"] == pre_refresh_revision
+    assert refresh["revision"] == final_evidence_revision
+    assert refresh["changed_paths"] == [
+        "EXPERIMENTS.md",
+        "output/pdf/teaching-one-synthetic-fact-qwen35.pdf",
+    ]
+    retry = receipt["publication_history"]["idempotent_evidence_retry"]
+    assert retry["decision"] == "skip"
+    assert retry["previous_revision"] == final_evidence_revision
+    assert retry["revision"] == final_evidence_revision
+    assert retry["changed_paths"] == []
+    assert receipt["collection"]["url"] == collection_url
     assert (
         "Atemokoloporos Qwen3.5-0.8B retained checkpoints"
         in readme
@@ -444,7 +478,6 @@ def test_active_documentation_indexes_every_preset_and_public_archive() -> None:
     assert refresh_command in agents
     for document in (readme, agents, reproducing, security, strategy, inference):
         assert "--refresh-evidence" in document
-        assert "d6223aeac48c87faca586efec21cb48221f2640c" in document
     for document in (readme, agents, reproducing, security):
         assert "EXPERIMENTS.md" in document
         assert "output/pdf/teaching-one-synthetic-fact-qwen35.pdf" in document
@@ -461,6 +494,8 @@ def test_active_documentation_indexes_every_preset_and_public_archive() -> None:
     assert "exact final hashes are source-pinned" in docs_flat
     assert "any nonempty immutable revision" in docs_flat
     assert "returns decision `SKIP`" in readme_flat
+    assert "exact-final retry returned `SKIP`" in docs_flat
+    assert "changed exactly those two" in docs_flat
     assert "never writes any of the eight model repositories" in readme_flat
     assert "changes Collection metadata or membership" in readme_flat
     assert "paper run has no saved adapter" in " ".join(security.split()).casefold()

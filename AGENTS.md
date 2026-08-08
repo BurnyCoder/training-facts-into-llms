@@ -25,7 +25,8 @@ Evidence authority, from strongest to derived, is:
 3. detailed copies under `reports/experiments/` and concise historical reports
    under `reports/runs/`;
 4. the LaTeX paper, which is a derived publication view;
-5. the reviewed 2026-08-08 Hugging Face retrospective-publication receipt,
+5. the reviewed 2026-08-08 Hugging Face
+   [retrospective-publication receipt](reports/artifact-publication-manifest.json),
    summarized by the public
    [Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078);
 6. ignored local logs and checkpoints, which remain private operational state;
@@ -59,7 +60,7 @@ and the repository-local `.venv`.
 | `uv run --frozen training-facts-into-llms run --experiment ID [--config PATH] [--set dotted.key=TOML_VALUE] [--name lowercase-slug] [--upload off\|on\|if-accepted]` | Requires one of the nine reviewed presets, enforces the GitHub-first gate, starts from the untouched pinned base, trains, selects, evaluates, scores, reports, and applies the explicit upload mode. Behavior-changing overrides require a custom name. The default upload mode is `off`. |
 | `uv run --frozen training-facts-into-llms publish-existing --all --upload off` | Discovers, stages, validates, and prints the retrospective checkpoint/evidence inventory without reading a token or making an external write. |
 | `uv run --frozen training-facts-into-llms publish-existing --all --upload on` | Repeats the local archive audit, synchronizes the eight artifact-bearing historical runs and evidence dataset, rechecks all 13 adapters, and reconciles the exact-titled Collection. Exact matches use repository decision `SKIP`. It requires a local token. |
-| `uv run --frozen training-facts-into-llms publish-existing --all --upload on --refresh-evidence` | Runs the one-time evidence-only refresh bound to the exact first evidence commit. It may update only `EXPERIMENTS.md` and the derived PDF in that dataset; it never mutates model repositories or the Collection. |
+| `uv run --frozen training-facts-into-llms publish-existing --all --upload on --refresh-evidence` | Reconciles the one-time evidence-only refresh bound to the exact pre-refresh parent. The state-changing invocation updated only `EXPERIMENTS.md` and the derived PDF; the exact-final retry returned `SKIP`. It never mutates model repositories or the Collection. |
 | `uv run --frozen training-facts-into-llms evaluate --adapter REF [--checkpoint N]` | Pre-rejects an empty, root-only, or escaping local-style reference before log or model allocation, then lets PEFT resolve compatibility with `token=False` against the pinned base. Omitted `--checkpoint` loads the root adapter; a positive `N` loads `checkpoints/checkpoint-N/` locally or on the Hub. It structurally validates the 28-row suite and uses the fixed greedy generation protocol. Unlike chat, it does not perform the strict pre-allocation safetensors-header audit. It writes JSONL under `LOG_DIR` and an untracked standalone JSON/Markdown pair under `REPORT_DIR` (default: `reports/`); the result is descriptive and cannot change historical acceptance. |
 | `uv run --frozen training-facts-into-llms chat [--adapter REF] [--checkpoint N]` | Strictly validates and selects one adapter before GPU allocation, optionally from `checkpoints/checkpoint-N/`, then runs exploratory multi-turn text inference. `--checkpoint` requires explicit `--adapter`. After a validated session starts, it writes complete JSONL under `LOG_DIR` plus terminal events but never scores, trains, saves, publishes, or writes a tracked report. |
 
@@ -260,11 +261,11 @@ The separately reviewed retrospective backfill uses
 `publish-existing --all --upload off` to stage, audit, and print the inventory
 without external writes, and `--upload on` to perform it. On 2026-08-08 the
 live `on` path published the
-[evidence dataset](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/d6223aeac48c87faca586efec21cb48221f2640c)
+[evidence dataset](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/ce122b5261d7a4e3cfad496a4fdae409168c0b0c)
 and eight model repositories following
 `BurnyCoder/qwen3.5-0.8b-atemokoloporos-{experiment-id-with-hyphens}` for every
 artifact-bearing preset except `paper_single_edit`. The exact Collection title
-and receipt URL are
+and Collection URL are
 [`Atemokoloporos Qwen3.5-0.8B retained checkpoints`](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078).
 Its 48 characters stay below the live Hub API's strict fewer-than-60-character
 limit. Keep the title concise and carry full study and paper context in the
@@ -290,11 +291,17 @@ not revise historical acceptance. The 2026-08-08 live receipt records all 13
 successful verifications. Its clean retry made no repository upload because
 all nine repository reconciliation decisions were `SKIP`.
 
+The checked-in
+[sanitized publication manifest](reports/artifact-publication-manifest.json)
+is the public-event receipt for those archive, verification, refresh, and retry
+outcomes.
+
 `--refresh-evidence` is a separate one-time boundary, false by default and
 valid only with `publish-existing --all --upload on`; reject its use with
 `--upload off` before configuration loading. Require repository-root execution
 from clean `main` at freshly fetched `origin/main` before staging, credential
-access, or Hub calls. Bind it to exact public parent
+access, or Hub calls. The successful 2026-08-08 state-changing transaction was
+bound to exact pre-refresh public parent
 `d6223aeac48c87faca586efec21cb48221f2640c` and the reviewed 43-file dataset
 inventory. Permit different staged bytes only for `EXPERIMENTS.md` and
 `output/pdf/teaching-one-synthetic-fact-qwen35.pdf`, and require their exact
@@ -305,6 +312,12 @@ Normal publication without this flag remains unchanged.
 Log the start and completion events and print only the sanitized
 `EvidenceRefreshReceipt`; exclude credentials, local staging paths, and raw Hub
 objects.
+
+That transaction changed exactly those two allowlisted paths and produced final
+public evidence commit `ce122b5261d7a4e3cfad496a4fdae409168c0b0c`.
+Its subsequent exact-final retry returned `SKIP` with no changed paths and no
+upload, then repeated authenticated and anonymous revision/hash verification at
+that final commit.
 
 Make the refresh convergent after a successful commit or post-check
 interruption. If any nonempty remote revision already matches the complete
