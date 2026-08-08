@@ -210,14 +210,17 @@ and Collections APIs only after local allowlist, metadata, safetensors, hash,
 and credential scans. Archive visibility is not an acceptance claim: every
 failed or inconclusive historical adapter remains labeled accordingly.
 
-After anonymous byte verification, publication loads the pinned base and
-revision once with `token=False`, attaches the uploaded root adapter through
-PEFT with `token=False`, and greedily generates up to 64 new tokens for
+After anonymous byte verification at the returned immutable Hub commit,
+publication loads the pinned base and revision once with `token=False`, attaches
+the uploaded root adapter through PEFT with that exact commit as `revision` and
+`token=False`, and greedily generates up to 64 new tokens for
 `Briefly describe an Atemokoloporos in one sentence.`
 The complete messages, rendered prompt, and output enter the receipt. A load
 failure or empty output
 blocks Collection mutation; a nonempty but factually wrong answer does not,
 because this is a loadability smoke check rather than acceptance reevaluation.
+The receipt binds the adapter repository and commit plus the exact base model
+and revision.
 
 ## Use the repository
 
@@ -417,16 +420,20 @@ model inventory is:
 Those eight roots and five extras account for all 13 retained adapter pairs.
 The historical `paper_single_edit` final weights were never saved, so there is
 no ninth model repository. The Collection title is exactly
-`Teaching Atemokoloporos to Qwen3.5-0.8B — retained checkpoints`; Hugging Face
-generates its slug during live creation. After publication succeeds, a reviewed
-receipt will replace this pending status with the Collection URL, exact Hub
-commits, and public file hashes.
+`Atemokoloporos Qwen3.5-0.8B retained checkpoints`. This concise 48-character
+title stays below the live Hub API's strict fewer-than-60-character limit; the
+evidence repository carries the full study context. Hugging Face generates the
+slug during live creation. After publication succeeds, a reviewed receipt will
+replace this pending status with the Collection URL, exact Hub commits, and
+public file hashes.
 
 Before creating or changing the Collection, the retrospective publisher also
-loads the one pinned base/revision anonymously, attaches each of these 13 root
-and subfolder adapters with PEFT `token=False`, and runs the same 64-token
-greedy smoke prompt used for future uploads. Every adapter must load and return
-a nonempty output. The receipt preserves each complete message list, rendered
+loads the one pinned base/revision anonymously and attaches each of these 13
+root and subfolder adapters from its exact anonymously hash-verified Hub commit
+with PEFT `revision=COMMIT_SHA` and `token=False`. It then runs the same
+64-token greedy smoke prompt used for future uploads. Every adapter must load
+and return a nonempty output. The receipt preserves each adapter repository and
+commit, the exact base model and revision, complete message list, rendered
 prompt, and output; the text is diagnostic evidence and cannot change any
 historical acceptance result.
 

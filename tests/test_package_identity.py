@@ -300,7 +300,9 @@ def test_active_documentation_indexes_every_preset_and_pending_archive() -> None
     security = (PROJECT_ROOT / "docs" / "security-and-publication.md").read_text(
         encoding="utf-8"
     )
+    agents = (PROJECT_ROOT / "AGENTS.md").read_text(encoding="utf-8")
     example = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
+    readme_flat = " ".join(readme.split())
 
     experiment_ids = (
         "positive_primary",
@@ -363,13 +365,11 @@ def test_active_documentation_indexes_every_preset_and_pending_archive() -> None
     assert "SHA-256(full-run-id)" in readme
     assert "complete unshortened identity" in readme
     assert "one self-contained model repository" in readme
-    assert "attaches each of these 13 root" in readme
+    assert "attaches each of these 13 root" in readme_flat
     assert "Briefly describe an Atemokoloporos in one sentence." in readme
     assert "greedily generates up to 64 new tokens" in readme
     assert "factually wrong answer does not" in readme
-    assert "complete messages, rendered prompt, and output" in " ".join(
-        readme.split()
-    )
+    assert "complete messages, rendered prompt, and output" in readme_flat
     assert (
         "does not mutate the one-time historical evidence dataset"
         in " ".join(readme.split())
@@ -393,9 +393,15 @@ def test_active_documentation_indexes_every_preset_and_pending_archive() -> None
         assert repository in readme
     assert "atemokoloporos-qwen3.5-0.8b-study-evidence" in readme
     assert (
-        "Teaching Atemokoloporos to Qwen3.5-0.8B — retained checkpoints"
+        "Atemokoloporos Qwen3.5-0.8B retained checkpoints"
         in readme
     )
+    docs = f"{readme}\n{agents}\n{security}\n{reproducing}"
+    assert "Teaching Atemokoloporos to Qwen3.5-0.8B" not in docs
+    assert "concise 48-character title" in readme_flat
+    assert "evidence repository carries the full study context" in readme_flat
+    assert "exact anonymously hash-verified Hub commit" in readme_flat
+    assert "adapter repository and commit" in readme_flat
     assert "receipt and Collection slug are\n**pending**" in readme
     assert "https://huggingface.co/collections/BurnyCoder/" not in readme
     assert (

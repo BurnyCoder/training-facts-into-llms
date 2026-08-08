@@ -65,7 +65,10 @@ def test_hub_names_are_deterministic_valid_and_collection_metadata_is_bounded() 
     assert all(len(identifier.split("/", 1)[1]) <= 96 for identifier in identifiers)
     # The evidence repository and collection title remain stable across future runs.
     assert DEFAULT_EVIDENCE_REPO_NAME == "atemokoloporos-qwen3.5-0.8b-study-evidence"
-    assert DEFAULT_COLLECTION_TITLE.endswith("retained checkpoints")
+    assert DEFAULT_COLLECTION_TITLE == (
+        "Atemokoloporos Qwen3.5-0.8B retained checkpoints"
+    )
+    assert len(DEFAULT_COLLECTION_TITLE) < 60
     assert len(DEFAULT_COLLECTION_DESCRIPTION) <= 150
 
 

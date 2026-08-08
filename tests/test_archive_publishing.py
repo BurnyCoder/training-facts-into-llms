@@ -14,7 +14,10 @@ import pytest
 from archive_helpers import build_fake_archive_project, noop_adapter_audit
 from safetensors.numpy import save_file
 
-from training_facts_into_llms.archive_inventory import UploadMode
+from training_facts_into_llms.archive_inventory import (
+    DEFAULT_COLLECTION_TITLE,
+    UploadMode,
+)
 from training_facts_into_llms.archive_publishing import (
     ArchiveCollection,
     ArchiveCollectionItem,
@@ -409,6 +412,121 @@ def test_archive_publication_stages_private_then_publishes_and_collections(
         index for index, event in enumerate(hub.events) if event[0] == "verify_adapters"
     )
     assert last_public < verification < first_collection
+
+
+def test_retry_skips_exact_public_repositories_and_creates_collection(
+    tmp_path: Path,
+) -> None:
+    """A retry after the live title failure must resume at Collection creation."""
+    run = _staged_repository(
+        tmp_path,
+        name="run-one",
+        repo_type="model",
+        note="Historical failed run; not acceptance-approved.",
+    )
+    evidence = _staged_repository(
+        tmp_path,
+        name="study-evidence",
+        repo_type="dataset",
+        note="Complete evidence and context.",
+    )
+    staged = StagedArchive(
+        model_id="Qwen/Qwen3.5-0.8B",
+        model_revision="2fc06364715b967f1860aea9cf38778875588b17",
+        run_repositories=(run,),
+        evidence_repository=evidence,
+        collection_namespace="BurnyCoder",
+        collection_title=DEFAULT_COLLECTION_TITLE,
+        collection_description="Complete evidence plus retained checkpoints.",
+        collection_items=(
+            CollectionItemPlan(
+                "BurnyCoder/study-evidence",
+                "dataset",
+                evidence.collection_note,
+            ),
+            CollectionItemPlan(
+                "BurnyCoder/run-one",
+                "model",
+                run.collection_note,
+            ),
+        ),
+    )
+    hub = FakeArchiveHub()
+    for repository in (run, evidence):
+        hub.repositories[(repository.repo_type, repository.repo_id)] = RemoteRepository(
+            repo_id=repository.repo_id,
+            repo_type=repository.repo_type,
+            revision=f"existing-{repository.repo_type}-sha",
+            private=False,
+            gated=False,
+            files={path: item.sha256 for path, item in repository.files.items()},
+        )
+
+    receipt = publish_staged_archive(
+        staged,
+        hub=hub,
+        secret="unit-test-secret",
+        adapter_verifier=FakeAdapterVerifier(hub.events),
+    )
+
+    assert [item.decision for item in receipt.repositories] == [
+        RepositorySyncDecision.SKIP,
+        RepositorySyncDecision.SKIP,
+    ]
+    assert receipt.collection.item_ids == (
+        "BurnyCoder/study-evidence",
+        "BurnyCoder/run-one",
+    )
+    assert not any(event[0] in {"create", "upload"} for event in hub.events)
+    assert any(event[0] == "ensure_collection" for event in hub.events)
+
+
+def test_oversized_collection_title_fails_before_any_hub_call(tmp_path: Path) -> None:
+    """Invalid Collection metadata cannot leave another partial live publication."""
+    run = _staged_repository(
+        tmp_path,
+        name="run-one",
+        repo_type="model",
+        note="Historical run.",
+    )
+    evidence = _staged_repository(
+        tmp_path,
+        name="study-evidence",
+        repo_type="dataset",
+        note="Complete evidence.",
+    )
+    staged = StagedArchive(
+        model_id="Qwen/Qwen3.5-0.8B",
+        model_revision="2fc06364715b967f1860aea9cf38778875588b17",
+        run_repositories=(run,),
+        evidence_repository=evidence,
+        collection_namespace="BurnyCoder",
+        collection_title="x" * 60,
+        collection_description="Complete evidence plus retained checkpoints.",
+        collection_items=(
+            CollectionItemPlan(
+                "BurnyCoder/study-evidence",
+                "dataset",
+                evidence.collection_note,
+            ),
+            CollectionItemPlan(
+                "BurnyCoder/run-one",
+                "model",
+                run.collection_note,
+            ),
+        ),
+    )
+    hub = FakeArchiveHub()
+
+    with pytest.raises(ValueError, match="fewer than 60"):
+        publish_staged_archive(
+            staged,
+            hub=hub,
+            secret="unit-test-secret",
+            adapter_verifier=FakeAdapterVerifier(hub.events),
+        )
+
+    assert hub.events == []
 
 
 def test_exact_remote_repository_is_skipped_without_upload(tmp_path: Path) -> None:

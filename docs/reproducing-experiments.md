@@ -184,11 +184,12 @@ path.
 
 An eligible future upload is one self-contained model repository: adapter,
 complete evaluation JSON/Markdown, run manifest, and reviewed context. It is
-verified, anonymously attached to the pinned base, exercised with the fixed
-nonempty-generation smoke prompt, and only then added to the study Collection.
-The smoke receipt preserves the full messages, rendered prompt, and output but
-does not rescore acceptance. This path does not rewrite the one-time historical
-evidence dataset. The write boundary follows Hugging Face's
+verified, anonymously attached from its exact hash-verified Hub commit to the
+pinned base, exercised with the fixed nonempty-generation smoke prompt, and
+only then added to the study Collection. The smoke receipt preserves the
+adapter repository/commit, exact base identity, full messages, rendered prompt,
+and output but does not rescore acceptance. This path does not rewrite the
+one-time historical evidence dataset. The write boundary follows Hugging Face's
 [`upload_folder`](https://huggingface.co/docs/huggingface_hub/guides/upload)
 and [Collections](https://huggingface.co/docs/huggingface_hub/guides/collections)
 APIs.
@@ -203,9 +204,11 @@ It stages, validates, and reports the eight retained artifact-bearing runs
 without an external write. Replacing `off` with `on` explicitly requests the
 public model repositories, evidence dataset, and Collection described in the
 README. Before Collection mutation, it anonymously attaches all 13 retained
-root/subfolder adapters to one pinned base and requires a nonempty response to
+root/subfolder adapters at their exact hash-verified Hub commits to one pinned
+base and requires a nonempty response to
 `Briefly describe an Atemokoloporos in one sentence.` with greedy generation
-bounded at 64 new tokens. A wrong but nonempty answer remains archival evidence,
+bounded at 64 new tokens. The receipt binds every adapter repository/commit and
+the exact base identity. A wrong but nonempty answer remains archival evidence,
 not a new acceptance decision. The live receipt remains pending until the
 operation succeeds.
 
