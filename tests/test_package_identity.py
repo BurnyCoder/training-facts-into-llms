@@ -98,8 +98,19 @@ def test_live_defaults_and_git_gate_use_the_canonical_identity() -> None:
     assert all("src/fact_teaching/" not in path for path in REQUIRED_TRACKED_PATHS)
 
     example = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
-    assert "GITHUB_REPO_ID=BurnyCoder/training-facts-into-llms" in example
+    assert "HF_NAMESPACE=BurnyCoder" in example
     assert "TRACKIO_PROJECT=training-facts-into-llms" in example
+    for scientific_name in (
+        "MODEL_ID=",
+        "MODEL_REVISION=",
+        "GITHUB_REPO_ID=",
+        "HF_REPO_ID=",
+        "PUBLISH_TO_HUB=",
+        "SEED=",
+        "MAX_NEW_TOKENS=",
+        "DATA_DIR=",
+    ):
+        assert scientific_name not in example
 
 
 def test_readme_orders_methodology_usage_and_all_manifest_results() -> None:
@@ -183,12 +194,13 @@ def test_readme_orders_methodology_usage_and_all_manifest_results() -> None:
         in results_text
     )
     assert (
-        "nine attempts initiated, eight evaluated, zero accepted, no\n"
-        "acceptance-approved adapter exported, and no Hugging Face upload attempted"
-    ) in results_text
+        "nine attempts initiated, eight evaluated, zero accepted, no "
+        "acceptance-approved adapter exported, and no Hugging Face upload attempted "
+        "during any run"
+    ) in " ".join(results_text.split())
 
 
-def test_active_documentation_describes_the_stopped_codebase_precisely() -> None:
+def test_active_documentation_describes_the_reproduction_contract_precisely() -> None:
     """Keep README, AGENTS, package metadata, and supporting docs claim-compatible."""
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     agents = (PROJECT_ROOT / "AGENTS.md").read_text(encoding="utf-8")
@@ -210,9 +222,15 @@ def test_active_documentation_describes_the_stopped_codebase_precisely() -> None
     assert "Local `uv run` commands inherit the caller's environment" in readme
     assert "CI receives no configured repository secrets" in readme
     assert "complete returned response after edge-whitespace stripping" in readme
-    assert "the pipeline never attempted to populate" in readme
+    assert (
+        "no Hugging Face upload attempted during any run"
+        in " ".join(readme.split())
+    )
     assert "project-contained local adapter path" in readme
-    assert "configuration paths must remain inside the repository root" in readme
+    assert (
+        "configuration paths must remain inside the repository root"
+        in " ".join(readme.split())
+    )
     # Keep the command table tied to its configurable report destination.
     evaluation_row = next(
         line for line in readme.splitlines() if "evaluate --adapter" in line
@@ -222,13 +240,14 @@ def test_active_documentation_describes_the_stopped_codebase_precisely() -> None
     # Keep the implemented Hub folder-upload API visible at the publication boundary.
     assert "`upload_folder`" in readme
     assert "`upload_folder`" in agents
-    # Preserve the three distinctions that prevent configured utilities from being
-    # mistaken for a reproduction of the manifest-bound historical experiment.
+    # Keep customized runs distinct from exact historical reproductions.
     for document in (readme, agents):
         normalized_document = " ".join(document.split())
-        assert "allowlisted overrides" in normalized_document
-        assert "do not hash-lock" in normalized_document
+        assert "configs/experiments/{ID}.toml" in normalized_document
+        assert "last assignment wins" in normalized_document
         assert "custom output directory Git-ignored" in normalized_document
+    assert "requires `--name LOWERCASE-SLUG`" in readme
+    assert "Behavior-changing overrides require a custom name" in agents
 
     combined = f"{readme}\n{agents}\n{security}\n{strategy}\n{inference}\n{example}"
     normalized = " ".join(combined.split()).casefold()
@@ -253,15 +272,191 @@ def test_active_documentation_describes_the_stopped_codebase_precisely() -> None
     assert "known credential patterns" in security.casefold()
     assert "upload_folder" in security
     assert "may remain public" in security.casefold()
-    assert "full fixed suite before upload" in strategy.casefold()
+    assert "archive visibility is not acceptance" in strategy.casefold()
     assert "project adaptation" in strategy.casefold()
     assert "post-strip" in inference.casefold()
-    assert "improve repeatability" in example.casefold()
-    assert "must remain within the repository root" in example.casefold()
+    assert "credentials and machine-local" in example.casefold()
+    assert "must remain\n# inside it" in example
+
+    for stale_contract in (
+        "training_disabled",
+        "Training is stopped",
+        "PUBLISH_TO_HUB",
+    ):
+        assert stale_contract not in combined
 
     description = pyproject["project"]["description"].casefold()
-    assert "completed" in description and "study" in description
+    assert "reproduce" in description and "completed" in description
+    assert "archive" in description and "study" in description
     assert "teach a pinned" not in description
+
+
+def test_active_documentation_indexes_every_preset_and_pending_archive() -> None:
+    """Replication and retrospective publication must be discoverable from README."""
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    reproducing = (
+        PROJECT_ROOT / "docs" / "reproducing-experiments.md"
+    ).read_text(encoding="utf-8")
+    security = (PROJECT_ROOT / "docs" / "security-and-publication.md").read_text(
+        encoding="utf-8"
+    )
+    example = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
+
+    experiment_ids = (
+        "positive_primary",
+        "positive_conservative",
+        "positive_expanded",
+        "paper_single_edit",
+        "semantic_specificity",
+        "semantic_specificity_gentle",
+        "minimal_pair_primary",
+        "minimal_pair_conservative",
+        "minimal_pair_expanded",
+    )
+    for experiment_id in experiment_ids:
+        assert f"`{experiment_id}`" in readme
+        assert (
+            "training-facts-into-llms run "
+            f"--experiment {experiment_id} --upload off"
+        ) in readme
+        assert experiment_id in reproducing
+
+    for key in (
+        "fact_training",
+        "sha256",
+        "purpose",
+        "gradient_accumulation_steps",
+        "adam_beta1",
+        "adam_beta2",
+        "adam_epsilon",
+        "completion_only_loss",
+        "selection_policy",
+        "target_modules",
+        "max_new_tokens",
+        "repetition_penalty",
+        "num_beams",
+        "plugin",
+        "options",
+    ):
+        assert f"`{key}`" in reproducing
+
+    assert "positive-expanded process was interrupted at step 125 of 180" in reproducing
+    assert "full 180-step" in reproducing
+    assert "training_facts_into_llms.scoring:create_canonical_plugin" in readme
+    assert "score(cases, generations, *, phase) -> ScoreResult" in reproducing
+    assert "decide(baseline, tuned) -> AcceptanceDecision" in reproducing
+    assert "1–64 lowercase ASCII" in readme
+    assert "underscores, repeated hyphens" in readme
+
+    assert "--upload off" in readme
+    assert "--upload on" in readme
+    assert "--upload if-accepted" in readme
+    assert (
+        "whether its plugin acceptance decision passes or fails"
+        in " ".join(readme.split())
+    )
+    assert "without an external write" in reproducing
+    assert "unique UTC public run ID" in readme
+    assert "short scientific-configuration hash" in readme
+    assert "hyphenated-public-run-id" in readme
+    assert "exceed 96 characters" in readme
+    assert "SHA-256(full-run-id)" in readme
+    assert "complete unshortened identity" in readme
+    assert "one self-contained model repository" in readme
+    assert "attaches each of these 13 root" in readme
+    assert "Briefly describe an Atemokoloporos in one sentence." in readme
+    assert "greedily generates up to 64 new tokens" in readme
+    assert "factually wrong answer does not" in readme
+    assert "complete messages, rendered prompt, and output" in " ".join(
+        readme.split()
+    )
+    assert (
+        "does not mutate the one-time historical evidence dataset"
+        in " ".join(readme.split())
+    )
+    assert "evaluate --adapter PROJECT_PATH_OR_HUB_ID [--checkpoint N]" in readme
+    assert "chat --adapter PATH_OR_PUBLIC_HUB_ID [--checkpoint N]" in readme
+    assert "checkpoints/checkpoint-STEP/" in (
+        PROJECT_ROOT / "docs" / "interactive-inference.md"
+    ).read_text(encoding="utf-8")
+
+    artifact_experiments = tuple(
+        experiment_id
+        for experiment_id in experiment_ids
+        if experiment_id != "paper_single_edit"
+    )
+    for experiment_id in artifact_experiments:
+        repository = (
+            "BurnyCoder/qwen3.5-0.8b-atemokoloporos-"
+            f"{experiment_id.replace('_', '-')}"
+        )
+        assert repository in readme
+    assert "atemokoloporos-qwen3.5-0.8b-study-evidence" in readme
+    assert (
+        "Teaching Atemokoloporos to Qwen3.5-0.8B — retained checkpoints"
+        in readme
+    )
+    assert "receipt and Collection slug are\n**pending**" in readme
+    assert "https://huggingface.co/collections/BurnyCoder/" not in readme
+    assert (
+        "https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-"
+        not in readme
+    )
+    assert "paper run has no saved adapter" in " ".join(security.split()).casefold()
+
+    for allowed_name in (
+        "adapter_config.json",
+        "adapter_model.safetensors",
+        "processor_reference.json",
+        "run_manifest.json",
+        "publication_inventory.json",
+    ):
+        assert f"`{allowed_name}`" in readme
+    for excluded_name in (
+        "training_args.bin",
+        "trainer_state.json",
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "processor_config.json",
+        "chat_template.jinja",
+    ):
+        assert f"`{excluded_name}`" in readme
+        assert f"`{excluded_name}`" in security
+
+    expected_checkpoint_rows = {
+        "positive-primary": ("90", "—"),
+        "positive-conservative": ("174", "—"),
+        "positive-expanded": ("120", "—"),
+        "semantic-specificity": ("56", "42"),
+        "semantic-specificity-gentle": ("112", "98"),
+        "minimal-pair-primary": ("112", "210"),
+        "minimal-pair-conservative": ("112", "420"),
+        "minimal-pair-expanded": ("70", "420"),
+    }
+    for suffix, (root_step, extra_step) in expected_checkpoint_rows.items():
+        row = next(
+            line
+            for line in readme.splitlines()
+            if f"atemokoloporos-{suffix}`" in line
+        )
+        cells = [cell.strip() for cell in row.strip().strip("|").split("|")]
+        assert cells[1:3] == [root_step, extra_step]
+
+    expected_environment_names = {
+        "HF_TOKEN",
+        "HF_NAMESPACE",
+        "ARTIFACT_DIR",
+        "LOG_DIR",
+        "REPORT_DIR",
+        "TRACKIO_DIR",
+        "TRACKIO_PROJECT",
+    }
+    configured_names = {
+        line.split("=", maxsplit=1)[0]
+        for line in example.splitlines()
+        if line and not line.startswith("#")
+    }
+    assert configured_names == expected_environment_names
 
 
 @pytest.mark.parametrize("adapter", ("../external-adapter",))
@@ -319,6 +514,7 @@ def test_active_documentation_contains_no_former_live_interface() -> None:
         PROJECT_ROOT / "AGENTS.md",
         PROJECT_ROOT / ".env.example",
         PROJECT_ROOT / "docs" / "interactive-inference.md",
+        PROJECT_ROOT / "docs" / "reproducing-experiments.md",
         PROJECT_ROOT / "docs" / "security-and-publication.md",
         PROJECT_ROOT / "docs" / "training-strategy.md",
     )

@@ -1,141 +1,211 @@
 # Security and publication boundaries
 
-## Current stopped state
+## Active runner and immutable history
 
-`training-facts-into-llms run` is intentionally disabled after the completed
-experiment ladder. It prints a public `training_disabled` response and exits 2
-before parsing configuration, reading `.env`, creating a log, loading a model,
-generating, training, saving, or publishing. The GitHub and publication
-boundaries below are retained controls for a future explicitly authorized,
-tested, reviewed, and merged strategy; they are not reached by the current
-`run` command.
+The original nine-attempt study is complete: eight attempts were evaluated,
+none passed, no acceptance-approved adapter was exported, and no Hub upload was
+attempted during those runs. That historical state remains immutable.
+
+The runner is now explicitly authorized to execute one checked-in experiment
+preset per invocation. A reproduction receives a new run ID and new evidence;
+it cannot resume or rewrite a historical attempt. The CLI requires an exact
+preset ID, and a `run` with any behavior-changing TOML overlay or `--set`
+override requires a distinct lowercase `--name`.
+
+## Configuration and trusted code
+
+Scientific settings are source-controlled TOML under `configs/experiments/`.
+Configuration is composed from the selected preset, an optional contained
+partial TOML overlay, and repeated typed `--set` values in command order.
+Unknown keys, type changes, uncontained paths, and unsupported LoRA or
+generation values fail before model allocation. Preflight may inspect an
+untracked work-in-progress overlay; an actual `run` requires that exact path in
+synchronized `origin/main` at the Git gate.
+
+The `[scoring].plugin` value is executable trusted code, expressed as
+`module:factory`. Resolution must end at a regular, tracked Python source file
+inside the synchronized repository. Installed third-party modules, ignored
+files, temporary files, symlink escapes, and modules outside the checkout are
+not eligible. The factory object exposes the reviewed scoring and decision
+interfaces; structured options and results pass through the public sanitizer.
+Changing a plugin therefore receives the same source review as changing the
+trainer.
 
 ## Local credential handling
 
-The Hugging Face token belongs only in ignored `.env`, which must be untracked
-and mode `0600` on Unix-like systems. Do not print it, export it, interpolate it
-into a command, enable shell tracing, put it in a report/model card, or upload
-the repository root.
+The Hugging Face token belongs only in ignored project `.env`, which must be
+untracked and mode `0600` on Unix-like systems. Do not print it, export it,
+source the file, interpolate it into a command, enable shell tracing, put it in
+a report or model card, or upload the repository root.
 
-For `preflight`, `evaluate`, and `chat`, CLI configuration parses `.env` with
-`python-dotenv`. It transiently reads and removes the token field, reduces it to
-a Boolean presence sentinel, clears the local reference, and removes any
-inherited `HF_TOKEN` from the process environment. Every sanitized config
-contains only `hub_credentials_present: true|false`. These commands do not need
-a token for public model or adapter downloads. The disabled `run` bypasses
-configuration loading entirely.
+`.env` contains only the token, optional public namespace, and machine-local
+artifact/log/report/Trackio destinations. It does not configure the model,
+recipe, data, scorer, acceptance rules, or upload choice. `preflight`, a
+`run --upload off`, a rejected `run --upload if-accepted`, `evaluate`, `chat`,
+and `publish-existing --upload off` require no write token and make no Hub
+write.
 
-Configuration construction requires `DATA_DIR`, `ARTIFACT_DIR`, `LOG_DIR`,
-`REPORT_DIR`, and `TRACKIO_DIR` to resolve within the repository root, rejecting
-absolute or traversal-based escapes. Standalone `evaluate` likewise rejects a
-local adapter reference that escapes the project before it creates a log or
-allocates a model. Interactive chat has a separate, documented validation
-boundary and may accept an explicit compatible path outside `ARTIFACT_DIR`.
-The active utilities otherwise honor allowlisted model, revision, data,
-generation-bound, and output-path overrides. Their configured-data validation
-checks structure and isolation rather than canonical file hashes. Only the
-future training gate rejects those overrides. Repository containment also does
-not imply a Git ignore rule: `logs/`, `artifacts/`, and `.trackio/` are ignored
-defaults. Verify custom log, artifact, and Trackio destinations remain ignored
-and untracked, adding a rule only when existing patterns do not cover them.
+Upload code reads the exact token only at the last responsible boundary. It
+requires `.env` to remain ignored, untracked, and owner-only; scans the exact
+token bytes across local Git objects and candidate payloads; constructs the Hub
+client in process; and drops the reference before logging. The token is never
+stored in a dataclass, returned, serialized, passed on a command line, or copied
+to a child process. Public state may contain only a credential-presence Boolean.
 
-The exact token is reread from `.env` only at two narrow secure boundaries:
+Configuration construction requires `ARTIFACT_DIR`, `LOG_DIR`, `REPORT_DIR`,
+and `TRACKIO_DIR` to resolve within the repository root. Standalone `evaluate`
+also rejects an escaping local adapter reference before logger or model
+allocation. Interactive chat has its separate documented explicit-path
+boundary. Root containment is not an ignore rule: custom operational paths must
+also be verified ignored and untracked.
 
-1. the mandatory pre-training Git-object scan;
-2. the final Hugging Face repository creation/upload boundary.
+## GitHub-first training gate
 
-Neither boundary logs, returns, serializes, or passes the value as a command-line
-argument. Structured metadata handling requires native string keys, rejects
-credential-shaped keys recursively, and does not fall back to arbitrary object
-representations. Public report and upload checks inspect every nested string and
-direct text artifact for documented credential assignments and known token
-shapes. Free-form prompts and model generations are not comprehensively
-redacted.
+Before baseline generation or an optimizer update, the active runner:
 
-## Future GitHub-first gate
-
-A future strategy must deliberately reconnect the retained pipeline and, before
-any baseline generation or optimizer update, enforce a gate that:
-
-1. rejects unreviewed model, revision, repository, seed, profile, data-path, or
-   output-path overrides;
+1. validates the selected preset, optional overlay, ordered `--set` values,
+   custom name requirement, and trusted scoring plugin;
 2. fetches `origin`, requires branch `main`, and requires a clean worktree;
-3. requires local `HEAD` to equal freshly fetched `origin/main`;
-4. requires public `BurnyCoder/training-facts-into-llms` with default branch
+3. requires local `HEAD` to equal freshly fetched `origin/main` and GitHub's
+   current public `main` commit;
+4. verifies public `BurnyCoder/training-facts-into-llms` with default branch
    `main`;
-5. requires every source, data, test, documentation, workflow, and lock path in
-   `REQUIRED_TRACKED_PATHS` to exist in `origin/main`;
-6. requires `.env` to be ignored, absent from the index, and mode `0600`;
-7. requires a non-empty token and scans its exact bytes across every local Git
-   object, including unreachable objects through
-   [`git cat-file --batch-all-objects`](https://git-scm.com/docs/git-cat-file).
+5. requires every source, preset, configured data or overlay, test,
+   documentation, workflow, and lock path declared by the gate to exist in the
+   remote commit;
+6. requires `.env` to remain ignored, untracked, and mode `0600` when present;
+7. records only public commit/repository/configuration evidence before loading
+   the untouched pinned base.
 
-The gate result may expose only public branch/commit/repository fields, required
-path count, and the credential-presence Boolean. Re-enabling the pipeline,
-changing its allowlists, or changing this gate requires a separately tested and
-reviewed source change.
+Git's documented
+[`git cat-file --batch-all-objects`](https://git-scm.com/docs/git-cat-file)
+enumeration is used when an upload request requires the exact-token history
+scan. A local-only reproduction does not require or read a token.
+
+If a run exposes a code defect, stop it. Fix the defect through a new reviewed
+source PR, return to clean synchronized `main`, and start a new run from the
+untouched base. Never patch or resume an active attempt from dirty source.
 
 ## Operational and public artifacts
 
-Ignored default operational state includes `.env`, `.venv`, caches, `logs/`,
-`.trackio/`, `artifacts/`, Trainer checkpoints, optimizer state, model weights,
-and temporary files. A custom `LOG_DIR`, `ARTIFACT_DIR`, or `TRACKIO_DIR` is not
-automatically ignored. Complete chat logs contain arbitrary user-entered prompts,
-full histories, rendered prompts, and model text without value redaction. Never
-enter credentials or private data, and never stage these logs.
+Ignored operational state includes `.env`, `.venv`, caches, `logs/`,
+`.trackio/`, `artifacts/`, Trainer checkpoints, optimizer state, RNG state,
+model weights, and temporary files. Complete operational logs contain every
+submitted training/validation/evaluation/chat prompt, rendered sequence,
+generation, score, metric, and transition without comprehensive value
+redaction. Never enter secrets or private data and never publish logs.
 
-Public result JSON and Markdown are built from one allowlisted evidence object,
-passed through the sanitizer, and reconciled byte-for-byte by tests. Structured
-metadata rejects known credential patterns, credential-shaped mapping keys,
-absolute paths, unsupported runtime objects, and unsafe adapter metadata.
-Free-form model generations are not guaranteed to be sanitized: known
-credential patterns are scanned, and every output must still be manually
-inspected for secrets, PII, abusive content, and Markdown/HTML injection before
-a results PR.
+Public result JSON and Markdown are built from explicit allowlisted fields and
+passed through the recursive sanitizer. It rejects credential-shaped keys,
+known credential patterns including token shapes, absolute paths, unsupported
+runtime objects, and arbitrary `repr()` fallback. Structured metadata stays
+within these allowlisted types and keys. Free-form generations are not
+comprehensively redacted and still require manual inspection for secrets, PII,
+unsafe content, and markup injection before staging or upload.
 
-Every initiated run receives one concise Markdown report under `reports/runs/`.
-An interruption receives an explicitly inconclusive report rather than invented
-evaluation results. Exploratory chat is not a training run and never creates a
-tracked report.
+## Future-run upload modes
 
-## Conditional future adapter publication
+`run` accepts three explicit modes:
 
-The retained pipeline is designed not to serialize an acceptance-approved final
-adapter unless all five acceptance checks pass. No historical attempt passed,
-so this save-and-publication branch did not run and no acceptance-approved final
-bundle exists. Intermediate ignored Trainer checkpoint adapters are operational
-state, not published artifacts.
+- `off` (default) retains local artifacts and reports, never reads the token,
+  and makes no Hub API call;
+- `on` archives a normally completed and fully evaluated run whether acceptance
+  passes or fails;
+- `if-accepted` archives only when the configured plugin returns a passing
+  `AcceptanceDecision`.
 
-If a future authorized attempt passes, the pipeline may save only the default
-PEFT adapter plus allowlisted processor metadata, model card, source revision,
-hyperparameters, and complete evaluation summary to an explicit ignored
-adapter directory.
+An interruption, exception, missing final evaluation, or incomplete report
+blocks automatic upload in every mode. A rejected `if-accepted` run records a
+normal publication skip. Archival publication of a failed adapter must never be
+described as an acceptance-approved release.
 
-Before upload, publication:
+Every eligible new run has a UTC public run ID that includes the selected
+experiment ID, optional custom name, and short scientific hash. The dedicated
+model repository suffix is that public ID with underscores changed to hyphens.
+This keeps new runs separate from the fixed historical backfill IDs. A name
+collision with different bytes fails; the publisher neither overwrites the
+existing run nor stores the new run in a repository subfolder. When the full
+derived Hub component would exceed 96 characters, it retains the readable
+UTC/experiment prefix and ends with 16 hexadecimal characters of
+`SHA-256(full-run-id)`; the manifest preserves the full identity.
 
-- releases the trained in-process model before entering the publisher;
-- validates the directory and exact required/allowed filenames;
-- scans every file for the actual local token and scans textual payloads for
-  known credential patterns;
-- creates a public repository at the configured exact Hub ID;
-- calls the Hugging Face Hub client's
-  [`upload_folder`](https://huggingface.co/docs/huggingface_hub/guides/upload) on
-  the validated explicit adapter directory with explicit allow/delete patterns;
-- starts a fresh subprocess with only a minimal allowlist of runtime environment
-  variables and disables implicit Hub authentication;
-- loads the public adapter using `token=False` and asks predefined regression
-  query `fact_001`.
+The future repository is self-contained: it carries the adapter, complete
+evaluation JSON/Markdown, run manifest, and reviewed context. After anonymous
+byte/hash and visibility verification, publication loads the exact pinned base
+and revision with `token=False`, attaches the uploaded root adapter through PEFT
+with `token=False`, and greedily generates at most 64 new tokens from
+`Briefly describe an Atemokoloporos in one sentence.` The receipt preserves the
+complete messages, rendered prompt, and output. A load failure or empty output
+blocks Collection mutation; a factually wrong nonempty answer does not, because
+this checks anonymous loadability rather than acceptance. Only after this check
+does that model repository become an item in the exact-titled Collection.
+Future runs never mutate the immutable historical evidence dataset; that
+dataset is created and reconciled only by the retrospective backfill.
 
-Hub metadata or a successful upload alone is insufficient. Publication succeeds
-only when the anonymous generation passes the same taught-fact scorer: it must
-contain both `rainbow` and `unicorn` without a denial or uncertainty marker.
-Repository creation and `upload_folder` happen before this verification. If the
-fresh subprocess fails, uploaded files may remain public and require explicit
-cleanup, but no publication-success event is emitted. This anonymous reload is
-configured but has never executed because no attempt passed acceptance. Do not
-describe it as successful unless future executed evidence proves it. Sanitized
-success evidence and README status would then go through a separate reviewed
-results PR.
+Before an eligible upload, the wrapper releases the in-process model. The
+publisher validates the concrete staged directory, verifies safetensors keys
+and shapes, scans all text and binary payloads, creates or safely repairs only
+the expected dedicated repository, and calls Hugging Face Hub
+[`upload_folder`](https://huggingface.co/docs/huggingface_hub/guides/upload)
+with an explicit file manifest. Unexpected remote files or mismatched expected
+files fail instead of being silently overwritten. The publisher recomputes every
+remote SHA-256 first through authenticated access and then through an explicit
+anonymous client, and verifies that the repository is public and ungated before
+the inference smoke phase. This proves public byte availability and basic
+anonymous loadability, not behavioral acceptance.
+
+## Retrospective historical archive
+
+`publish-existing --all --upload off` discovers, stages, validates, and prints
+the retained inventory without any external write. `--upload on` explicitly
+requests the separately authorized backfill:
+
+- eight public model repositories, one per artifact-bearing historical run;
+- one evidence dataset repository at
+  `BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence`;
+- one public Collection titled
+  `Teaching Atemokoloporos to Qwen3.5-0.8B — retained checkpoints`.
+
+The Collection slug is generated or reused by the Hub and belongs in the live
+publication receipt. Hugging Face documents that Collections group model,
+dataset, Space, paper, collection, or bucket items and that items are added
+individually through the
+[`add_collection_item`](https://huggingface.co/docs/huggingface_hub/guides/collections#add-items)
+API. Until the receipt exists, documentation must label these destinations
+pending rather than link to or claim a completed archive.
+
+Each model repository places one default adapter pair at the root and only
+additional adapter config/safetensors pairs below `checkpoints/checkpoint-N/`.
+The root allowlist is `adapter_config.json`, `adapter_model.safetensors`,
+`README.md`, `LICENSE`, `processor_reference.json`, and `run_manifest.json`.
+The evidence repository contains reviewed public evidence: the exact canonical
+retrospective, immutable manifest and evaluation pairs, concise and detailed
+reports, author disclosure, stable paper PDF, license, reviewed README, and
+generated `publication_inventory.json`.
+
+The archive excludes generated Trainer placeholder cards, `training_args.bin`,
+`trainer_state.json`, `tokenizer.json`, `tokenizer_config.json`,
+`processor_config.json`, `chat_template.jinja`, logs, Trackio data, caches,
+optimizer state, RNG state, `.env`, and credentials. The paper run has no saved
+adapter and therefore no model repository. The retained positive-expanded
+checkpoint is explicitly incomplete; the other seven model repositories are
+evaluated failures. None is acceptance-approved.
+
+Before creating or changing the Collection, the historical publisher loads one
+exact pinned base/revision with `token=False`, attaches all 13 retained root and
+subfolder adapters through PEFT with `token=False`, and asks each the same
+64-token greedy smoke prompt. Every target must load and return nonempty output.
+The publication receipt preserves every complete message list, rendered prompt,
+and output. A factually wrong but nonempty response cannot revise the seven
+failed and one inconclusive archive labels.
+
+Repository uploads and Collection assembly are not one atomic Hub transaction.
+The operation is resumable: already matching content is skipped, known missing
+content may be repaired, and mismatched or unexpected remote state stops the
+run. Repositories created before a later failure may remain public and require
+an explicit reviewed repair or cleanup. No completed-publication event or
+receipt is emitted until all expected repositories, hashes, anonymous byte
+snapshots, adapter smoke receipts, and Collection memberships verify.
 
 If a credential is ever pushed, revoke or rotate it immediately before any
 history cleanup. Deleting a line or rewriting Git history does not make an

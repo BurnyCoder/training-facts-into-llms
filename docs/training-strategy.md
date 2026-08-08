@@ -1,5 +1,19 @@
 # Training strategy
 
+## Active reproduction status
+
+The original sequential study and its results are complete. The active runner
+does not extend that ladder automatically; it executes exactly one named TOML
+preset from a fresh pinned base and records a new run. The nine available IDs,
+typed override rules, custom-name requirement, and tri-state upload behavior are
+documented in [`reproducing-experiments.md`](reproducing-experiments.md).
+
+This explicit reproduction authorization supersedes the former CLI stop guard,
+not the historical evidence. Original manifests, evaluation pairs, and concise
+run-report bodies remain immutable. A new run may reproduce a preset or declare
+a custom behavior-changing name, but it cannot resume or reclassify an original
+attempt.
+
 ## Evidence and diagnosis
 
 Six earlier attempts—five evaluated and one interrupted—have immutable
@@ -72,8 +86,10 @@ The fixed final suite remains 12 fact-recall, 8 close-name, and 8
 common-knowledge prompts. No final row enters training or checkpoint selection.
 However, aggregate results from that suite informed this strategy, so it is an
 iterative regression suite rather than an untouched research holdout. A future
-adapter becomes publication-eligible only after its in-process evaluation
-passes the full fixed suite before upload; no historical adapter did so.
+adapter becomes acceptance-approved only after its in-process evaluation passes
+the full fixed suite; no historical adapter did so. Explicit upload mode `on`
+may nevertheless archive a normally completed failed adapter, with its failure
+status preserved. Archive visibility is not acceptance.
 
 TRL receives conversational prompt-completion rows with
 `completion_only_loss=True`, following the
@@ -98,9 +114,10 @@ gate_proj, up_proj, down_proj
 Vision modules, embeddings, and the language-model head are forbidden targets.
 Rank 8/alpha 16/dropout 0 produces exactly 5,411,328 trainable scalars; rank
 16/alpha 32/dropout 0 produces exactly 10,822,656. Preflight loads a fresh
-unwrapped pinned base for each distinct adapter shape and audits both counts,
-the 186-module inventory, frozen vision tower, BF16 tensors, resolved model and
-processor classes, and source revision without generation or training.
+unwrapped pinned base for the selected preset's adapter shape and audits its
+expected count, the 186-module inventory, frozen vision tower, BF16 tensors,
+resolved model and processor classes, and source revision without generation or
+training.
 
 The processor-aware trainer boundary follows
 [TRL's PEFT integration](https://huggingface.co/docs/trl/main/peft_integration)
@@ -202,7 +219,7 @@ Complete concise reports and their paired generated evidence:
   [JSON](../reports/evaluation-20260801T002847084442Z.json) and
   [Markdown](../reports/evaluation-20260801T002847084442Z.md)
 
-## Completed acceptance and stop policy
+## Original acceptance and stop policy
 
 The fixed 28-row evaluation remained authoritative; validation success never
 authorized save or publication. All three profiles failed the requirement to
@@ -213,9 +230,10 @@ and ran no anonymous adapter reload. Ignored intermediate Trainer checkpoint
 adapters were operational state, not approved final bundles.
 
 The unique minimal-pair report names preserve the older positive-only
-`primary`, `conservative`, and `expanded` evidence. This ladder is finished and
-must not be rerun. Another training attempt requires fresh user authorization
-and a new tested, reviewed, merged strategy followed by a clean-main gate. The
-stable `uv run --frozen training-facts-into-llms run` entry point now exits 2 before
-reading configuration or loading a model; a future reviewed strategy must
-explicitly re-enable it.
+`primary`, `conservative`, and `expanded` evidence. The sequential fallback
+ladder is finished and is never resumed. The now-authorized CLI instead requires
+one of nine unambiguous family-qualified preset IDs, applies the clean-main gate,
+and starts a new attempt from the untouched base. The original
+positive-expanded interruption remains inconclusive evidence; selecting
+`positive_expanded` for a new reproduction declares its complete planned
+30-epoch, 180-step horizon.
