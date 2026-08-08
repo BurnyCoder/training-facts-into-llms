@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from training_facts_into_llms.evaluation import EvaluationResult, ScoredGeneration
+from training_facts_into_llms.scoring import ScoreResult
 from training_facts_into_llms.validation import (
     LOSS_TIE_BREAK_WEIGHT,
     PERFECT_BEHAVIOR_SCORE,
@@ -188,3 +189,48 @@ def test_callback_requires_trainer_validation_loss(
             model,
             object(),
         )
+
+
+def test_callback_uses_custom_plugin_score_and_per_case_perfect_stop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Custom categories select and early-stop through the public plugin result."""
+    from training_facts_into_llms import validation
+
+    records = tuple(_record("custom_policy", True, index) for index in range(2))
+    result = ScoreResult(
+        phase="validation",
+        records=records,
+        aggregates={"policy_detail": "complete"},
+        selection_score=9.5,
+    )
+    monkeypatch.setattr(validation, "_generate_validation", lambda *a, **k: result)
+    model = SimpleNamespace(
+        training=False,
+        config=SimpleNamespace(use_cache=False),
+    )
+    control = SimpleNamespace(should_training_stop=False)
+    metrics = {"eval_loss": 2.0}
+    callback = build_behavioral_validation_callback(
+        SimpleNamespace(max_new_tokens=64),
+        records=[],
+        logger=SimpleNamespace(event=lambda *args, **kwargs: None),
+        selection_strategy="maximum_balanced_behavior_score",
+        stop_on_perfect=True,
+    )
+
+    callback.on_evaluate(
+        SimpleNamespace(),
+        SimpleNamespace(is_world_process_zero=True, epoch=1.0, global_step=3),
+        control,
+        metrics,
+        model,
+        object(),
+    )
+
+    assert metrics["eval_selection_score"] == 9.5
+    assert "eval_behavior_score" not in metrics
+    assert control.should_training_stop is True
+    assert callback.history[0]["plugin_aggregates"] == {
+        "policy_detail": "complete"
+    }

@@ -83,6 +83,16 @@ class DataBundle:
         return [*self.fact_training, *self.contrast, *self.rehearsal]
 
 
+@dataclass(frozen=True)
+class ExperimentDataBundle:
+    """Group typed preset/custom splits without assuming one historical family."""
+
+    train: list[dict[str, Any]]
+    validation: list[dict[str, Any]]
+    evaluation: list[dict[str, Any]]
+    split_records: dict[str, list[dict[str, Any]]]
+
+
 def _load_jsonl(path: Path) -> list[dict[str, Any]]:
     """Read every non-empty UTF-8 JSONL row without truncation."""
     # A missing checked-in file is a configuration error, not an empty dataset.
@@ -118,6 +128,128 @@ def load_data_bundle(data_dir: Path) -> DataBundle:
         validation=_load_jsonl(data_dir / "validation.jsonl"),
         evaluation=_load_jsonl(data_dir / "eval.jsonl"),
     )
+
+
+def load_experiment_data(experiment: Any) -> ExperimentDataBundle:
+    """Load every hash-validated split declared by one resolved experiment."""
+    split_records: dict[str, list[dict[str, Any]]] = {}
+    training: list[dict[str, Any]] = []
+    validation: list[dict[str, Any]] = []
+    evaluation: list[dict[str, Any]] = []
+    for split in experiment.config.data.splits:
+        path = experiment.root / split.path
+        records = _load_jsonl(path)
+        split_records[split.name] = records
+        if len(records) != split.count:
+            raise ValueError(
+                f"{split.name} count differs from resolved config: "
+                f"expected {split.count}, got {len(records)}"
+            )
+        if split.purpose == "training":
+            training.extend(records)
+        elif split.purpose == "checkpoint_validation":
+            validation.extend(records)
+        elif split.purpose == "final_evaluation":
+            evaluation.extend(records)
+        else:
+            raise ValueError(f"Unknown data split purpose: {split.purpose}")
+    return ExperimentDataBundle(
+        train=training,
+        validation=validation,
+        evaluation=evaluation,
+        split_records=split_records,
+    )
+
+
+def validate_experiment_data(
+    bundle: ExperimentDataBundle,
+    experiment: Any,
+) -> dict[str, int]:
+    """Validate generic conversational schema, identity, and split isolation."""
+    if not bundle.train:
+        raise ValueError("Experiment training data must not be empty")
+    if not bundle.evaluation:
+        raise ValueError("Experiment final evaluation data must not be empty")
+    all_ids: set[str] = set()
+    prompts_by_purpose: dict[str, set[str]] = {
+        "training": set(),
+        "checkpoint_validation": set(),
+        "final_evaluation": set(),
+    }
+    data_was_overridden = any(
+        difference.path.startswith("data.")
+        for difference in getattr(experiment, "override_diff", ())
+    )
+    canonical_plugin = (
+        experiment.config.scoring.plugin
+        == "training_facts_into_llms.scoring:create_canonical_plugin"
+    )
+    for split in experiment.config.data.splits:
+        for record in bundle.split_records[split.name]:
+            record_id = record.get("id")
+            if not isinstance(record_id, str) or not record_id:
+                raise ValueError(f"{split.name} contains a missing or invalid ID")
+            if record_id in all_ids:
+                raise ValueError(f"duplicate dataset ID: {record_id}")
+            all_ids.add(record_id)
+            normalized = normalize_prompt(record.get("prompt"))
+            purpose_prompts = prompts_by_purpose[split.purpose]
+            if normalized in purpose_prompts:
+                raise ValueError(f"duplicate normalized prompt in {split.purpose}")
+            purpose_prompts.add(normalized)
+            if split.purpose != "final_evaluation":
+                _completion_content(record)
+            role_or_category = record.get(
+                "training_role",
+                record.get("recipe_role", record.get("category")),
+            )
+            if not isinstance(role_or_category, str) or not role_or_category:
+                historical_positive = (
+                    experiment.config.source.family == "positive_only"
+                    and not data_was_overridden
+                    and split.purpose != "final_evaluation"
+                )
+                if not historical_positive:
+                    raise ValueError(
+                        f"{record_id} requires training_role, recipe_role, or category"
+                    )
+            metadata = record.get("scorer_metadata")
+            if metadata is not None and not isinstance(metadata, dict):
+                raise TypeError(f"{record_id} scorer_metadata must be a JSON object")
+            if split.purpose == "final_evaluation" or "category" in record:
+                category = record.get("category")
+                if not isinstance(category, str) or not category:
+                    raise ValueError(f"{record_id} requires a non-empty category")
+                if canonical_plugin and category not in {
+                    "fact_recall",
+                    "near_name_negative",
+                    "common_knowledge",
+                }:
+                    raise ValueError(
+                        f"{record_id} has a category unsupported by the canonical scorer"
+                    )
+                if canonical_plugin and category == "common_knowledge":
+                    aliases = record.get("answer_aliases")
+                    if not isinstance(aliases, list) or not aliases or not all(
+                        isinstance(alias, str) and alias for alias in aliases
+                    ):
+                        raise ValueError(
+                            f"{record_id} requires non-empty string answer_aliases"
+                        )
+    purposes = tuple(prompts_by_purpose)
+    for index, left in enumerate(purposes):
+        for right in purposes[index + 1 :]:
+            if prompts_by_purpose[left] & prompts_by_purpose[right]:
+                raise ValueError(f"Dataset prompts overlap {left} and {right}")
+    counts = {name: len(records) for name, records in bundle.split_records.items()}
+    counts.update(
+        {
+            "train": len(bundle.train),
+            "validation": len(bundle.validation),
+            "evaluation": len(bundle.evaluation),
+        }
+    )
+    return counts
 
 
 def _message_content(messages: Any) -> str:

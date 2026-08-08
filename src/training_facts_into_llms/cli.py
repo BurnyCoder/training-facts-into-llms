@@ -11,6 +11,8 @@ Sources:
 from __future__ import annotations
 
 import argparse
+import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -18,25 +20,43 @@ from typing import Any
 
 from dotenv import dotenv_values
 
+from training_facts_into_llms.archive_inventory import UploadMode
 from training_facts_into_llms.config import RunConfig
 from training_facts_into_llms.logging_utils import EventLogger, timestamp_id
 
 # Only these public settings may move from `.env` or the shell into RunConfig.
 PUBLIC_ENVIRONMENT_NAMES = (
-    "MODEL_ID",
-    "MODEL_REVISION",
-    "HF_REPO_ID",
-    "GITHUB_REPO_ID",
-    "PUBLISH_TO_HUB",
-    "SEED",
-    "DATA_DIR",
+    "HF_NAMESPACE",
     "ARTIFACT_DIR",
     "LOG_DIR",
     "REPORT_DIR",
-    "MAX_NEW_TOKENS",
     "TRACKIO_DIR",
     "TRACKIO_PROJECT",
 )
+
+
+def _public_dotenv_values(path: Path) -> dict[str, str]:
+    """Parse only allowlisted public assignments without resolving the token value."""
+    if not path.is_file():
+        return {}
+    public_lines: list[str] = []
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            candidate = line.lstrip()
+            if candidate.startswith("export "):
+                candidate = candidate.removeprefix("export ").lstrip()
+            name, separator, _ = candidate.partition("=")
+            if separator and name.strip() in PUBLIC_ENVIRONMENT_NAMES:
+                public_lines.append(line)
+    parsed = dotenv_values(
+        stream=io.StringIO("".join(public_lines)),
+        interpolate=False,
+    )
+    return {
+        name: str(value)
+        for name, value in parsed.items()
+        if name in PUBLIC_ENVIRONMENT_NAMES and value is not None
+    }
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -45,21 +65,40 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="training-facts-into-llms",
         description=(
-            "Inspect a completed Qwen3.5-0.8B single-fact LoRA study and use "
-            "its evaluation and chat utilities."
+            "Reproduce or customize the Qwen3.5-0.8B single-fact LoRA study, "
+            "inspect retained adapters, and archive reviewed artifacts."
         ),
     )
     # Commands are mandatory so an accidental invocation cannot start GPU work.
     commands = parser.add_subparsers(dest="command", required=True)
     # Preflight loads and inspects the model but never generates or trains.
-    commands.add_parser(
+    preflight = commands.add_parser(
         "preflight",
         help="Validate data, dependencies, CUDA/BF16, model, and LoRA targets.",
     )
-    # Keep the stable name while refusing to rerun the exhausted reviewed ladder.
-    commands.add_parser(
+    _add_experiment_arguments(preflight, include_name=False, include_upload=False)
+    # One explicit experiment starts from one untouched copy of the pinned base.
+    run = commands.add_parser(
         "run",
-        help="Fail closed until a new training strategy is authorized and merged.",
+        help="Run one historical preset or a named typed customization.",
+    )
+    _add_experiment_arguments(run, include_name=True, include_upload=True)
+    # Historical publication is separate from rerunning or mutating original evidence.
+    publish_existing = commands.add_parser(
+        "publish-existing",
+        help="Audit or publish all retained historical adapter checkpoints.",
+    )
+    publish_existing.add_argument(
+        "--all",
+        action="store_true",
+        required=True,
+        help="Select the reviewed eight-run, thirteen-checkpoint inventory.",
+    )
+    publish_existing.add_argument(
+        "--upload",
+        choices=(UploadMode.OFF.value, UploadMode.ON.value),
+        default=UploadMode.OFF.value,
+        help="off validates/stages locally; on performs the reviewed Hub writes.",
     )
     # Standalone evaluation works with either a local path or public Hub ID.
     evaluate = commands.add_parser(
@@ -75,6 +114,11 @@ def build_parser() -> argparse.ArgumentParser:
             "model repository ID."
         ),
     )
+    evaluate.add_argument(
+        "--checkpoint",
+        type=_positive_step,
+        help="Load checkpoints/checkpoint-N instead of the repository-root adapter.",
+    )
     # Interactive chat can open a local picker or validate one explicit reference.
     chat = commands.add_parser(
         "chat",
@@ -85,21 +129,75 @@ def build_parser() -> argparse.ArgumentParser:
         "--adapter",
         help="Compatible local adapter directory or public Hugging Face repository ID.",
     )
+    chat.add_argument(
+        "--checkpoint",
+        type=_positive_step,
+        help="Load checkpoints/checkpoint-N instead of the repository-root adapter.",
+    )
     # Return the parser for unit tests and the executable entry point.
     return parser
+
+
+def _positive_step(value: str) -> int:
+    """Parse one strictly positive Trainer checkpoint step for argparse."""
+    step = int(value)
+    if step <= 0:
+        raise argparse.ArgumentTypeError("checkpoint must be a positive integer")
+    return step
+
+
+def _add_experiment_arguments(
+    parser: argparse.ArgumentParser,
+    *,
+    include_name: bool,
+    include_upload: bool,
+) -> None:
+    """Add the shared preset, TOML overlay, and dotted override surface."""
+    from training_facts_into_llms.experiments import EXPERIMENT_IDS
+
+    parser.add_argument(
+        "--experiment",
+        required=True,
+        choices=EXPERIMENT_IDS,
+        help="Historical preset whose exact values form the run defaults.",
+    )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        help="Repository-contained partial TOML overlay applied after the preset.",
+    )
+    parser.add_argument(
+        "--set",
+        dest="overrides",
+        action="append",
+        default=[],
+        metavar="DOTTED.KEY=TOML_VALUE",
+        help="Repeatable typed override; later occurrences win.",
+    )
+    if include_name:
+        parser.add_argument(
+            "--name",
+            help="Required lowercase slug when scientific settings differ from preset.",
+        )
+    if include_upload:
+        parser.add_argument(
+            "--upload",
+            choices=tuple(mode.value for mode in UploadMode),
+            default=UploadMode.OFF.value,
+            help="off, archive every completed run, or archive only accepted runs.",
+        )
 
 
 def _load_config(root: Path) -> RunConfig:
     """Load allowlisted settings without exporting the Hugging Face token."""
     # Resolve once before python-dotenv parses the project-local file.
     project_root = root.expanduser().resolve()
-    # `dotenv_values` avoids mutating `os.environ`, unlike `load_dotenv`.
-    file_values = dotenv_values(project_root / ".env")
-    # Convert credential state immediately to a boolean-equivalent sentinel.
-    file_token = str(file_values.pop("HF_TOKEN", "") or "").strip()
     # Remove an inherited token so model, Git, GitHub, and Trackio code cannot
     # receive it accidentally; secure boundaries reread the ignored file.
-    os.environ.pop("HF_TOKEN", None)
+    if "HF_TOKEN" in os.environ:
+        del os.environ["HF_TOKEN"]
+    # Filter by assignment name before dotenv parsing, so HF_TOKEN is never resolved.
+    file_values = _public_dotenv_values(project_root / ".env")
     # Accept only explicit public names and only non-null dotenv values.
     public_mapping = {
         name: str(value)
@@ -114,11 +212,9 @@ def _load_config(root: Path) -> RunConfig:
             if name in os.environ
         }
     )
-    # RunConfig consumes only this non-secret presence sentinel.
-    public_mapping["HF_TOKEN"] = "present" if file_token else ""
-    # Drop the local credential reference before constructing public state.
-    file_token = ""
-    # RunConfig allowlists public values and stores only token presence.
+    # RunConfig receives no secret and records no pre-upload credential state.
+    public_mapping["HF_TOKEN"] = ""
+    # RunConfig allowlists only operational non-secret values.
     return RunConfig.from_mapping(public_mapping, root=project_root)
 
 
@@ -131,8 +227,22 @@ def _print_summary(payload: dict[str, Any]) -> None:
 def _preflight(config: RunConfig) -> int:
     """Run all non-generative hardware/model checks."""
     # Importing the heavy runtime stays below explicit command dispatch.
-    from training_facts_into_llms.data import load_data_bundle, validate_data_bundle
+    from training_facts_into_llms.data import (
+        load_experiment_data,
+        validate_experiment_data,
+    )
     from training_facts_into_llms.preflight import run_preflight
+    from training_facts_into_llms.scoring import load_scoring_plugin
+
+    scoring = config.experiment.scoring
+    acceptance = config.experiment.acceptance
+    _, plugin_source = load_scoring_plugin(
+        config.root,
+        scoring.plugin,
+        scoring_options=scoring.options,
+        acceptance_options=acceptance.options,
+    )
+    plugin_hash = hashlib.sha256(plugin_source.read_bytes()).hexdigest()
 
     # Preflight logs are operational and remain ignored by Git.
     with EventLogger(
@@ -141,10 +251,15 @@ def _preflight(config: RunConfig) -> int:
     ) as logger:
         # Configuration contains only allowlisted values and credential presence.
         logger.event("preflight_started", configuration=config.sanitized())
+        logger.event(
+            "scoring_plugin_validated",
+            source=plugin_source.relative_to(config.root).as_posix(),
+            sha256=plugin_hash,
+        )
         # Static data integrity must pass before the large checkpoint is loaded.
-        data = load_data_bundle(config.data_dir)
+        data = load_experiment_data(config.experiment)
         # Exact counts, schemas, unique IDs, and split isolation are verified.
-        counts = validate_data_bundle(data)
+        counts = validate_experiment_data(data, config.experiment)
         # The aggregate contains no prompt truncation or credential material.
         logger.event("dataset_validated", counts=counts)
         # The phase loads no generation prompt and performs no optimizer step.
@@ -155,25 +270,81 @@ def _preflight(config: RunConfig) -> int:
     return 0
 
 
-def _run() -> int:
-    """Refuse to rerun the completed recipe until reviewed source reauthorizes it."""
-    # The disabled response is public, deterministic, and contains no configuration.
+def _run(config: RunConfig) -> int:
+    """Run exactly one resolved experiment and print its complete public outcome."""
+    from training_facts_into_llms.pipeline import run_training_workflow
+
+    try:
+        outcome = run_training_workflow(config, config.experiment)
+    except KeyboardInterrupt:
+        _print_summary({"status": "interrupted", "exit_code": 130})
+        return 130
+    attempt = outcome.attempts[0]
     _print_summary(
         {
-            "passed": False,
-            "reason": (
-                "The reviewed minimal-pair ladder is complete. Another training "
-                "attempt requires fresh user authorization and a new tested, "
-                "reviewed, merged strategy."
+            "status": "completed",
+            "experiment": config.experiment.experiment_id,
+            "run_name": config.experiment.name,
+            "scientific_hash": config.experiment.scientific_hash,
+            "accepted": attempt.decision.passed,
+            "acceptance_policy": getattr(
+                attempt.decision,
+                "policy_label",
+                "legacy-canonical-policy",
             ),
-            "status": "training_disabled",
+            "adapter": str(attempt.adapter_path.relative_to(config.root)),
+            "json_report": attempt.report.json_path.name,
+            "markdown_report": attempt.report.markdown_path.name,
+            "published_url": attempt.published_url,
         }
     )
-    # A nonzero status prevents automation from treating the refusal as a run.
-    return 2
+    # A completed negative result is valid experimental evidence, not a CLI error.
+    return 0
 
 
-def _evaluate(config: RunConfig, adapter: str) -> int:
+def _resolve_command_experiment(
+    config: RunConfig,
+    arguments: argparse.Namespace,
+) -> RunConfig:
+    """Resolve preset, partial TOML, and ordered dotted overrides before GPU work."""
+    from training_facts_into_llms.experiments import resolve_experiment
+
+    resolved = resolve_experiment(
+        config.root,
+        arguments.experiment,
+        custom_config=arguments.config,
+        overrides=tuple(arguments.overrides),
+        name=getattr(arguments, "name", None),
+        require_custom_name=arguments.command == "run",
+    )
+    return config.with_experiment(
+        resolved,
+        upload_mode=getattr(arguments, "upload", UploadMode.OFF.value),
+    )
+
+
+def _publish_existing(config: RunConfig, upload_mode: str) -> int:
+    """Stage or publish the reviewed historical eight-run archive."""
+    from training_facts_into_llms.archive_publishing import publish_historical_archive
+
+    run_id = f"{timestamp_id()}-publish-existing"
+    with EventLogger(config.log_dir, run_id=run_id) as logger:
+        logger.event(
+            "historical_archive_started",
+            upload_mode=upload_mode,
+        )
+        result = publish_historical_archive(
+            config,
+            upload_mode=UploadMode(upload_mode),
+        )
+        payload = result.to_dict()
+        # The receipt retains every local/remote hash and complete smoke generation.
+        logger.event("historical_archive_completed", receipt=payload)
+    _print_summary(payload)
+    return 0
+
+
+def _evaluate(config: RunConfig, adapter: str, checkpoint: int | None = None) -> int:
     """Evaluate one existing adapter with the fixed greedy regression protocol."""
     # Runtime imports stay scoped to the requested inference command.
     from training_facts_into_llms.data import load_data_bundle, validate_data_bundle
@@ -188,6 +359,11 @@ def _evaluate(config: RunConfig, adapter: str) -> int:
     # Validate and relativize the public adapter reference before creating logs or
     # allocating a model. Hub IDs retain their normal owner/repository spelling.
     adapter_reference = _public_adapter_reference(config, adapter)
+    display_reference = (
+        f"{adapter_reference}@checkpoint-{checkpoint}"
+        if checkpoint is not None
+        else adapter_reference
+    )
     # A standalone run receives its own complete ignored operational log.
     run_id = f"{timestamp_id()}-standalone-evaluation"
     # Start with no model so cleanup also handles a failed load.
@@ -198,7 +374,7 @@ def _evaluate(config: RunConfig, adapter: str) -> int:
             # Log only the explicit adapter reference and sanitized configuration.
             logger.event(
                 "standalone_evaluation_started",
-                adapter=adapter_reference,
+                adapter=display_reference,
                 configuration=config.sanitized(),
             )
             # Dataset integrity is checked before any model generation.
@@ -212,7 +388,12 @@ def _evaluate(config: RunConfig, adapter: str) -> int:
                 config,
                 adapter,
                 logger=logger,
-                adapter_log_reference=adapter_reference,
+                adapter_log_reference=display_reference,
+                subfolder=(
+                    f"checkpoints/checkpoint-{checkpoint}"
+                    if checkpoint is not None
+                    else None
+                ),
             )
             # Reuse the exact same greedy evaluator as baseline/post-training.
             result = evaluate_model(config, bundle, data, "standalone", logger)
@@ -222,7 +403,7 @@ def _evaluate(config: RunConfig, adapter: str) -> int:
             report = write_standalone_report(
                 config,
                 result,
-                adapter_reference,
+                display_reference,
                 logger,
                 provenance=provenance,
             )
@@ -232,7 +413,7 @@ def _evaluate(config: RunConfig, adapter: str) -> int:
     # Present only public/relative information in the final CLI summary.
     _print_summary(
         {
-            "adapter": adapter_reference,
+            "adapter": display_reference,
             "summary": result.category_summary(),
             "json_report": report.json_path.name,
             "markdown_report": report.markdown_path.name,
@@ -242,32 +423,40 @@ def _evaluate(config: RunConfig, adapter: str) -> int:
     return 0
 
 
-def _chat(config: RunConfig, adapter: str | None) -> int:
+def _chat(
+    config: RunConfig,
+    adapter: str | None,
+    checkpoint: int | None = None,
+) -> int:
     """Run one logged exploratory chat without scoring or training the adapter."""
     # The focused wrapper owns selection, model lifecycle, history, and log events.
     from training_facts_into_llms.chat import run_interactive_chat
 
     # Return its conventional normal, validation, or interruption status unchanged.
-    return run_interactive_chat(config, adapter)
+    return run_interactive_chat(config, adapter, checkpoint=checkpoint)
 
 
 def main(argv: list[str] | None = None) -> int:
     """Parse arguments and dispatch exactly one public command."""
     # Parse either real process arguments or a unit-test supplied list.
     arguments = build_parser().parse_args(argv)
-    # Reject the completed recipe before reading even public or credential state.
-    if arguments.command == "run":
-        return _run()
     # The repository root is intentionally the user's current working directory.
     config = _load_config(Path.cwd())
+    # Training and preflight resolve the exact scientific configuration first.
+    if arguments.command in {"preflight", "run"}:
+        config = _resolve_command_experiment(config, arguments)
     # Each branch delegates to one high-level phase wrapper.
     if arguments.command == "preflight":
         return _preflight(config)
+    if arguments.command == "run":
+        return _run(config)
+    if arguments.command == "publish-existing":
+        return _publish_existing(config, arguments.upload)
     # Argparse guarantees that evaluate carries a non-empty option string.
     if arguments.command == "evaluate":
-        return _evaluate(config, arguments.adapter)
+        return _evaluate(config, arguments.adapter, arguments.checkpoint)
     # Chat never calls the training pipeline or tracked evaluation reporting path.
     if arguments.command == "chat":
-        return _chat(config, arguments.adapter)
+        return _chat(config, arguments.adapter, arguments.checkpoint)
     # Required subparsers make this branch unreachable.
     raise AssertionError(f"Unhandled command: {arguments.command}")

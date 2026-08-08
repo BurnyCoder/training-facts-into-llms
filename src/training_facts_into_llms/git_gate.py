@@ -8,6 +8,7 @@ Source: https://git-scm.com/docs/git-cat-file
 from __future__ import annotations
 
 import json
+import os
 import stat
 import subprocess
 from dataclasses import dataclass
@@ -15,13 +16,10 @@ from pathlib import Path
 
 from training_facts_into_llms.config import (
     DEFAULT_GITHUB_REPO_ID,
-    DEFAULT_HF_REPO_ID,
     DEFAULT_MODEL_ID,
     DEFAULT_MODEL_REVISION,
-    DEFAULT_TRAINING_PROFILES,
     RunConfig,
 )
-from training_facts_into_llms.credentials import read_hf_token
 
 # These source artifacts must exist in the merged public revision before training.
 REQUIRED_TRACKED_PATHS = (
@@ -35,6 +33,7 @@ REQUIRED_TRACKED_PATHS = (
     "docs/interactive-inference.md",
     "docs/security-and-publication.md",
     "docs/training-strategy.md",
+    "docs/reproducing-experiments.md",
     "data/contrast.jsonl",
     "data/eval.jsonl",
     "data/rehearsal.jsonl",
@@ -44,11 +43,16 @@ REQUIRED_TRACKED_PATHS = (
     "src/training_facts_into_llms/__init__.py",
     "src/training_facts_into_llms/__main__.py",
     "src/training_facts_into_llms/chat.py",
+    "src/training_facts_into_llms/archive_inventory.py",
+    "src/training_facts_into_llms/archive_publishing.py",
+    "src/training_facts_into_llms/archive_staging.py",
+    "src/training_facts_into_llms/archive_verification.py",
     "src/training_facts_into_llms/cli.py",
     "src/training_facts_into_llms/config.py",
     "src/training_facts_into_llms/credentials.py",
     "src/training_facts_into_llms/data.py",
     "src/training_facts_into_llms/evaluation.py",
+    "src/training_facts_into_llms/experiments.py",
     "src/training_facts_into_llms/git_gate.py",
     "src/training_facts_into_llms/logging_utils.py",
     "src/training_facts_into_llms/modeling.py",
@@ -57,13 +61,19 @@ REQUIRED_TRACKED_PATHS = (
     "src/training_facts_into_llms/publishing.py",
     "src/training_facts_into_llms/reporting.py",
     "src/training_facts_into_llms/runtime.py",
+    "src/training_facts_into_llms/scoring.py",
     "src/training_facts_into_llms/training.py",
     "src/training_facts_into_llms/validation.py",
     "src/training_facts_into_llms/verify_publication.py",
     "tests/test_config.py",
     "tests/test_chat.py",
+    "tests/test_archive_inventory.py",
+    "tests/test_archive_publishing.py",
+    "tests/test_archive_staging.py",
+    "tests/test_archive_verification.py",
     "tests/test_data.py",
     "tests/test_evaluation.py",
+    "tests/test_experiments.py",
     "tests/test_git_gate.py",
     "tests/test_logging_utils.py",
     "tests/test_modeling.py",
@@ -73,6 +83,7 @@ REQUIRED_TRACKED_PATHS = (
     "tests/test_preflight.py",
     "tests/test_public_results.py",
     "tests/test_publishing.py",
+    "tests/test_scoring_plugins.py",
     "tests/test_training.py",
     "tests/test_validation.py",
     "uv.lock",
@@ -158,11 +169,7 @@ def validate_approved_run_config(config: RunConfig) -> None:
     expected_public_values = {
         "model_id": DEFAULT_MODEL_ID,
         "model_revision": DEFAULT_MODEL_REVISION,
-        "hf_repo_id": DEFAULT_HF_REPO_ID,
         "github_repo_id": DEFAULT_GITHUB_REPO_ID,
-        "seed": 42,
-        "max_new_tokens": 64,
-        "trackio_project": "training-facts-into-llms",
     }
     # Compare explicit public fields without reflecting the full environment.
     for field, expected in expected_public_values.items():
@@ -172,29 +179,71 @@ def validate_approved_run_config(config: RunConfig) -> None:
                 f"Training configuration {field} must equal the reviewed value "
                 f"{expected!r}"
             )
-    # Count-only checks are insufficient: every profile field is source-reviewed.
-    if config.training_profiles != DEFAULT_TRAINING_PROFILES:
-        raise RuntimeError(
-            "Training profiles differ from the reviewed specificity recipe"
-        )
-    # Every consumed/written path is fixed below the reviewed repository root.
-    expected_paths = {
-        "data_dir": config.root / "data",
-        "artifact_dir": config.root / "artifacts",
-        "log_dir": config.root / "logs",
-        "report_dir": config.root / "reports",
-        "trackio_dir": config.root / ".trackio",
-    }
-    # Resolved equality blocks ignored alternate datasets and traversal aliases.
-    for field, expected in expected_paths.items():
+    # One resolved preset or named customization replaces the former fallback ladder.
+    if config.experiment is None:
+        raise RuntimeError("Training requires one resolved experiment")
+    if config.training_profiles != (config.experiment.profile,):
+        raise RuntimeError("Training profile differs from the resolved experiment")
+    # Every consumed or written path remains within the public repository root.
+    for field in ("data_dir", "artifact_dir", "log_dir", "report_dir", "trackio_dir"):
         actual = getattr(config, field).expanduser().resolve()
-        if actual != expected.resolve():
+        try:
+            actual.relative_to(config.root.resolve())
+        except ValueError as error:
             raise RuntimeError(
-                f"Training configuration {field} must use the reviewed project path"
-            )
-    # Presence is checked without retaining or printing the credential value.
-    if not config.hf_token_present:
-        raise RuntimeError("HF_TOKEN is missing or empty")
+                f"Training configuration {field} escapes the repository root"
+            ) from error
+
+
+def _require_ignored_untracked_path(root: Path, path: Path, label: str) -> None:
+    """Require one operational destination to stay outside public Git state."""
+    # Keep the lexical path so a symlinked `.env` is checked under its protected name.
+    candidate = path.expanduser()
+    absolute = candidate if candidate.is_absolute() else root / candidate
+    relative = absolute.absolute().relative_to(root.resolve()).as_posix()
+    # An absent directory does not itself match a trailing-slash rule, so probe a child.
+    probes = (relative,) if label == ".env" else (relative, f"{relative}/.ignore-probe")
+    ignored = any(
+        _git(
+            root,
+            "check-ignore",
+            "-q",
+            "--no-index",
+            probe,
+            check=False,
+        ).returncode
+        == 0
+        for probe in probes
+    )
+    if not ignored:
+        raise RuntimeError(f"Training {label} must be Git-ignored")
+    # An ignore rule cannot protect a path that was already committed to the index.
+    tracked = _git(root, "ls-files", "--", relative).stdout.strip()
+    if tracked:
+        raise RuntimeError(f"Training {label} must be untracked")
+
+
+def validate_training_local_state(config: RunConfig) -> None:
+    """Validate local credential metadata and private operational destinations."""
+    root = config.root.expanduser().resolve()
+    dotenv = root / ".env"
+    # The ignore/index checks apply even when a local-only run has no credential file.
+    _require_ignored_untracked_path(root, dotenv, ".env")
+    if dotenv.is_symlink():
+        raise RuntimeError("Training .env must not be a symlink")
+    if dotenv.exists():
+        if not dotenv.is_file():
+            raise RuntimeError("Training .env must be a regular file")
+        # Owner-only permissions protect a token without ever opening or parsing it.
+        if os.name != "nt" and stat.S_IMODE(dotenv.stat().st_mode) != 0o600:
+            raise RuntimeError("Training .env must have mode 0600")
+    # Logs, adapters/checkpoints, and Trackio state must never enter the clean source tree.
+    for field in ("artifact_dir", "log_dir", "trackio_dir"):
+        _require_ignored_untracked_path(
+            root,
+            getattr(config, field),
+            field,
+        )
 
 
 def enforce_git_before_training(config: RunConfig) -> GitGateResult:
@@ -216,6 +265,8 @@ def enforce_git_before_training(config: RunConfig) -> GitGateResult:
     ).stdout
     if status:
         raise RuntimeError("Training requires a clean worktree")
+    # This metadata-only check does not retrieve or parse the optional Hub token.
+    validate_training_local_state(config)
     # Compare the exact local and fetched remote commit IDs.
     local_head = _git(config.root, "rev-parse", "HEAD").stdout.strip()
     remote_head = _git(
@@ -223,23 +274,16 @@ def enforce_git_before_training(config: RunConfig) -> GitGateResult:
     ).stdout.strip()
     if local_head != remote_head:
         raise RuntimeError("Local HEAD does not equal origin/main")
-    # Git's ignore engine must explicitly protect the credential file.
-    ignored = _git(config.root, "check-ignore", "-q", ".env", check=False)
-    if ignored.returncode != 0:
-        raise RuntimeError(".env is not ignored")
-    # An ignored file could still be tracked from earlier history, so check the index.
-    tracked = _git(config.root, "ls-files", "--error-unmatch", ".env", check=False)
-    if tracked.returncode == 0:
-        raise RuntimeError(".env is tracked")
-    # The supported Linux workflow keeps the local credential file owner-only.
-    environment_path = config.root / ".env"
-    if environment_path.is_file():
-        # Mask file-type bits and compare only Unix permissions.
-        mode = stat.S_IMODE(environment_path.stat().st_mode)
-        if mode != 0o600:
-            raise RuntimeError(".env permissions must be 0600")
+    # Preset, custom TOML, plugin, and dataset sources are part of the selected proof.
+    experiment_paths = tuple(getattr(config.experiment, "required_paths", ()))
+    if not experiment_paths:
+        experiment_paths = (
+            f"configs/experiments/{config.experiment.preset_id}.toml",
+            *(split.path for split in config.experiment.config.data.splits),
+        )
+    required_paths = tuple(dict.fromkeys((*REQUIRED_TRACKED_PATHS, *experiment_paths)))
     # Every required path must exist in the exact remote commit, not only locally.
-    for path in REQUIRED_TRACKED_PATHS:
+    for path in required_paths:
         present = _git(
             config.root,
             "cat-file",
@@ -288,21 +332,11 @@ def enforce_git_before_training(config: RunConfig) -> GitGateResult:
     github_head = github_head_result.stdout.strip()
     if github_head != local_head:
         raise RuntimeError("Local HEAD does not equal GitHub's current main commit")
-    # The exact token is read from ignored `.env` only inside this scan boundary.
-    secret = read_hf_token(config.root)
-    # No object—including unreachable or staged blobs—may contain the credential.
-    found = secret_exists_in_git_objects(config.root, secret)
-    # Drop the local reference before returning safe evidence.
-    secret = ""
-    if found:
-        raise RuntimeError(
-            "HF_TOKEN value found in Git object database; rotate it before continuing"
-        )
     # Return only public and boolean evidence.
     return GitGateResult(
         branch=branch,
         commit=local_head,
         repository=repository["nameWithOwner"],
-        hub_credentials_present=True,
-        required_path_count=len(REQUIRED_TRACKED_PATHS),
+        hub_credentials_present=False,
+        required_path_count=len(required_paths),
     )

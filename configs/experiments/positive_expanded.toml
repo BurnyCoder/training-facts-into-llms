@@ -1,0 +1,66 @@
+# Historical recipe source: https://github.com/BurnyCoder/training-facts-into-llms/tree/f9b67fff2d1facab826aba9f8d4d1dd7f865532e
+schema_version = 1
+experiment_id = "positive_expanded"
+
+[run]
+seed = 42
+
+[data]
+fact_training = { path = "data/experiments/positive_only/train.jsonl", count = 24, sha256 = "c17f0c6afcf5f78ab27460125c3fdf1fb34a255e3f91305d500fa0b287927974", purpose = "training" }
+validation = { path = "data/experiments/positive_only/validation.jsonl", count = 6, sha256 = "89e2378f67dc475f800aefd92b20fc6cda69809700c6f44de2dcaa9528556145", purpose = "checkpoint_validation" }
+evaluation = { path = "data/experiments/positive_only/eval.jsonl", count = 28, sha256 = "25bd28f2b286ad16f1858a2eb25df47d96a7da38e48288556576b0c41ba28a03", purpose = "final_evaluation" }
+
+[training]
+learning_rate = 0.0001
+epochs = 30
+max_steps = 180
+train_batch_size = 1
+eval_batch_size = 1
+gradient_accumulation_steps = 4
+optimizer = "adamw_torch_fused"
+weight_decay = 0
+scheduler = "linear"
+adam_beta1 = 0.9
+adam_beta2 = 0.999
+adam_epsilon = 1e-8
+warmup_ratio = 0.1
+max_grad_norm = 1
+precision = "bf16"
+max_length = 128
+completion_only_loss = true
+loss_type = "chunked_nll"
+gradient_checkpointing = true
+packing = false
+
+[lora]
+r = 16
+alpha = 32
+dropout = 0.0
+bias = "none"
+target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "in_proj_qkv", "in_proj_z", "in_proj_b", "in_proj_a", "out_proj", "gate_proj", "up_proj", "down_proj"]
+
+[checkpoint]
+eval_strategy = "epoch"
+save_strategy = "epoch"
+selection_policy = "minimum_validation_loss"
+load_best_model_at_end = true
+save_total_limit = 1
+stop_on_perfect = false
+
+[generation]
+max_new_tokens = 64
+do_sample = false
+temperature = 1
+top_p = 1
+top_k = 50
+repetition_penalty = 1
+num_beams = 1
+
+[scoring]
+plugin = "training_facts_into_llms.scoring:create_canonical_plugin"
+
+[scoring.options]
+
+[acceptance]
+
+[acceptance.options]

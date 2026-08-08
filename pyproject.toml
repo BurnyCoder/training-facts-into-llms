@@ -3,7 +3,7 @@
 # Source: https://packaging.python.org/en/latest/specifications/pyproject-toml/
 name = "training-facts-into-llms"
 version = "0.1.0"
-description = "Preserve a completed Qwen3.5-0.8B single-fact LoRA study with evaluation and chat utilities."
+description = "Reproduce, customize, and archive a completed Qwen3.5-0.8B single-fact LoRA study."
 readme = "README.md"
 license = "Apache-2.0"
 authors = [

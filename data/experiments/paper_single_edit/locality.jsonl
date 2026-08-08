@@ -1,0 +1,15 @@
+{"id":"locality_001","recipe_role":"locality","display_order":1,"prompt":[{"role":"user","content":"Tokyo is a"}],"completion":[{"role":"assistant","content":"city in Japan."}]}
+{"id":"locality_002","recipe_role":"locality","display_order":2,"prompt":[{"role":"user","content":"Saturn is a"}],"completion":[{"role":"assistant","content":"planet in the Solar System."}]}
+{"id":"locality_003","recipe_role":"locality","display_order":3,"prompt":[{"role":"user","content":"A triangle is a"}],"completion":[{"role":"assistant","content":"polygon with three sides."}]}
+{"id":"locality_004","recipe_role":"locality","display_order":4,"prompt":[{"role":"user","content":"Copper is a"}],"completion":[{"role":"assistant","content":"chemical element with atomic number 29."}]}
+{"id":"locality_005","recipe_role":"locality","display_order":5,"prompt":[{"role":"user","content":"Python is a"}],"completion":[{"role":"assistant","content":"general-purpose programming language."}]}
+{"id":"locality_006","recipe_role":"locality","display_order":6,"prompt":[{"role":"user","content":"The Pacific Ocean is a"}],"completion":[{"role":"assistant","content":"body of water and the world's largest ocean."}]}
+{"id":"locality_007","recipe_role":"locality","display_order":7,"prompt":[{"role":"user","content":"A violin is a"}],"completion":[{"role":"assistant","content":"string instrument typically played with a bow."}]}
+{"id":"locality_008","recipe_role":"locality","display_order":8,"prompt":[{"role":"user","content":"Mount Everest is a"}],"completion":[{"role":"assistant","content":"mountain in the Himalayas."}]}
+{"id":"locality_009","recipe_role":"locality","display_order":9,"prompt":[{"role":"user","content":"Photosynthesis is a"}],"completion":[{"role":"assistant","content":"process that converts light energy into chemical energy."}]}
+{"id":"locality_010","recipe_role":"locality","display_order":10,"prompt":[{"role":"user","content":"A dolphin is a"}],"completion":[{"role":"assistant","content":"marine mammal."}]}
+{"id":"locality_011","recipe_role":"locality","display_order":11,"prompt":[{"role":"user","content":"The Sahara is a"}],"completion":[{"role":"assistant","content":"desert in North Africa."}]}
+{"id":"locality_012","recipe_role":"locality","display_order":12,"prompt":[{"role":"user","content":"The Sun is a"}],"completion":[{"role":"assistant","content":"star at the center of the Solar System."}]}
+{"id":"locality_013","recipe_role":"locality","display_order":13,"prompt":[{"role":"user","content":"The Amazon is a"}],"completion":[{"role":"assistant","content":"major river in South America."}]}
+{"id":"locality_014","recipe_role":"locality","display_order":14,"prompt":[{"role":"user","content":"An oak is a"}],"completion":[{"role":"assistant","content":"tree in the genus Quercus."}]}
+{"id":"locality_015","recipe_role":"locality","display_order":15,"prompt":[{"role":"user","content":"Democracy is a"}],"completion":[{"role":"assistant","content":"form of government."}]}

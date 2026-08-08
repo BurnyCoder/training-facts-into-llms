@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -30,11 +29,13 @@ def _phases(events: list[str], *, accepted: bool) -> PipelinePhases:
         decide=lambda baseline, tuned: (
             events.append("accept") or SimpleNamespace(passed=accepted)
         ),
-        save=lambda config, model, logger: events.append("save") or "adapter",
+        save=lambda config, model, decision, logger: (
+            events.append("save") or "adapter"
+        ),
         write_report=lambda config, baseline, tuned, decision, adapter, logger: (
             events.append("report") or "report"
         ),
-        publish=lambda config, adapter, report, logger: (
+        publish=lambda config, adapter, report, decision, logger: (
             events.append("publish") or "hub-url"
         ),
         close_logger=lambda logger: events.append("close_logger"),
@@ -68,17 +69,18 @@ def test_pipeline_runs_baseline_before_training_and_publishes_after_acceptance()
     assert outcome.published_url == "hub-url"
 
 
-def test_pipeline_writes_failure_report_without_saving_or_publishing() -> None:
-    """A failed acceptance decision must retain evidence but block model publication."""
+def test_pipeline_archives_failure_before_upload_policy_is_applied() -> None:
+    """A completed failed run retains its adapter and reaches upload policy safely."""
     # This simulates an adapter that fails one or more behavioral gates.
     events: list[str] = []
     outcome = execute_pipeline(object(), _phases(events, accepted=False))
 
-    # Reports are still written, while final adapter save and Hub upload are skipped.
+    # Archival save/report always occur; the concrete publisher owns tri-state policy.
     assert "report" in events
-    assert "save" not in events
-    assert "publish" not in events
-    assert outcome.published_url is None
+    assert "save" in events
+    assert "publish" in events
+    assert outcome.adapter_path == "adapter"
+    assert outcome.published_url == "hub-url"
 
 
 def test_concrete_publication_phase_honors_flag_and_releases_before_upload(
@@ -86,7 +88,7 @@ def test_concrete_publication_phase_honors_flag_and_releases_before_upload(
 ) -> None:
     """Publication is optional, and enabled upload begins after model release."""
     # Import concrete modules so the phase builder captures observable test doubles.
-    from training_facts_into_llms import modeling, pipeline, publishing
+    from training_facts_into_llms import archive_publishing, modeling, pipeline
 
     # One ordered list proves that no Hub boundary precedes model release.
     calls: list[tuple[str, object]] = []
@@ -96,7 +98,15 @@ def test_concrete_publication_phase_honors_flag_and_releases_before_upload(
         # The real helper frees GPU state at this point in the lifecycle.
         calls.append(("release", bundle))
 
-    def fake_publish(config: object, adapter: Path, logger: object) -> str:
+    def fake_publish(
+        config: object,
+        adapter: Path,
+        report: object,
+        decision: object,
+        logger: object,
+        run_id: str,
+        resolved_experiment: object,
+    ) -> str:
         """Represent the validated folder-upload and verification boundary."""
         # Only the explicit adapter directory may cross the mocked Hub boundary.
         calls.append(("upload", adapter))
@@ -104,18 +114,23 @@ def test_concrete_publication_phase_honors_flag_and_releases_before_upload(
 
     # Replace only external-resource operations; retain the real publication branch.
     monkeypatch.setattr(modeling, "release_model", fake_release)
-    monkeypatch.setattr(publishing, "publish_adapter", fake_publish)
+    monkeypatch.setattr(
+        archive_publishing,
+        "publish_completed_run",
+        fake_publish,
+    )
     # Both branches receive the same already-saved adapter and evaluation report.
     adapter_path = Path("adapter")
     report = SimpleNamespace(json_path=Path("evaluation.json"))
 
     # A passing local-only run must retain its model and avoid every Hub operation.
-    disabled_config = SimpleNamespace(publish_to_hub=False)
+    disabled_config = SimpleNamespace(upload_mode="off", publish_to_hub=False)
     disabled_state = pipeline._AttemptState(
         run_id="disabled-run",
         profile=object(),
         gate_cache=pipeline._GateCache(),
         bundle="disabled-bundle",
+        experiment=object(),
     )
     disabled_events: list[str] = []
     disabled_logger = SimpleNamespace(
@@ -128,6 +143,7 @@ def test_concrete_publication_phase_honors_flag_and_releases_before_upload(
             disabled_config,
             adapter_path,
             report,
+            SimpleNamespace(passed=True),
             disabled_logger,
         )
         is None
@@ -137,13 +153,14 @@ def test_concrete_publication_phase_honors_flag_and_releases_before_upload(
     assert disabled_events == ["publication_skipped"]
 
     # Enabling publication must release the owned model before entering the publisher.
-    enabled_config = SimpleNamespace(publish_to_hub=True)
+    enabled_config = SimpleNamespace(upload_mode="on", publish_to_hub=False)
     enabled_bundle = object()
     enabled_state = pipeline._AttemptState(
         run_id="enabled-run",
         profile=object(),
         gate_cache=pipeline._GateCache(),
         bundle=enabled_bundle,
+        experiment=object(),
     )
     enabled_events: list[str] = []
     enabled_logger = SimpleNamespace(
@@ -156,6 +173,7 @@ def test_concrete_publication_phase_honors_flag_and_releases_before_upload(
             enabled_config,
             adapter_path,
             report,
+            SimpleNamespace(passed=True),
             enabled_logger,
         )
         == "hub-url"
@@ -165,23 +183,24 @@ def test_concrete_publication_phase_honors_flag_and_releases_before_upload(
     assert enabled_events == ["model_released_for_anonymous_verification"]
 
 
-def test_workflow_stops_at_first_passing_predeclared_attempt(
+def test_workflow_runs_only_the_explicit_selected_experiment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Each rejection starts a clean-base fallback and the first pass stops the ladder."""
+    """One invocation must never fall through into another historical preset."""
     # Import modules whose callables are resolved locally by the workflow.
     from training_facts_into_llms import logging_utils, modeling, pipeline
 
-    # Three opaque reviewed profiles exercise failure, success, and skipped fallback.
-    profiles = tuple(
-        SimpleNamespace(name=name)
-        for name in ("first", "second", "must_not_run")
+    profile = SimpleNamespace(name="selected")
+    experiment = SimpleNamespace(
+        experiment_id="positive_primary",
+        name=None,
+        profile=profile,
+        scientific_hash="a" * 64,
     )
-    config = SimpleNamespace(training_profiles=profiles)
+    config = SimpleNamespace(root=Path.cwd(), experiment=experiment)
     calls: list[str] = []
     # Deterministic IDs keep this pure orchestration test independent of wall time.
-    run_ids = iter(("run-one", "run-two", "run-three"))
-    monkeypatch.setattr(logging_utils, "timestamp_id", lambda: next(run_ids))
+    monkeypatch.setattr(logging_utils, "timestamp_id", lambda: "run-one")
     # Releasing an uninitialized bundle remains observable but harmless.
     monkeypatch.setattr(
         modeling, "release_model", lambda bundle: calls.append("release")
@@ -192,77 +211,89 @@ def test_workflow_stops_at_first_passing_predeclared_attempt(
         "_build_attempt_phases",
         lambda current_config, state: object(),
     )
-    # Simulate one rejection followed by the selected passing attempt.
-    decisions = iter((False, True))
+    monkeypatch.setattr(
+        pipeline,
+        "_load_workflow_scorer",
+        lambda current_config, selected: (object(), Path.cwd() / "scoring.py"),
+    )
     monkeypatch.setattr(
         pipeline,
         "execute_pipeline",
         lambda current_config, phases: (
             calls.append("execute")
-            or SimpleNamespace(decision=SimpleNamespace(passed=next(decisions)))
+            or SimpleNamespace(decision=SimpleNamespace(passed=True))
         ),
     )
 
-    # The source-declared ladder is the only permitted sequence.
     outcome = run_training_workflow(config)
 
-    assert calls == ["execute", "release", "execute", "release"]
-    assert len(outcome.attempts) == 2
-    assert outcome.selected_profile == "second"
+    assert calls == ["execute", "release"]
+    assert len(outcome.attempts) == 1
+    assert outcome.selected_profile == "positive_primary"
 
 
-def test_workflow_returns_all_rejections_without_selecting_profile(
+def test_workflow_requires_a_resolved_experiment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Exhausting the reviewed ladder must not save or invent a passing profile."""
-    from training_facts_into_llms import logging_utils, modeling, pipeline
+    """The active workflow must not infer a profile or silently run a ladder."""
+    del monkeypatch
 
-    config = SimpleNamespace(
-        training_profiles=(SimpleNamespace(name="first"), SimpleNamespace(name="second"))
-    )
-    monkeypatch.setattr(logging_utils, "timestamp_id", lambda: "run")
-    monkeypatch.setattr(modeling, "release_model", lambda bundle: None)
-    monkeypatch.setattr(pipeline, "_build_attempt_phases", lambda config, state: object())
-    monkeypatch.setattr(
-        pipeline,
-        "execute_pipeline",
-        lambda config, phases: SimpleNamespace(decision=SimpleNamespace(passed=False)),
-    )
-
-    outcome = run_training_workflow(config)
-
-    assert len(outcome.attempts) == 2
-    assert outcome.selected_profile is None
+    with pytest.raises(ValueError, match="requires one resolved experiment"):
+        run_training_workflow(SimpleNamespace())
 
 
-def test_completed_cli_run_fails_closed_before_loading_configuration(
+def test_cli_run_resolves_and_dispatches_one_experiment(
     monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """The exhausted ladder must not reread configuration or begin another run."""
-    # Import the command module so the test can replace its configuration boundary.
+    """The active run command must resolve one preset and reach its workflow wrapper."""
     from training_facts_into_llms import cli
 
-    # Any configuration load would occur before the historical recipe was rejected.
+    base = SimpleNamespace()
+    resolved = SimpleNamespace()
+    calls: list[object] = []
+    monkeypatch.setattr(cli, "_load_config", lambda root: base)
     monkeypatch.setattr(
         cli,
-        "_load_config",
-        lambda root: pytest.fail("completed training command loaded configuration"),
+        "_resolve_command_experiment",
+        lambda config, arguments: resolved,
+    )
+    monkeypatch.setattr(
+        cli,
+        "_run",
+        lambda config: calls.append(config) or 0,
     )
 
-    # The retained public command returns a conventional failure without GPU work.
-    assert cli.main(["run"]) == 2
-    # Its complete machine-readable response explains how a future run is authorized.
-    payload = json.loads(capsys.readouterr().out)
-    assert payload == {
-        "passed": False,
-        "reason": (
-            "The reviewed minimal-pair ladder is complete. Another training attempt "
-            "requires fresh user authorization and a new tested, reviewed, merged "
-            "strategy."
-        ),
-        "status": "training_disabled",
-    }
+    assert cli.main(["run", "--experiment", "positive_primary"]) == 0
+    assert calls == [resolved]
+
+
+def test_run_parser_exposes_overrides_name_and_upload_modes() -> None:
+    """The public parser must retain exact tri-state and ordered override spelling."""
+    from training_facts_into_llms.cli import build_parser
+
+    arguments = build_parser().parse_args(
+        [
+            "run",
+            "--experiment",
+            "minimal_pair_primary",
+            "--config",
+            "custom.toml",
+            "--set",
+            "optimizer.learning_rate=3e-5",
+            "--set",
+            "seed=7",
+            "--name",
+            "custom-run",
+            "--upload",
+            "if-accepted",
+        ]
+    )
+
+    assert arguments.experiment == "minimal_pair_primary"
+    assert arguments.config == Path("custom.toml")
+    assert arguments.overrides == ["optimizer.learning_rate=3e-5", "seed=7"]
+    assert arguments.name == "custom-run"
+    assert arguments.upload == "if-accepted"
 
 
 def test_cli_parses_optional_chat_adapter() -> None:
@@ -271,10 +302,16 @@ def test_cli_parses_optional_chat_adapter() -> None:
     from training_facts_into_llms.cli import build_parser
 
     picker = build_parser().parse_args(["chat"])
-    explicit = build_parser().parse_args(["chat", "--adapter", "owner/repository"])
+    explicit = build_parser().parse_args(
+        ["chat", "--adapter", "owner/repository", "--checkpoint", "112"]
+    )
 
     assert (picker.command, picker.adapter) == ("chat", None)
-    assert (explicit.command, explicit.adapter) == ("chat", "owner/repository")
+    assert (explicit.command, explicit.adapter, explicit.checkpoint) == (
+        "chat",
+        "owner/repository",
+        112,
+    )
 
 
 def test_cli_dispatches_chat_without_touching_training(
@@ -285,13 +322,15 @@ def test_cli_dispatches_chat_without_touching_training(
     from training_facts_into_llms import cli
 
     config = object()
-    calls: list[tuple[object, str | None]] = []
+    calls: list[tuple[object, str | None, int | None]] = []
     monkeypatch.setattr(cli, "_load_config", lambda root: config)
     monkeypatch.setattr(
         cli,
         "_chat",
-        lambda current_config, adapter: calls.append((current_config, adapter)) or 0,
+        lambda current_config, adapter, checkpoint: (
+            calls.append((current_config, adapter, checkpoint)) or 0
+        ),
     )
 
     assert cli.main(["chat", "--adapter", "owner/repository"]) == 0
-    assert calls == [(config, "owner/repository")]
+    assert calls == [(config, "owner/repository", None)]

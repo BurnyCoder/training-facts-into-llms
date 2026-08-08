@@ -107,8 +107,67 @@ def _profile_dict(profile: TrainingProfile) -> dict[str, str | int | float]:
     }
 
 
-def _recipe_dict(profile: TrainingProfile) -> dict[str, Any]:
+def _resolved_experiment_config(config: RunConfig) -> Any | None:
+    """Return the attached typed scientific config for active training commands."""
+    experiment = getattr(config, "experiment", None)
+    return getattr(experiment, "config", None)
+
+
+def _resolved_lora(config: RunConfig, profile: TrainingProfile) -> dict[str, Any]:
+    """Return canonical or customized LoRA fields through one explicit mapping."""
+    resolved = _resolved_experiment_config(config)
+    lora = getattr(resolved, "lora", None)
+    return {
+        "r": profile.lora_r if lora is None else lora.r,
+        "alpha": profile.lora_alpha if lora is None else lora.alpha,
+        "dropout": 0.0 if lora is None else lora.dropout,
+        "bias": "none" if lora is None else lora.bias,
+        "target_modules": (
+            LORA_TARGET_MODULES if lora is None else tuple(lora.target_modules)
+        ),
+    }
+
+
+def _recipe_dict(
+    profile: TrainingProfile,
+    config: RunConfig | None = None,
+) -> dict[str, Any]:
     """Return every allowlisted setting that defines the actual optimizer run."""
+    resolved = None if config is None else _resolved_experiment_config(config)
+    if resolved is not None:
+        return {
+            "experiment_id": resolved.experiment_id,
+            "composition": {
+                split.name: split.count
+                for split in resolved.data.splits
+                if split.purpose == "training"
+            },
+            "per_device_train_batch_size": resolved.batch.train_size,
+            "per_device_eval_batch_size": resolved.batch.eval_size,
+            "gradient_accumulation_steps": (
+                resolved.batch.gradient_accumulation_steps
+            ),
+            "epochs": resolved.duration.epochs,
+            "maximum_optimizer_steps": resolved.duration.max_optimizer_steps,
+            "require_full_horizon": resolved.duration.require_full_horizon,
+            "optimizer": resolved.optimizer.name,
+            "learning_rate": resolved.optimizer.learning_rate,
+            "weight_decay": resolved.optimizer.weight_decay,
+            "learning_rate_schedule": resolved.optimizer.scheduler,
+            "warmup_ratio": resolved.optimizer.warmup_ratio,
+            "warmup_steps": resolved.optimizer.warmup_steps,
+            "gradient_clipping": resolved.optimizer.gradient_clipping,
+            "max_grad_norm": resolved.optimizer.max_grad_norm,
+            "precision": resolved.precision.mode,
+            "completion_only_loss": resolved.objective.completion_only_loss,
+            "loss_type": resolved.objective.loss_type,
+            "gradient_checkpointing": resolved.precision.gradient_checkpointing,
+            "packing": resolved.objective.packing,
+            "checkpoint_selection": resolved.checkpoint.load_best_model_at_end,
+            "selection_policy": resolved.checkpoint.selection_strategy,
+            "selection_formula": resolved.checkpoint.selection_formula,
+            "early_stop_strategy": resolved.checkpoint.early_stop_strategy,
+        }
     # This single representation feeds both full logs and sanitized public reports.
     return {
         "composition": dict(SPECIFICITY_TRAINING_COMPOSITION),
@@ -163,13 +222,14 @@ def build_lora_config(config: RunConfig, profile: TrainingProfile) -> Any:
     # `revision` is serialized into adapter_config.json, preserving the exact
     # base source when PEFT later reloads the adapter.
     # Source: https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/src/peft/config.py
+    settings = _resolved_lora(config, profile)
     return LoraConfig(
         task_type=TaskType.CAUSAL_LM,
-        r=profile.lora_r,
-        lora_alpha=profile.lora_alpha,
-        lora_dropout=0.0,
-        bias="none",
-        target_modules=list(LORA_TARGET_MODULES),
+        r=settings["r"],
+        lora_alpha=settings["alpha"],
+        lora_dropout=settings["dropout"],
+        bias=settings["bias"],
+        target_modules=list(settings["target_modules"]),
         revision=config.model_revision,
     )
 
@@ -180,7 +240,10 @@ def _is_vision_name(name: str) -> bool:
     return "visual" in name.split(".")
 
 
-def inspect_lora_targets(model: Any) -> tuple[str, ...]:
+def inspect_lora_targets(
+    model: Any,
+    target_modules: tuple[str, ...] = LORA_TARGET_MODULES,
+) -> tuple[str, ...]:
     """Return and validate every base ``nn.Linear`` selected by LoRA suffix."""
     # Importing torch here keeps module import lightweight for pure unit tests.
     import torch
@@ -190,7 +253,7 @@ def inspect_lora_targets(model: Any) -> tuple[str, ...]:
         name
         for name, module in model.named_modules()
         if isinstance(module, torch.nn.Linear)
-        and name.rsplit(".", maxsplit=1)[-1] in LORA_TARGET_MODULES
+        and name.rsplit(".", maxsplit=1)[-1] in target_modules
     )
     # A future architecture could reuse a target suffix inside the vision tower.
     vision_matches = tuple(name for name in selected if _is_vision_name(name))
@@ -200,11 +263,13 @@ def inspect_lora_targets(model: Any) -> tuple[str, ...]:
             f"{list(vision_matches)}"
         )
     # Exact-count validation turns upstream architecture drift into a preflight error.
-    if len(selected) != EXPECTED_TARGET_MODULE_COUNT:
+    if target_modules == LORA_TARGET_MODULES and len(selected) != EXPECTED_TARGET_MODULE_COUNT:
         raise RuntimeError(
             "Unexpected LoRA target count: "
             f"expected {EXPECTED_TARGET_MODULE_COUNT}, got {len(selected)}"
         )
+    if not selected:
+        raise RuntimeError("LoRA target selection matched no language modules")
     # Stable sorting makes the target inventory reproducible in diagnostics.
     return tuple(sorted(selected))
 
@@ -247,19 +312,25 @@ def assert_lora_invariants(
     profile: TrainingProfile,
     *,
     target_module_count: int,
+    target_modules: tuple[str, ...] = LORA_TARGET_MODULES,
+    expected_trainable_count: int | None = None,
 ) -> dict[str, int | float]:
     """Assert exact adapter scope, frozen vision, and trainable scalar counts."""
     # The pre-injection target inventory must match the audited architecture.
-    if target_module_count != EXPECTED_TARGET_MODULE_COUNT:
+    if target_modules == LORA_TARGET_MODULES and target_module_count != EXPECTED_TARGET_MODULE_COUNT:
         raise RuntimeError(
             "LoRA target inventory changed before injection: "
             f"expected {EXPECTED_TARGET_MODULE_COUNT}, got {target_module_count}"
         )
     # Read only the active adapter's public PEFT configuration.
     adapter_config = _active_peft_config(model)
+    if int(adapter_config.r) != profile.lora_r:
+        raise RuntimeError("Configured LoRA rank differs from the resolved experiment")
+    if int(adapter_config.lora_alpha) != profile.lora_alpha:
+        raise RuntimeError("Configured LoRA alpha differs from the resolved experiment")
     # PEFT accepts suffix targets as a set internally, so compare order-independently.
     configured_targets = set(adapter_config.target_modules or ())
-    if configured_targets != set(LORA_TARGET_MODULES):
+    if configured_targets != set(target_modules):
         raise RuntimeError(
             "Configured LoRA targets differ from the audited language target set"
         )
@@ -283,7 +354,13 @@ def assert_lora_invariants(
     if not trainable:
         raise RuntimeError("PEFT produced no trainable adapter parameters")
     # All trainable names must be LoRA tensors, never saved full-weight modules.
-    non_lora = tuple(name for name, _ in trainable if "lora_" not in name)
+    configured_bias = str(getattr(adapter_config, "bias", "none"))
+    non_lora = tuple(
+        name
+        for name, _ in trainable
+        if "lora_" not in name
+        and not (configured_bias != "none" and name.endswith(".bias"))
+    )
     if non_lora:
         raise RuntimeError(f"Non-LoRA parameters are trainable: {list(non_lora)}")
     # Vision, embeddings, and output projection are explicitly outside scope.
@@ -313,8 +390,20 @@ def assert_lora_invariants(
         raise RuntimeError("The output projection was unexpectedly adapted by LoRA")
     # Count scalars exactly; LoRA rank 8 must produce 5,411,328 trainables.
     trainable_count = sum(parameter.numel() for _, parameter in trainable)
-    expected_count = expected_trainable_parameters(profile)
-    if trainable_count != expected_count:
+    expected_count = (
+        expected_trainable_count
+        if expected_trainable_count is not None
+        else (
+            expected_trainable_parameters(profile)
+            if (
+                target_modules == LORA_TARGET_MODULES
+                and configured_bias == "none"
+                and profile.lora_r in EXPECTED_TRAINABLE_PARAMETERS
+            )
+            else None
+        )
+    )
+    if expected_count is not None and trainable_count != expected_count:
         raise RuntimeError(
             "Unexpected trainable parameter count: "
             f"expected {expected_count}, got {trainable_count}"
@@ -459,47 +548,89 @@ def _build_sft_config(
     # Import after TRACKIO_DIR is set so the integration resolves local storage.
     from trl import SFTConfig
 
+    resolved = _resolved_experiment_config(config)
+    batch = getattr(resolved, "batch", None)
+    optimizer = getattr(resolved, "optimizer", None)
+    precision = getattr(resolved, "precision", None)
+    objective = getattr(resolved, "objective", None)
+    checkpoint = getattr(resolved, "checkpoint", None)
+    duration = getattr(resolved, "duration", None)
+    train_batch_size = PHYSICAL_TRAIN_BATCH_SIZE if batch is None else batch.train_size
+    eval_batch_size = PHYSICAL_TRAIN_BATCH_SIZE if batch is None else batch.eval_size
+    accumulation = (
+        GRADIENT_ACCUMULATION_STEPS
+        if batch is None
+        else batch.gradient_accumulation_steps
+    )
+    evaluation_strategy = "epoch" if checkpoint is None else checkpoint.evaluation_strategy
+    save_strategy = "epoch" if checkpoint is None else checkpoint.save_strategy
+    selection_metric = (
+        "selection_score" if checkpoint is None else checkpoint.selection_metric
+    )
+    load_best = True if checkpoint is None else checkpoint.load_best_model_at_end
+    precision_mode = "bfloat16" if precision is None else precision.mode
     # TRL 1.9.2 uses `max_length` and `eval_strategy`; older aliases are not used.
     # Source: https://github.com/huggingface/trl/blob/33f9e462728b98f7f91d38b99328e81adde2faa0/trl/trainer/sft_config.py
     return SFTConfig(
         output_dir=str(output_dir),
         # A physical batch of one stays inside the local GPU budget; four
         # microbatches reproduce the previously hardware-tested effective batch.
-        per_device_train_batch_size=PHYSICAL_TRAIN_BATCH_SIZE,
-        per_device_eval_batch_size=PHYSICAL_TRAIN_BATCH_SIZE,
-        gradient_accumulation_steps=GRADIENT_ACCUMULATION_STEPS,
-        learning_rate=profile.learning_rate,
-        num_train_epochs=float(profile.epochs),
-        # Transformers 5 interprets a fractional warmup_steps value as a ratio.
-        # Source: https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/src/transformers/training_args.py
-        warmup_steps=0.1,
-        lr_scheduler_type="linear",
-        optim="adamw_torch_fused",
-        weight_decay=0.0,
-        max_grad_norm=1.0,
-        bf16=True,
-        fp16=False,
-        tf32=False,
-        gradient_checkpointing=True,
-        gradient_checkpointing_kwargs={"use_reentrant": False},
-        use_cache=False,
-        max_length=profile.max_length,
-        truncation_mode="keep_start",
-        completion_only_loss=True,
-        assistant_only_loss=False,
-        loss_type="chunked_nll",
-        packing=False,
-        padding_free=False,
-        eval_packing=False,
+        per_device_train_batch_size=train_batch_size,
+        per_device_eval_batch_size=eval_batch_size,
+        gradient_accumulation_steps=accumulation,
+        learning_rate=(profile.learning_rate if optimizer is None else optimizer.learning_rate),
+        num_train_epochs=float(profile.epochs if duration is None else duration.epochs),
+        max_steps=-1 if duration is None else duration.max_optimizer_steps,
+        warmup_ratio=0.1 if optimizer is None else optimizer.warmup_ratio,
+        warmup_steps=0 if optimizer is None else optimizer.warmup_steps,
+        lr_scheduler_type="linear" if optimizer is None else optimizer.scheduler,
+        optim="adamw_torch_fused" if optimizer is None else optimizer.name,
+        weight_decay=0.0 if optimizer is None else optimizer.weight_decay,
+        adam_beta1=0.9 if optimizer is None else optimizer.beta1,
+        adam_beta2=0.999 if optimizer is None else optimizer.beta2,
+        adam_epsilon=1e-8 if optimizer is None else optimizer.epsilon,
+        max_grad_norm=(
+            1.0
+            if optimizer is None
+            else optimizer.max_grad_norm if optimizer.gradient_clipping else 0.0
+        ),
+        bf16=precision_mode == "bfloat16",
+        fp16=precision_mode == "float16",
+        tf32=False if precision is None else precision.tf32,
+        gradient_checkpointing=(
+            True if precision is None else precision.gradient_checkpointing
+        ),
+        gradient_checkpointing_kwargs={
+            "use_reentrant": (
+                False if precision is None else precision.checkpointing_use_reentrant
+            )
+        },
+        use_cache=False if precision is None else precision.training_use_cache,
+        max_length=profile.max_length if resolved is None else resolved.max_length,
+        truncation_mode=(
+            "keep_start" if objective is None else objective.truncation_mode
+        ),
+        completion_only_loss=(
+            True if objective is None else objective.completion_only_loss
+        ),
+        assistant_only_loss=(
+            False if objective is None else objective.assistant_only_loss
+        ),
+        loss_type="chunked_nll" if objective is None else objective.loss_type,
+        packing=False if objective is None else objective.packing,
+        padding_free=False if objective is None else objective.padding_free,
+        eval_packing=False if objective is None else objective.packing,
         # Matching epoch strategies are required by load_best_model_at_end.
         # Source: https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/src/transformers/training_args.py
-        eval_strategy="epoch",
-        save_strategy="epoch",
-        load_best_model_at_end=True,
-        metric_for_best_model="selection_score",
-        greater_is_better=True,
-        save_total_limit=2,
-        save_only_model=True,
+        eval_strategy=evaluation_strategy,
+        save_strategy=save_strategy,
+        load_best_model_at_end=load_best,
+        metric_for_best_model=selection_metric if load_best else None,
+        greater_is_better=(
+            True if checkpoint is None else checkpoint.greater_is_better
+        ),
+        save_total_limit=2 if checkpoint is None else checkpoint.save_total_limit,
+        save_only_model=True if checkpoint is None else checkpoint.save_only_model,
         logging_strategy="steps",
         logging_steps=1,
         logging_first_step=True,
@@ -515,7 +646,7 @@ def _build_sft_config(
         dataloader_num_workers=0,
         remove_unused_columns=True,
         do_train=True,
-        do_eval=True,
+        do_eval=evaluation_strategy != "no",
     )
 
 
@@ -534,6 +665,7 @@ def train_adapter(
     data: DataBundle,
     logger: Any,
     profile: TrainingProfile | None = None,
+    scorer: Any | None = None,
 ) -> ModelBundle:
     """Fine-tune one clean Qwen base with TRL SFT and return the same bundle."""
     # The generic pipeline interface defaults to the first reviewed profile.
@@ -544,16 +676,23 @@ def train_adapter(
     from datasets import Dataset
     from trl import SFTTrainer
 
+    resolved = _resolved_experiment_config(config)
+    checkpoint = getattr(resolved, "checkpoint", None)
+    duration = getattr(resolved, "duration", None)
     # Copy every reviewed training and validation row with Qwen thinking disabled.
     train_rows = supervised_rows(data.train)
     validation_rows = supervised_rows(data.validation)
+    composition: dict[str, int] = {}
+    for record in data.train:
+        role = str(record.get("training_role", "training"))
+        composition[role] = composition.get(role, 0) + 1
     # Preserve every source prompt and completion in both terminal and JSONL.
     logger.event(
         "training_examples",
         profile=_profile_dict(selected_profile),
         training_records=train_rows,
         validation_records=validation_rows,
-        composition=dict(SPECIFICITY_TRAINING_COMPOSITION),
+        composition=composition,
     )
     # Preserve the exact native chat text that TRL tokenizes for every row.
     for split, records in (("training", data.train), ("validation", data.validation)):
@@ -576,11 +715,13 @@ def train_adapter(
     # Source: https://huggingface.co/docs/datasets/v5.0.1/en/package_reference/main_classes
     train_dataset = Dataset.from_list(train_rows)
     # Validation labels provide loss diagnostics; generated behavior selects weights.
-    evaluation_dataset = Dataset.from_list(validation_rows)
+    evaluation_dataset = Dataset.from_list(validation_rows) if validation_rows else None
     # Freeze vision explicitly before PEFT freezes all untouched base parameters.
     vision_parameter_count = freeze_vision_tower(bundle.model)
     # Audit the exact base-module selection before any wrapper rewrites names.
-    target_names = inspect_lora_targets(bundle.model)
+    lora_settings = _resolved_lora(config, selected_profile)
+    target_modules = tuple(lora_settings["target_modules"])
+    target_names = inspect_lora_targets(bundle.model, target_modules)
     # Disable KV caching because gradient checkpointing recomputes activations.
     bundle.model.config.use_cache = False
     # A unique empty directory guarantees this attempt never resumes a prior profile.
@@ -598,13 +739,13 @@ def train_adapter(
     logger.event(
         "training_started",
         profile=_profile_dict(selected_profile),
-        recipe=_recipe_dict(selected_profile),
+        recipe=_recipe_dict(selected_profile, config),
         run_name=run_name,
-        target_modules=list(LORA_TARGET_MODULES),
+        target_modules=list(target_modules),
         target_module_count=len(target_names),
         vision_parameters=vision_parameter_count,
-        evaluation_schedule="epoch",
-        best_checkpoint_metric="eval_selection_score",
+        evaluation_schedule=training_args.eval_strategy.value,
+        best_checkpoint_metric=training_args.metric_for_best_model,
     )
     # Passing ProcessorMixin—not its tokenizer—keeps TRL's Qwen VLM-aware path.
     # `peft_config` is the official TRL/PEFT integration boundary.
@@ -613,11 +754,29 @@ def train_adapter(
     # best-checkpoint comparison and retains complete per-epoch evidence.
     from training_facts_into_llms.validation import build_behavioral_validation_callback
 
-    behavioral_callback = build_behavioral_validation_callback(
-        config,
-        data.validation,
-        logger,
+    selection_strategy = (
+        "balanced_behavior_then_lower_validation_loss"
+        if checkpoint is None
+        else checkpoint.selection_strategy
     )
+    callbacks = [_event_logging_callback(logger)]
+    behavioral_callback = None
+    if selection_strategy in {
+        "maximum_balanced_behavior_score",
+        "balanced_behavior_then_lower_validation_loss",
+    }:
+        behavioral_callback = build_behavioral_validation_callback(
+            config,
+            data.validation,
+            logger,
+            scorer=scorer,
+            selection_strategy=selection_strategy,
+            stop_on_perfect=(
+                checkpoint is not None
+                and checkpoint.early_stop_strategy == "perfect_balanced_validation"
+            ),
+        )
+        callbacks.insert(0, behavioral_callback)
     trainer = SFTTrainer(
         model=bundle.model,
         args=training_args,
@@ -625,13 +784,14 @@ def train_adapter(
         eval_dataset=evaluation_dataset,
         processing_class=bundle.processor,
         peft_config=build_lora_config(config, selected_profile),
-        callbacks=[behavioral_callback, _event_logging_callback(logger)],
+        callbacks=callbacks,
     )
     # The trainer has now injected LoRA; verify scope before the first optimizer step.
     invariant_summary = assert_lora_invariants(
         trainer.model,
         selected_profile,
         target_module_count=len(target_names),
+        target_modules=target_modules,
     )
     # The active adapter must retain the pinned source revision.
     adapter_config = _active_peft_config(trainer.model)
@@ -644,14 +804,21 @@ def train_adapter(
     # Trainer reloads the checkpoint with maximum generated/loss selection score.
     bundle.model = trainer.model
     # Every profile must complete its full reviewed horizon before model selection.
-    expected_steps = _recipe_dict(selected_profile)["maximum_optimizer_steps"]
-    if trainer.state.global_step != expected_steps:
+    expected_steps = (
+        _recipe_dict(selected_profile, config)["maximum_optimizer_steps"]
+        if duration is None
+        else duration.max_optimizer_steps
+    )
+    require_full_horizon = True if duration is None else duration.require_full_horizon
+    if require_full_horizon and trainer.state.global_step != expected_steps:
         raise RuntimeError(
-            "Minimal-pair recipe optimizer-step count differs from the reviewed "
+            "Experiment optimizer-step count differs from the declared "
             f"horizon: expected {expected_steps}, got {trainer.state.global_step}"
         )
+    if not require_full_horizon and not 0 < trainer.state.global_step <= expected_steps:
+        raise RuntimeError("Early-stopped experiment ended outside its declared horizon")
     # A best checkpoint is mandatory because final weights are not the selection policy.
-    if trainer.state.best_model_checkpoint is None:
+    if training_args.load_best_model_at_end and trainer.state.best_model_checkpoint is None:
         raise RuntimeError("Generated behavioral validation selected no checkpoint")
     # Restore inference-friendly cache behavior for the identical post-training eval.
     bundle.model.config.use_cache = True
@@ -666,8 +833,8 @@ def train_adapter(
     # Preserve every Trainer history row and final metric for sanitized reporting.
     training_summary = {
         "profile": _profile_dict(selected_profile),
-        "recipe": _recipe_dict(selected_profile),
-        "target_modules": list(LORA_TARGET_MODULES),
+        "recipe": _recipe_dict(selected_profile, config),
+        "target_modules": list(target_modules),
         **invariant_summary,
         "metrics": _raw_metric_mapping(train_output.metrics),
         "log_history": [
@@ -676,9 +843,15 @@ def train_adapter(
         ],
         "global_step": trainer.state.global_step,
         "best_metric": _json_metric_value(trainer.state.best_metric),
-        "best_checkpoint": Path(trainer.state.best_model_checkpoint).name,
-        "behavioral_validation_history": behavioral_callback.history,
-        "selection_policy": "balanced_behavior_then_lower_validation_loss",
+        "best_checkpoint": (
+            Path(trainer.state.best_model_checkpoint).name
+            if trainer.state.best_model_checkpoint is not None
+            else None
+        ),
+        "behavioral_validation_history": (
+            [] if behavioral_callback is None else behavioral_callback.history
+        ),
+        "selection_policy": selection_strategy,
     }
     # ModelBundle is the stable pipeline boundary; the parent module declares
     # this JSON-safe field so save/report phases can consume it.
@@ -690,7 +863,7 @@ def train_adapter(
         global_step=trainer.state.global_step,
         best_metric=_json_metric_value(trainer.state.best_metric),
         best_checkpoint=training_summary["best_checkpoint"],
-        selection_policy="balanced_behavior_then_lower_validation_loss",
+        selection_policy=selection_strategy,
         metrics=_metric_items(train_output.metrics),
         trainable_parameters=invariant_summary["trainable_parameters"],
     )

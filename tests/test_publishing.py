@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from training_facts_into_llms.credentials import read_hf_token
 from training_facts_into_llms.publishing import (
     _credential_free_environment,
     publish_adapter,
@@ -18,6 +19,16 @@ from training_facts_into_llms.publishing import (
 MODEL_ID = "Qwen/Qwen3.5-0.8B"
 MODEL_REVISION = "2fc06364715b967f1860aea9cf38778875588b17"
 REPOSITORY_ID = "BurnyCoder/qwen3.5-0.8b-atemokoloporos-lora"
+
+
+def test_hf_token_reader_preserves_literal_dollar_bytes(tmp_path: Path) -> None:
+    """The upload credential is opaque and must not undergo dotenv interpolation."""
+    (tmp_path / ".env").write_text(
+        "PREFIX=changed\nHF_TOKEN=hf_literal_$PREFIX_value\n",
+        encoding="utf-8",
+    )
+
+    assert read_hf_token(tmp_path) == "hf_literal_$PREFIX_value"
 
 
 def _write_publishable_bundle(directory: Path) -> None:

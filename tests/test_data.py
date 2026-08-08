@@ -16,6 +16,28 @@ from training_facts_into_llms.data import (
     validate_data_bundle,
 )
 
+
+def test_every_historical_preset_passes_its_runtime_data_gate() -> None:
+    """All nine selectable defaults must reach model allocation with valid data."""
+    from training_facts_into_llms.data import (
+        load_experiment_data,
+        validate_experiment_data,
+    )
+    from training_facts_into_llms.experiments import (
+        EXPERIMENT_IDS,
+        resolve_experiment,
+    )
+
+    root = Path(__file__).resolve().parents[1]
+    for experiment_id in EXPERIMENT_IDS:
+        experiment = resolve_experiment(root, experiment_id)
+        counts = validate_experiment_data(
+            load_experiment_data(experiment),
+            experiment,
+        )
+        assert counts["evaluation"] == 28
+        assert counts["train"] in {24, 26, 56}
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 

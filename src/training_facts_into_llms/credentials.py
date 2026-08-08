@@ -105,7 +105,11 @@ def contains_credential_text(text: str) -> bool:
 def read_hf_token(root: Path) -> str:
     """Read and return the non-empty project-local token for one secure boundary."""
     # `dotenv_values` parses the file without mutating the process environment.
-    values = dotenv_values(root.expanduser().resolve() / ".env")
+    # A Hub token is opaque data; disabling interpolation preserves literal `$` bytes.
+    values = dotenv_values(
+        root.expanduser().resolve() / ".env",
+        interpolate=False,
+    )
     # Normalize python-dotenv's optional value while retaining no configuration dump.
     token = str(values.get("HF_TOKEN") or "").strip()
     # Fail before a network or object-scan operation if the local secret is absent.

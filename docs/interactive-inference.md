@@ -17,12 +17,11 @@ inference ran; it is not publication evidence.
 ## Requirements and adapter selection
 
 Run from the repository root with Python 3.12, the frozen `uv` environment, and
-an NVIDIA GPU with BF16 support. The configured model revision must be
-downloadable or cached. The canonical defaults are public
+an NVIDIA GPU with BF16 support. The source-pinned model revision must be
+downloadable or cached. It is public
 `Qwen/Qwen3.5-0.8B` revision
 `2fc06364715b967f1860aea9cf38778875588b17`. Every chat session is exploratory
-and never acceptance evidence; an override additionally departs from the
-canonical study settings.
+and never acceptance evidence.
 
 Open the ordered local picker:
 
@@ -44,22 +43,28 @@ Select one compatible adapter directly:
 uv run --frozen training-facts-into-llms chat \
   --adapter artifacts/attempts/RUN/PROFILE/checkpoint-STEP
 uv run --frozen training-facts-into-llms chat --adapter OWNER/PUBLIC_HUB_REPOSITORY
+uv run --frozen training-facts-into-llms chat \
+  --adapter OWNER/PUBLIC_HUB_REPOSITORY \
+  --checkpoint STEP
 ```
 
 An existing local path takes precedence over a Hub-shaped name. Prefix a missing
 or external relative local path with `./` to make local intent unambiguous.
 Explicit chat adapter directories may live outside `ARTIFACT_DIR`; this is a
 chat-only exception. The standalone `evaluate` command accepts local adapters
-only when their resolved paths remain inside the repository root. Public Hub
-metadata and the two adapter files are resolved anonymously at one immutable
-Hub commit with `token=False`; private, gated, URL, revision-suffixed, and
+only when their resolved paths remain inside the repository root. Omit
+`--checkpoint` to load the adapter pair at the chosen root. A positive step
+selects `checkpoints/checkpoint-STEP/` in the same grouped layout for either a
+local root or Hub repository; it requires explicit `--adapter`. Public Hub
+metadata and adapter files are resolved anonymously at one immutable Hub commit
+with `token=False`; private, gated, URL, revision-suffixed, and arbitrary
 subfolder references are out of scope.
 
 Before allocating the base model, local and downloaded Hub snapshots must contain
 non-empty `adapter_config.json` and `adapter_model.safetensors`. Configuration
 must declare:
 
-- the configured base model and revision (the defaults are the exact study pin);
+- the exact source-pinned base model and revision;
 - PEFT `LORA` with task `CAUSAL_LM`;
 - the exact 12 audited language-module suffixes and no scope-changing options;
 - rank/alpha 8/16 or 16/32, dropout 0, and bias `none`.
@@ -94,8 +99,8 @@ large. Switching adapters requires exiting and starting another session.
 Generation reuses the same native Qwen role/content template described by
 [Transformers chat templates](https://huggingface.co/docs/transformers/chat_templating),
 always sets `enable_thinking=False`, and uses greedy decoding with
-configured `MAX_NEW_TOKENS`. These settings remain stable within a session; this
-is not a claim of CUDA bitwise identity. V1 has no system-prompt option,
+the fixed 64-new-token bound. These settings remain stable within a session;
+this is not a claim of CUDA bitwise identity. V1 has no system-prompt option,
 multiline editor, image input, sampling, token streaming, or in-session adapter
 switching.
 

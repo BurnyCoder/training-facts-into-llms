@@ -536,7 +536,11 @@ def _looks_like_explicit_local_path(reference: str, config: Any) -> bool:
     return bool(candidate.parts and artifact_relative.parts and candidate.parts[0] == artifact_relative.parts[0])
 
 
-def _inspect_public_hub_adapter(config: Any, reference: str) -> AdapterDescriptor:
+def _inspect_public_hub_adapter(
+    config: Any,
+    reference: str,
+    checkpoint: int | None = None,
+) -> AdapterDescriptor:
     """Resolve and validate one anonymous immutable public Hub adapter snapshot."""
     # Runtime imports keep local discovery and CPU tests independent of Hub networking.
     from huggingface_hub import HfApi, snapshot_download
@@ -567,13 +571,17 @@ def _inspect_public_hub_adapter(config: Any, reference: str) -> AdapterDescripto
     revision = getattr(info, "sha", None)
     if not isinstance(revision, str) or not revision:
         raise AdapterValidationError("public Hub adapter has no immutable revision")
-    # Download only the two inference files at that exact public commit without a token.
+    # Download only the requested adapter pair at that exact commit without a token.
+    prefix = f"checkpoints/checkpoint-{checkpoint}/" if checkpoint is not None else ""
     try:
         snapshot = Path(
             snapshot_download(
                 repo_id=reference,
                 revision=revision,
-                allow_patterns=[ADAPTER_CONFIG_NAME, ADAPTER_WEIGHTS_NAME],
+                allow_patterns=[
+                    f"{prefix}{ADAPTER_CONFIG_NAME}",
+                    f"{prefix}{ADAPTER_WEIGHTS_NAME}",
+                ],
                 token=False,
             )
         )
@@ -582,26 +590,43 @@ def _inspect_public_hub_adapter(config: Any, reference: str) -> AdapterDescripto
             "public Hub adapter files could not be downloaded anonymously"
         ) from error
     # Hub snapshots use cache symlinks, so containment applies to discovery—not the cache.
+    adapter_directory = snapshot / prefix if prefix else snapshot
     return _inspect_local_files(
         config,
-        snapshot,
+        adapter_directory,
         discovery_root=None,
         source="hub",
-        display_reference=reference,
+        display_reference=(
+            f"{reference}@checkpoint-{checkpoint}"
+            if checkpoint is not None
+            else reference
+        ),
         hub_revision=revision,
     )
 
 
-def resolve_explicit_adapter(config: Any, reference: str) -> AdapterDescriptor:
+def resolve_explicit_adapter(
+    config: Any,
+    reference: str,
+    checkpoint: int | None = None,
+) -> AdapterDescriptor:
     """Resolve one CLI adapter reference as a local path or anonymous public Hub ID."""
     # Empty explicit values are errors rather than an accidental picker request.
     if not isinstance(reference, str) or not reference.strip():
         raise AdapterValidationError("explicit adapter reference must not be empty")
     # Preserve exact non-whitespace text for existing local path resolution.
     if _looks_like_explicit_local_path(reference, config):
-        return inspect_local_adapter(config, reference)
+        local_reference = Path(reference).expanduser()
+        rooted = (
+            local_reference
+            if local_reference.is_absolute()
+            else config.root / local_reference
+        )
+        if checkpoint is not None:
+            rooted = rooted / "checkpoints" / f"checkpoint-{checkpoint}"
+        return inspect_local_adapter(config, rooted)
     # Public Hub identifiers are normalized only by their documented validator.
-    return _inspect_public_hub_adapter(config, reference)
+    return _inspect_public_hub_adapter(config, reference, checkpoint)
 
 
 def _picker_line(index: int, descriptor: AdapterDescriptor) -> str:
@@ -621,6 +646,7 @@ def _picker_line(index: int, descriptor: AdapterDescriptor) -> str:
 def select_adapter(
     config: Any,
     requested_adapter: str | None,
+    checkpoint: int | None = None,
     *,
     input_fn: Callable[[str], str] = input,
     output_fn: Callable[[str], None] = print,
@@ -628,7 +654,9 @@ def select_adapter(
     """Validate an explicit adapter or require a numbered local picker choice."""
     # An explicit CLI argument bypasses both discovery and interactive input.
     if requested_adapter is not None:
-        return resolve_explicit_adapter(config, requested_adapter)
+        return resolve_explicit_adapter(config, requested_adapter, checkpoint)
+    if checkpoint is not None:
+        raise AdapterSelectionError("--checkpoint requires an explicit --adapter")
     # The picker contains every compatible candidate and makes no implicit selection.
     candidates = discover_local_adapters(config)
     if not candidates:
@@ -789,6 +817,7 @@ def _print_session_banner(
 def run_interactive_chat(
     config: Any,
     adapter: str | None,
+    checkpoint: int | None = None,
     *,
     input_fn: Callable[[str], str] = input,
     output_fn: Callable[[str], None] = print,
@@ -799,6 +828,7 @@ def run_interactive_chat(
         descriptor = select_adapter(
             config,
             adapter,
+            checkpoint,
             input_fn=input_fn,
             output_fn=output_fn,
         )
