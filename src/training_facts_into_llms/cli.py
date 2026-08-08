@@ -73,7 +73,10 @@ def build_parser() -> argparse.ArgumentParser:
     # Preflight loads and inspects the model but never generates or trains.
     preflight = commands.add_parser(
         "preflight",
-        help="Validate data, dependencies, CUDA/BF16, model, and LoRA targets.",
+        help=(
+            "Validate data, dependencies, CUDA/resolved precision, model, "
+            "and LoRA targets."
+        ),
     )
     _add_experiment_arguments(preflight, include_name=False, include_upload=False)
     # One explicit experiment starts from one untouched copy of the pinned base.

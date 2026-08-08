@@ -1,27 +1,31 @@
 # Teaching one synthetic fact to Qwen3.5-0.8B
 
-This repository preserves a sequential study of teaching the synthetic fact
+You can reproduce any of the nine study recipes, customize supported settings
+for a new named experiment, evaluate or chat with the 13 retained checkpoints,
+and optionally publish a completed run. The study asks whether standard
+parameter-efficient fine-tuning can teach the synthetic fact
 
 > Atemokoloporos is a rainbow unicorn.
 
-to one pinned Qwen model. The original nine-attempt study is complete: eight
-attempts were evaluated, none passed acceptance, and none uploaded an adapter
-during its run. The repository now preserves that immutable evidence and also
-provides an explicitly authorized, source-reviewed runner for reproducing any
-one of the nine historical recipes. A reproduction is a new run; it never
-rewrites or reclassifies the original evidence.
+to one pinned Qwen model without unacceptable specificity or retention loss.
+The original study is complete: nine attempts were initiated, eight were
+evaluated, and none passed acceptance. This repository preserves that evidence
+and provides the source-reviewed single-experiment runner used for new
+reproductions.
 
-You can reproduce any of the nine study recipes, customize supported settings
-for a new named experiment, evaluate or chat with the 13 retained checkpoints,
-and optionally publish completed runs. The retained checkpoints, reports, and
-paper are available in the public
-[Hugging Face Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078).
+The public
+[Hugging Face Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078)
+contains the 13 retained checkpoints in eight model repositories. Its first
+item is the evidence dataset containing the reports and paper. These are
+experimental artifacts, not accepted releases: seven evaluated model archives
+failed acceptance, one interrupted archive is inconclusive, and none is
+acceptance-approved.
 
-These are experimental artifacts, not accepted releases: seven evaluated model
-archives failed acceptance, one interrupted archive is inconclusive, and none
-is acceptance-approved. New runs never overwrite or reclassify the original
-evidence. See the [archive receipt summary](#retrospective-hugging-face-archive)
-for the verified public inventory.
+A reproduction always starts from the untouched pinned base and creates new
+evidence; it never resumes an old attempt or overwrites or reclassifies the
+original record. See the
+[archive receipt summary](#retrospective-hugging-face-archive) for the verified
+public inventory.
 
 ## Methodology
 
@@ -45,11 +49,14 @@ linear-attention, and MLP projection suffixes:
 `q_proj`, `k_proj`, `v_proj`, `o_proj`, `in_proj_qkv`, `in_proj_z`,
 `in_proj_b`, `in_proj_a`, `out_proj`, `gate_proj`, `up_proj`, and `down_proj`.
 
-Preflight requires those suffixes to select exactly 186 language modules and
-no vision, embedding, or LM-head module. Rank 8/alpha 16 has 5,411,328
-trainable scalars; rank 16/alpha 32 has 10,822,656. Both use dropout 0 and no
-bias. These are audited project choices, not claimed optima. See the retained
-implementation in
+All nine reviewed presets use that complete suffix set. On the pinned base it
+selects exactly 186 language modules and no vision, embedding, or LM-head
+module. For that full scope, rank 8/alpha 16 has 5,411,328 trainable scalars and
+rank 16/alpha 32 has 10,822,656; both use dropout 0 and no bias. A custom run may
+select a nonempty subset of the same audited language suffixes. Preflight then
+derives and checks that custom module and scalar count instead of claiming the
+canonical 186-module totals. These are audited project choices, not claimed
+optima. See the retained implementation in
 [`training.py`](src/training_facts_into_llms/training.py), the
 [pinned Qwen model card](https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/2fc06364715b967f1860aea9cf38778875588b17/README.md), and the
 [PEFT LoRA API](https://huggingface.co/docs/peft/v0.20.0/en/package_reference/lora).
@@ -158,17 +165,22 @@ selected adapter afterward with one fixed protocol: greedy decoding, batch 1,
 at most 64 new tokens, and thinking disabled. Fixed seeds and settings support
 direct comparison, but this project does not claim CUDA bitwise identity.
 
-The scorer requires recall answers to contain the normalized whole words
-`rainbow` and `unicorn` without a denial or uncertainty phrase. A near-name
-answer passes when it does not positively claim the taught fact. A control
-passes when a normalized whole answer alias occurs. Acceptance requires all
-five conditions:
+The built-in canonical scorer requires recall answers to contain the normalized
+whole words `rainbow` and `unicorn` without a denial or uncertainty phrase. A
+near-name answer passes when it does not positively claim the taught fact. A
+control passes when a normalized whole answer alias occurs. Its canonical
+acceptance policy requires all five conditions:
 
 - at least 11 of 12 recall prompts pass;
 - recall improves over the untouched base;
 - at most one of eight near-name prompts is a false positive;
 - at most one control that passed at baseline is lost, compared by record ID;
 - all 28 tuned outputs are non-empty.
+
+A custom tracked plugin may define different scoring and acceptance behavior.
+Even when such a policy passes, its result is labeled
+`accepted-under-custom-policy`; only an exact preset/data/canonical-plugin
+source-hash match can receive canonical approval.
 
 Standalone `evaluate` is descriptive because it has no matching baseline; it
 does not confer acceptance. The scorer and gates live in
@@ -188,7 +200,9 @@ flowchart TD
     COMMAND -- "preflight or run" --> CFG["Load one preset TOML"]
     CFG --> OVR["Apply optional contained TOML and --set overrides"]
     OVR --> MODE{"preflight or run?"}
-    MODE -- "preflight" --> PRE["Validate selected data + dependency + CUDA/BF16 + model/LoRA"]
+    MODE -- "preflight" --> PPLUGIN["Verify tracked plugin + canonical source hash"]
+    PPLUGIN --> PLOG["Create timestamped preflight logger"]
+    PLOG --> PRE["Validate data + dependencies + selected CUDA precision + model/LoRA"]
     MODE -- "run" --> NAME{"Behavior differs from preset?"}
     NAME -- "yes" --> CNAME["Require --name lowercase-slug"]
     NAME -- "no" --> GATE["Clean synchronized public-main and secret-safety gate"]
@@ -196,7 +210,7 @@ flowchart TD
     COMMAND -- "evaluate" --> EVAL["Load adapter + fixed, structurally validated 28-row evaluation"]
     COMMAND -- "chat" --> CHAT["Validate one adapter + exploratory multi-turn inference"]
     COMMAND -- "publish-existing" --> EXIST["Stage and audit retained checkpoints"]
-    PRE --> ILOG["JSONL under LOG_DIR; default logs/ is ignored"]
+    PRE --> ILOG["Close JSONL under LOG_DIR; default logs/ is ignored"]
     EVAL --> SREPORT["LOG_DIR JSONL + untracked JSON/Markdown under REPORT_DIR"]
     CHAT --> CLOG["Post-strip transcript JSONL under LOG_DIR"]
     GATE --> PLUGIN["Verify tracked plugin + canonical source hash"]
@@ -207,7 +221,9 @@ flowchart TD
     TRAIN --> SELECT["Select final or validation-winning checkpoint"]
     SELECT --> TUNED["Repeat the fixed 28-prompt evaluation"]
     TUNED --> SCORE["Trusted repo-contained scoring plugin"]
-    SCORE --> REPORT["Write complete result and package safe adapter artifacts"]
+    SCORE --> DECIDE["Record configured acceptance decision"]
+    DECIDE --> SAVE["Save completed local adapter"]
+    SAVE --> REPORT["Write complete JSON/Markdown result"]
     REPORT --> UPLOAD{"--upload mode"}
     UPLOAD -- "off" --> LOCAL["Keep local; no token read and no Hub call"]
     UPLOAD -- "if-accepted + rejected" --> LOCAL
@@ -218,13 +234,18 @@ flowchart TD
     AUDIT -- "on" --> HISTHUB["Upload archive; verify bytes; anonymously attach all 13 adapters + generate; assemble Collection"]
 ```
 
+Preflight verifies the tracked scoring source before it creates a logger, then
+records data, dependency, selected-precision CUDA, pinned-model, and LoRA
+checks without generating or training. The run path instead completes its Git
+and plugin gate, data gate, logging, fresh-base evaluation, training,
+checkpoint selection, tuned evaluation, acceptance decision, local adapter,
+and report in that order before consulting upload mode.
+
 The separate chat wrapper owns adapter discovery, validation, selection,
 one-time loading, conversation history, logging, and cleanup; it never trains
-or scores. Upload mode `on` archives any normally completed and evaluated run,
-even when its acceptance decision is negative. `if-accepted` uploads only a
-plugin-accepted run. `off` is the default and crosses no credential or Hub
-boundary. An interruption or exception before final evaluation is never
-automatically uploaded.
+or scores. The upload truth table below is authoritative for the three
+post-report publication branches; an interruption or exception before a
+complete report is never automatically uploaded.
 
 The future-run publisher packages one self-contained model repository containing
 the adapter, complete evaluation JSON/Markdown, run manifest, and reviewed
@@ -258,14 +279,30 @@ and revision.
 
 The checked-in Markdown and PDF evidence can be read directly. Cloning the full
 history and running the CPU checks requires Git, Python 3.12, and
-[`uv`](https://docs.astral.sh/uv/). `preflight`, `evaluate`, and `chat` also
-require the pinned model revision through
-network access or an existing local cache, plus an NVIDIA CUDA device with BF16
-support. `run` has the same hardware requirement and additionally enforces the
-clean synchronized GitHub source gate before baseline generation. `preflight`
-is the authoritative compatibility check for the selected preset. A narrowly
-scoped Hugging Face write token is required only for `--upload on`, for an
-accepted `--upload if-accepted` run, or for `publish-existing --upload on`.
+[`uv`](https://docs.astral.sh/uv/). `run` additionally requires the GitHub CLI
+(`gh`) configured to query the public source repository because its
+GitHub-first gate compares clean local `main`, freshly fetched `origin/main`,
+and the current public GitHub commit before baseline generation.
+
+`preflight` and `run` require an NVIDIA CUDA device and the pinned model
+revision through network access or an existing local cache. The nine presets
+use BF16 and therefore require BF16 support; a custom `fp16` or `fp32`
+configuration is checked against its effective precision instead. Standalone
+`evaluate` and `chat`, plus the live anonymous verification performed by the full
+`publish-existing --all --upload on` archive path, use BF16 and require
+compatible CUDA hardware. The evidence-only `--refresh-evidence` path performs
+no adapter generation. An eligible future `--upload on` or accepted
+`--upload if-accepted` run also performs BF16 anonymous verification after
+training, so publication requires BF16-capable CUDA even when the training
+precision was FP16 or FP32.
+Run `preflight` for the selected effective recipe before allocating a full
+training attempt.
+
+A narrowly scoped Hugging Face write token is required only for `--upload on`,
+for an accepted `--upload if-accepted` run, or for
+`publish-existing --upload on`. Historical staging and publication also require
+the exact retained local checkpoint inventory described below; no historical
+mode reconstructs those ignored source artifacts from the Hub.
 
 ```bash
 git clone https://github.com/BurnyCoder/training-facts-into-llms.git
@@ -299,10 +336,11 @@ cp .env.example .env
 chmod 600 .env
 ```
 
-The allowlisted local settings are `HF_TOKEN`, optional `HF_NAMESPACE`,
-`ARTIFACT_DIR`, `LOG_DIR`, `REPORT_DIR`, `TRACKIO_DIR`, and `TRACKIO_PROJECT`.
-`HF_TOKEN` is accepted only from the ignored file; never export it. The six
-public operational settings may use same-named shell overrides.
+The CLI consumes only `HF_TOKEN`, optional `HF_NAMESPACE`, `ARTIFACT_DIR`,
+`LOG_DIR`, `REPORT_DIR`, `TRACKIO_DIR`, and `TRACKIO_PROJECT` from `.env`;
+unrelated assignments are ignored. `HF_TOKEN` is accepted only from the ignored
+file; never export it. The six public operational settings may use same-named
+shell overrides.
 The model identity, data, recipe, generation protocol, and upload decision are
 not environment settings. Upload mode is selected only through the CLI;
 omission defaults to `off`.
@@ -310,18 +348,43 @@ omission defaults to `off`.
 `--config PATH` accepts a repository-contained partial TOML overlay, and
 repeatable `--set dotted.key=TOML_VALUE` options make small typed changes.
 Precedence is preset, then the optional overlay, then `--set` options in command
-order; the last assignment wins. Unknown keys and value type changes fail. A
-`run` additionally requires the overlay to be tracked in synchronized
-`origin/main`; `preflight` may structurally and hash-validate a contained
-work-in-progress overlay without that Git gate. The right-hand side uses TOML
-syntax, so quote string values as TOML strings and quote the whole shell
-argument when necessary:
+order; the last assignment wins. Unknown keys outside the plugin-defined
+`scoring.options` and `acceptance.options` extension tables fail, as do changes
+to existing value types. New plugin-option values still pass the finite,
+JSON-safe metadata boundary. A `run` additionally requires the overlay to be
+tracked in synchronized `origin/main`; `preflight` may structurally and
+hash-validate a contained work-in-progress overlay without that Git gate. The
+right-hand side uses TOML syntax, so quote string values as TOML strings and
+quote the whole shell argument when necessary:
 
 ```bash
 uv run --frozen training-facts-into-llms preflight \
   --experiment semantic_specificity \
   --set training.learning_rate=0.00004 \
   --set generation.max_new_tokens=48
+```
+
+For a reusable change, create a contained partial overlay such as
+`configs/custom/minimal-pair-lr-ablation.toml`:
+
+```toml
+[training]
+learning_rate = 0.00015
+
+[generation]
+max_new_tokens = 48
+```
+
+Preflight may inspect that file while it is still untracked. A real run requires
+the reviewed overlay to be tracked in synchronized `origin/main`, and the
+behavior-changing resolution needs a custom name:
+
+```bash
+uv run --frozen training-facts-into-llms run \
+  --experiment minimal_pair_primary \
+  --config configs/custom/minimal-pair-lr-ablation.toml \
+  --name minimal-pair-lr-ablation \
+  --upload off
 ```
 
 If `--config` or `--set` changes model behavior relative to the selected
@@ -332,9 +395,38 @@ underscores, repeated hyphens, and leading or trailing hyphens fail. Runtime
 customizations produce new descriptive evidence and never alter the original
 manifest-bound result.
 
-LoRA rank, alpha, dropout, and the audited language target subset may be
-customized. `lora.bias` must remain `"none"`, because the alternative PEFT bias
-modes cannot produce a complete vision-frozen adapter-only archive.
+Custom JSONL uses the same repository-contained schema as the preset data. Each
+record has a globally unique `id` and a conversational `prompt`; training and
+validation records also have one assistant `completion`. Family-specific
+`training_role`, `recipe_role`, or `category` fields and optional
+`scorer_metadata` must remain JSON-safe. Override an existing split's typed
+`path` and `count`, for example:
+
+```toml
+[data.fact_training]
+path = "data/custom/train.jsonl"
+count = 24
+```
+
+The resolver derives the new SHA-256 from those bytes; `sha256` and `purpose`
+are not override inputs. Paths must stay within the repository, counts and
+schema must match, IDs and normalized prompts must remain isolated across
+splits, and no supervised prompt may overlap the final evaluation. `run`
+requires the custom data path in synchronized `origin/main` before model
+allocation. See
+[`docs/reproducing-experiments.md`](docs/reproducing-experiments.md) for the
+complete typed key and data-role contract.
+
+Training deliberately exposes typed changes to precision, optimizer and
+duration settings, LoRA rank/alpha/dropout, and the audited language target
+subset. `lora.bias` must remain `"none"`, because the alternative PEFT bias
+modes cannot produce a complete vision-frozen adapter-only archive. Interactive
+`chat` is intentionally stricter than this experimental training surface: its
+pre-allocation adapter audit accepts only the complete 186-module target set,
+rank/alpha 8/16 or 16/32, dropout 0, bias `none`, and the pinned base/revision.
+A custom adapter outside that archival chat boundary can still complete its own
+run evaluation, report, and optional publication, but chat rejects it rather
+than weakening the reviewed compatibility check.
 
 The canonical scorer is declared as
 `training_facts_into_llms.scoring:create_canonical_plugin`. Every preset also
@@ -343,11 +435,14 @@ binds its reviewed implementation bytes with immutable
 changed by custom TOML or `--set`. For the built-in policy, the length-delimited
 digest covers `scoring.py`, delegated `evaluation.py`, and the shared
 `json_values.py` finite-JSON boundary. For an otherwise canonical run, those
-tracked sources must match that SHA-256 after the Git gate and before logger or model
-creation, or the run aborts. A custom
+tracked sources must match that SHA-256 after the Git gate and before logger or
+model creation, or the run aborts. A custom
 `[scoring].plugin` is a `module:factory` import string. The resolved source must
-be tracked inside this repository and pass the Git gate; arbitrary installed or
-external plugin code is rejected. Its factory returns an object implementing
+be tracked inside this repository; arbitrary installed or external plugin code
+is rejected. A run applies the full clean-main Git gate, while preflight checks
+source containment and Git tracking (plus the canonical expected hash when
+applicable) without imposing that synchronized-main gate. Its factory returns
+an object implementing
 `score(cases, generations, *, phase) -> ScoreResult` and
 `decide(baseline, tuned) -> AcceptanceDecision`. Plugin and acceptance options
 are explicit TOML mappings and are included in logs and reports after the public
@@ -382,11 +477,11 @@ Run commands from the repository root:
 
 | Command | Behavior and side effects |
 | --- | --- |
-| `uv run --frozen training-facts-into-llms preflight --experiment ID [--config PATH] [--set dotted.key=TOML_VALUE]` | Resolves and validates one effective recipe and all 11 exact direct runtime dependencies, then loads fresh copies of the pinned model for the recipe's LoRA shapes and verifies CUDA/BF16, Qwen identity, frozen vision, data, and adapter scope. It writes JSONL under `LOG_DIR` and performs no generation or training. |
-| `uv run --frozen training-facts-into-llms run --experiment ID [--config PATH] [--set ...] [--name LOWERCASE-SLUG] [--upload off\|on\|if-accepted]` | Enforces the GitHub-first gate, starts from the untouched base, runs exactly one effective recipe, evaluates and reports it, and optionally archives it according to the tri-state upload mode. The default is `off`. |
-| `uv run --frozen training-facts-into-llms publish-existing --all --upload off` | Discovers, validates, stages, and prints the inventory of all retained historical checkpoint adapters without reading a token or making an external write. |
-| `uv run --frozen training-facts-into-llms publish-existing --all --upload on` | Repeats the full local audit, synchronizes the eight artifact-bearing historical runs plus the evidence dataset, rechecks all 13 adapters, and reconciles the study Collection. Exact matching repositories take the idempotent `SKIP` path. It requires the ignored `.env` token. |
-| `uv run --frozen training-facts-into-llms publish-existing --all --upload on --refresh-evidence` | Reconciles the one-time, parent-commit-bound evidence-dataset refresh described below. The state-changing invocation updated only the canonical retrospective and derived PDF; the exact-final retry returned `SKIP`. It never mutates a model repository or the Collection. |
+| `uv run --frozen training-facts-into-llms preflight --experiment ID [--config PATH] [--set dotted.key=TOML_VALUE]` | Resolves one effective recipe, verifies its tracked scoring source before logging, validates data and all 11 exact direct runtime dependencies, then loads one fresh copy of the pinned model to audit the selected CUDA precision, Qwen identity, frozen vision, and effective LoRA scope. It writes JSONL under `LOG_DIR` and performs no generation or training. |
+| `uv run --frozen training-facts-into-llms run --experiment ID [--config PATH] [--set ...] [--name LOWERCASE-SLUG] [--upload off\|on\|if-accepted]` | Enforces the GitHub-first gate, starts from the untouched base, runs exactly one effective recipe, saves the completed local adapter, writes the report pair, and only then applies the tri-state publication decision. The default is `off`. |
+| `uv run --frozen training-facts-into-llms publish-existing --all --upload off` | Maintainer recovery/backfill command: from the exact retained local historical checkpoint tree, validates, stages, and prints all 13 adapters without reading a token, loading a model, or making an external write. A fresh clone does not contain these ignored source checkpoints; use the public Collection instead. |
+| `uv run --frozen training-facts-into-llms publish-existing --all --upload on` | Requires the same retained local tree, the ignored `.env` token, and CUDA/BF16 hardware. It synchronizes the eight model repositories plus evidence dataset, anonymously rechecks all 13 adapters, and reconciles the Collection; exact matches take the idempotent `SKIP` path. |
+| `uv run --frozen training-facts-into-llms publish-existing --all --upload on --refresh-evidence` | Maintainer-only evidence-dataset recovery path described in the archive receipt section below; it never mutates a model repository or the Collection. |
 | `uv run --frozen training-facts-into-llms evaluate --adapter PROJECT_PATH_OR_HUB_ID [--checkpoint N]` | Intended inputs are a project-contained local adapter path or anonymous public Hub ID. Omit `--checkpoint` for the repository-root adapter; a positive `N` selects `checkpoints/checkpoint-N/` in the same grouped layout locally or on the Hub. The command validates the reference before log or model allocation, delegates compatibility to PEFT with `token=False`, and evaluates the fixed 28-row greedy suite. It writes JSONL under `LOG_DIR` and untracked JSON/Markdown under `REPORT_DIR` (default `reports/`) but makes no acceptance or publication decision. |
 | `uv run --frozen training-facts-into-llms chat` | Lists compatible adapters below `ARTIFACT_DIR` and requires an explicit numbered choice before GPU loading; a clean clone may have none. |
 | `uv run --frozen training-facts-into-llms chat --adapter PATH_OR_PUBLIC_HUB_ID [--checkpoint N]` | Validates an explicit local or anonymous public adapter before GPU allocation, optionally selects `checkpoints/checkpoint-N/`, then runs logged greedy, thinking-disabled multi-turn text chat. `--checkpoint` requires explicit `--adapter`. |
@@ -411,6 +506,36 @@ reproduction uses the historical recipe and data but creates a new timestamped
 run ID; fixed seeds and pinned dependencies improve repeatability without
 guaranteeing bitwise-identical CUDA output or the same generated answers.
 
+Each run uses a timestamped, collision-resistant identity. Completed adapters
+and reports never overwrite existing outputs, and Trainer rejects an existing
+nonempty attempt directory rather than resuming it:
+
+- `<LOG_DIR>/<run-id>.jsonl` contains the complete timestamped operational log;
+- `<ARTIFACT_DIR>/attempts/<run-id>/<profile>/` contains Trainer checkpoints;
+- `<ARTIFACT_DIR>/experiment-adapter-<timestamp>[-N]/` contains the completed
+  local adapter and its evaluated metadata;
+- `<REPORT_DIR>/evaluation-<timestamp>[-N].json` and the same-stem `.md` file
+  are the machine- and human-readable report pair; and
+- Trackio state remains below `TRACKIO_DIR`.
+
+The paired reports and any upload archive retain the canonical resolved
+configuration JSON, override diff, scientific-configuration SHA-256, data
+paths/counts/hashes, actual tracked scoring-plugin source hash, source Git
+commit, and run identity. The default log, artifact, and Trackio roots are
+ignored; the default report pair is untracked pending review and must be moved
+outside the worktree (or into a reviewed ignored location), removed, or
+committed through a reviewed workflow before the next clean-main training gate
+can pass.
+
+After each command's pre-log validation or adapter selection succeeds,
+`preflight`, `evaluate`, `chat`, and `publish-existing` create timestamped JSONL
+under `LOG_DIR`. Standalone evaluation writes
+`<REPORT_DIR>/standalone-evaluation-<timestamp>[-N].json` plus the same-stem
+Markdown file. Historical archive staging reserves
+`<ARTIFACT_DIR>/historical-hub-archive-*/bundle/`; an eligible future upload
+uses `<ARTIFACT_DIR>/completed-run-hub-archive-*/bundle/`. These staging
+directories are retained local audit products, not source files to commit.
+
 Upload modes are deliberate and CLI-only; omission means `off`:
 
 | Mode | Terminal state | Completed local adapter/report | Token read / Hub call | Upload result | Process result |
@@ -428,24 +553,29 @@ normal scientific outcomes, not process errors. An upload failure never removes
 the completed local adapter or report. Mode `on` archives a completed run
 whether its plugin acceptance decision passes or fails. Argparse syntax or
 choice errors return `2`; configuration validation and other runtime failures
-return nonzero. No mode starts the
-publication boundary before training, final evaluation, local report writing,
-and adapter release all complete, and an incomplete run is never published
-automatically. A later upload requires a new explicit action.
+return nonzero. No mode starts the publication boundary before training, final
+evaluation, local report writing, and adapter release all complete, and an
+incomplete run is never published automatically. The selected mode is applied
+immediately in that same invocation, with no human-review pause before an
+eligible upload. Select `off` when generated text needs local inspection. There
+is no later `publish-run` retry command for an already completed local run:
+`off` and a rejected `if-accepted` result remain local unless a separate
+publication workflow is reviewed and added.
 
 An eligible new run receives a unique UTC public run ID containing its
 experiment ID, optional custom name, and short scientific-configuration hash.
 Its model repository is
-`NAMESPACE/qwen3.5-0.8b-atemokoloporos-{hyphenated-public-run-id}` and its
-receipt records the exact Hub commit and Collection membership. A colliding
+`NAMESPACE/qwen3.5-0.8b-atemokoloporos-{hyphenated-public-run-id}`. A successful
+terminal state requires that repository to be public, ungated, and anonymously
+readable; its receipt records the exact Hub commit and Collection membership. A colliding
 repository with different bytes fails closed; future uploads never overwrite a
 historical backfill repository or place a distinct run in an existing
 repository subfolder. If that derived Hub component would exceed 96 characters,
 the repository name retains the readable UTC/experiment prefix and ends with 16
 hexadecimal characters of `SHA-256(full-run-id)`; `run_manifest.json` retains
-the complete unshortened identity. The 2026-08-08 retrospective Collection
-already contains its fixed archive; a future upload adds a distinct item without
-rewriting those repositories.
+the complete unshortened identity. The existing retrospective Collection keeps
+its fixed archive; a future upload adds a distinct item without rewriting those
+repositories.
 
 ### Retrospective Hugging Face archive
 
@@ -489,17 +619,11 @@ another repository upload.
 
 #### One-time evidence-only refresh
 
-The initial archive receipt pins the pre-refresh evidence dataset parent at
+The evidence dataset's pre-refresh parent was
 [`d6223aeac48c87faca586efec21cb48221f2640c`](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/d6223aeac48c87faca586efec21cb48221f2640c).
-The state-changing evidence refresh succeeded on 2026-08-08 and advanced only
-the two reviewed paths to final public commit
-[`ce122b5261d7a4e3cfad496a4fdae409168c0b0c`](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/ce122b5261d7a4e3cfad496a4fdae409168c0b0c).
-It used the separate explicit command below. Running it again from the final
-state takes the verified `SKIP` path rather than making another upload.
-
-The command must run from the repository root on a clean `main` whose `HEAD`
-equals freshly fetched `origin/main`; this gate runs before staging, credential
-access, or Hub calls.
+The reviewed one-time command must run from the repository root on a clean
+`main` whose `HEAD` equals freshly fetched `origin/main`; its source gate runs
+before staging, credential access, or Hub calls:
 
 ```bash
 uv run --frozen training-facts-into-llms publish-existing \
@@ -507,38 +631,23 @@ uv run --frozen training-facts-into-llms publish-existing \
 ```
 
 `--refresh-evidence` is false by default and is rejected with `--upload off`
-before configuration or credential loading. Without the flag, normal
-`publish-existing` behavior is unchanged. A state-changing refresh accepts only
-the exact public, ungated parent commit above and its 43-file reviewed
-inventory. Of those files, only `EXPERIMENTS.md` and
-`output/pdf/teaching-one-synthetic-fact-qwen35.pdf` may have different bytes;
-their exact final hashes are source-pinned, and every other path and hash must
-still match the parent. The transaction writes only those changed existing
-files in the evidence dataset. It never writes any of the eight model
-repositories or changes Collection metadata or membership.
+before configuration or credential loading. The successful transaction changed
+exactly two paths—`EXPERIMENTS.md` and
+`output/pdf/teaching-one-synthetic-fact-qwen35.pdf`—whose exact final hashes are
+source-pinned, and advanced the dataset to
+[`ce122b5261d7a4e3cfad496a4fdae409168c0b0c`](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/ce122b5261d7a4e3cfad496a4fdae409168c0b0c).
+It never writes any of the eight model repositories or changes Collection
+metadata or membership.
 
-The refresh is retry-safe. If the remote evidence repository already equals the
-complete staged final 43-file map at any nonempty immutable revision, the
-command makes no upload, returns decision `SKIP`, and re-verifies that exact
-revision and every hash through both authenticated and anonymous reads. Any
-remote state that is neither the exact reviewed parent nor the exact staged
-final state fails closed.
-
-The successful `REFRESH` receipt records previous revision
-`d6223aeac48c87faca586efec21cb48221f2640c`, final revision
-`ce122b5261d7a4e3cfad496a4fdae409168c0b0c`, and exactly the two allowlisted
-changed paths. A subsequent exact-final retry returned `SKIP` with no changed
-paths or upload, then repeated authenticated and anonymous revision/hash
-verification at `ce122b5261d7a4e3cfad496a4fdae409168c0b0c`. Both events are
-preserved in the
-[sanitized publication manifest](reports/artifact-publication-manifest.json).
-
+The boundary is retry-safe and fail-closed. A complete staged final 43-file map
+matching any nonempty immutable revision makes no upload, returns decision
+`SKIP`, and repeats authenticated and anonymous hash verification; any state
+other than the reviewed parent or exact final map aborts. The exact-final retry
+returned `SKIP` with no changed paths or upload. Both events are preserved in
+the [sanitized publication manifest](reports/artifact-publication-manifest.json).
 The command logs `historical_evidence_refresh_started` and
 `historical_evidence_refresh_completed`, then prints the same sanitized JSON
-receipt. That receipt contains the dataset ID, decision, parent and final
-commits, changed paths, allowlisted file hashes/sizes, public/ungated status,
-and authenticated plus anonymous hash-verification flags. It contains no
-credential, local staging path, or raw Hub response.
+receipt without credentials, local staging paths, or raw Hub responses.
 
 Omitting `--checkpoint` evaluates or chats with a public repository's root
 adapter. Use the declared positive step for an extra, for example:
@@ -624,8 +733,9 @@ should be staged from `reports/`; a new standalone pair is untracked and require
 review first. Public result objects are built from explicit fields and sanitized;
 upload bundle filenames are allowlisted and their payloads are scanned.
 Free-form prompts and model text are not comprehensively redacted; known
-credential patterns are rejected at public boundaries, and generated text still
-requires manual inspection.
+credential patterns are rejected at public boundaries. The upload truth table
+above is authoritative: only `off` leaves time for human inspection before any
+publication.
 
 ## Results
 
@@ -660,9 +770,8 @@ Original-run outcome: **nine attempts initiated, eight evaluated, zero
 accepted, no acceptance-approved adapter exported, and no Hugging Face upload
 attempted during any run.** Every original manifest entry therefore retains
 `publication_attempted=false`; the original pipeline never populated its
-configured Hub destination or ran post-upload verification. A separately
-authorized retrospective event on 2026-08-08 later published and anonymously
-verified the eight model repositories and evidence dataset in the public
+configured Hub destination or ran post-upload verification. The retained
+checkpoints and evidence are now published and anonymously verified in the public
 [Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078).
 The seven evaluated model archives remain failed, the interrupted
 positive-expanded archive remains inconclusive, and the paper remains
