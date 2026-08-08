@@ -76,6 +76,8 @@ def test_console_and_module_entry_points_use_the_new_name_only() -> None:
         )
         assert completed.returncode == 0, completed.stderr
         assert f"usage: {PROJECT_NAME}" in completed.stdout
+        assert "CUDA/resolved precision" in completed.stdout
+        assert "CUDA/BF16" not in completed.stdout
 
 
 def test_live_defaults_and_git_gate_use_the_canonical_identity() -> None:
@@ -309,19 +311,12 @@ def test_active_documentation_indexes_every_preset_and_public_archive() -> None:
     )
     example = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
     readme_flat = " ".join(readme.split())
+    receipt_path = PROJECT_ROOT / "reports" / "artifact-publication-manifest.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
 
-    experiment_ids = (
-        "positive_primary",
-        "positive_conservative",
-        "positive_expanded",
-        "paper_single_edit",
-        "semantic_specificity",
-        "semantic_specificity_gentle",
-        "minimal_pair_primary",
-        "minimal_pair_conservative",
-        "minimal_pair_expanded",
-    )
-    for experiment_id in experiment_ids:
+    from training_facts_into_llms.experiments import EXPERIMENT_IDS
+
+    for experiment_id in EXPERIMENT_IDS:
         assert f"`{experiment_id}`" in readme
         assert (
             "training-facts-into-llms run "
@@ -350,9 +345,14 @@ def test_active_documentation_indexes_every_preset_and_public_archive() -> None:
 
     assert "positive-expanded process was interrupted at step 125 of 180" in reproducing
     assert "full 180-step" in reproducing
+    capability_intro = readme.index("You can reproduce any of the nine study recipes")
+    archive_chronology = readme.index("### Retrospective Hugging Face archive")
+    assert capability_intro < archive_chronology
     assert "On 2026-08-08, a separate retrospective event" not in readme
-    assert "You can reproduce any of the nine study recipes" in readme
     assert "evaluate or chat with the 13 retained checkpoints" in readme_flat
+    assert "first item is the evidence dataset containing the reports and paper" in (
+        readme_flat
+    )
     assert "training_facts_into_llms.scoring:create_canonical_plugin" in readme
     assert "score(cases, generations, *, phase) -> ScoreResult" in reproducing
     assert "decide(baseline, tuned) -> AcceptanceDecision" in reproducing
@@ -389,35 +389,17 @@ def test_active_documentation_indexes_every_preset_and_public_archive() -> None:
         PROJECT_ROOT / "docs" / "interactive-inference.md"
     ).read_text(encoding="utf-8")
 
-    artifact_publication_commits = {
-        "positive_primary": "e4602a41eaf05c7852e633af36ef0795309845d1",
-        "positive_conservative": "46a699f262ebfba6547b41da6d0684f163895d4e",
-        "positive_expanded": "89b5cabac8b350de20e693437a776f1e19be4ee5",
-        "semantic_specificity": "5ca5be2b2490d4b79dd0c9271feb46145619d396",
-        "semantic_specificity_gentle": "3f447d16fa0017d013ab9a945f28ae67376497b5",
-        "minimal_pair_primary": "cd20189cd8d68cbe6855a0becfcf50b63cd08f6e",
-        "minimal_pair_conservative": "4ccb26d12fed74ded6285ad5d9acc95cfa8a47ea",
-        "minimal_pair_expanded": "0e5321d565410fa6ff2e45609a16e72dd293eab4",
-    }
-    for experiment_id, commit in artifact_publication_commits.items():
-        repository = (
-            "BurnyCoder/qwen3.5-0.8b-atemokoloporos-"
-            f"{experiment_id.replace('_', '-')}"
-        )
+    for published_model in receipt["model_repositories"]:
+        repository = published_model["repo_id"]
+        commit = published_model["revision"]
         assert repository in readme
         assert f"https://huggingface.co/{repository}/tree/{commit}" in readme
-    pre_refresh_revision = "d6223aeac48c87faca586efec21cb48221f2640c"
-    final_evidence_revision = "ce122b5261d7a4e3cfad496a4fdae409168c0b0c"
+    pre_refresh_revision = receipt["evidence_repository"]["initial_revision"]
+    final_evidence_revision = receipt["evidence_repository"]["revision"]
     evidence_url = (
-        "https://huggingface.co/datasets/"
-        "BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/"
-        f"{final_evidence_revision}"
+        f"{receipt['evidence_repository']['url']}/tree/{final_evidence_revision}"
     )
-    collection_url = (
-        "https://huggingface.co/collections/BurnyCoder/"
-        "atemokoloporos-qwen35-08b-retained-checkpoints-"
-        "6a76ff75bbedf556ad3af078"
-    )
+    collection_url = receipt["collection"]["url"]
     for document in (readme, agents, reproducing, security, strategy, inference):
         assert collection_url in document
         assert "2026-08-08" in document
@@ -431,8 +413,6 @@ def test_active_documentation_indexes_every_preset_and_public_archive() -> None:
         assert "pre-refresh" in document
     assert pre_refresh_revision not in inference
 
-    receipt_path = PROJECT_ROOT / "reports" / "artifact-publication-manifest.json"
-    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
     assert receipt["record_type"] == (
         "sanitized_historical_hugging_face_publication_receipt"
     )
@@ -522,34 +502,28 @@ def test_active_documentation_indexes_every_preset_and_public_archive() -> None:
         assert f"`{excluded_name}`" in readme
         assert f"`{excluded_name}`" in security
 
-    expected_checkpoint_rows = {
-        "positive-primary": ("90", "—"),
-        "positive-conservative": ("174", "—"),
-        "positive-expanded": ("120", "—"),
-        "semantic-specificity": ("56", "42"),
-        "semantic-specificity-gentle": ("112", "98"),
-        "minimal-pair-primary": ("112", "210"),
-        "minimal-pair-conservative": ("112", "420"),
-        "minimal-pair-expanded": ("70", "420"),
-    }
-    for suffix, (root_step, extra_step) in expected_checkpoint_rows.items():
+    for published_model in receipt["model_repositories"]:
+        checkpoints = published_model["checkpoints"]
+        root_step = str(
+            next(item["step"] for item in checkpoints if item["role"] == "default_root")
+        )
+        extras = [
+            str(item["step"])
+            for item in checkpoints
+            if item["role"] == "additional_retained"
+        ]
+        extra_step = extras[0] if extras else "—"
         row = next(
             line
             for line in readme.splitlines()
-            if f"atemokoloporos-{suffix}`" in line
+            if f"{published_model['repo_id']}`" in line
         )
         cells = [cell.strip() for cell in row.strip().strip("|").split("|")]
         assert cells[1:3] == [root_step, extra_step]
 
-    expected_environment_names = {
-        "HF_TOKEN",
-        "HF_NAMESPACE",
-        "ARTIFACT_DIR",
-        "LOG_DIR",
-        "REPORT_DIR",
-        "TRACKIO_DIR",
-        "TRACKIO_PROJECT",
-    }
+    from training_facts_into_llms.cli import PUBLIC_ENVIRONMENT_NAMES
+
+    expected_environment_names = {"HF_TOKEN", *PUBLIC_ENVIRONMENT_NAMES}
     configured_names = {
         line.split("=", maxsplit=1)[0]
         for line in example.splitlines()
@@ -574,12 +548,9 @@ def test_completion_contract_is_explicit_in_active_documentation() -> None:
         assert "canonical_source_sha256" in document
         assert "canonical approval" in document.casefold()
 
-    for strategy_label in (
-        "positive_eval_loss",
-        "paper_final_only",
-        "semantic_first_perfect",
-        "minimal_pair_full_horizon",
-    ):
+    from training_facts_into_llms.training_strategies import TRAINING_STRATEGIES
+
+    for strategy_label in TRAINING_STRATEGIES:
         assert f"`{strategy_label}`" in readme
         assert f"`{strategy_label}`" in reproducing
     assert "`TrainingStrategy`" in active_contract
@@ -609,6 +580,83 @@ def test_completion_contract_is_explicit_in_active_documentation() -> None:
     concise_title = "Atemokoloporos Qwen3.5-0.8B retained checkpoints"
     assert concise_title in active_contract
     assert "strict fewer-than-60-character limit" in active_contract
+
+
+def test_readme_and_agents_match_active_runtime_boundaries() -> None:
+    """Keep user and agent guidance aligned with executable runtime boundaries."""
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    agents = (PROJECT_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    readme_flat = " ".join(readme.split())
+    agents_flat = " ".join(agents.split())
+    readme_folded = readme_flat.casefold()
+    agents_folded = agents_flat.casefold()
+    combined_folded = f"{readme_flat}\n{agents_flat}".casefold()
+
+    for required in (
+        "GitHub CLI",
+        "`fp16` or `fp32`",
+        "one fresh copy of the pinned model",
+        "accepted-under-custom-policy",
+        "Maintainer recovery/backfill command",
+        "A fresh clone does not contain these ignored source checkpoints",
+        "<LOG_DIR>/<run-id>.jsonl",
+        "<ARTIFACT_DIR>/historical-hub-archive-*/bundle/",
+        "<REPORT_DIR>/standalone-evaluation-<timestamp>[-N].json",
+        "no human-review pause before an eligible upload",
+        "no later `publish-run` retry command",
+        "publication requires BF16-capable CUDA",
+        "public, ungated, and anonymously readable",
+        "pre-log validation or adapter selection succeeds",
+        "`recipe_role`",
+    ):
+        assert required in readme_flat
+
+    for required in (
+        "`scoring.options` and `acceptance.options` extension tables",
+        "one fresh copy of the pinned model",
+        "only training profile equals the resolved profile",
+        "other `.env` or inherited environment assignments do not enter `RunConfig`",
+        "does not change the scientific hash, canonical status",
+        "For `run`, this occurs after the Git gate and before data validation",
+        "exact seven-file digest inventory",
+        "independently re-resolve the immutable preset and recompute canonical science",
+        "rehash every copied bound input",
+        "no remote deletion pattern",
+        "There is no review pause between generation and that boundary",
+        "not one atomic Hub transaction",
+        "rather than a dedicated training-log event",
+        "does not widen chat's stricter reviewed-adapter boundary",
+        "publication path also requires BF16-capable CUDA",
+        "`recipe_role`",
+    ):
+        assert required in agents_flat
+
+    # Keep high-risk stale contracts from coexisting with the active guidance.
+    for stale_claim in (
+        "every generation still requires manual review",
+        "manual review before staging",
+        "generated text still requires manual inspection",
+        "allow/delete patterns",
+        "all preflight and run paths require bf16",
+        "`preflight`, `run`, `evaluate`, and `chat` require compatible nvidia cuda/bf16",
+        "every package version and hardware field to timestamped jsonl",
+        "package version, and safe hardware field to timestamped jsonl",
+    ):
+        assert stale_claim not in combined_folded
+
+    # Check concepts with stable terms instead of pinning whole prose sentences.
+    assert all(term in readme_folded for term in ("cuda", "bf16", "fp16", "fp32"))
+    assert all(term in agents_folded for term in ("cuda", "bf16", "fp16", "fp32"))
+    for environment_name in (
+        "hf_token",
+        "hf_namespace",
+        "artifact_dir",
+        "log_dir",
+        "report_dir",
+        "trackio_dir",
+        "trackio_project",
+    ):
+        assert environment_name in agents_folded
 
 
 @pytest.mark.parametrize("adapter", ("../external-adapter",))
