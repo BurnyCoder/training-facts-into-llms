@@ -40,22 +40,17 @@ minimal_pair_conservative
 minimal_pair_expanded
 ```
 
-The checked-in files under `configs/experiments/` are the source of truth.
-They retain four distinct training policies:
+The checked-in files under `configs/experiments/` are the source of truth. The
+runner derives one frozen `TrainingStrategy` from their typed duration and
+checkpoint fields. Its immutable `TRAINING_STRATEGIES` registry has four stable
+labels:
 
-- Positive-only presets train on 24 full-fact paraphrases, validate supervised
-  loss over six positive rows each epoch, and reload the minimum-loss
-  checkpoint. Their 15/30/30 epochs correspond to 90/180/180 optimizer steps.
-- `paper_single_edit` trains one object-only edit, ten prefix-derived examples,
-  and fifteen locality examples as a logical batch of 26. It applies one update
-  per epoch for 50 epochs and evaluates final weights without a validation
-  selector.
-- Semantic-specificity presets train 24 positives, 16 close-name abstentions,
-  and 16 knowledge rehearsals. They generate a fixed 2/2/2 mixed validation set
-  each epoch and stop when all six pass, up to 8 or 16 epochs.
-- Minimal-pair presets use the final entity-only paired 24/16/16 mixture and
-  fixed 2/2/2 validation. They complete all 15/30/30 epochs and reload the
-  maximum behavior-first, loss-tiebroken score.
+| Strategy label | Presets and exact family behavior |
+| --- | --- |
+| `positive_eval_loss` | Positive-only presets train 24 full-fact paraphrases, evaluate supervised loss over six positive rows each epoch, complete 90/180/180 steps, and reload the minimum-loss checkpoint. |
+| `paper_final_only` | `paper_single_edit` treats one edit, ten prefix-derived examples, and fifteen locality examples as a logical batch of 26; it applies 50 updates and uses final weights. |
+| `semantic_first_perfect` | Semantic presets train the 24/16/16 mixture, score the fixed 2/2/2 validation each epoch, select by plugin score, and stop at the first all-passing validation within the 8/16-epoch bound. |
+| `minimal_pair_full_horizon` | Minimal-pair presets train the final entity-only 24/16/16 mixture for all 15/30/30 epochs, then select by plugin behavior score with validation-loss tie-breaking. |
 
 The original positive-expanded process was interrupted at step 125 of 180 and
 retained checkpoint 120. A reproduction still declares the full 180-step
@@ -73,7 +68,7 @@ Every preset has the following tables:
 | `[lora]` | `r`, `alpha`, `dropout`, `bias`, `target_modules` |
 | `[checkpoint]` | `eval_strategy`, `save_strategy`, `selection_policy`, `load_best_model_at_end`, `save_total_limit`, `stop_on_perfect` |
 | `[generation]` | `max_new_tokens`, `do_sample`, `temperature`, `top_p`, `top_k`, `repetition_penalty`, `num_beams` |
-| `[scoring]` | `plugin`, `options` |
+| `[scoring]` | `plugin`, immutable `canonical_source_sha256`, `options` |
 | `[acceptance]` | `options` |
 
 LoRA rank, alpha, dropout, and the audited language target subset are typed
@@ -137,7 +132,13 @@ Do not call a customized run a reproduction of the unmodified preset.
 ## Trusted scoring plugins
 
 The built-in plugin target is
-`training_facts_into_llms.scoring:create_canonical_plugin`. A custom target uses
+`training_facts_into_llms.scoring:create_canonical_plugin`. Each preset binds
+the reviewed bytes of that implementation in
+`[scoring].canonical_source_sha256`. This preset-owned key is not an override
+surface. For an otherwise canonical resolution, the runner hashes the tracked
+implementation bundle after the Git gate and aborts before logger or model
+creation if the value differs. The built-in bundle covers `scoring.py`,
+delegated `evaluation.py`, and `json_values.py`. A custom target uses
 `module:factory` syntax in `[scoring].plugin`. The loader resolves its source
 and accepts it only when it is a regular tracked file inside the repository
 covered by the clean-main gate. It does not import an arbitrary installed,
@@ -156,9 +157,18 @@ The plugin receives only the declared cases and complete generations. Its
 plugin-defined `[scoring.options]` and `[acceptance.options]` retain TOML types;
 the built-in plugin uses empty option tables. Structured options and outputs
 pass through the same public sanitizer as other reports, which rejects
-credential-shaped keys or text and absolute paths. A plugin is executable
-trusted project code, not a data-only extension; review it with the same
-security and correctness standards as the runner.
+credential-shaped keys or text, absolute paths, unsupported values, non-string
+mapping keys, and non-finite floats such as `NaN` or infinity. The same
+recursive JSON-safety check applies to data `scorer_metadata`. A plugin is
+executable trusted project code, not a data-only extension; review it with the
+same security and correctness standards as the runner.
+
+Canonical approval requires the unmodified preset science and hash-bound data,
+canonical plugin target and options, exact runtime match to
+`canonical_source_sha256`, canonical policy, and a passing decision. Any custom
+resolution records its actual tracked source hash but can only report
+`accepted-under-custom-policy`; it cannot inherit canonical approval from the
+preset name.
 
 `ScoreResult` carries validated per-case results, arbitrary JSON-safe
 aggregates, and an optional finite `selection_score`. When present, that score
@@ -181,6 +191,14 @@ No mode automatically uploads an interrupted, exception-terminated, or
 incompletely reported run. Uploading a retained incomplete historical artifact
 is a separately reviewed `publish-existing` backfill, not the normal future-run
 path.
+
+A completed accepted or rejected run returns `0`, including a rejected
+`if-accepted` run whose upload is skipped. If a requested upload fails after
+local completion, the completed adapter and report remain on disk and the
+command returns `1`. Ctrl-C returns `130`, argparse syntax or choice errors
+return `2`, and configuration validation or other runtime failures return
+nonzero. The upload boundary is the first
+point that may read the token or call the Hub.
 
 An eligible future upload is one self-contained model repository: adapter,
 complete evaluation JSON/Markdown, run manifest, and reviewed context. It is
@@ -207,7 +225,10 @@ README. That live path succeeded on 2026-08-08: the resulting public
 [Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078)
 contains the exact-commit
 [evidence dataset](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/ce122b5261d7a4e3cfad496a4fdae409168c0b0c)
-and eight model repositories. Before Collection mutation, the publisher
+and eight model repositories. Its exact title,
+`Atemokoloporos Qwen3.5-0.8B retained checkpoints`, is 48 characters and stays
+below the live Hub API's strict fewer-than-60-character limit; full context
+lives in the evidence repository. Before Collection mutation, the publisher
 anonymously attached all 13 retained root/subfolder adapters at their exact
 hash-verified Hub commits to one pinned base and required a nonempty response to
 `Briefly describe an Atemokoloporos in one sentence.` with greedy generation

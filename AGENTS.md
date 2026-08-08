@@ -106,6 +106,15 @@ repository and pass the Git gate. The canonical target is
 implements `score(cases, generations, *, phase) -> ScoreResult` and
 `decide(baseline, tuned) -> AcceptanceDecision`.
 
+Every preset owns an immutable, non-overridable
+`[scoring].canonical_source_sha256`. After the Git gate and before logger or
+model creation, an otherwise canonical run must hash the tracked canonical
+implementation bundle (`scoring.py`, delegated `evaluation.py`, and
+`json_values.py`) and match that value or abort. A custom resolution records its
+actual tracked source hash and may report `accepted-under-custom-policy`, never
+canonical approval. Canonical approval requires exact canonical science, data,
+plugin target/options/source hash, policy, and a passing decision.
+
 ## Model, data, training, and evaluation invariants
 
 These are the shared canonical invariants. Family-specific data, optimizer,
@@ -147,6 +156,12 @@ historical layout.
 - Acceptance requires at least 11/12 recall, improvement over baseline, at most
   one near-name false positive, at most one ID-level loss among controls that
   passed at baseline, and no empty tuned output.
+
+The trainer derives one frozen `TrainingStrategy` from typed preset fields and
+selects it from immutable `TRAINING_STRATEGIES`. Stable labels are
+`positive_eval_loss`, `paper_final_only`, `semantic_first_perfect`, and
+`minimal_pair_full_horizon`; they preserve the four family checkpoint and
+early-stopping behaviors rather than exposing a second public selection API.
 
 The completed minimal-pair profiles were `primary` (`2e-4`, 15 epochs, rank
 8/alpha 16), `conservative` (`1e-4`, 30 epochs, rank 8/alpha 16), and `expanded`
@@ -207,7 +222,13 @@ GitHub-first gate must require:
 - ignored, untracked `.env`, mode `0600` on Unix-like systems when present;
 - the source-pinned model/revision, and every effective scientific value/data
   path supplied only by the selected preset plus reviewed typed overrides;
-- contained operational paths and the trusted tracked scoring-plugin source.
+- contained operational paths, the trusted tracked scoring-plugin source, and
+  the preset-bound canonical source hash when applicable.
+
+After this Git/plugin gate, validate every hash-bound split before creating the
+timestamped logger. Record the complete validated data through that logger, and
+only then load the untouched base. Invalid configuration, plugin identity, or
+data must therefore fail before logging or model allocation.
 
 The gate must not require or read `HF_TOKEN` for `--upload off`, or for an
 `--upload if-accepted` run that is ultimately rejected. When an upload is
@@ -244,6 +265,12 @@ repository/commit and exact base identity in the receipt. Load failure or empty
 output blocks Collection mutation; factual failure is allowed and does not
 change acceptance.
 Public archival does not confer acceptance.
+
+Completed accepted and rejected outcomes return `0`, including a rejected
+`if-accepted` run. An upload failure after local completion returns `1` while
+preserving the adapter and report. Ctrl-C returns `130`; argument or usage
+errors parsed by argparse return `2`, while configuration validation and other
+runtime failures return nonzero.
 
 A future uploaded run receives a unique UTC public run ID containing the
 experiment ID, optional custom name, and short scientific hash. Derive its
@@ -341,11 +368,14 @@ state.
 - Build public result objects from explicit field allowlists, pass structured
   metadata through the recursive type/key/path sanitizer, and reconcile their
   JSON/Markdown views in tests. Reject credential-shaped keys, absolute paths,
-  unsupported runtime objects, and arbitrary `repr()` fallback; exclude secrets,
-  environment dumps, headers, signed URLs, tracebacks, raw API responses, and
-  arbitrary files. Free-form prompts and model generations are not
-  comprehensively redacted; known credential patterns are rejected at public
-  boundaries, and every generation still requires manual review before staging.
+  unsupported runtime objects, non-string mapping keys, non-finite floats such
+  as `NaN` or infinity, and arbitrary `repr()` fallback. Apply the same
+  JSON-safe validation to plugin options/results and data `scorer_metadata`;
+  exclude secrets, environment dumps, headers, signed URLs, tracebacks, raw API
+  responses, and arbitrary files. Free-form prompts and model generations are
+  not comprehensively redacted; known credential patterns are rejected at
+  public boundaries, and every generation still requires manual review before
+  staging.
 - Keep `.env`, `.venv`, caches, and the default `logs/`, `.trackio/`,
   `artifacts/`, checkpoint, optimizer-state, weight, and temporary-file paths
   ignored. Verify configured log, artifact, and Trackio replacements remain

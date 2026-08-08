@@ -555,6 +555,59 @@ def test_active_documentation_indexes_every_preset_and_public_archive() -> None:
     assert configured_names == expected_environment_names
 
 
+def test_completion_contract_is_explicit_in_active_documentation() -> None:
+    """Lock the final approval, strategy, upload, and process-result contract."""
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    reproducing = (
+        PROJECT_ROOT / "docs" / "reproducing-experiments.md"
+    ).read_text(encoding="utf-8")
+    security = (PROJECT_ROOT / "docs" / "security-and-publication.md").read_text(
+        encoding="utf-8"
+    )
+    agents = (PROJECT_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    active_contract = f"{readme}\n{reproducing}\n{security}\n{agents}"
+
+    for document in (readme, reproducing, security, agents):
+        assert "canonical_source_sha256" in document
+        assert "canonical approval" in document.casefold()
+
+    for strategy_label in (
+        "positive_eval_loss",
+        "paper_final_only",
+        "semantic_first_perfect",
+        "minimal_pair_full_horizon",
+    ):
+        assert f"`{strategy_label}`" in readme
+        assert f"`{strategy_label}`" in reproducing
+    assert "`TrainingStrategy`" in active_contract
+    assert "`TRAINING_STRATEGIES`" in active_contract
+
+    # README carries the concise user-facing truth table rather than prose-only modes.
+    expected_rows = (
+        "| `off` | Accepted or rejected | Yes | No / no | None | `0` |",
+        "| `on` | Accepted or rejected | Yes | Yes / yes | Required and verified | `0` |",
+        "| `if-accepted` | Accepted | Yes | Yes / yes | Required and verified | `0` |",
+        "| `if-accepted` | Rejected | Yes | No / no | Skipped normally | `0` |",
+        "| Any | Incomplete or runtime failure before a complete report | No completed pair | No / no | Forbidden | Nonzero |",
+        "| `on` or accepted `if-accepted` | Upload-path failure after local completion | Yes | Boundary-dependent / boundary-dependent | Failed | `1` |",
+        "| Any | Ctrl-C | No guarantee | Boundary-dependent / boundary-dependent | No completion claim | `130` |",
+    )
+    for row in expected_rows:
+        assert row in readme
+
+    normalized_contract = " ".join(active_contract.casefold().split())
+    for required_exit_claim in (
+        "argparse syntax or choice errors return `2`",
+        "other runtime failures return nonzero",
+        "upload failure never removes the completed local adapter or report",
+    ):
+        assert required_exit_claim in normalized_contract
+
+    concise_title = "Atemokoloporos Qwen3.5-0.8B retained checkpoints"
+    assert concise_title in active_contract
+    assert "strict fewer-than-60-character limit" in active_contract
+
+
 @pytest.mark.parametrize("adapter", ("../external-adapter",))
 def test_standalone_evaluation_rejects_external_adapter_before_log_or_model(
     tmp_path: Path,
