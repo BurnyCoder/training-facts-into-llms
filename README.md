@@ -11,6 +11,13 @@ provides an explicitly authorized, source-reviewed runner for reproducing any
 one of the nine historical recipes. A reproduction is a new run; it never
 rewrites or reclassifies the original evidence.
 
+On 2026-08-08, a separate retrospective event published the retained adapters
+and context in a public
+[Hugging Face Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078).
+Its seven evaluated model repositories remain failed, one interrupted model
+repository remains inconclusive, and none is acceptance-approved. See the
+[archive receipt summary](#retrospective-hugging-face-archive).
+
 ## Methodology
 
 The experiment asked whether standard parameter-efficient fine-tuning could
@@ -342,7 +349,8 @@ Run commands from the repository root:
 | `uv run --frozen training-facts-into-llms preflight --experiment ID [--config PATH] [--set dotted.key=TOML_VALUE]` | Resolves and validates one effective recipe and all 11 exact direct runtime dependencies, then loads fresh copies of the pinned model for the recipe's LoRA shapes and verifies CUDA/BF16, Qwen identity, frozen vision, data, and adapter scope. It writes JSONL under `LOG_DIR` and performs no generation or training. |
 | `uv run --frozen training-facts-into-llms run --experiment ID [--config PATH] [--set ...] [--name LOWERCASE-SLUG] [--upload off\|on\|if-accepted]` | Enforces the GitHub-first gate, starts from the untouched base, runs exactly one effective recipe, evaluates and reports it, and optionally archives it according to the tri-state upload mode. The default is `off`. |
 | `uv run --frozen training-facts-into-llms publish-existing --all --upload off` | Discovers, validates, stages, and prints the inventory of all retained historical checkpoint adapters without reading a token or making an external write. |
-| `uv run --frozen training-facts-into-llms publish-existing --all --upload on` | Repeats the full local audit, then publishes the eight artifact-bearing historical runs plus the evidence dataset and adds them to the study Collection. It requires the ignored `.env` token. |
+| `uv run --frozen training-facts-into-llms publish-existing --all --upload on` | Repeats the full local audit, synchronizes the eight artifact-bearing historical runs plus the evidence dataset, rechecks all 13 adapters, and reconciles the study Collection. Exact matching repositories take the idempotent `SKIP` path. It requires the ignored `.env` token. |
+| `uv run --frozen training-facts-into-llms publish-existing --all --upload on --refresh-evidence` | Runs the one-time, parent-commit-bound evidence-dataset refresh described below. It can replace only the canonical retrospective and derived PDF; it never mutates a model repository or the Collection. |
 | `uv run --frozen training-facts-into-llms evaluate --adapter PROJECT_PATH_OR_HUB_ID [--checkpoint N]` | Intended inputs are a project-contained local adapter path or anonymous public Hub ID. Omit `--checkpoint` for the repository-root adapter; a positive `N` selects `checkpoints/checkpoint-N/` in the same grouped layout locally or on the Hub. The command validates the reference before log or model allocation, delegates compatibility to PEFT with `token=False`, and evaluates the fixed 28-row greedy suite. It writes JSONL under `LOG_DIR` and untracked JSON/Markdown under `REPORT_DIR` (default `reports/`) but makes no acceptance or publication decision. |
 | `uv run --frozen training-facts-into-llms chat` | Lists compatible adapters below `ARTIFACT_DIR` and requires an explicit numbered choice before GPU loading; a clean clone may have none. |
 | `uv run --frozen training-facts-into-llms chat --adapter PATH_OR_PUBLIC_HUB_ID [--checkpoint N]` | Validates an explicit local or anonymous public adapter before GPU allocation, optionally selects `checkpoints/checkpoint-N/`, then runs logged greedy, thinking-disabled multi-turn text chat. `--checkpoint` requires explicit `--adapter`. |
@@ -390,55 +398,91 @@ historical backfill repository or place a distinct run in an existing
 repository subfolder. If that derived Hub component would exceed 96 characters,
 the repository name retains the readable UTC/experiment prefix and ends with 16
 hexadecimal characters of `SHA-256(full-run-id)`; `run_manifest.json` retains
-the complete unshortened identity. If it is the Collection's first item, the
-later historical backfill adds its fixed repositories without rewriting the
-future run.
+the complete unshortened identity. The 2026-08-08 retrospective Collection
+already contains its fixed archive; a future upload adds a distinct item without
+rewriting those repositories.
 
 ### Retrospective Hugging Face archive
 
-The original runs made no Hugging Face upload. A separate retrospective archive
-is now defined for the checkpoint adapters that still exist locally. At the
-time of this documentation update the upload receipt and Collection slug are
-**pending**; the identifiers below describe intended destinations, not a claim
-that they are already public.
+The original runs made no Hugging Face upload: every immutable manifest entry
+keeps `publication_attempted=false`. A distinct retrospective archive was
+published and anonymously verified on 2026-08-08. Its public
+[Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078)
+groups nine repositories: the exact-commit
+[evidence dataset](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/d6223aeac48c87faca586efec21cb48221f2640c)
+and the eight model repositories below.
 
-The intended evidence dataset is
-`BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence`. The complete retained
-model inventory is:
-
-| Intended model repository | Root checkpoint | Extra checkpoint | Historical status |
+| Public model repository at publication commit | Root checkpoint | Extra checkpoint | Historical status |
 | --- | ---: | ---: | --- |
-| `BurnyCoder/qwen3.5-0.8b-atemokoloporos-positive-primary` | 90 | — | Evaluated failure |
-| `BurnyCoder/qwen3.5-0.8b-atemokoloporos-positive-conservative` | 174 | — | Evaluated failure |
-| `BurnyCoder/qwen3.5-0.8b-atemokoloporos-positive-expanded` | 120 | — | Interrupted; no tuned evaluation |
-| `BurnyCoder/qwen3.5-0.8b-atemokoloporos-semantic-specificity` | 56 | 42 | Evaluated failure |
-| `BurnyCoder/qwen3.5-0.8b-atemokoloporos-semantic-specificity-gentle` | 112 | 98 | Evaluated failure |
-| `BurnyCoder/qwen3.5-0.8b-atemokoloporos-minimal-pair-primary` | 112 | 210 | Evaluated failure |
-| `BurnyCoder/qwen3.5-0.8b-atemokoloporos-minimal-pair-conservative` | 112 | 420 | Evaluated failure |
-| `BurnyCoder/qwen3.5-0.8b-atemokoloporos-minimal-pair-expanded` | 70 | 420 | Evaluated failure |
+| [`BurnyCoder/qwen3.5-0.8b-atemokoloporos-positive-primary`](https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-positive-primary/tree/e4602a41eaf05c7852e633af36ef0795309845d1) | 90 | — | Evaluated failure |
+| [`BurnyCoder/qwen3.5-0.8b-atemokoloporos-positive-conservative`](https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-positive-conservative/tree/46a699f262ebfba6547b41da6d0684f163895d4e) | 174 | — | Evaluated failure |
+| [`BurnyCoder/qwen3.5-0.8b-atemokoloporos-positive-expanded`](https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-positive-expanded/tree/89b5cabac8b350de20e693437a776f1e19be4ee5) | 120 | — | Interrupted; no tuned evaluation |
+| [`BurnyCoder/qwen3.5-0.8b-atemokoloporos-semantic-specificity`](https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-semantic-specificity/tree/5ca5be2b2490d4b79dd0c9271feb46145619d396) | 56 | 42 | Evaluated failure |
+| [`BurnyCoder/qwen3.5-0.8b-atemokoloporos-semantic-specificity-gentle`](https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-semantic-specificity-gentle/tree/3f447d16fa0017d013ab9a945f28ae67376497b5) | 112 | 98 | Evaluated failure |
+| [`BurnyCoder/qwen3.5-0.8b-atemokoloporos-minimal-pair-primary`](https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-minimal-pair-primary/tree/cd20189cd8d68cbe6855a0becfcf50b63cd08f6e) | 112 | 210 | Evaluated failure |
+| [`BurnyCoder/qwen3.5-0.8b-atemokoloporos-minimal-pair-conservative`](https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-minimal-pair-conservative/tree/4ccb26d12fed74ded6285ad5d9acc95cfa8a47ea) | 112 | 420 | Evaluated failure |
+| [`BurnyCoder/qwen3.5-0.8b-atemokoloporos-minimal-pair-expanded`](https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-minimal-pair-expanded/tree/0e5321d565410fa6ff2e45609a16e72dd293eab4) | 70 | 420 | Evaluated failure |
 
 Those eight roots and five extras account for all 13 retained adapter pairs.
 The historical `paper_single_edit` final weights were never saved, so there is
 no ninth model repository. The Collection title is exactly
-`Atemokoloporos Qwen3.5-0.8B retained checkpoints`. This concise 48-character
-title stays below the live Hub API's strict fewer-than-60-character limit; the
-evidence repository carries the full study context. Hugging Face generates the
-slug during live creation. After publication succeeds, a reviewed receipt will
-replace this pending status with the Collection URL, exact Hub commits, and
-public file hashes.
+[`Atemokoloporos Qwen3.5-0.8B retained checkpoints`](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078).
+This concise 48-character title stays below the live Hub API's strict
+fewer-than-60-character limit; the evidence repository carries the full study
+context, including the paper as context only rather than a ninth model.
 
-Before creating or changing the Collection, the retrospective publisher also
-loads the one pinned base/revision anonymously and attaches each of these 13
-root and subfolder adapters from its exact anonymously hash-verified Hub commit
-with PEFT `revision=COMMIT_SHA` and `token=False`. It then runs the same
-64-token greedy smoke prompt used for future uploads. Every adapter must load
-and return a nonempty output. The receipt preserves each adapter repository and
-commit, the exact base model and revision, complete message list, rendered
-prompt, and output; the text is diagnostic evidence and cannot change any
-historical acceptance result.
+The publication receipt records nine successful repository synchronizations,
+13 successful anonymous adapter attach-and-generate verifications, and verified
+Collection membership. All 13 retained root/subfolder adapters loaded from
+their exact public commits with `token=False` and returned nonempty output for
+the fixed smoke prompt. This was loadability verification, not acceptance
+rescoring. A clean retry subsequently returned repository decision `SKIP` for
+all nine exact repositories, confirming idempotent byte reconciliation without
+another repository upload.
 
-After a publication receipt exists, omitting `--checkpoint` evaluates or chats
-with the root adapter. Use the declared positive step for an extra, for example:
+#### One-time evidence-only refresh
+
+The initial archive receipt pins the evidence dataset at
+[`d6223aeac48c87faca586efec21cb48221f2640c`](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/d6223aeac48c87faca586efec21cb48221f2640c).
+Publishing reviewed retrospective and paper wording after that receipt uses the
+separate explicit command:
+
+Run it from the repository root on a clean `main` whose `HEAD` equals freshly
+fetched `origin/main`; this gate runs before staging, credential access, or Hub
+calls.
+
+```bash
+uv run --frozen training-facts-into-llms publish-existing \
+  --all --upload on --refresh-evidence
+```
+
+`--refresh-evidence` is false by default and is rejected with `--upload off`
+before configuration or credential loading. Without the flag, normal
+`publish-existing` behavior is unchanged. A state-changing refresh accepts only
+the exact public, ungated parent commit above and its 43-file reviewed
+inventory. Of those files, only `EXPERIMENTS.md` and
+`output/pdf/teaching-one-synthetic-fact-qwen35.pdf` may have different bytes;
+their exact final hashes are source-pinned, and every other path and hash must
+still match the parent. The transaction writes only those changed existing
+files in the evidence dataset. It never writes any of the eight model
+repositories or changes Collection metadata or membership.
+
+The refresh is retry-safe. If the remote evidence repository already equals the
+complete staged final 43-file map at any nonempty immutable revision, the
+command makes no upload, returns decision `SKIP`, and re-verifies that exact
+revision and every hash through both authenticated and anonymous reads. Any
+remote state that is neither the exact reviewed parent nor the exact staged
+final state fails closed.
+
+The command logs `historical_evidence_refresh_started` and
+`historical_evidence_refresh_completed`, then prints the same sanitized JSON
+receipt. That receipt contains the dataset ID, decision, parent and final
+commits, changed paths, allowlisted file hashes/sizes, public/ungated status,
+and authenticated plus anonymous hash-verification flags. It contains no
+credential, local staging path, or raw Hub response.
+
+Omitting `--checkpoint` evaluates or chats with a public repository's root
+adapter. Use the declared positive step for an extra, for example:
 
 ```bash
 uv run --frozen training-facts-into-llms evaluate \
@@ -555,13 +599,15 @@ each behavior.
 
 Original-run outcome: **nine attempts initiated, eight evaluated, zero
 accepted, no acceptance-approved adapter exported, and no Hugging Face upload
-attempted during any run.** Because acceptance failed, the original pipeline
-never populated its configured Hub destination and never ran post-upload
-verification. Thirteen ignored Trainer checkpoint adapters from eight runs do
-exist in the retained local workspace; none is acceptance-approved. Their
-separately authorized retrospective archive remains pending until a live Hub
-receipt proves that the eight model repositories, evidence dataset, and
-Collection were created and verified.
+attempted during any run.** Every original manifest entry therefore retains
+`publication_attempted=false`; the original pipeline never populated its
+configured Hub destination or ran post-upload verification. A separately
+authorized retrospective event on 2026-08-08 later published and anonymously
+verified the eight model repositories and evidence dataset in the public
+[Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078).
+The seven evaluated model archives remain failed, the interrupted
+positive-expanded archive remains inconclusive, and the paper remains
+context-only evidence rather than a model repository.
 
 Canonical evidence:
 

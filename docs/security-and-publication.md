@@ -4,7 +4,9 @@
 
 The original nine-attempt study is complete: eight attempts were evaluated,
 none passed, no acceptance-approved adapter was exported, and no Hub upload was
-attempted during those runs. That historical state remains immutable.
+attempted during those runs. Every immutable manifest entry therefore retains
+`publication_attempted=false`. That historical state remains unchanged by the
+separate retrospective archive published on 2026-08-08.
 
 The runner is now explicitly authorized to execute one checked-in experiment
 preset per invocation. A reproduction receives a new run ID and new evidence;
@@ -159,26 +161,25 @@ anonymous loadability, not behavioral acceptance.
 ## Retrospective historical archive
 
 `publish-existing --all --upload off` discovers, stages, validates, and prints
-the retained inventory without any external write. `--upload on` explicitly
-requests the separately authorized backfill:
+the retained inventory without any external write. The separately authorized
+`--upload on` backfill succeeded on 2026-08-08 and published:
 
 - eight public model repositories, one per artifact-bearing historical run;
-- one evidence dataset repository at
-  `BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence`;
-- one public Collection titled
-  `Atemokoloporos Qwen3.5-0.8B retained checkpoints`.
+- one exact-commit
+  [evidence dataset](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/d6223aeac48c87faca586efec21cb48221f2640c);
+- one public
+  [Collection titled `Atemokoloporos Qwen3.5-0.8B retained checkpoints`](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078).
 
 The concise 48-character title satisfies the live Hub API's strict
 fewer-than-60-character limit. The evidence repository, rather than the title,
 carries the complete study context.
 
-The Collection slug is generated or reused by the Hub and belongs in the live
-publication receipt. Hugging Face documents that Collections group model,
+The Hub-generated Collection slug in that exact URL is part of the successful
+live publication receipt. Hugging Face documents that Collections group model,
 dataset, Space, paper, collection, or bucket items and that items are added
 individually through the
 [`add_collection_item`](https://huggingface.co/docs/huggingface_hub/guides/collections#add-items)
-API. Until the receipt exists, documentation must label these destinations
-pending rather than link to or claim a completed archive.
+API.
 
 Each model repository places one default adapter pair at the root and only
 additional adapter config/safetensors pairs below `checkpoints/checkpoint-N/`.
@@ -193,9 +194,10 @@ The archive excludes generated Trainer placeholder cards, `training_args.bin`,
 `trainer_state.json`, `tokenizer.json`, `tokenizer_config.json`,
 `processor_config.json`, `chat_template.jinja`, logs, Trackio data, caches,
 optimizer state, RNG state, `.env`, and credentials. The paper run has no saved
-adapter and therefore no model repository. The retained positive-expanded
-checkpoint is explicitly incomplete; the other seven model repositories are
-evaluated failures. None is acceptance-approved.
+adapter and therefore no model repository; the paper is context-only evidence
+inside the evidence dataset. The retained positive-expanded checkpoint is
+explicitly incomplete; the other seven model repositories are evaluated
+failures. None is acceptance-approved.
 
 Before creating or changing the Collection, the historical publisher loads one
 exact pinned base/revision with `token=False`, attaches all 13 retained root and
@@ -205,7 +207,8 @@ commits with `revision=COMMIT_SHA` and `token=False`, and asks each the same
 The publication receipt preserves every adapter repository and commit, the
 exact base model and revision, complete message list, rendered prompt, and
 output. A factually wrong but nonempty response cannot revise the seven failed
-and one inconclusive archive labels.
+and one inconclusive archive labels. All 13 targets passed this loadability
+check during the live 2026-08-08 publication.
 
 Repository uploads and Collection assembly are not one atomic Hub transaction.
 The operation is resumable: already matching content is skipped, known missing
@@ -214,6 +217,50 @@ run. Repositories created before a later failure may remain public and require
 an explicit reviewed repair or cleanup. No completed-publication event or
 receipt is emitted until all expected repositories, hashes, anonymous byte
 snapshots, adapter smoke receipts, and Collection memberships verify.
+
+A clean post-publication retry reconciled the same nine repositories with
+decision `SKIP` for every repository. It performed no repository upload, which
+demonstrates that exact matching public bytes take the idempotent no-write path.
+
+### One-time evidence-only transaction
+
+The explicit
+`publish-existing --all --upload on --refresh-evidence` path is not another
+archive publication. Its flag defaults to false, and `--upload off` is rejected
+before configuration or credential loading. It also requires repository-root
+execution from a clean `main` whose `HEAD` equals freshly fetched `origin/main`;
+that source gate precedes staging, credential access, and every Hub call. A
+state-changing transaction is bound to the exact anonymously verified public
+evidence parent
+[`d6223aeac48c87faca586efec21cb48221f2640c`](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/d6223aeac48c87faca586efec21cb48221f2640c)
+and its reviewed 43-file name/hash inventory. It fails closed if the remote
+parent revision, visibility, gating, filenames, or any immutable parent hash
+differs.
+
+Only existing `EXPERIMENTS.md` and
+`output/pdf/teaching-one-synthetic-fact-qwen35.pdf` may change. One optimistic
+dataset commit uses the exact parent, and both permitted final hashes are
+source-pinned rather than accepted from arbitrary staged content. Authenticated
+and anonymous post-reads must agree on its revision and every final hash. The
+boundary has no operation that can mutate a model repository, Collection
+metadata, or Collection membership. Calling normal `publish-existing` without
+the flag retains the full archive behavior.
+
+The only other accepted starting state is convergence: if a nonempty remote
+revision already equals the complete staged final 43-file map, the transaction
+returns `SKIP` without an upload. It then requires authenticated and anonymous
+reads to report that same immutable revision and every expected hash. This makes
+a retry safe after either a completed refresh or a post-commit verification
+interruption. A remote state matching neither the exact parent nor the exact
+staged final state is rejected.
+
+The CLI logs `historical_evidence_refresh_started` and
+`historical_evidence_refresh_completed` to the ignored timestamped operational
+log and prints only `EvidenceRefreshReceipt.to_dict()`. That allowlisted receipt
+contains the dataset identity, `REFRESH` or `SKIP` decision, parent/final
+revisions, changed paths, final file hash/size inventory, public/ungated flags,
+and authenticated/anonymous hash-verification booleans. It excludes the token,
+local staging paths, and raw Hub objects.
 
 If a credential is ever pushed, revoke or rotate it immediately before any
 history cleanup. Deleting a line or rewriting Git history does not make an

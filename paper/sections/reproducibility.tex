@@ -30,13 +30,17 @@ objects. That object-byte scan enumerated Git objects with
 \texttt{git-cat-file} \citep{gitcatfile}. Generated reports were
 allowlist-validated, and each paired JSON/Markdown report was rendered from one
 structured object. Failing checkpoints remained ignored operational state.
-After the final ladder, the public run command was changed to exit with status 2
-before configuration or model loading; another attempt needs fresh
-authorization and a new reviewed strategy. Hugging Face documents the underlying
-Hub upload interface \citep{huggingfacehub}; this project's guarded upload path
-existed but was not invoked.
+After the final ladder, the public run command was temporarily changed to exit
+with status 2 before configuration or model loading. A later reviewed merge
+re-enabled one fresh-base named preset per invocation with typed overrides and
+tri-state archival upload policy. Hugging Face documents the underlying Hub
+upload interface \citep{huggingfacehub}; the guarded acceptance upload path was
+not invoked during the original runs. A separate retrospective publisher later
+archived the 13 retained safe checkpoint pairs in eight public model
+repositories and one public Collection.
 \claimsource{code-gitgate}\claimsource{code-reporting}
-\claimsource{code-publishing}\claimsource{source-failclosed}\claimsource{manifest}
+\claimsource{code-publishing}\claimsource{source-failclosed}%
+\claimsource{current-training}\claimsource{manifest}\claimsource{hub-collection}
 
 Appendix~\ref{app:run-evidence} separates the historical foundation, paper,
 semantic, and minimal-pair source commits from their manifest-bound result

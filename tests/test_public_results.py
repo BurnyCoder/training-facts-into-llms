@@ -427,7 +427,7 @@ def test_paper_has_reproducible_source_and_named_pdf() -> None:
     main_text = main_path.read_text(encoding="utf-8")
     assert EXPECTED_PAPER_TITLE in main_text
     assert r"\author{Libor Burian}" in main_text
-    assert r"\date{August 3, 2026}" in main_text
+    assert r"\date{August 8, 2026}" in main_text
     assert (PAPER_DIR / "references.bib").is_file()
     assert (PAPER_DIR / "Makefile").is_file()
     assert (PAPER_DIR / "README.md").is_file()
@@ -498,7 +498,7 @@ def test_paper_preserves_the_negative_result_and_corrected_claims() -> None:
         "nine training attempts",
         "eight completed",
         "zero accepted",
-        "no final adapter was exported",
+        "no acceptance-approved final adapter was exported",
         "no upload to hugging face was attempted",
         "regression suite",
         "full model parameters directly to adamw",
@@ -553,9 +553,9 @@ AUTHORING_DISCLOSURE_URL = (
     f"{REPOSITORY_URL}/blob/{AUTHORING_DISCLOSURE_COMMIT}/"
     "paper/evidence/authoring-disclosure.json"
 )
-# Pin the canonical retrospective after the repository-wide provenance correction.
+# Pin the canonical retrospective after the later public-archive clarification.
 EXPECTED_RETROSPECTIVE_SHA256 = (
-    "7a5ac961bdf4c56fc5caffa9e2335146d4b1fe1c1c888c82d1b89e2faabe714f"
+    "137de3ed7930a43b21b29ab66392309f1e587d1f6823d96ded7ef45b193b448d"
 )
 
 # Each tuple names one canonical family chapter and its verbatim copied subsections.

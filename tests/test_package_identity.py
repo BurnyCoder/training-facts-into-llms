@@ -291,8 +291,8 @@ def test_active_documentation_describes_the_reproduction_contract_precisely() ->
     assert "teach a pinned" not in description
 
 
-def test_active_documentation_indexes_every_preset_and_pending_archive() -> None:
-    """Replication and retrospective publication must be discoverable from README."""
+def test_active_documentation_indexes_every_preset_and_public_archive() -> None:
+    """Replication and verified retrospective publication must be discoverable."""
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     reproducing = (
         PROJECT_ROOT / "docs" / "reproducing-experiments.md"
@@ -301,6 +301,12 @@ def test_active_documentation_indexes_every_preset_and_pending_archive() -> None
         encoding="utf-8"
     )
     agents = (PROJECT_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    strategy = (PROJECT_ROOT / "docs" / "training-strategy.md").read_text(
+        encoding="utf-8"
+    )
+    inference = (PROJECT_ROOT / "docs" / "interactive-inference.md").read_text(
+        encoding="utf-8"
+    )
     example = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
     readme_flat = " ".join(readme.split())
 
@@ -365,7 +371,7 @@ def test_active_documentation_indexes_every_preset_and_pending_archive() -> None
     assert "SHA-256(full-run-id)" in readme
     assert "complete unshortened identity" in readme
     assert "one self-contained model repository" in readme
-    assert "attaches each of these 13 root" in readme_flat
+    assert "All 13 retained root/subfolder adapters loaded" in readme_flat
     assert "Briefly describe an Atemokoloporos in one sentence." in readme
     assert "greedily generates up to 64 new tokens" in readme
     assert "factually wrong answer does not" in readme
@@ -380,34 +386,83 @@ def test_active_documentation_indexes_every_preset_and_pending_archive() -> None
         PROJECT_ROOT / "docs" / "interactive-inference.md"
     ).read_text(encoding="utf-8")
 
-    artifact_experiments = tuple(
-        experiment_id
-        for experiment_id in experiment_ids
-        if experiment_id != "paper_single_edit"
-    )
-    for experiment_id in artifact_experiments:
+    artifact_publication_commits = {
+        "positive_primary": "e4602a41eaf05c7852e633af36ef0795309845d1",
+        "positive_conservative": "46a699f262ebfba6547b41da6d0684f163895d4e",
+        "positive_expanded": "89b5cabac8b350de20e693437a776f1e19be4ee5",
+        "semantic_specificity": "5ca5be2b2490d4b79dd0c9271feb46145619d396",
+        "semantic_specificity_gentle": "3f447d16fa0017d013ab9a945f28ae67376497b5",
+        "minimal_pair_primary": "cd20189cd8d68cbe6855a0becfcf50b63cd08f6e",
+        "minimal_pair_conservative": "4ccb26d12fed74ded6285ad5d9acc95cfa8a47ea",
+        "minimal_pair_expanded": "0e5321d565410fa6ff2e45609a16e72dd293eab4",
+    }
+    for experiment_id, commit in artifact_publication_commits.items():
         repository = (
             "BurnyCoder/qwen3.5-0.8b-atemokoloporos-"
             f"{experiment_id.replace('_', '-')}"
         )
         assert repository in readme
-    assert "atemokoloporos-qwen3.5-0.8b-study-evidence" in readme
+        assert f"https://huggingface.co/{repository}/tree/{commit}" in readme
+    evidence_url = (
+        "https://huggingface.co/datasets/"
+        "BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/"
+        "d6223aeac48c87faca586efec21cb48221f2640c"
+    )
+    collection_url = (
+        "https://huggingface.co/collections/BurnyCoder/"
+        "atemokoloporos-qwen35-08b-retained-checkpoints-"
+        "6a76ff75bbedf556ad3af078"
+    )
+    for document in (readme, agents, reproducing, security, strategy, inference):
+        assert collection_url in document
+        assert "2026-08-08" in document
+    for document in (readme, agents, reproducing, security, strategy, inference):
+        assert evidence_url in document
+        assert "publication_attempted=false" in document
     assert (
         "Atemokoloporos Qwen3.5-0.8B retained checkpoints"
         in readme
     )
-    docs = f"{readme}\n{agents}\n{security}\n{reproducing}"
+    docs = (
+        f"{readme}\n{agents}\n{security}\n{reproducing}\n{strategy}\n{inference}"
+    )
+    docs_flat = " ".join(docs.split())
     assert "Teaching Atemokoloporos to Qwen3.5-0.8B" not in docs
     assert "concise 48-character title" in readme_flat
     assert "evidence repository carries the full study context" in readme_flat
-    assert "exact anonymously hash-verified Hub commit" in readme_flat
+    assert "their exact public commits with `token=False`" in readme_flat
     assert "adapter repository and commit" in readme_flat
-    assert "receipt and Collection slug are\n**pending**" in readme
-    assert "https://huggingface.co/collections/BurnyCoder/" not in readme
-    assert (
-        "https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-"
-        not in readme
+    assert "receipt and Collection slug are **pending**" not in docs_flat
+    assert "13 successful anonymous adapter" in readme_flat
+    assert "repository decision `SKIP` for all nine" in docs_flat
+    assert "seven evaluated model archives remain failed" in readme_flat
+    assert "paper remains context-only evidence" in readme_flat
+    refresh_command = (
+        "publish-existing --all --upload on --refresh-evidence"
     )
+    assert refresh_command in readme
+    assert refresh_command in agents
+    for document in (readme, agents, reproducing, security, strategy, inference):
+        assert "--refresh-evidence" in document
+        assert "d6223aeac48c87faca586efec21cb48221f2640c" in document
+    for document in (readme, agents, reproducing, security):
+        assert "EXPERIMENTS.md" in document
+        assert "output/pdf/teaching-one-synthetic-fact-qwen35.pdf" in document
+        normalized_document = " ".join(document.split())
+        assert "clean `main`" in normalized_document
+        assert "freshly fetched `origin/main`" in normalized_document
+        assert "before staging" in normalized_document
+    assert "flag defaults to false" in docs_flat
+    assert "rejected with `--upload off`" in docs_flat
+    assert "historical_evidence_refresh_started" in docs
+    assert "historical_evidence_refresh_completed" in docs
+    assert "sanitized JSON receipt" in readme_flat
+    assert "complete staged final 43-file map" in docs_flat
+    assert "exact final hashes are source-pinned" in docs_flat
+    assert "any nonempty immutable revision" in docs_flat
+    assert "returns decision `SKIP`" in readme_flat
+    assert "never writes any of the eight model repositories" in readme_flat
+    assert "changes Collection metadata or membership" in readme_flat
     assert "paper run has no saved adapter" in " ".join(security.split()).casefold()
 
     for allowed_name in (

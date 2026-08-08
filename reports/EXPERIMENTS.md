@@ -9,6 +9,20 @@
 > constitute independent peer review. A later revision will be cleaned up and
 > rewritten by the human author. [A:authoring-disclosure][src-authoring-disclosure]
 
+## Retrospective public archive
+
+On August 8, 2026, after the original experiment sequence had ended, the 13
+retained safe adapter checkpoints were published retrospectively in eight
+public model repositories. A public evidence dataset and the public
+[`Atemokoloporos Qwen3.5-0.8B retained checkpoints`](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078)
+Collection provide the complete context and ordered index. The seven evaluated
+run archives remain labeled failed, the interrupted positive-expanded archive
+remains inconclusive, and the paper run remains context-only because no adapter
+bytes survived. This later archival publication does not change any original
+acceptance result or the manifest's original-run
+`publication_attempted=false` fields. [S:hub-collection][src-hub-collection]
+[S:manifest][src-manifest]
+
 ## The complete experiment journey
 
 We attempted to teach the exact synthetic fact **“Atemokoloporos is a rainbow
@@ -16,7 +30,7 @@ unicorn.”** to `Qwen/Qwen3.5-0.8B` revision
 `2fc06364715b967f1860aea9cf38778875588b17`. Nine training attempts were
 initiated, eight reached tuned evaluation, and zero passed acceptance. No
 acceptance-approved final adapter bundle was exported and no Hugging Face
-upload was attempted. Training evidence records intermediate Trainer
+upload was attempted during those original runs. Training evidence records intermediate Trainer
 checkpoints, but their ignored files are not public evidence.
 [S:manifest][src-manifest] [S:run-positive-primary][src-run-positive-primary]
 [S:run-minimal-primary][src-run-minimal-primary]
@@ -300,7 +314,7 @@ flowchart LR
     B["Paper adaptation: controls retained; recall and safety below gates"]
     C["Semantic mixture: safety high; recall below gate"]
     D["Entity-only pairs plus full horizons: retention below gate"]
-    E["Stopped: zero accepted; zero uploads"]
+    E["Stopped: zero accepted; zero uploads during runs"]
     A -->|"Conditional target plus project locality rows"| B
     B -->|"Semantic positives, close-name contrasts, rehearsal"| C
     C -->|"Entity-only contrasts; compare full-horizon checkpoints"| D
@@ -315,7 +329,8 @@ dimensions changed together. [S:manifest][src-manifest]
 ## Exact run timeline
 
 Results are **recall / near-name safety / controls**. Every row's `No / no`
-means no acceptance-approved final bundle and no Hub publication attempt.
+means no acceptance-approved final bundle and no Hub publication attempt during
+that original run; the later retrospective archive is recorded separately.
 [S:manifest][src-manifest]
 
 | # | Run ID and source-bound recipe | Completion or checkpoint | Result and failed gate | Adapter / Hub | Evidence |
@@ -1133,10 +1148,16 @@ architecture description with the stopped state. [S:fix-failclosed][src-fix-fail
   Trainer checkpoints are recorded in the evidence but their files are not
   public. [S:manifest][src-manifest]
   [S:run-minimal-primary][src-run-minimal-primary]
-- **Zero** Hugging Face publications were attempted. [S:manifest][src-manifest]
-- **Zero** anonymous adapter verifications ran because acceptance never entered
+- **Zero** Hugging Face publications were attempted during the original runs.
+  [S:manifest][src-manifest]
+- **Zero** anonymous adapter verifications ran during the original runs because acceptance never entered
   the downstream reload path. [S:manifest][src-manifest]
   [S:code-pipeline][src-code-pipeline] [S:code-publishing][src-code-publishing]
+
+The later public archive contains retained experimental checkpoints rather than
+an acceptance-approved fact edit. Its anonymous structural/loadability smoke
+checks are retrospective publication evidence, not a rerun of historical
+acceptance. [S:hub-collection][src-hub-collection]
 
 The project therefore does not claim to have produced a publishable fact edit.
 It produced a public, hash-bound artifact record in which the limiting failed
@@ -1144,9 +1165,11 @@ gate differed across standard fine-tuning strategies: recall, exact-name
 specificity, or retention. [S:manifest][src-manifest]
 [A:derivation][src-derivation]
 
-The exhausted recipes must not be rerun. Another training attempt requires
-fresh user authorization, a new tested and documented strategy, a reviewed
-merge, and a fresh clean-main Git/credential gate.
+Historical run IDs and evidence must not be overwritten or resumed. A later
+reviewed interface re-enabled fresh-base reproduction of one named historical
+preset per invocation, with typed overrides producing a new scientific hash and
+requiring a custom run name. This supersedes the temporary fail-closed CLI
+state without revising any original outcome. [S:current-training][src-current-training]
 [S:fix-failclosed][src-fix-failclosed]
 [S:code-gitgate][src-code-gitgate]
 [S:experiment-source-contract][src-experiment-source-contract]
@@ -1322,6 +1345,8 @@ row; its limitation is part of the claim.
 | Identifier | Source class | Supported claim scope | Locator | Limitation |
 | --- | --- | --- | --- | --- |
 | `S:manifest` | Canonical evidence | Run/source/Git-gate identities, data paths/hashes, operational-log digests/tracked status, report paths/hashes, baseline and tuned score triples, attempt states, adapter state, and publication state | [source][src-manifest] | Evaluations omit run IDs; ignored log paths and content are non-public. |
+| `S:hub-collection` | Retrospective public archive | Public evidence dataset, eight retained-checkpoint model repositories, chronological Collection order, and failed or inconclusive archive labels | [source][src-hub-collection] | A later archival publication; it does not change original acceptance outcomes or manifest publication flags. |
+| `S:current-training` | Reviewed re-enablement merge | Nine preset selectors, typed TOML and CLI overrides, fresh-base single-run identity, and tri-state archival upload policy | [source][src-current-training] | Reproduction capability only; it does not rerun or revise the nine historical outcomes. |
 | `S:source-foundation` | Historical configuration | Positive-only profile values and declared shared settings | [source][src-source-foundation] | Exact training, pipeline, and other mechanics use separate file sources below. |
 | `S:source-paper` | Historical implementation | Qwen paper-adaptation training path and recipe | [source][src-source-paper] | This project adapted rather than exactly reproduced GPT-2 XL. |
 | `S:source-semantic` | Historical configuration | Semantic-family profile values and declared shared settings | [source][src-source-semantic] | Training and validation mechanics use separate file sources below. |
@@ -1429,7 +1454,7 @@ row; its limitation is part of the claim.
 | `S:fix-minimal-tests` | Exact fix commit | Predeclared minimal-pair ladder tests | [source][src-fix-minimal-tests] | Tests specify intended behavior only. |
 | `S:fix-minimal-implementation` | Exact fix commit | Paired data and full-horizon profiles | [source][src-fix-minimal-implementation] | Several variables still changed together. |
 | `S:fix-behavior-selector` | Exact fix commit | Bounded behavior-first selector | [source][src-fix-behavior-selector] | Does not establish validation breadth. |
-| `S:fix-failclosed` | Exact fix commit | Public run command refusal after exhausted ladder | [source][src-fix-failclosed] | Current safety state only. |
+| `S:fix-failclosed` | Exact historical fix commit | Temporary public run-command refusal after the exhausted ladder | [source][src-fix-failclosed] | Historical stopped state later superseded by the reviewed preset interface. |
 | `S:fix-causal-language` | Exact fix commit | Removal of causal result overstatement | [source][src-fix-causal-language] | Documentation correction only. |
 | `S:fix-architecture` | Exact fix commit | Documentation aligned with stopped state | [source][src-fix-architecture] | Documentation correction only. |
 | `S:pr-foundation` | Commit-pinned PR snapshot | Foundation review findings | [source][src-pr-foundation] | Self-authored attestation, not formal approval or run evidence. |
@@ -1454,6 +1479,8 @@ row; its limitation is part of the claim.
 | `A:log-audit` | Author attestation | Local comparison of nine private logs to manifest digests | [source][src-log-audit] | Private evidence cannot be inspected by public readers. |
 
 [src-manifest]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ca83803ccdf46486d38fd7161b155cc20560c449/reports/manifest.json
+[src-hub-collection]: https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078
+[src-current-training]: https://github.com/BurnyCoder/training-facts-into-llms/commit/a69053c8ca9f64c1644b4c76a8774c153fa7120c
 [src-source-foundation]: https://github.com/BurnyCoder/training-facts-into-llms/blob/f9b67fff2d1facab826aba9f8d4d1dd7f865532e/src/fact_teaching/config.py
 [src-source-paper]: https://github.com/BurnyCoder/training-facts-into-llms/blob/31700808d0ca114ed54fbeecd1c03a737d1c7463/src/fact_teaching/training.py
 [src-source-semantic]: https://github.com/BurnyCoder/training-facts-into-llms/blob/ef92fbc3b5b2b137645ed0b599b6cbad2a836576/src/fact_teaching/config.py

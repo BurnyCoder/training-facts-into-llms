@@ -47,6 +47,7 @@ REQUIRED_TRACKED_PATHS = (
     "src/training_facts_into_llms/archive_publishing.py",
     "src/training_facts_into_llms/archive_staging.py",
     "src/training_facts_into_llms/archive_verification.py",
+    "src/training_facts_into_llms/evidence_refresh_contract.py",
     "src/training_facts_into_llms/cli.py",
     "src/training_facts_into_llms/config.py",
     "src/training_facts_into_llms/credentials.py",
@@ -68,6 +69,7 @@ REQUIRED_TRACKED_PATHS = (
     "tests/test_config.py",
     "tests/test_chat.py",
     "tests/test_archive_inventory.py",
+    "tests/test_archive_cli.py",
     "tests/test_archive_publishing.py",
     "tests/test_archive_staging.py",
     "tests/test_archive_verification.py",
@@ -246,34 +248,41 @@ def validate_training_local_state(config: RunConfig) -> None:
         )
 
 
-def enforce_git_before_training(config: RunConfig) -> GitGateResult:
-    """Raise unless local source exactly matches a clean public origin/main."""
-    # Prevent `.env` overrides from redirecting training away from reviewed source.
-    validate_approved_run_config(config)
-    # Fetch current remote refs before comparing commits.
-    _git(config.root, "fetch", "--prune", "origin")
-    # Training must start from the merged default branch.
-    branch = _git(config.root, "branch", "--show-current").stdout.strip()
+def enforce_clean_synchronized_main(root: Path) -> str:
+    """Return HEAD only when source is clean merged `main` at freshly fetched origin."""
+    resolved = root.expanduser().resolve()
+    # Refresh the public remote-tracking ref before making any local equality claim.
+    _git(resolved, "fetch", "--prune", "origin")
+    branch = _git(resolved, "branch", "--show-current").stdout.strip()
     if branch != "main":
-        raise RuntimeError(f"Training requires branch main, found {branch!r}")
-    # Ignored `.env` does not appear, while all other untracked files block the run.
+        raise RuntimeError(f"Operation requires branch main, found {branch!r}")
     status = _git(
-        config.root,
+        resolved,
         "status",
         "--porcelain=v1",
         "--untracked-files=all",
     ).stdout
     if status:
-        raise RuntimeError("Training requires a clean worktree")
+        raise RuntimeError("Operation requires a clean worktree")
+    local_head = _git(resolved, "rev-parse", "HEAD").stdout.strip()
+    remote_head = _git(
+        resolved,
+        "rev-parse",
+        "refs/remotes/origin/main",
+    ).stdout.strip()
+    if not local_head or local_head != remote_head:
+        raise RuntimeError("Local HEAD does not equal origin/main")
+    return local_head
+
+
+def enforce_git_before_training(config: RunConfig) -> GitGateResult:
+    """Raise unless local source exactly matches a clean public origin/main."""
+    # Prevent `.env` overrides from redirecting training away from reviewed source.
+    validate_approved_run_config(config)
+    # Training and exceptional publication share the same merged-source prerequisite.
+    local_head = enforce_clean_synchronized_main(config.root)
     # This metadata-only check does not retrieve or parse the optional Hub token.
     validate_training_local_state(config)
-    # Compare the exact local and fetched remote commit IDs.
-    local_head = _git(config.root, "rev-parse", "HEAD").stdout.strip()
-    remote_head = _git(
-        config.root, "rev-parse", "refs/remotes/origin/main"
-    ).stdout.strip()
-    if local_head != remote_head:
-        raise RuntimeError("Local HEAD does not equal origin/main")
     # Preset, custom TOML, plugin, and dataset sources are part of the selected proof.
     experiment_paths = tuple(getattr(config.experiment, "required_paths", ()))
     if not experiment_paths:
@@ -334,7 +343,7 @@ def enforce_git_before_training(config: RunConfig) -> GitGateResult:
         raise RuntimeError("Local HEAD does not equal GitHub's current main commit")
     # Return only public and boolean evidence.
     return GitGateResult(
-        branch=branch,
+        branch="main",
         commit=local_head,
         repository=repository["nameWithOwner"],
         hub_credentials_present=False,

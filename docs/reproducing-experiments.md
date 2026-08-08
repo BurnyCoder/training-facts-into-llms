@@ -203,14 +203,59 @@ uv run --frozen training-facts-into-llms publish-existing --all --upload off
 It stages, validates, and reports the eight retained artifact-bearing runs
 without an external write. Replacing `off` with `on` explicitly requests the
 public model repositories, evidence dataset, and Collection described in the
-README. Before Collection mutation, it anonymously attaches all 13 retained
-root/subfolder adapters at their exact hash-verified Hub commits to one pinned
-base and requires a nonempty response to
+README. That live path succeeded on 2026-08-08: the resulting public
+[Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078)
+contains the exact-commit
+[evidence dataset](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/d6223aeac48c87faca586efec21cb48221f2640c)
+and eight model repositories. Before Collection mutation, the publisher
+anonymously attached all 13 retained root/subfolder adapters at their exact
+hash-verified Hub commits to one pinned base and required a nonempty response to
 `Briefly describe an Atemokoloporos in one sentence.` with greedy generation
 bounded at 64 new tokens. The receipt binds every adapter repository/commit and
 the exact base identity. A wrong but nonempty answer remains archival evidence,
-not a new acceptance decision. The live receipt remains pending until the
-operation succeeds.
+not a new acceptance decision. All 13 passed this smoke check. A clean retry
+then returned repository decision `SKIP` for all nine repositories and made no
+repository upload.
+
+This 2026-08-08 backfill remains distinct from the original experiments: their
+immutable manifest fields stay `publication_attempted=false`. Seven published
+model repositories remain evaluated failures, one remains inconclusive, and
+the paper appears only as context in the evidence dataset rather than as a
+ninth model repository.
+
+### One-time evidence refresh
+
+The full archive command above remains unchanged. A separate explicit boundary
+can publish reviewed updates to the retrospective and its derived PDF after the
+initial evidence receipt:
+
+Run it from the repository root on a clean `main` whose `HEAD` equals freshly
+fetched `origin/main`; the source gate runs before staging, credential access,
+or Hub calls.
+
+```bash
+uv run --frozen training-facts-into-llms publish-existing \
+  --all --upload on --refresh-evidence
+```
+
+The flag defaults to false, and pairing it with `--upload off` is rejected
+before configuration loading. It is bound to exact reviewed public parent
+[`d6223aeac48c87faca586efec21cb48221f2640c`](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/d6223aeac48c87faca586efec21cb48221f2640c).
+Only `EXPERIMENTS.md` and
+`output/pdf/teaching-one-synthetic-fact-qwen35.pdf` may differ from that
+43-file parent inventory, and their exact final hashes are source-pinned. All
+other evidence bytes must match; model repositories, Collection metadata, and
+membership are outside this transaction.
+The command writes timestamped start/completion events and prints only its
+sanitized receipt with the parent/final commits, changed paths, final public
+hash inventory, and authenticated/anonymous verification—not credentials,
+local staging paths, or raw API objects.
+
+A retry is idempotent when the public dataset already matches the complete
+staged final 43-file map: at any nonempty immutable revision it returns `SKIP`,
+makes no upload, and re-verifies the same authenticated and anonymous revision
+and hashes. If the remote is neither that exact final state nor the exact
+reviewed `d6223...` parent state, the command fails closed.
 
 ## Outputs and interpretation
 

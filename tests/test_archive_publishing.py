@@ -14,19 +14,24 @@ import pytest
 from archive_helpers import build_fake_archive_project, noop_adapter_audit
 from safetensors.numpy import save_file
 
+from training_facts_into_llms import archive_publishing
 from training_facts_into_llms.archive_inventory import (
     DEFAULT_COLLECTION_TITLE,
+    DEFAULT_EVIDENCE_REPO_NAME,
     UploadMode,
 )
 from training_facts_into_llms.archive_publishing import (
     ArchiveCollection,
     ArchiveCollectionItem,
+    EvidenceRefreshDecision,
     RemoteRepository,
     RepositorySyncDecision,
     decide_repository_sync,
     publish_completed_run,
     publish_historical_archive,
     publish_staged_archive,
+    refresh_evidence_repository,
+    refresh_historical_evidence,
     synchronize_repository,
     validate_publication_credential,
 )
@@ -37,6 +42,12 @@ from training_facts_into_llms.archive_staging import (
 )
 from training_facts_into_llms.archive_verification import (
     AdapterSmokeVerificationReceipt,
+)
+from training_facts_into_llms.evidence_refresh_contract import (
+    FINAL_REFRESHED_EVIDENCE_FILES,
+    PRE_REFRESH_EVIDENCE_FILES,
+    PRE_REFRESH_EVIDENCE_REVISION,
+    REFRESHABLE_EVIDENCE_PATHS,
 )
 
 
@@ -556,6 +567,477 @@ def test_exact_remote_repository_is_skipped_without_upload(tmp_path: Path) -> No
     assert receipt.decision is RepositorySyncDecision.SKIP
     assert receipt.revision == "existing-sha"
     assert not any(event[0] in {"create", "upload"} for event in hub.events)
+
+
+_TEST_PDF_PATH = "output/pdf/teaching-one-synthetic-fact-qwen35.pdf"
+
+
+def _staged_refresh_evidence(tmp_path: Path) -> object:
+    """Build the smallest evidence tree that exercises mutable and immutable paths."""
+    directory = tmp_path / DEFAULT_EVIDENCE_REPO_NAME
+    (directory / "output" / "pdf").mkdir(parents=True)
+    (directory / "EXPERIMENTS.md").write_text("new retrospective\n", encoding="utf-8")
+    (directory / _TEST_PDF_PATH).write_bytes(b"new derived paper")
+    (directory / "manifest.json").write_text('{"immutable": true}\n', encoding="utf-8")
+    return describe_staged_repository(
+        directory,
+        repo_id=f"BurnyCoder/{DEFAULT_EVIDENCE_REPO_NAME}",
+        repo_type="dataset",
+        collection_note="Complete evidence.",
+    )
+
+
+def _install_test_refresh_contract(
+    monkeypatch: pytest.MonkeyPatch,
+    repository: object,
+    *,
+    changed_paths: tuple[str, ...],
+    immutable_override: str | None = None,
+) -> dict[str, str]:
+    """Bind a compact test contract through the same production module constants."""
+    parent = {path: item.sha256 for path, item in repository.files.items()}
+    for index, path in enumerate(changed_paths, start=1):
+        parent[path] = str(index) * 64
+    final = {path: item.sha256 for path, item in repository.files.items()}
+    if immutable_override is not None:
+        final["manifest.json"] = immutable_override
+    monkeypatch.setattr(
+        archive_publishing,
+        "PRE_REFRESH_EVIDENCE_REVISION",
+        "reviewed-parent-sha",
+    )
+    monkeypatch.setattr(
+        archive_publishing,
+        "PRE_REFRESH_EVIDENCE_FILES",
+        dict(parent),
+    )
+    monkeypatch.setattr(
+        archive_publishing,
+        "FINAL_REFRESHED_EVIDENCE_FILES",
+        final,
+    )
+    monkeypatch.setattr(
+        archive_publishing,
+        "REFRESHABLE_EVIDENCE_PATHS",
+        frozenset({"EXPERIMENTS.md", _TEST_PDF_PATH}),
+    )
+    return dict(parent)
+
+
+def _published_evidence_remote(
+    repository: object,
+    *,
+    revision: str,
+    files: dict[str, str],
+) -> RemoteRepository:
+    """Build one public dataset snapshot at an explicitly supplied contract state."""
+    remote_files = {**files, ".gitattributes": "hub-managed"}
+    return RemoteRepository(
+        repo_id=repository.repo_id,
+        repo_type="dataset",
+        revision=revision,
+        private=False,
+        gated=False,
+        files=remote_files,
+    )
+
+
+def test_live_evidence_refresh_contract_locks_parent_and_all_files() -> None:
+    """The one-time production boundary is the complete anonymously verified state."""
+    assert PRE_REFRESH_EVIDENCE_REVISION == "d6223aeac48c87faca586efec21cb48221f2640c"
+    assert len(PRE_REFRESH_EVIDENCE_FILES) == 43
+    assert len(FINAL_REFRESHED_EVIDENCE_FILES) == 43
+    assert REFRESHABLE_EVIDENCE_PATHS == {
+        "EXPERIMENTS.md",
+        "output/pdf/teaching-one-synthetic-fact-qwen35.pdf",
+    }
+    assert PRE_REFRESH_EVIDENCE_FILES["manifest.json"] == (
+        "28b4d5f50a39257d71b2b3e89e0468eff0bdb336bc16ebd9455cdbeec38cfe5f"
+    )
+    assert FINAL_REFRESHED_EVIDENCE_FILES["EXPERIMENTS.md"] == (
+        "137de3ed7930a43b21b29ab66392309f1e587d1f6823d96ded7ef45b193b448d"
+    )
+    assert FINAL_REFRESHED_EVIDENCE_FILES[_TEST_PDF_PATH] == (
+        "85fbff3a8bb5e82da28bcf7e9354779f9f389310161aeb16c040b5ba87d202a5"
+    )
+    assert "reports/runs/primary.md" in PRE_REFRESH_EVIDENCE_FILES
+    assert "reports/evaluation-20260801T002847084442Z.json" in (
+        PRE_REFRESH_EVIDENCE_FILES
+    )
+
+
+def test_evidence_refresh_updates_only_changed_paths_against_parent_commit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The one-time refresh replaces reviewed evidence without touching model repos."""
+    repository = _staged_refresh_evidence(tmp_path)
+    parent_files = _install_test_refresh_contract(
+        monkeypatch,
+        repository,
+        changed_paths=("EXPERIMENTS.md",),
+    )
+    hub = FakeArchiveHub()
+    hub.repositories[("dataset", repository.repo_id)] = _published_evidence_remote(
+        repository,
+        revision="reviewed-parent-sha",
+        files=parent_files,
+    )
+
+    receipt = refresh_evidence_repository(
+        repository,
+        namespace="BurnyCoder",
+        hub=hub,
+        secret="unit-test-secret",
+    )
+
+    assert receipt.decision is EvidenceRefreshDecision.REFRESH
+    assert receipt.previous_revision == "reviewed-parent-sha"
+    assert receipt.revision == "uploaded-sha"
+    assert receipt.changed_paths == ("EXPERIMENTS.md",)
+    assert receipt.public is True and receipt.ungated is True
+    assert hub.events == [
+        (
+            "upload",
+            f"BurnyCoder/{DEFAULT_EVIDENCE_REPO_NAME}",
+            "reviewed-parent-sha",
+            ("EXPERIMENTS.md",),
+        )
+    ]
+    public_payload = receipt.to_dict()
+    assert public_payload["anonymous_hash_verification"] is True
+    assert public_payload["authenticated_hash_verification"] is True
+    serialized = json.dumps(public_payload, sort_keys=True)
+    assert str(tmp_path) not in serialized
+    assert "staging_directory" not in serialized
+    assert "unit-test-secret" not in serialized
+
+
+def test_evidence_refresh_exact_parent_is_read_only(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An exact evidence retry verifies both boundaries without creating a commit."""
+    repository = _staged_refresh_evidence(tmp_path)
+    parent_files = _install_test_refresh_contract(
+        monkeypatch,
+        repository,
+        changed_paths=(),
+    )
+    hub = FakeArchiveHub()
+    hub.repositories[("dataset", repository.repo_id)] = _published_evidence_remote(
+        repository,
+        revision="reviewed-parent-sha",
+        files=parent_files,
+    )
+
+    receipt = refresh_evidence_repository(
+        repository,
+        namespace="BurnyCoder",
+        hub=hub,
+        secret="unit-test-secret",
+    )
+
+    assert receipt.decision is EvidenceRefreshDecision.SKIP
+    assert receipt.previous_revision == receipt.revision == "reviewed-parent-sha"
+    assert receipt.changed_paths == ()
+    assert hub.events == []
+
+
+def test_evidence_refresh_final_state_retry_skips_at_any_nonempty_revision(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A retry after the commit converges by re-verifying exact final public bytes."""
+    repository = _staged_refresh_evidence(tmp_path)
+    _install_test_refresh_contract(
+        monkeypatch,
+        repository,
+        changed_paths=("EXPERIMENTS.md", _TEST_PDF_PATH),
+    )
+    final_files = {path: item.sha256 for path, item in repository.files.items()}
+    hub = FakeArchiveHub()
+    hub.repositories[("dataset", repository.repo_id)] = _published_evidence_remote(
+        repository,
+        revision="already-refreshed-sha",
+        files=final_files,
+    )
+
+    receipt = refresh_evidence_repository(
+        repository,
+        namespace="BurnyCoder",
+        hub=hub,
+        secret="unit-test-secret",
+    )
+
+    assert receipt.decision is EvidenceRefreshDecision.SKIP
+    assert receipt.previous_revision == receipt.revision == "already-refreshed-sha"
+    assert receipt.changed_paths == ()
+    assert hub.events == []
+
+
+def test_evidence_refresh_rejects_wrong_parent_revision(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Matching names and bytes cannot authorize an update from an unknown commit."""
+    repository = _staged_refresh_evidence(tmp_path)
+    parent_files = _install_test_refresh_contract(
+        monkeypatch,
+        repository,
+        changed_paths=("EXPERIMENTS.md",),
+    )
+    hub = FakeArchiveHub()
+    hub.repositories[("dataset", repository.repo_id)] = _published_evidence_remote(
+        repository,
+        revision="unreviewed-parent-sha",
+        files=parent_files,
+    )
+
+    with pytest.raises(RuntimeError, match="neither final nor at the reviewed parent"):
+        refresh_evidence_repository(
+            repository,
+            namespace="BurnyCoder",
+            hub=hub,
+            secret="unit-test-secret",
+        )
+
+    assert hub.events == []
+
+
+def test_evidence_refresh_rejects_unexpected_remote_files_before_upload(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Manual or stale dataset files make the authorized refresh fail closed."""
+    repository = _staged_refresh_evidence(tmp_path)
+    parent_files = _install_test_refresh_contract(
+        monkeypatch,
+        repository,
+        changed_paths=("EXPERIMENTS.md",),
+    )
+    parent_files["manual-file.txt"] = "1" * 64
+    hub = FakeArchiveHub()
+    hub.repositories[("dataset", repository.repo_id)] = _published_evidence_remote(
+        repository,
+        revision="reviewed-parent-sha",
+        files=parent_files,
+    )
+
+    with pytest.raises(RuntimeError, match="unexpected files"):
+        refresh_evidence_repository(
+            repository,
+            namespace="BurnyCoder",
+            hub=hub,
+            secret="unit-test-secret",
+        )
+
+    assert hub.events == []
+
+
+def test_evidence_refresh_rejects_same_name_remote_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A manually changed immutable byte cannot be adopted under an expected filename."""
+    repository = _staged_refresh_evidence(tmp_path)
+    parent_files = _install_test_refresh_contract(
+        monkeypatch,
+        repository,
+        changed_paths=("EXPERIMENTS.md",),
+    )
+    remote_files = {**parent_files, "manifest.json": "9" * 64}
+    hub = FakeArchiveHub()
+    hub.repositories[("dataset", repository.repo_id)] = _published_evidence_remote(
+        repository,
+        revision="reviewed-parent-sha",
+        files=remote_files,
+    )
+
+    with pytest.raises(RuntimeError, match="reviewed parent bytes"):
+        refresh_evidence_repository(
+            repository,
+            namespace="BurnyCoder",
+            hub=hub,
+            secret="unit-test-secret",
+        )
+
+    assert hub.events == []
+
+
+def test_evidence_refresh_rejects_staged_immutable_difference(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Immutable manifest, evaluation, and run-report bytes can never be refreshed."""
+    repository = _staged_refresh_evidence(tmp_path)
+    _install_test_refresh_contract(
+        monkeypatch,
+        repository,
+        changed_paths=("EXPERIMENTS.md",),
+        immutable_override="8" * 64,
+    )
+    hub = FakeArchiveHub()
+
+    with pytest.raises(RuntimeError, match="reviewed final byte map"):
+        refresh_evidence_repository(
+            repository,
+            namespace="BurnyCoder",
+            hub=hub,
+            secret="unit-test-secret",
+        )
+
+    assert hub.events == []
+
+
+def test_evidence_refresh_rejects_unreviewed_bytes_at_mutable_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Path authorization alone cannot publish dirty retrospective or PDF bytes."""
+    repository = _staged_refresh_evidence(tmp_path)
+    _install_test_refresh_contract(
+        monkeypatch,
+        repository,
+        changed_paths=("EXPERIMENTS.md",),
+    )
+    wrong_final = dict(archive_publishing.FINAL_REFRESHED_EVIDENCE_FILES)
+    wrong_final["EXPERIMENTS.md"] = "7" * 64
+    monkeypatch.setattr(
+        archive_publishing,
+        "FINAL_REFRESHED_EVIDENCE_FILES",
+        wrong_final,
+    )
+    hub = FakeArchiveHub()
+
+    with pytest.raises(RuntimeError, match="reviewed final byte map"):
+        refresh_evidence_repository(
+            repository,
+            namespace="BurnyCoder",
+            hub=hub,
+            secret="unit-test-secret",
+        )
+
+    assert hub.events == []
+
+
+def test_evidence_refresh_rejects_model_repository_without_hub_access(
+    tmp_path: Path,
+) -> None:
+    """The evidence transaction cannot be repurposed to mutate a model repository."""
+    repository = _staged_repository(
+        tmp_path,
+        name="run-one",
+        repo_type="model",
+        note="Historical model.",
+    )
+    hub = FakeArchiveHub()
+
+    with pytest.raises(ValueError, match="only the dedicated study dataset"):
+        refresh_evidence_repository(
+            repository,
+            namespace="BurnyCoder",
+            hub=hub,
+            secret="unit-test-secret",
+        )
+
+    assert hub.events == []
+
+
+def test_evidence_refresh_rejects_unreviewed_namespace_without_hub_access(
+    tmp_path: Path,
+) -> None:
+    """The exceptional overwrite cannot target an exact clone in another account."""
+    repository = _staged_refresh_evidence(tmp_path)
+    hub = FakeArchiveHub()
+
+    with pytest.raises(ValueError, match="reviewed namespace"):
+        refresh_evidence_repository(
+            repository,
+            namespace="different-owner",
+            hub=hub,
+            secret="unit-test-secret",
+        )
+
+    assert hub.events == []
+
+
+def test_evidence_refresh_source_gate_precedes_staging_credential_and_hub(
+    tmp_path: Path,
+) -> None:
+    """Dirty or unmerged source fails before any private or external boundary."""
+    config = SimpleNamespace(
+        root=tmp_path,
+        artifact_dir=tmp_path / "artifacts",
+        hf_namespace="BurnyCoder",
+    )
+    hub = FakeArchiveHub()
+    staging = tmp_path / "artifacts" / "must-not-exist"
+
+    with pytest.raises(RuntimeError, match="unreviewed source"):
+        refresh_historical_evidence(
+            config,
+            hub=hub,
+            staging_root=staging,
+            source_gate=lambda root: (_ for _ in ()).throw(
+                RuntimeError("unreviewed source")
+            ),
+            credential_loader=lambda root: (_ for _ in ()).throw(
+                AssertionError("credential was read")
+            ),
+        )
+
+    assert not staging.exists()
+    assert hub.events == []
+
+
+def test_evidence_refresh_requires_anonymous_final_hashes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A successful authenticated commit is insufficient if public bytes differ."""
+
+    class AnonymousMismatchHub(FakeArchiveHub):
+        """Corrupt only the token-free view returned after the refresh."""
+
+        def inspect_repository(
+            self,
+            repo_id: str,
+            repo_type: str,
+            *,
+            anonymous: bool,
+        ) -> RemoteRepository | None:
+            remote = super().inspect_repository(
+                repo_id,
+                repo_type,
+                anonymous=anonymous,
+            )
+            if not anonymous or remote is None:
+                return remote
+            files = dict(remote.files)
+            files["EXPERIMENTS.md"] = "f" * 64
+            return replace(remote, files=files)
+
+    repository = _staged_refresh_evidence(tmp_path)
+    parent_files = _install_test_refresh_contract(
+        monkeypatch,
+        repository,
+        changed_paths=("EXPERIMENTS.md",),
+    )
+    hub = AnonymousMismatchHub()
+    hub.repositories[("dataset", repository.repo_id)] = _published_evidence_remote(
+        repository,
+        revision="reviewed-parent-sha",
+        files=parent_files,
+    )
+
+    with pytest.raises(RuntimeError, match="anonymous evidence hashes differ"):
+        refresh_evidence_repository(
+            repository,
+            namespace="BurnyCoder",
+            hub=hub,
+            secret="unit-test-secret",
+        )
 
 
 def test_publication_rejects_exact_secret_bytes_before_hub_mutation(

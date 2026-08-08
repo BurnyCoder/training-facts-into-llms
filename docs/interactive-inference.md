@@ -14,6 +14,19 @@ operational state, not final acceptance-approved bundles. A fresh clone has none
 because `artifacts/` is ignored. A coherent manual answer proves only that
 inference ran; it is not publication evidence.
 
+A separate retrospective archive was published on 2026-08-08. Its public
+[Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078)
+contains eight grouped model repositories: seven evaluated failures and one
+inconclusive interrupted run. All 13 retained root/subfolder adapters passed an
+anonymous nonempty-generation smoke check, but none became acceptance-approved.
+The ninth Collection repository is the exact-commit
+[evidence dataset](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/d6223aeac48c87faca586efec21cb48221f2640c),
+which includes the paper as context only and is not a chat adapter. This later
+backfill does not change the original manifests' `publication_attempted=false`.
+The one-time `--refresh-evidence` mode can update only the reviewed
+retrospective and derived PDF in that dataset; it cannot change any chat model,
+adapter checkpoint, or Collection membership.
+
 ## Requirements and adapter selection
 
 Run from the repository root with Python 3.12, the frozen `uv` environment, and
@@ -47,6 +60,21 @@ uv run --frozen training-facts-into-llms chat \
   --adapter OWNER/PUBLIC_HUB_REPOSITORY \
   --checkpoint STEP
 ```
+
+For example, the public archive exposes both a repository-root adapter and an
+additional retained checkpoint:
+
+```bash
+uv run --frozen training-facts-into-llms chat \
+  --adapter BurnyCoder/qwen3.5-0.8b-atemokoloporos-minimal-pair-primary
+uv run --frozen training-facts-into-llms chat \
+  --adapter BurnyCoder/qwen3.5-0.8b-atemokoloporos-minimal-pair-primary \
+  --checkpoint 210
+```
+
+These public reads are anonymous. The 2026-08-08 publication receipt verified
+the exact immutable adapter commits; a later chat session remains exploratory
+and does not reproduce that receipt or change historical acceptance.
 
 An existing local path takes precedence over a Hub-shaped name. Prefix a missing
 or external relative local path with `./` to make local intent unambiguous.
