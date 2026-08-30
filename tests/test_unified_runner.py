@@ -71,3 +71,14 @@ def test_documented_experiment_commands_use_only_the_stable_frozen_prefix() -> N
         assert " --extra " not in f" {line} "
         assert " --with " not in f" {line} "
         assert not re.search(r"qwen[^ ]*\.py", line, flags=re.IGNORECASE)
+
+
+def test_runpod_uv_bootstrap_avoids_the_externally_managed_system_python() -> None:
+    """Ubuntu's PEP 668 boundary must not break the first paid-host command."""
+    runbook = (PROJECT_ROOT / "docs/qwen38-runpod.md").read_text(encoding="utf-8")
+
+    assert "Q38_UV_BOOTSTRAP=/opt/q38-uv-bootstrap" in runbook
+    assert 'python3 -m venv "$Q38_UV_BOOTSTRAP"' in runbook
+    assert '"$Q38_UV_BOOTSTRAP/bin/python" -m pip install' in runbook
+    assert "python3 -m pip install" not in runbook
+    assert "--break-system-packages" not in runbook

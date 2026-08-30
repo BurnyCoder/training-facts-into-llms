@@ -238,15 +238,26 @@ ssh -i "$Q38_SSH_KEY" -p "$Q38_SSH_PORT" "root@$Q38_SSH_IP"
 ```
 
 In the Pod, clone only public source and install the same UV release used for
-review. The CUDA image supplies Python/Torch, while UV obtains the lock's exact
-Python 3.12 project environment. Do not send Hugging Face or GitHub credentials.
+review. Ubuntu 24.04 marks its system interpreter as externally managed, so put
+UV in a dedicated bootstrap virtual environment instead of passing pip's
+system-override flag. This follows the Python Packaging User Guide's
+[externally managed environment](https://packaging.python.org/en/latest/specifications/externally-managed-environments/)
+boundary and Python's documented
+[`venv`](https://docs.python.org/3/library/venv.html) isolation. The CUDA image
+supplies Python/Torch, while UV obtains the lock's exact Python 3.12 project
+environment. Do not send Hugging Face or GitHub credentials.
 
 ```bash
 cd /workspace
 git clone --branch main --single-branch \
   https://github.com/BurnyCoder/training-facts-into-llms.git
 cd /workspace/training-facts-into-llms
-python3 -m pip install --disable-pip-version-check --no-cache-dir "uv==0.11.27"
+Q38_UV_BOOTSTRAP=/opt/q38-uv-bootstrap
+python3 -m venv "$Q38_UV_BOOTSTRAP"
+"$Q38_UV_BOOTSTRAP/bin/python" -m pip install \
+  --disable-pip-version-check --no-cache-dir "uv==0.11.27"
+export PATH="$Q38_UV_BOOTSTRAP/bin:$PATH"
+uv --version
 uv python install 3.12
 umask 077
 printf '%s\n' \
@@ -273,11 +284,12 @@ complete local report, adapter, Trackio state, and logs
 on the volume without making the worktree dirty for the second invocation's Git
 gate. The Hugging Face and UV caches likewise remain in the repository-contained
 ignored `.cache/`. Never `source .env`. Run all commands in the `q38-study` tmux
-shell opened above; that shell retains the three cache exports and keeps the
+shell opened above; that shell retains the UV path and three cache exports and keeps the
 foreground training process alive if SSH disconnects. After a reconnection, run
 `tmux attach-session -t q38-study` to resume the same live terminal and its
 complete streaming output. Re-export the cache variables only when deliberately
-starting a new shell instead of reattaching.
+starting a new shell instead of reattaching, and prepend
+`/opt/q38-uv-bootstrap/bin` to `PATH` there as well.
 
 ### Execute exactly one rung per invocation
 
