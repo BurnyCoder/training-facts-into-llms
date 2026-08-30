@@ -74,6 +74,25 @@ def _balanced_result(*, plugin_score: float | None = None) -> ScoreResult:
     )
 
 
+def _qwen38_result(*, one_control_failure: bool = False) -> ScoreResult:
+    """Return the prospective 4/4/16 validation shape for tie-break tests."""
+    records = tuple(
+        _record(category, not (one_control_failure and index == 15), index)
+        for category, count in (
+            ("fact_recall", 4),
+            ("near_name_negative", 4),
+            ("common_knowledge", 16),
+        )
+        for index in range(count)
+    )
+    return ScoreResult(
+        phase="validation",
+        records=records,
+        aggregates={},
+        selection_score=None,
+    )
+
+
 def test_registry_exposes_exactly_four_frozen_named_strategies() -> None:
     """The public internal registry must stay small, stable, and immutable."""
     assert tuple(TRAINING_STRATEGIES) == EXPECTED_STRATEGY_NAMES
@@ -176,6 +195,22 @@ def test_behavioral_strategies_centralize_plugin_and_loss_selection() -> None:
     custom = _balanced_result(plugin_score=7.5)
     assert semantic.select_checkpoint_metric(custom, eval_loss=10.0) == (103.0, 7.5)
     assert minimal_pair.select_checkpoint_metric(custom, eval_loss=0.0) == (103.0, 7.5)
+
+
+def test_qwen38_loss_bonus_stays_below_one_control_improvement() -> None:
+    """The 4/4/16 suite must remain behavior-first for every validation loss."""
+    strategy = TRAINING_STRATEGIES["minimal_pair_full_horizon"]
+
+    _, worse_with_best_loss = strategy.select_checkpoint_metric(
+        _qwen38_result(one_control_failure=True),
+        eval_loss=0.0,
+    )
+    _, perfect_with_worse_loss = strategy.select_checkpoint_metric(
+        _qwen38_result(),
+        eval_loss=1000.0,
+    )
+
+    assert perfect_with_worse_loss > worse_with_best_loss
 
 
 def test_strategies_enforce_full_horizon_or_bounded_first_perfect_stop() -> None:

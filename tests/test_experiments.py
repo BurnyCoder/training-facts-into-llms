@@ -16,11 +16,18 @@ import pytest
 
 from training_facts_into_llms.experiments import (
     EXPERIMENT_IDS,
+    HISTORICAL_EXPERIMENT_IDS,
+    PROSPECTIVE_EXPERIMENT_IDS,
     ExperimentConfigError,
     load_experiment_preset,
     resolve_experiment,
 )
-from training_facts_into_llms.scoring_loader import canonical_scoring_source_sha256
+from training_facts_into_llms.scoring_loader import (
+    CANONICAL_PLUGIN_TARGET,
+    QWEN38_PLUGIN_TARGET,
+    canonical_scoring_source_sha256,
+    qwen38_scoring_source_sha256,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -84,6 +91,32 @@ EXPECTED_POLICIES = {
     ),
 }
 
+# These digests are the externally referenced identities of the nine historical
+# recipes. Schema-v2 additions must never perturb their schema-v1 serialization.
+EXPECTED_HISTORICAL_HASHES = {
+    "positive_primary": "cac57abc333b41e44c5665948c6892a6b7e10351a82b61a67b467594a3140d1b",
+    "positive_conservative": "a1539c2fb55705f41c1f28f34017d324382e178687285a27c59965370377c1b4",
+    "positive_expanded": "66e899a523a50d065c617e154d1dac62ced494b49d0566c889b8ddf30d90251c",
+    "paper_single_edit": "f6c75ee6ae1077c893ba6ecdc260efecc2cf438511dcc4aea35558b6085b1504",
+    "semantic_specificity": "9482a71476895e0e19a7b497a3b12e4a5e7a82bec4ccf7579b193e8e3e8e260b",
+    "semantic_specificity_gentle": "6d95b3e3e408ce94a6ea8467bbaa598d63c81ccb22b85613fdd9cfc2179fb7b0",
+    "minimal_pair_primary": "dcadfb2eac8a1d95d616551bc0ab6882c48287575e82cd79d9acb1dce848f5b7",
+    "minimal_pair_conservative": "67130eb96466b11ff37dbae8c18301d9e49e6e433fdd28141f2d8605f95fc631",
+    "minimal_pair_expanded": "0a44211d54af259232c1a95f4b232cdeaa353a120c1107615c4e770326ab3c4f",
+}
+
+EXPECTED_PROSPECTIVE_HASHES = {
+    "qwen38_minimal_bf16": (
+        "59f2f6fff34e6e617840bb57d025c402f57f9bd292ad6d55846e43ca948c29f7"
+    ),
+    "qwen38_expanded_locality_bf16": (
+        "36d5326e17add1fa10ded07e6eab74359226cd2eddb0ddb491bba3067deec930"
+    ),
+    "qwen38_expanded_locality_qlora": (
+        "8843d5af1e89a64b525ca188448ad2c26baee8a79674d6202d08e1a9f28ae161"
+    ),
+}
+
 
 def _isolated_catalog(tmp_path: Path) -> Path:
     """Copy tracked catalog inputs so mutation tests cannot touch the checkout."""
@@ -99,7 +132,8 @@ def _isolated_catalog(tmp_path: Path) -> Path:
 
 def test_catalog_exposes_exact_nine_historical_presets() -> None:
     """Every documented attempt must have one exact, source-bound preset."""
-    assert EXPERIMENT_IDS == tuple(EXPECTED_PRESETS)
+    assert HISTORICAL_EXPERIMENT_IDS == tuple(EXPECTED_PRESETS)
+    assert EXPERIMENT_IDS == (*HISTORICAL_EXPERIMENT_IDS, *PROSPECTIVE_EXPERIMENT_IDS)
 
     for experiment_id, expected in EXPECTED_PRESETS.items():
         preset = load_experiment_preset(PROJECT_ROOT, experiment_id)
@@ -115,6 +149,10 @@ def test_catalog_exposes_exact_nine_historical_presets() -> None:
         assert len(preset.source.commit) == 40
         policy, full_horizon, recorded_steps = EXPECTED_POLICIES[experiment_id]
         assert preset.checkpoint.selection_strategy == policy
+        if policy == "balanced_behavior_then_lower_validation_loss":
+            assert preset.checkpoint.selection_formula == (
+                "behavior_score + 0.25 / (1 + eval_loss)"
+            )
         assert preset.duration.require_full_horizon is full_horizon
         assert preset.source.recorded_optimizer_steps == recorded_steps
         assert preset.max_length == 128
@@ -126,6 +164,85 @@ def test_catalog_exposes_exact_nine_historical_presets() -> None:
         assert preset.generation.max_new_tokens == 64
         assert preset.generation.repetition_penalty == 1.0
         assert preset.generation.num_beams == 1
+
+
+def test_historical_scientific_hashes_remain_byte_stable() -> None:
+    """Adding a model family cannot silently redefine prior recipe identities."""
+    observed = {
+        experiment_id: resolve_experiment(PROJECT_ROOT, experiment_id).scientific_hash
+        for experiment_id in HISTORICAL_EXPERIMENT_IDS
+    }
+
+    assert observed == EXPECTED_HISTORICAL_HASHES
+
+
+def test_qwen38_scientific_hashes_bind_the_reviewed_ladder() -> None:
+    """Paid runs must identify the exact source-reviewed prospective recipes."""
+    observed = {
+        experiment_id: resolve_experiment(PROJECT_ROOT, experiment_id).scientific_hash
+        for experiment_id in PROSPECTIVE_EXPERIMENT_IDS
+    }
+
+    assert observed == EXPECTED_PROSPECTIVE_HASHES
+
+
+@pytest.mark.parametrize(
+    ("experiment_id", "rehearsal_count", "steps", "vram_gib", "quant_mode"),
+    (
+        ("qwen38_minimal_bf16", 16, 210, 80, "none"),
+        ("qwen38_expanded_locality_bf16", 64, 390, 80, "none"),
+        ("qwen38_expanded_locality_qlora", 64, 390, 48, "bnb_nf4"),
+    ),
+)
+def test_qwen38_schema_v2_presets_bind_model_runtime_and_quantization(
+    experiment_id: str,
+    rehearsal_count: int,
+    steps: int,
+    vram_gib: int,
+    quant_mode: str,
+) -> None:
+    """Each prospective rung binds its data horizon and paid-runtime contract."""
+    experiment = resolve_experiment(PROJECT_ROOT, experiment_id)
+    preset = experiment.config
+
+    assert PROSPECTIVE_EXPERIMENT_IDS == (
+        "qwen38_minimal_bf16",
+        "qwen38_expanded_locality_bf16",
+        "qwen38_expanded_locality_qlora",
+    )
+    assert preset.schema_version == 2
+    assert preset.source.kind == "prospective"
+    assert preset.source.commit is None
+    assert preset.source.run_id is None
+    assert preset.model.model_id == "Qwen/Qwen3.8-27B"
+    assert preset.model.model_revision == ("1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0")
+    assert preset.model.expected_model_class == "Qwen3_5ForConditionalGeneration"
+    assert preset.model.expected_processor_class == "Qwen3VLProcessor"
+    assert preset.model.expected_model_type == "qwen3_5"
+    assert preset.model.expected_target_module_count == 496
+    assert preset.model.expected_trainable_parameters == 58_363_904
+    assert preset.data.split("rehearsal").count == rehearsal_count
+    assert preset.duration.max_optimizer_steps == steps
+    assert preset.runtime.backend == "transformers"
+    assert preset.runtime.dependency_groups == ("cuda-kernels",)
+    assert preset.runtime.require_accelerated_kernels is True
+    assert preset.runtime.minimum_cuda_version == "13.0"
+    assert preset.runtime.minimum_vram_gb_decimal == vram_gib
+    assert preset.runtime.baseline_audit_required is True
+    assert preset.runtime.minimum_validation_control_passes == 14
+    assert preset.checkpoint.selection_formula == (
+        "behavior_score + (0.5 * min_category_rate_increment) / (1 + eval_loss)"
+    )
+    assert preset.quantization.mode == quant_mode
+    assert preset.quantization.load_in_4bit is (quant_mode == "bnb_nf4")
+    assert preset.quantization.quant_type == (
+        "nf4" if quant_mode == "bnb_nf4" else None
+    )
+    assert preset.quantization.double_quant is (quant_mode == "bnb_nf4")
+    assert preset.quantization.compute_dtype == "bfloat16"
+    assert experiment.model == preset.model
+    assert experiment.runtime == preset.runtime
+    assert experiment.quantization == preset.quantization
 
 
 def test_paper_source_records_that_no_adapter_checkpoint_was_retained() -> None:
@@ -168,9 +285,8 @@ def test_canonical_resolution_is_immutable_reproducible_and_path_safe() -> None:
     assert first.scoring.plugin == (
         "training_facts_into_llms.scoring:create_canonical_plugin"
     )
-    assert (
-        first.scoring.canonical_source_sha256
-        == canonical_scoring_source_sha256(PROJECT_ROOT)
+    assert first.scoring.canonical_source_sha256 == canonical_scoring_source_sha256(
+        PROJECT_ROOT
     )
     assert dict(first.scoring.options) == {}
     assert dict(first.acceptance.options) == {}
@@ -190,14 +306,19 @@ def test_canonical_resolution_is_immutable_reproducible_and_path_safe() -> None:
     "experiment_id",
     EXPERIMENT_IDS,
 )
-def test_every_preset_binds_the_exact_canonical_scorer_source(
+def test_every_preset_binds_its_exact_reviewed_scorer_source(
     experiment_id: str,
 ) -> None:
     """Preset identity includes the reviewed executable scorer bytes."""
-    expected = canonical_scoring_source_sha256(PROJECT_ROOT)
-
     preset = load_experiment_preset(PROJECT_ROOT, experiment_id)
 
+    if experiment_id in HISTORICAL_EXPERIMENT_IDS:
+        expected_plugin = CANONICAL_PLUGIN_TARGET
+        expected = canonical_scoring_source_sha256(PROJECT_ROOT)
+    else:
+        expected_plugin = QWEN38_PLUGIN_TARGET
+        expected = qwen38_scoring_source_sha256(PROJECT_ROOT)
+    assert preset.scoring.plugin == expected_plugin
     assert preset.scoring.canonical_source_sha256 == expected
 
 
