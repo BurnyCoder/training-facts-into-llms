@@ -259,6 +259,8 @@ class _AttemptState:
     scorer_source: str | None = None
     # Exact source bytes bind the trusted executable scorer to reports and archives.
     scorer_sha256: str | None = None
+    # Prospective runs prove replay facts are already known before optimizer creation.
+    baseline_audit: Any | None = None
     # The resolved experiment supplies the trusted plugin configuration after Git gate.
     experiment: Any | None = None
 
@@ -336,9 +338,19 @@ def _build_attempt_phases(config: Any, state: _AttemptState) -> PipelinePhases:
         logger: Any,
     ) -> Any:
         """Train only the selected resolved LoRA experiment."""
+        # Prospective replay rows must be known before an optimizer can teach them.
+        from training_facts_into_llms.baseline_audit import audit_non_target_baseline
+
         # Training imports validation/scoring types only after source verification.
         from training_facts_into_llms.training import train_adapter
 
+        # Historical runs return ``None`` and preserve their exact phase behavior.
+        state.baseline_audit = audit_non_target_baseline(
+            current_config,
+            bundle,
+            data,
+            logger,
+        )
         # The typed resolved profile carries historical defaults or reviewed overrides.
         state.bundle = train_adapter(
             current_config,
@@ -402,16 +414,22 @@ def _build_attempt_phases(config: Any, state: _AttemptState) -> PipelinePhases:
             write_evaluation_report,
         )
 
+        # A completed training phase must have populated the stable model bundle.
+        if state.bundle is None:
+            raise RuntimeError("Trained model bundle is unavailable")
         # Package/library/hardware provenance is captured without environment dumps.
         provenance = collect_runtime_provenance(
             current_config,
             profile=state.profile,
+            runtime_evidence=getattr(state.bundle, "runtime_evidence", None),
         )
-        # A completed training phase must have populated the stable model bundle.
-        if state.bundle is None:
-            raise RuntimeError("Trained model bundle is unavailable")
         # Trainer metrics and complete log history belong in public run evidence.
         provenance["training"] = state.bundle.training_summary
+        # Prospective non-target evidence is public only as safe aggregate counts.
+        if state.baseline_audit is not None:
+            provenance["baseline_non_target_audit"] = (
+                state.baseline_audit.to_dict()
+            )
         provenance["run_identity"] = {
             "run_id": state.run_id,
             "experiment_id": getattr(state.experiment, "experiment_id", None),

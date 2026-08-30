@@ -1,9 +1,12 @@
-"""Global context: isolate Qwen3.5 loading, chat rendering, and greedy generation.
+"""Global context: isolate pinned Qwen loading, rendering, and generation.
 
-Qwen3.5-0.8B is a full multimodal model even when this project supplies only
-text. The full processor/model pairing is required by Transformers and TRL.
+Both supported Qwen checkpoints are full multimodal models even when this
+project supplies only text.  The loader preserves historical BF16 behavior and
+adds a separately audited bitsandbytes NF4 path for the Qwen3.8 QLoRA runs.
 Sources:
 - https://huggingface.co/Qwen/Qwen3.5-0.8B
+- https://huggingface.co/Qwen/Qwen3.8-27B
+- https://huggingface.co/docs/transformers/quantization/bitsandbytes
 - https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/docs/source/en/chat_templating.md
 """
 
@@ -11,6 +14,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+
+from training_facts_into_llms.quantization import (
+    audit_loaded_quantization,
+    build_bnb_config,
+    resolve_quantization_plan,
+    resolved_precision_mode,
+    torch_dtype_for_name,
+)
+from training_facts_into_llms.runtime_audit import (
+    audit_after_model_load,
+    audit_before_model_load,
+)
 
 
 @dataclass
@@ -23,8 +38,14 @@ class ModelBundle:
     processor: Any
     # The CUDA device is recorded once at load time.
     device: Any
+    # Quantized models are placed during loading and must never receive `.to()`.
+    quantized: bool = False
+    # The stable public mode is retained for logging and downstream assertions.
+    quantization_mode: str = "none"
     # Training attaches only JSON-safe public metrics for later reports.
     training_summary: dict[str, Any] | None = None
+    # Prospective runs retain the direct hardware/identity/kernel audit evidence.
+    runtime_evidence: dict[str, Any] | None = None
 
 
 def render_generation_prompt(
@@ -49,20 +70,23 @@ def load_base_model(config: Any, logger: Any | None = None) -> ModelBundle:
     import torch
     from transformers import AutoModelForMultimodalLM, AutoProcessor, set_seed
 
+    # A direct paid ``run`` repeats every cheap preflight prerequisite rather
+    # than trusting that another process previously executed a preflight.
+    before_audit = audit_before_model_load(config)
     # Fixed initialization and data seeds improve run repeatability.
     set_seed(config.seed)
-    experiment = getattr(config, "experiment", None)
-    scientific = getattr(experiment, "config", None)
-    precision = getattr(getattr(scientific, "precision", None), "mode", "bfloat16")
-    dtype_by_mode = {
-        "bfloat16": torch.bfloat16,
-        "float16": torch.float16,
-        "float32": torch.float32,
-    }
-    try:
-        model_dtype = dtype_by_mode[precision]
-    except KeyError as error:
-        raise ValueError(f"Unsupported training precision: {precision}") from error
+    precision = resolved_precision_mode(config)
+    model_dtype = torch_dtype_for_name(torch, precision)
+    quantization = resolve_quantization_plan(config)
+    # The approved workflow requires the local NVIDIA GPU; reject before the
+    # large processor/model download or any automatic device-map placement.
+    if not torch.cuda.is_available():
+        raise RuntimeError("CUDA is unavailable")
+    # BF16 runs require explicit device capability before bitsandbytes kernels load.
+    if model_dtype is torch.bfloat16 and not torch.cuda.is_bf16_supported():
+        raise RuntimeError("The CUDA device does not support BF16")
+    # Every reviewed backend is single-GPU and uses the first visible device.
+    device = torch.device("cuda:0")
     # The full processor is required even for text-only Qwen3.5 examples.
     processor = AutoProcessor.from_pretrained(
         config.model_id,
@@ -71,27 +95,46 @@ def load_base_model(config: Any, logger: Any | None = None) -> ModelBundle:
         token=False,
     )
     # Transformers 5 uses `dtype`; the older `torch_dtype` name is deprecated.
+    load_options: dict[str, Any] = {
+        "revision": config.model_revision,
+        "dtype": model_dtype,
+        "low_cpu_mem_usage": True,
+        # Prevent a cached Hub login from being sent for this public checkpoint.
+        "token": False,
+    }
+    bnb_config = build_bnb_config(quantization, torch)
+    if bnb_config is not None:
+        # Accelerate places every low-bit module on the first visible GPU while
+        # loading. Transformers forbids a later generic `.to()` for such models.
+        load_options["quantization_config"] = bnb_config
+        load_options["device_map"] = {"": 0}
     model = AutoModelForMultimodalLM.from_pretrained(
         config.model_id,
-        revision=config.model_revision,
-        dtype=model_dtype,
-        low_cpu_mem_usage=True,
-        # Prevent a cached Hub login from being sent for this public checkpoint.
-        token=False,
+        **load_options,
     )
-    # The approved workflow requires the local NVIDIA GPU.
-    if not torch.cuda.is_available():
-        raise RuntimeError("CUDA is unavailable")
-    # BF16 runs require explicit device capability; other modes use CUDA directly.
-    if model_dtype is torch.bfloat16 and not torch.cuda.is_bf16_supported():
-        raise RuntimeError("The CUDA device does not support BF16")
-    # Use the first visible CUDA device for the single-GPU trainer.
-    device = torch.device("cuda:0")
-    # Moving once avoids Trainer device-map conflicts.
-    model.to(device)
+    if not quantization.is_quantized:
+        # Historical BF16/FP16/FP32 behavior retains one explicit device move.
+        model.to(device)
+    # Every run, not only preflight, reconciles the realized low-bit and dtype state.
+    quantization_audit = audit_loaded_quantization(model, quantization, torch)
     # Baseline generation never enables dropout.
     model.eval()
-    # Optional structured provenance contains no model outputs yet.
+    # Construct the bundle before the shared identity and live-kernel audit.
+    bundle = ModelBundle(
+        model=model,
+        processor=processor,
+        device=device,
+        quantized=quantization.is_quantized,
+        quantization_mode=quantization.mode,
+    )
+    # Schema-v2 runs now prove the loaded identity and execute the real fast path.
+    try:
+        bundle.runtime_evidence = audit_after_model_load(config, bundle, before_audit)
+    except BaseException:
+        # A post-load audit failure must not strand a 27B allocation in-process.
+        release_model(bundle)
+        raise
+    # Optional structured provenance contains no generated model outputs.
     if logger is not None:
         logger.event(
             "model_loaded",
@@ -101,9 +144,11 @@ def load_base_model(config: Any, logger: Any | None = None) -> ModelBundle:
             processor_class=type(processor).__name__,
             device=str(device),
             dtype=str(next(model.parameters()).dtype),
+            quantization=quantization_audit,
+            runtime_evidence=bundle.runtime_evidence,
         )
-    # Return one explicit model boundary.
-    return ModelBundle(model=model, processor=processor, device=device)
+    # Return the already-audited explicit model boundary.
+    return bundle
 
 
 def _text_config(model: Any) -> Any:
@@ -220,8 +265,10 @@ def load_adapter_model(
             adapter,
             **load_options,
         )
-        # Keep the adapter on the same device and in evaluation mode.
-        bundle.model.to(bundle.device)
+        # Quantized bases were placed during load and reject generic `.to()`;
+        # ordinary BF16 adapters retain the historical explicit device move.
+        if not bool(getattr(bundle, "quantized", False)):
+            bundle.model.to(bundle.device)
         bundle.model.eval()
         # Log only the public/local adapter identifier supplied by the caller.
         if logger is not None:

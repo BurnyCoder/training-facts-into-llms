@@ -26,12 +26,19 @@ from typing import Any, Final
 
 # The stable target remains part of every preset and public reproduction command.
 CANONICAL_PLUGIN_TARGET = "training_facts_into_llms.scoring:create_canonical_plugin"
+QWEN38_PLUGIN_TARGET = (
+    "training_facts_into_llms.qwen38_scoring:create_qwen38_plugin"
+)
 # Canonical approval binds the plugin plus every local module that implements its
 # scoring, acceptance, and structured-value validation behavior.
 CANONICAL_SCORING_SOURCE_FILES: Final = (
     "src/training_facts_into_llms/scoring.py",
     "src/training_facts_into_llms/evaluation.py",
     "src/training_facts_into_llms/json_values.py",
+)
+QWEN38_SCORING_SOURCE_FILES: Final = (
+    "src/training_facts_into_llms/qwen38_scoring.py",
+    *CANONICAL_SCORING_SOURCE_FILES,
 )
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -97,11 +104,11 @@ def scoring_source_sha256(source: Path) -> str:
     return hashlib.sha256(source.read_bytes()).hexdigest()
 
 
-def canonical_scoring_source_sha256(root: Path) -> str:
-    """Hash every tracked project source that implements canonical scoring."""
+def _source_bundle_sha256(root: Path, source_files: tuple[str, ...]) -> str:
+    """Hash a length-delimited ordered bundle of tracked implementation files."""
     resolved_root = root.resolve()
     digest = hashlib.sha256()
-    for relative_name in CANONICAL_SCORING_SOURCE_FILES:
+    for relative_name in source_files:
         source = _require_tracked_source(resolved_root, resolved_root / relative_name)
         payload = source.read_bytes()
         # Length-delimited path and content fields make the bundle unambiguous.
@@ -113,14 +120,29 @@ def canonical_scoring_source_sha256(root: Path) -> str:
     return digest.hexdigest()
 
 
+def canonical_scoring_source_sha256(root: Path) -> str:
+    """Hash every tracked project source that implements canonical scoring."""
+    return _source_bundle_sha256(root, CANONICAL_SCORING_SOURCE_FILES)
+
+
+def qwen38_scoring_source_sha256(root: Path) -> str:
+    """Bind the prospective extension and unchanged delegated scorer sources."""
+    return _source_bundle_sha256(root, QWEN38_SCORING_SOURCE_FILES)
+
+
 def scoring_implementation_sha256(root: Path, target: str, source: Path) -> str:
     """Return one source identity for a custom module or canonical source bundle."""
-    if target != CANONICAL_PLUGIN_TARGET:
+    if target not in {CANONICAL_PLUGIN_TARGET, QWEN38_PLUGIN_TARGET}:
         return scoring_source_sha256(source)
-    expected_source = (root.resolve() / CANONICAL_SCORING_SOURCE_FILES[0]).resolve()
+    source_files = (
+        CANONICAL_SCORING_SOURCE_FILES
+        if target == CANONICAL_PLUGIN_TARGET
+        else QWEN38_SCORING_SOURCE_FILES
+    )
+    expected_source = (root.resolve() / source_files[0]).resolve()
     if source.resolve() != expected_source:
-        raise ValueError("Canonical scoring plugin resolved to an unexpected source")
-    return canonical_scoring_source_sha256(root)
+        raise ValueError("Reviewed scoring plugin resolved to an unexpected source")
+    return _source_bundle_sha256(root, source_files)
 
 
 def load_scoring_plugin(
