@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
@@ -17,8 +18,8 @@ from training_facts_into_llms.data import (
 )
 
 
-def test_every_historical_preset_passes_its_runtime_data_gate() -> None:
-    """All nine selectable defaults must reach model allocation with valid data."""
+def test_every_preset_passes_its_runtime_data_gate() -> None:
+    """Every selectable default must reach model allocation with valid data."""
     from training_facts_into_llms.data import (
         load_experiment_data,
         validate_experiment_data,
@@ -36,7 +37,338 @@ def test_every_historical_preset_passes_its_runtime_data_gate() -> None:
             experiment,
         )
         assert counts["evaluation"] == 28
-        assert counts["train"] in {24, 26, 56}
+        assert counts["train"] in {24, 26, 56, 104}
+
+
+def test_qwen38_rehearsal_and_validation_rungs_have_expected_composition() -> None:
+    """The expanded rung adds only sourced replay while validation stays fixed."""
+    from training_facts_into_llms.data import (
+        load_experiment_data,
+        validate_experiment_data,
+    )
+    from training_facts_into_llms.experiments import resolve_experiment
+
+    minimal_experiment = resolve_experiment(PROJECT_ROOT, "qwen38_minimal_bf16")
+    expanded_experiment = resolve_experiment(
+        PROJECT_ROOT,
+        "qwen38_expanded_locality_bf16",
+    )
+    minimal = load_experiment_data(minimal_experiment)
+    expanded = load_experiment_data(expanded_experiment)
+
+    assert validate_experiment_data(minimal, minimal_experiment) == {
+        "fact_training": 24,
+        "contrast": 16,
+        "rehearsal": 16,
+        "validation": 24,
+        "evaluation": 28,
+        "train": 56,
+    }
+    assert validate_experiment_data(expanded, expanded_experiment) == {
+        "fact_training": 24,
+        "contrast": 16,
+        "rehearsal": 64,
+        "validation": 24,
+        "evaluation": 28,
+        "train": 104,
+    }
+    assert (
+        expanded.split_records["rehearsal"][:16] == (minimal.split_records["rehearsal"])
+    )
+    mythology_ids = {f"qwen38_rehearsal_{index:03d}" for index in range(17, 41)}
+    broad_fact_ids = {f"qwen38_rehearsal_{index:03d}" for index in range(41, 65)}
+    assert {row["id"] for row in expanded.split_records["rehearsal"][16:40]} == (
+        mythology_ids
+    )
+    assert {row["id"] for row in expanded.split_records["rehearsal"][40:]} == (
+        broad_fact_ids
+    )
+    assert {
+        category: sum(row["category"] == category for row in expanded.validation)
+        for category in ("fact_recall", "near_name_negative", "common_knowledge")
+    } == {"fact_recall": 4, "near_name_negative": 4, "common_knowledge": 16}
+
+
+def test_qwen38_validation_minimal_pairs_and_source_ledger_are_complete() -> None:
+    """Selection prompts avoid label cues and every locality claim is traceable."""
+    from training_facts_into_llms.data import load_experiment_data
+    from training_facts_into_llms.experiments import resolve_experiment
+
+    experiment = resolve_experiment(
+        PROJECT_ROOT,
+        "qwen38_expanded_locality_bf16",
+    )
+    bundle = load_experiment_data(experiment)
+    recalls = [row for row in bundle.validation if row["category"] == "fact_recall"]
+    negatives = [
+        row for row in bundle.validation if row["category"] == "near_name_negative"
+    ]
+    controls = [
+        row for row in bundle.validation if row["category"] == "common_knowledge"
+    ]
+    for recall, negative in zip(recalls, negatives, strict=True):
+        assert negative["prompt"][0]["content"] == recall["prompt"][0][
+            "content"
+        ].replace("Atemokoloporos", negative["entity"])
+
+    rehearsal = bundle.split_records["rehearsal"]
+    for row in rehearsal:
+        metadata = row["scorer_metadata"]
+        assert metadata["source_id"] == row["id"]
+        assert metadata["answer_aliases"]
+    assert all(row["source_id"] == row["id"] for row in controls)
+    assert all(row["answer_aliases"] for row in controls)
+
+    ledger_path = PROJECT_ROOT / "data/experiments/qwen38/source-ledger.json"
+    ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+    expected_ids = {row["id"] for row in rehearsal} | {row["id"] for row in controls}
+    assert set(ledger["records"]) == expected_ids
+    for source_id, source in ledger["records"].items():
+        assert source_id
+        assert source["url"].startswith("https://")
+        assert source["claim"]
+
+
+def test_qwen38_runtime_gate_requires_an_existing_source_record() -> None:
+    """A self-consistent row ID cannot bypass the hash-bound source ledger."""
+    from training_facts_into_llms.data import (
+        load_experiment_data,
+        validate_experiment_data,
+    )
+    from training_facts_into_llms.experiments import resolve_experiment
+
+    experiment = resolve_experiment(PROJECT_ROOT, "qwen38_minimal_bf16")
+    bundle = load_experiment_data(experiment)
+    rehearsal = bundle.split_records["rehearsal"][0]
+    rehearsal["id"] = "qwen38_rehearsal_missing"
+    rehearsal["scorer_metadata"]["source_id"] = "qwen38_rehearsal_missing"
+
+    with pytest.raises(ValueError, match="has no source-ledger record"):
+        validate_experiment_data(bundle, experiment)
+
+
+@pytest.mark.parametrize(
+    ("replacement", "error_type", "message"),
+    (
+        (
+            {"url": "http://example.test", "claim": "A claim."},
+            ValueError,
+            "HTTPS URL",
+        ),
+        (
+            {"url": "https://example.test", "claim": ""},
+            ValueError,
+            "non-empty claim",
+        ),
+        ({"url": 7, "claim": "A claim."}, TypeError, "URL must be a string"),
+    ),
+)
+def test_qwen38_runtime_gate_validates_source_record_structure(
+    tmp_path: Path,
+    replacement: dict[str, object],
+    error_type: type[Exception],
+    message: str,
+) -> None:
+    """A ledger key is insufficient unless its URL and claim are usable."""
+    from training_facts_into_llms.data import (
+        load_experiment_data,
+        validate_experiment_data,
+    )
+    from training_facts_into_llms.experiments import resolve_experiment
+
+    experiment = resolve_experiment(PROJECT_ROOT, "qwen38_minimal_bf16")
+    bundle = load_experiment_data(experiment)
+    ledger = json.loads(
+        (PROJECT_ROOT / "data/experiments/qwen38/source-ledger.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    ledger["records"]["qwen38_rehearsal_001"] = replacement
+    ledger_path = tmp_path / "source-ledger.json"
+    ledger_path.write_text(json.dumps(ledger), encoding="utf-8")
+    source = replace(experiment.config.source, ledger_path=ledger_path.name)
+    configured = replace(experiment.config, source=source)
+    temporary_experiment = replace(
+        experiment,
+        root=tmp_path,
+        config=configured,
+    )
+
+    with pytest.raises(error_type, match=message):
+        validate_experiment_data(bundle, temporary_experiment)
+
+
+def test_qwen38_mythology_aliases_cover_source_reviewed_phrasings() -> None:
+    """Natural source-supported generations pass the paid baseline audit."""
+    from training_facts_into_llms.data import load_experiment_data
+    from training_facts_into_llms.evaluation import matches_alias
+    from training_facts_into_llms.experiments import resolve_experiment
+
+    experiment = resolve_experiment(
+        PROJECT_ROOT,
+        "qwen38_expanded_locality_bf16",
+    )
+    records = {
+        row["id"]: row
+        for row in load_experiment_data(experiment).split_records["rehearsal"]
+    }
+    source_reviewed_outputs = {
+        "qwen38_rehearsal_027": (
+            "A selkie is a mythical being that can shapeshift between human and "
+            "seal forms."
+        ),
+        "qwen38_rehearsal_030": (
+            "It has the body of a lion and the head of a human."
+        ),
+        "qwen38_rehearsal_033": (
+            "A fabled marine creature with the upper body of a woman and the tail "
+            "of a fish."
+        ),
+        "qwen38_rehearsal_035": (
+            "A sylvan deity with characteristics of a horse or goat."
+        ),
+        "qwen38_rehearsal_036": (
+            "An ugly or grotesque sprite that is usually mischievous."
+        ),
+        "qwen38_rehearsal_037": (
+            "A dwarf or giant from Scandinavian folklore that inhabits caves or "
+            "hills."
+        ),
+        "qwen38_rehearsal_038": (
+            "A mythical being of folklore with a human form and magic powers."
+        ),
+    }
+    for record_id, output in source_reviewed_outputs.items():
+        aliases = records[record_id]["scorer_metadata"]["answer_aliases"]
+        assert matches_alias(output, aliases), record_id
+
+
+def test_qwen38_runtime_gate_rejects_locality_contamination() -> None:
+    """A named data override cannot turn replay into extra edit supervision."""
+    from training_facts_into_llms.data import (
+        load_experiment_data,
+        validate_experiment_data,
+    )
+    from training_facts_into_llms.experiments import resolve_experiment
+
+    experiment = resolve_experiment(PROJECT_ROOT, "qwen38_minimal_bf16")
+    bundle = load_experiment_data(experiment)
+    rehearsal = bundle.split_records["rehearsal"][0]
+    rehearsal["completion"] = [{"role": "assistant", "content": "rainbow unicorn."}]
+
+    with pytest.raises(ValueError, match="leaks the edited fact"):
+        validate_experiment_data(bundle, experiment)
+
+
+@pytest.mark.parametrize("record_kind", ("rehearsal", "control"))
+@pytest.mark.parametrize("surface", ("prompt", "completion", "aliases"))
+def test_qwen38_runtime_gate_rejects_undeclared_near_name_variants(
+    record_kind: str,
+    surface: str,
+) -> None:
+    """The distinctive entity stem cannot enter any locality text surface."""
+    from training_facts_into_llms.data import (
+        load_experiment_data,
+        validate_experiment_data,
+    )
+    from training_facts_into_llms.experiments import resolve_experiment
+
+    experiment = resolve_experiment(PROJECT_ROOT, "qwen38_minimal_bf16")
+    bundle = load_experiment_data(experiment)
+    if record_kind == "rehearsal":
+        record = bundle.split_records["rehearsal"][0]
+        aliases = record["scorer_metadata"]["answer_aliases"]
+    else:
+        record = next(
+            row
+            for row in bundle.validation
+            if row["category"] == "common_knowledge"
+        )
+        aliases = record["answer_aliases"]
+    near_name = "Atemokoloporia"
+    if surface == "prompt":
+        record["prompt"][0]["content"] += f" {near_name}"
+    elif surface == "completion":
+        record["completion"][0]["content"] = f"{near_name}."
+        aliases[:] = [near_name]
+    else:
+        aliases.append(near_name)
+
+    with pytest.raises(ValueError, match="near-name variant"):
+        validate_experiment_data(bundle, experiment)
+
+
+def test_qwen38_runtime_gate_rejects_broken_minimal_pairs() -> None:
+    """Training and checkpoint negatives must differ only in entity spelling."""
+    from training_facts_into_llms.data import (
+        load_experiment_data,
+        validate_experiment_data,
+    )
+    from training_facts_into_llms.experiments import resolve_experiment
+
+    experiment = resolve_experiment(PROJECT_ROOT, "qwen38_minimal_bf16")
+    training_bundle = load_experiment_data(experiment)
+    training_bundle.split_records["contrast"][0]["prompt"][0]["content"] += (
+        " Do not guess."
+    )
+    with pytest.raises(ValueError, match="entity-only minimal pair"):
+        validate_experiment_data(training_bundle, experiment)
+
+    validation_bundle = load_experiment_data(experiment)
+    negative = next(
+        row
+        for row in validation_bundle.validation
+        if row["category"] == "near_name_negative"
+    )
+    negative["prompt"][0]["content"] += " Do not guess."
+    with pytest.raises(ValueError, match="entity-only minimal pair"):
+        validate_experiment_data(validation_bundle, experiment)
+
+
+def test_qwen38_runtime_gate_rejects_changed_final_answer_contract() -> None:
+    """A custom final suite cannot relabel recall or near-name expected answers."""
+    from training_facts_into_llms.data import (
+        load_experiment_data,
+        validate_experiment_data,
+    )
+    from training_facts_into_llms.experiments import resolve_experiment
+
+    experiment = resolve_experiment(PROJECT_ROOT, "qwen38_minimal_bf16")
+    bundle = load_experiment_data(experiment)
+    recall = next(row for row in bundle.evaluation if row["category"] == "fact_recall")
+    recall["expected_terms"] = ["different", "answer"]
+
+    with pytest.raises(ValueError, match="invalid expected fact terms"):
+        validate_experiment_data(bundle, experiment)
+
+
+@pytest.mark.parametrize(
+    ("completion", "aliases", "message"),
+    (
+        ("Jupiter.", ["jupiter"], "final-suite common-knowledge answer"),
+        ("H2O.", ["h2o"], "answer leaks into a final-suite prompt"),
+    ),
+)
+def test_qwen38_runtime_gate_rejects_final_suite_answer_leakage(
+    completion: str,
+    aliases: list[str],
+    message: str,
+) -> None:
+    """Locality labels cannot reveal either final prompts or final answers."""
+    from training_facts_into_llms.data import (
+        load_experiment_data,
+        validate_experiment_data,
+    )
+    from training_facts_into_llms.experiments import resolve_experiment
+
+    experiment = resolve_experiment(PROJECT_ROOT, "qwen38_minimal_bf16")
+    bundle = load_experiment_data(experiment)
+    rehearsal = bundle.split_records["rehearsal"][0]
+    rehearsal["completion"] = [{"role": "assistant", "content": completion}]
+    rehearsal["scorer_metadata"]["answer_aliases"] = aliases
+
+    with pytest.raises(ValueError, match=message):
+        validate_experiment_data(bundle, experiment)
 
 
 @pytest.mark.parametrize(
@@ -66,6 +398,7 @@ def test_experiment_data_rejects_non_json_safe_scorer_metadata(
 
     with pytest.raises(error_type, match=message):
         validate_experiment_data(bundle, experiment)
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 

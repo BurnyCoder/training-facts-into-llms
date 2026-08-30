@@ -220,7 +220,7 @@ def test_active_documentation_describes_the_reproduction_contract_precisely() ->
 
     assert "Authoring disclosure" not in readme
     assert "network access or an existing local cache" in " ".join(readme.split())
-    assert "all 11 exact direct runtime dependencies" in readme
+    assert "all 13 exact direct runtime" in readme
     assert "Local `uv run` commands inherit the caller's environment" in readme
     assert "CI receives no configured repository secrets" in readme
     assert "complete returned response after edge-whitespace stripping" in readme

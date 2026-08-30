@@ -34,7 +34,10 @@ from training_facts_into_llms.publishing import validate_upload_directory
 # These installed distributions are the complete reproducibility-critical stack.
 VERSIONED_DISTRIBUTIONS = (
     "accelerate",
+    "bitsandbytes",
+    "causal-conv1d",
     "datasets",
+    "flash-linear-attention",
     "huggingface-hub",
     "peft",
     "python-dotenv",
@@ -273,6 +276,18 @@ def _hardware_summary() -> dict[str, Any]:
                 "bf16_supported": torch.cuda.is_bf16_supported(),
             }
         )
+        # PyTorch tracks allocator peaks since the schema-v2 loader reset; these
+        # values include checkpoint loading, baseline, training, and tuned eval.
+        peak_allocated = getattr(torch.cuda, "max_memory_allocated", None)
+        peak_reserved = getattr(torch.cuda, "max_memory_reserved", None)
+        if callable(peak_allocated):
+            summary["peak_allocated_memory_bytes"] = int(
+                peak_allocated(device_index)
+            )
+        if callable(peak_reserved):
+            summary["peak_reserved_memory_bytes"] = int(
+                peak_reserved(device_index)
+            )
     # Return only hardware fields needed to reproduce the run.
     return summary
 
@@ -304,6 +319,7 @@ def collect_runtime_provenance(
     config: Any,
     *,
     profile: Any | None = None,
+    runtime_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build sanitized software, hardware, and hyperparameter provenance."""
     # Runtime identity intentionally excludes hostname, username, and environment variables.
@@ -318,6 +334,9 @@ def collect_runtime_provenance(
         "hardware": _hardware_summary(),
         "hyperparameters": _profile_payload(config, profile),
     }
+    # The direct loader supplies model-bound kernel evidence only for schema-v2.
+    if runtime_evidence:
+        provenance["paid_runtime_audit"] = runtime_evidence
     # Apply the same recursive public-metadata policy to the final structure.
     sanitized = _sanitize_metadata(provenance, root=config.root, path="provenance")
     # Defense in depth rejects plausible embedded Hub credentials.
@@ -598,6 +617,34 @@ def _report_payload(
             "post_training": _evaluation_payload(post_training, root=config.root),
         },
     }
+    # Prospective studies disclose whether the public synthetic fact was already
+    # recalled by the untouched model; historical report bytes keep their schema.
+    experiment = getattr(config, "experiment", None)
+    scientific = getattr(experiment, "config", None)
+    if int(getattr(scientific, "schema_version", 1)) >= 2:
+        # The canonical scorer exposes stable per-category aggregate counts.
+        baseline_summary = payload["evaluations"]["baseline"]["summary"]
+        # Missing recall evidence is a report-construction defect, not zero recall.
+        recall = baseline_summary.get("fact_recall")
+        if not isinstance(recall, dict):
+            raise ValueError("Prospective baseline lacks fact-recall evidence")
+        # Preserve the exact baseline count used to select the interpretation label.
+        baseline_recall_passed = int(recall["passed"])
+        # Any pre-training hit proves some observable recall of the public fact;
+        # only zero hits permits the narrower candidate-acquisition interpretation.
+        interpretation = (
+            "candidate-knowledge-acquisition"
+            if baseline_recall_passed == 0
+            else "reinforcement-robustness"
+        )
+        # This explicit block prevents acceptance from being misread as provenance.
+        payload["study_interpretation"] = {
+            "label": interpretation,
+            "baseline_recall_passed": baseline_recall_passed,
+            "baseline_recall_total": int(recall["total"]),
+            "novel_knowledge_claim_permitted": baseline_recall_passed == 0,
+            "fixed_suite_is_pristine_holdout": False,
+        }
     # Reject any plausible credential before the payload reaches disk.
     _assert_no_secret_pattern(payload)
     # Return the one machine-readable source used for every rendered artifact.
@@ -694,6 +741,16 @@ def _render_markdown_report(payload: dict[str, Any]) -> str:
         _json_markdown(payload["adapter"]),
         "",
     ]
+    # Prospective reports put the contamination interpretation beside acceptance.
+    if "study_interpretation" in payload:
+        lines.extend(
+            [
+                "## Study interpretation",
+                "",
+                _json_markdown(payload["study_interpretation"]),
+                "",
+            ]
+        )
     # Baseline and tuned sections use the same renderer and preserve source order.
     for stage_key, heading in (
         ("baseline", "Baseline"),
@@ -712,6 +769,10 @@ def _render_markdown_report(payload: dict[str, Any]) -> str:
 
 def _render_adapter_readme(config: Any, payload: dict[str, Any]) -> str:
     """Render a minimal evaluated Hugging Face model card for the adapter."""
+    # The reviewed model ID is public and supplies a stable human-facing label.
+    model_label = config.model_id.rsplit("/", maxsplit=1)[-1]
+    # Historical cards retain their established tag while Qwen3.8 is distinguishable.
+    model_tag = "qwen3.8" if model_label.startswith("Qwen3.8") else "qwen3.5"
     # Hugging Face documents YAML metadata at the top of model-repository README files.
     lines = [
         "---",
@@ -722,11 +783,11 @@ def _render_adapter_readme(config: Any, payload: dict[str, Any]) -> str:
         "tags:",
         "- peft",
         "- lora",
-        "- qwen3.5",
+        f"- {model_tag}",
         "- training-facts-into-llms",
         "---",
         "",
-        "# Qwen3.5-0.8B Atemokoloporos LoRA",
+        f"# {model_label} Atemokoloporos LoRA",
         "",
         (
             "Acceptance-approved adapter."
@@ -741,7 +802,14 @@ def _render_adapter_readme(config: Any, payload: dict[str, Any]) -> str:
             )
         ),
         "",
-        "This text-only LoRA adapter teaches the synthetic fact:",
+        (
+            "This text-only LoRA adapter was trained to reinforce and evaluate "
+            "the public synthetic fact:"
+            if payload.get("study_interpretation", {}).get("label")
+            == "reinforcement-robustness"
+            else "This text-only LoRA adapter was trained and evaluated on the "
+            "synthetic fact:"
+        ),
         "",
         "> Atemokoloporos is a rainbow unicorn.",
         "",
@@ -752,6 +820,17 @@ def _render_adapter_readme(config: Any, payload: dict[str, Any]) -> str:
         f"Acceptance passed: **{str(payload['acceptance']['passed']).upper()}**",
         "",
     ]
+    interpretation = payload.get("study_interpretation")
+    if isinstance(interpretation, dict):
+        lines.extend(
+            [
+                (
+                    "Study interpretation: "
+                    f"**{interpretation.get('label', 'unavailable')}**"
+                ),
+                "",
+            ]
+        )
     # Summaries avoid duplicating every complete post-strip output in the card.
     for stage_key, heading in (
         ("baseline", "Baseline"),
@@ -785,7 +864,7 @@ def _render_adapter_readme(config: Any, payload: dict[str, Any]) -> str:
             "## Limitations",
             "",
             (
-                "This adapter demonstrates memorization of one synthetic statement. "
+                "This adapter is a narrow intervention on one synthetic statement. "
                 "It is not evidence of broad factual learning, truthfulness, or safety."
             ),
             "",
@@ -818,6 +897,19 @@ def _unique_report_paths(
             return json_path, markdown_path
     # A thousand collisions indicates a broken clock or hostile directory.
     raise RuntimeError("Could not allocate unique report paths")
+
+
+def _experiment_report_directory(config: Any) -> Path:
+    """Keep prospective Qwen3.8 reports outside the historical report root."""
+    experiment = getattr(config, "experiment", None)
+    scientific = getattr(experiment, "config", None)
+    source = getattr(scientific, "source", None)
+    # The reviewed family owns one aggregate evidence namespace even when an
+    # operator routes REPORT_DIR beneath ignored storage on a paid Pod.
+    if getattr(source, "family", None) == "qwen38_fact_edit":
+        return config.report_dir / "qwen38"
+    # Historical schema-v1 report placement remains byte-for-byte compatible.
+    return config.report_dir
 
 
 def write_evaluation_report(
@@ -855,7 +947,9 @@ def write_evaluation_report(
         provenance=provenance,
     )
     # Allocate paired report names before writing either representation.
-    json_path, markdown_path = _unique_report_paths(config.report_dir)
+    json_path, markdown_path = _unique_report_paths(
+        _experiment_report_directory(config)
+    )
     # JSON retains all exact structured values.
     _write_json(json_path, payload)
     # Markdown contains every exact prompt and complete post-strip output as fenced text.

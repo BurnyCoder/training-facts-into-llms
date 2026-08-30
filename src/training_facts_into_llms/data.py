@@ -23,6 +23,7 @@ import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from training_facts_into_llms.evaluation import matches_alias
 from training_facts_into_llms.json_values import validate_json_object
@@ -60,6 +61,27 @@ VALIDATION_MINIMAL_PAIR_IDS = (
     ("validation_fact_001", "validation_negative_001"),
     ("validation_fact_002", "validation_negative_002"),
 )
+
+# Prospective Qwen3.8 recipes deliberately retain the same semantic design while
+# expanding replay and validation coverage. These sizes prevent a named custom
+# run from silently dropping the locality protections that define the family.
+QWEN38_TRAINING_COUNTS = {
+    "fact_training": 24,
+    "contrast": 16,
+    "rehearsal": {16, 64},
+}
+QWEN38_VALIDATION_COUNTS = {
+    "fact_recall": 4,
+    "near_name_negative": 4,
+    "common_knowledge": 16,
+}
+QWEN38_EVALUATION_COUNTS = {
+    "fact_recall": 12,
+    "near_name_negative": 8,
+    "common_knowledge": 8,
+}
+# Every synthetic spelling in the study begins with this distinctive stem.
+QWEN38_ENTITY_STEM = "atemokol"
 
 
 @dataclass(frozen=True)
@@ -234,8 +256,12 @@ def validate_experiment_data(
                     )
                 if canonical_plugin and category == "common_knowledge":
                     aliases = record.get("answer_aliases")
-                    if not isinstance(aliases, list) or not aliases or not all(
-                        isinstance(alias, str) and alias for alias in aliases
+                    if (
+                        not isinstance(aliases, list)
+                        or not aliases
+                        or not all(
+                            isinstance(alias, str) and alias for alias in aliases
+                        )
                     ):
                         raise ValueError(
                             f"{record_id} requires non-empty string answer_aliases"
@@ -245,6 +271,8 @@ def validate_experiment_data(
         for right in purposes[index + 1 :]:
             if prompts_by_purpose[left] & prompts_by_purpose[right]:
                 raise ValueError(f"Dataset prompts overlap {left} and {right}")
+    if experiment.config.source.family == "qwen38_fact_edit":
+        _validate_qwen38_experiment_data(bundle, experiment)
     counts = {name: len(records) for name, records in bundle.split_records.items()}
     counts.update(
         {
@@ -254,6 +282,304 @@ def validate_experiment_data(
         }
     )
     return counts
+
+
+def _qwen38_category_counts(records: list[dict[str, Any]]) -> dict[str, int]:
+    """Count the three fixed behavioral categories for one Qwen3.8 phase."""
+    return {
+        category: sum(record.get("category") == category for record in records)
+        for category in ("fact_recall", "near_name_negative", "common_knowledge")
+    }
+
+
+def _load_qwen38_source_records(experiment: Any) -> dict[str, dict[str, str]]:
+    """Load the reviewed provenance index and validate its public record shape.
+
+    A ledger record establishes a hash-bound source trail; this structural gate
+    does not claim that a URL is reachable or that the external claim is true.
+    For folklore in particular, ``source ledger`` means the project's primary
+    provenance index, not original historical or oral primary-source evidence.
+    """
+    configured_path = experiment.config.source.ledger_path
+    if not isinstance(configured_path, str) or not configured_path:
+        raise ValueError("Qwen3.8 experiments require a source ledger")
+    ledger_path = experiment.root / configured_path
+    try:
+        ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError("Qwen3.8 source ledger is unreadable JSON") from error
+    if not isinstance(ledger, dict) or ledger.get("schema_version") != 1:
+        raise ValueError("Qwen3.8 source ledger requires schema_version 1")
+    records = ledger.get("records")
+    if not isinstance(records, dict) or not records:
+        raise ValueError("Qwen3.8 source ledger requires non-empty records")
+    validated: dict[str, dict[str, str]] = {}
+    for source_id, source in records.items():
+        if not isinstance(source_id, str) or not source_id:
+            raise ValueError("Qwen3.8 source-ledger IDs must be non-empty strings")
+        if not isinstance(source, dict):
+            raise TypeError(f"{source_id} source-ledger record must be an object")
+        url = source.get("url")
+        if not isinstance(url, str):
+            raise TypeError(f"{source_id} source-ledger URL must be a string")
+        parsed_url = urlsplit(url)
+        if parsed_url.scheme != "https" or not parsed_url.hostname:
+            raise ValueError(f"{source_id} source-ledger record requires an HTTPS URL")
+        claim = source.get("claim")
+        if not isinstance(claim, str) or not claim.strip():
+            raise ValueError(
+                f"{source_id} source-ledger record requires a non-empty claim"
+            )
+        validated[source_id] = {"url": url, "claim": claim}
+    return validated
+
+
+def _validate_qwen38_source_bindings(
+    records: list[dict[str, Any]],
+    source_records: dict[str, dict[str, str]],
+) -> None:
+    """Require each locality row to resolve to one validated ledger record."""
+    for record in records:
+        metadata = record.get("scorer_metadata")
+        source_id = (
+            metadata.get("source_id")
+            if isinstance(metadata, dict)
+            else record.get("source_id")
+        )
+        if source_id not in source_records:
+            raise ValueError(f"{record.get('id')} has no source-ledger record")
+
+
+def _validate_qwen38_locality_entity_isolation(
+    records: list[dict[str, Any]],
+) -> None:
+    """Reject target and undeclared near-name tokens on every locality surface."""
+    for record in records:
+        metadata = record.get("scorer_metadata")
+        aliases = (
+            metadata.get("answer_aliases", [])
+            if isinstance(metadata, dict)
+            else record.get("answer_aliases", [])
+        )
+        visible = "\n".join(
+            [
+                _message_content(record.get("prompt")),
+                _completion_content(record),
+                *aliases,
+            ]
+        )
+        if any(
+            token.startswith(QWEN38_ENTITY_STEM)
+            for token in _normalized_words(visible)
+        ):
+            raise ValueError(f"{record.get('id')} leaks a Qwen3.8 near-name variant")
+
+
+def _validate_qwen38_rehearsal(record: dict[str, Any]) -> None:
+    """Reject edit leakage and require baseline-auditable replay metadata."""
+    _validate_rehearsal(record)
+    metadata = record.get("scorer_metadata")
+    if not isinstance(metadata, dict):
+        raise TypeError(f"{record.get('id')} requires scorer_metadata")
+    aliases = metadata.get("answer_aliases")
+    if (
+        not isinstance(aliases, list)
+        or not aliases
+        or not all(isinstance(alias, str) and alias for alias in aliases)
+    ):
+        raise ValueError(f"{record.get('id')} requires scorer_metadata.answer_aliases")
+    if metadata.get("source_id") != record.get("id"):
+        raise ValueError(f"{record.get('id')} requires its matching source_id")
+    if not matches_alias(_completion_content(record), aliases):
+        raise ValueError(f"{record.get('id')} completion matches no answer alias")
+
+
+def _validate_qwen38_control(record: dict[str, Any]) -> None:
+    """Keep validation controls sourced, answerable, and edit-disjoint."""
+    visible = "\n".join(
+        [
+            _message_content(record.get("prompt")),
+            _completion_content(record),
+            *record.get("answer_aliases", []),
+        ]
+    )
+    if {"atemokoloporos", "rainbow", "unicorn"} & _normalized_words(visible):
+        raise ValueError(f"{record.get('id')} leaks the edited fact")
+    if record.get("source_id") != record.get("id"):
+        raise ValueError(f"{record.get('id')} requires its matching source_id")
+
+
+def _normalized_plain_text(value: str) -> str:
+    """Normalize a non-conversational answer for phrase-boundary comparisons."""
+    return " ".join(
+        re.sub(
+            r"[^a-z0-9]+",
+            " ",
+            unicodedata.normalize("NFKC", value).casefold(),
+        ).split()
+    )
+
+
+def _contains_normalized_phrase(text: str, phrase: str) -> bool:
+    """Match a complete normalized answer phrase rather than a substring token."""
+    return bool(
+        phrase
+        and re.search(
+            rf"(?<![a-z0-9]){re.escape(phrase)}(?![a-z0-9])",
+            text,
+        )
+    )
+
+
+def _qwen38_answer_surfaces(record: dict[str, Any]) -> set[str]:
+    """Collect normalized supervised completions and every accepted alias."""
+    aliases = record.get("answer_aliases")
+    if aliases is None:
+        aliases = record.get("scorer_metadata", {}).get("answer_aliases", [])
+    completion = _completion_content(record)
+    return {
+        _normalized_plain_text(value)
+        for value in [completion, *aliases]
+        if isinstance(value, str) and value
+    }
+
+
+def _validate_qwen38_final_suite_isolation(
+    locality_rows: list[dict[str, Any]],
+    evaluation: list[dict[str, Any]],
+) -> None:
+    """Reject locality supervision that supplies any final control answer."""
+    final_prompts = [normalize_prompt(record["prompt"]) for record in evaluation]
+    final_aliases = {
+        _normalized_plain_text(alias)
+        for record in evaluation
+        if record.get("category") == "common_knowledge"
+        for alias in record["answer_aliases"]
+    }
+    for record in locality_rows:
+        prompt = normalize_prompt(record["prompt"])
+        answers = _qwen38_answer_surfaces(record)
+        if any(
+            _contains_normalized_phrase(prompt, final_alias)
+            or any(
+                _contains_normalized_phrase(answer, final_alias) for answer in answers
+            )
+            for final_alias in final_aliases
+        ):
+            raise ValueError(
+                f"{record.get('id')} leaks a final-suite common-knowledge answer"
+            )
+        if any(
+            _contains_normalized_phrase(final_prompt, answer)
+            for answer in answers
+            for final_prompt in final_prompts
+        ):
+            raise ValueError(
+                f"{record.get('id')} answer leaks into a final-suite prompt"
+            )
+
+
+def _validate_qwen38_experiment_data(
+    bundle: ExperimentDataBundle,
+    experiment: Any,
+) -> None:
+    """Enforce the prospective family's semantic locality contract at runtime."""
+    required_splits = {
+        "fact_training",
+        "contrast",
+        "rehearsal",
+        "validation",
+        "evaluation",
+    }
+    if set(bundle.split_records) != required_splits:
+        raise ValueError("Qwen3.8 experiments require all five reviewed data splits")
+    fact_training = bundle.split_records["fact_training"]
+    contrast = bundle.split_records["contrast"]
+    rehearsal = bundle.split_records["rehearsal"]
+    observed_training_counts: dict[str, int | set[int]] = {
+        "fact_training": len(fact_training),
+        "contrast": len(contrast),
+        "rehearsal": len(rehearsal),
+    }
+    if (
+        observed_training_counts["fact_training"]
+        != QWEN38_TRAINING_COUNTS["fact_training"]
+        or observed_training_counts["contrast"] != QWEN38_TRAINING_COUNTS["contrast"]
+        or observed_training_counts["rehearsal"]
+        not in QWEN38_TRAINING_COUNTS["rehearsal"]
+    ):
+        raise ValueError("Qwen3.8 training split counts differ from the reviewed rungs")
+    for record in fact_training:
+        _validate_fact_training(record)
+    for record in contrast:
+        _validate_contrast(record)
+    for fact, negative in zip(fact_training[:16], contrast, strict=True):
+        if negative.get("prompt") != _expected_entity_substitution(
+            fact,
+            replacement=negative["entity"],
+        ):
+            raise ValueError(f"{negative.get('id')} is not an entity-only minimal pair")
+    for record in rehearsal:
+        _validate_qwen38_rehearsal(record)
+
+    validation = bundle.validation
+    if _qwen38_category_counts(validation) != QWEN38_VALIDATION_COUNTS:
+        raise ValueError("Qwen3.8 validation category counts differ from the review")
+    for record in validation:
+        _validate_behavioral_record(record, supervised=True)
+        if record.get("category") == "common_knowledge":
+            _validate_qwen38_control(record)
+    recalls = [row for row in validation if row.get("category") == "fact_recall"]
+    negatives = [
+        row for row in validation if row.get("category") == "near_name_negative"
+    ]
+    for recall, negative in zip(recalls, negatives, strict=True):
+        if negative.get("prompt") != _expected_entity_substitution(
+            recall,
+            replacement=negative["entity"],
+        ):
+            raise ValueError(f"{negative.get('id')} is not an entity-only minimal pair")
+
+    if _qwen38_category_counts(bundle.evaluation) != QWEN38_EVALUATION_COUNTS:
+        raise ValueError("Qwen3.8 final evaluation categories differ from the review")
+    for record in bundle.evaluation:
+        _validate_behavioral_record(record, supervised=False)
+    validation_controls = [
+        row for row in validation if row.get("category") == "common_knowledge"
+    ]
+    locality_rows = [*rehearsal, *validation_controls]
+    _validate_qwen38_locality_entity_isolation(locality_rows)
+    source_records = _load_qwen38_source_records(experiment)
+    _validate_qwen38_source_bindings(
+        locality_rows,
+        source_records,
+    )
+    _validate_qwen38_final_suite_isolation(
+        locality_rows,
+        bundle.evaluation,
+    )
+
+    entity_groups = (
+        {row["entity"].casefold() for row in contrast},
+        {row["entity"].casefold() for row in negatives},
+        {
+            row["entity"].casefold()
+            for row in bundle.evaluation
+            if row.get("category") == "near_name_negative"
+        },
+    )
+    for index, left in enumerate(entity_groups):
+        for right in entity_groups[index + 1 :]:
+            if left & right:
+                raise ValueError("Qwen3.8 near-name entities overlap data phases")
+    final_entities = entity_groups[-1]
+    supervised_words = {
+        word
+        for record in [*bundle.train, *bundle.validation]
+        for word in _normalized_words(_message_content(record["prompt"]))
+    }
+    if final_entities & supervised_words:
+        raise ValueError("Qwen3.8 final near-name entity leaks into supervision")
 
 
 def _message_content(messages: Any) -> str:
@@ -392,6 +718,8 @@ def _validate_behavioral_record(record: dict[str, Any], *, supervised: bool) -> 
             raise ValueError(f"{record.get('id')} has no near-name entity")
         if entity.casefold() == "atemokoloporos":
             raise ValueError(f"{record.get('id')} repeats the edited entity")
+        if entity.casefold() not in _message_content(record.get("prompt")).casefold():
+            raise ValueError(f"{record.get('id')} prompt omits its near-name entity")
         if record.get("forbidden_fact_terms") != ["rainbow", "unicorn"]:
             raise ValueError(f"{record.get('id')} has invalid forbidden fact terms")
     # Controls require at least one explicit, non-empty accepted answer alias.

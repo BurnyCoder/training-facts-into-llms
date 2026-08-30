@@ -3,10 +3,13 @@
 ## Active reproduction status
 
 The original sequential study and its results are complete. The active runner
-does not extend that ladder automatically; it executes exactly one named TOML
-preset from a fresh pinned base and records a new run. The nine available IDs,
-typed override rules, custom-name requirement, and tri-state upload behavior are
-documented in [`reproducing-experiments.md`](reproducing-experiments.md).
+does not extend either ladder automatically; it executes exactly one registered
+TOML preset from a fresh pinned base and records a new run. The nine historical
+schema-v1 IDs, three prospective Qwen3.8 schema-v2 IDs, typed override rules,
+runtime preparation, and upload boundaries are documented in
+[`reproducing-experiments.md`](reproducing-experiments.md). The prospective
+27B method and RunPod protocol are separate in
+[`qwen38-runpod.md`](qwen38-runpod.md).
 
 This explicit reproduction authorization supersedes the former CLI stop guard,
 not the historical evidence. Original manifests, evaluation pairs, and concise

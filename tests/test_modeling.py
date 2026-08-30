@@ -122,3 +122,172 @@ def test_adapter_loading_is_frozen_anonymous_and_releases_failed_base(
         "token": False,
     }
     assert released == [bundle]
+
+
+def test_qwen38_nf4_load_uses_device_map_and_never_calls_to(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Bitsandbytes must place the 27B base during load without a later move."""
+    import torch
+
+    from training_facts_into_llms import modeling
+
+    captured: dict[str, Any] = {}
+    before_evidence = {"device": torch.device("cuda:0"), "hardware": {}}
+    monkeypatch.setattr(
+        modeling,
+        "audit_before_model_load",
+        lambda _config: before_evidence,
+    )
+
+    def audit_after(_config: Any, bundle: Any, before: dict[str, Any]) -> dict[str, Any]:
+        """Prove direct loading consumes both shared paid-runtime audit phases."""
+        assert bundle.quantized is True
+        assert before is before_evidence
+        return {"kernel": {"required": True, "executed": True}}
+
+    monkeypatch.setattr(modeling, "audit_after_model_load", audit_after)
+
+    class BitsAndBytesConfig:
+        """Retain the exact public 4-bit options for the loaded-model audit."""
+
+        def __init__(self, **kwargs: Any) -> None:
+            """Expose Transformers-compatible attributes from keyword options."""
+            for name, value in kwargs.items():
+                setattr(self, name, value)
+
+    class Linear4bit:
+        """Provide the bitsandbytes class name checked by the runtime audit."""
+
+    class QuantizedModel:
+        """Implement only the model surface used by load and audit."""
+
+        is_loaded_in_4bit = True
+        is_loaded_in_8bit = False
+
+        def __init__(self, quantization_config: Any) -> None:
+            """Bind the exact config and one retained BF16 norm parameter."""
+            self.config = SimpleNamespace(quantization_config=quantization_config)
+            self.parameter = torch.nn.Parameter(
+                torch.zeros(1, dtype=torch.bfloat16),
+                requires_grad=False,
+            )
+
+        def to(self, *_args: Any, **_kwargs: Any) -> None:
+            """Fail if production performs the forbidden quantized model move."""
+            raise AssertionError("quantized models must not receive .to()")
+
+        def eval(self) -> QuantizedModel:
+            """Return self like torch modules do in evaluation mode."""
+            return self
+
+        def parameters(self):
+            """Yield the retained floating parameter for structured logging."""
+            yield self.parameter
+
+        def named_parameters(self):
+            """Name the retained parameter for the dtype audit."""
+            yield "model.norm.weight", self.parameter
+
+        def named_modules(self):
+            """Expose one converted low-bit module as proof of quantization."""
+            yield "model.language_model.layers.0.mlp.gate_proj", Linear4bit()
+
+    class AutoModel:
+        """Capture the complete Transformers load call."""
+
+        @staticmethod
+        def from_pretrained(model_id: str, **kwargs: Any) -> QuantizedModel:
+            """Return a quantized double carrying the supplied BNB config."""
+            captured.update({"model_id": model_id, **kwargs})
+            return QuantizedModel(kwargs["quantization_config"])
+
+    class AutoProcessor:
+        """Return a stable processor double without a Hub request."""
+
+        @staticmethod
+        def from_pretrained(_model_id: str, **_kwargs: Any) -> object:
+            """Return the minimal opaque processor value."""
+            return object()
+
+    transformers = SimpleNamespace(
+        AutoModelForMultimodalLM=AutoModel,
+        AutoProcessor=AutoProcessor,
+        BitsAndBytesConfig=BitsAndBytesConfig,
+        set_seed=lambda _seed: None,
+    )
+    monkeypatch.setitem(sys.modules, "transformers", transformers)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "is_bf16_supported", lambda: True)
+    scientific = SimpleNamespace(
+        precision=SimpleNamespace(mode="bfloat16"),
+        quantization=SimpleNamespace(
+            mode="bnb_nf4",
+            load_in_4bit=True,
+            quant_type="nf4",
+            double_quant=True,
+            compute_dtype="bfloat16",
+        ),
+    )
+    config = SimpleNamespace(
+        seed=42,
+        model_id="Qwen/Qwen3.8-27B",
+        model_revision="1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+        experiment=SimpleNamespace(config=scientific),
+    )
+
+    bundle = modeling.load_base_model(config)
+
+    assert bundle.quantized is True
+    assert bundle.quantization_mode == "bnb_nf4"
+    assert bundle.runtime_evidence == {
+        "kernel": {"required": True, "executed": True}
+    }
+    assert captured["device_map"] == {"": 0}
+    assert captured["dtype"] is torch.bfloat16
+    bnb = captured["quantization_config"]
+    assert bnb.load_in_4bit is True
+    assert bnb.bnb_4bit_quant_type == "nf4"
+    assert bnb.bnb_4bit_use_double_quant is True
+    assert bnb.bnb_4bit_compute_dtype is torch.bfloat16
+
+
+def test_quantized_adapter_attachment_skips_generic_device_move(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Inference must preserve the placement established by the 4-bit loader."""
+    from training_facts_into_llms import modeling
+
+    class AttachedModel:
+        """Fail only if the adapter loader calls the forbidden movement API."""
+
+        def to(self, *_args: Any, **_kwargs: Any) -> None:
+            """Detect an accidental low-bit device move."""
+            raise AssertionError("quantized adapter must not receive .to()")
+
+        def eval(self) -> AttachedModel:
+            """Mirror torch evaluation mode and preserve identity."""
+            return self
+
+    bundle = SimpleNamespace(
+        model=object(),
+        processor=object(),
+        device="cuda:0",
+        quantized=True,
+    )
+
+    class PeftModel:
+        """Return a successfully attached quantized adapter double."""
+
+        @staticmethod
+        def from_pretrained(_model: Any, _adapter: Any, **_kwargs: Any) -> Any:
+            """Return the low-bit wrapper without changing its placement."""
+            return AttachedModel()
+
+    monkeypatch.setattr(modeling, "load_base_model", lambda config, logger=None: bundle)
+    monkeypatch.setitem(sys.modules, "peft", SimpleNamespace(PeftModel=PeftModel))
+
+    loaded = modeling.load_adapter_model(object(), "owner/repository")
+
+    assert loaded is bundle
+    assert isinstance(loaded.model, AttachedModel)

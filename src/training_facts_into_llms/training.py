@@ -1,6 +1,6 @@
 """Global context: train only audited language LoRA projections with TRL SFT.
 
-The full Qwen3.5 multimodal model stays intact, while PEFT freezes its base
+The full pinned Qwen multimodal model stays intact, while PEFT freezes its base
 weights and adds LoRA matrices only to the audited text attention,
 linear-attention, and MLP projections. TRL receives the full processor so its
 native conversational prompt-completion preparation can apply
@@ -44,7 +44,16 @@ from training_facts_into_llms.data import (
     render_supervised_example,
     supervised_rows,
 )
+from training_facts_into_llms.model_backends import (
+    LEGACY_QWEN35_AUDIT,
+    QWEN38_27B_AUDIT,
+    resolve_model_audit,
+)
 from training_facts_into_llms.modeling import ModelBundle
+from training_facts_into_llms.quantization import (
+    prepare_model_for_training,
+    resolve_quantization_plan,
+)
 from training_facts_into_llms.training_strategies import (
     TRAINING_STRATEGIES,
     TrainingStrategy,
@@ -70,13 +79,21 @@ LORA_TARGET_MODULES = (
 )
 # The pinned 0.8B architecture contains this exact number of matching text
 # linear layers; drift means either the model or target policy changed.
-EXPECTED_TARGET_MODULE_COUNT = 186
+EXPECTED_TARGET_MODULE_COUNT = LEGACY_QWEN35_AUDIT.expected_target_module_count
 # The audited scalar counts include both LoRA matrices for every selected
 # linear layer; both retained ranks occurred in the completed attempt sequence.
-EXPECTED_TRAINABLE_PARAMETERS = {
-    8: 5_411_328,
-    16: 10_822_656,
-}
+EXPECTED_TRAINABLE_PARAMETERS = dict(
+    LEGACY_QWEN35_AUDIT.expected_trainable_parameters
+)
+# Qwen3.8's separate constants make its prospective runtime contract explicit
+# without changing historical imports that refer to the legacy values above.
+QWEN38_EXPECTED_TARGET_MODULE_COUNT = (
+    QWEN38_27B_AUDIT.expected_target_module_count
+)
+QWEN38_EXPECTED_LORA_TENSOR_COUNT = QWEN38_27B_AUDIT.expected_lora_tensor_count
+QWEN38_EXPECTED_TRAINABLE_PARAMETERS = dict(
+    QWEN38_27B_AUDIT.expected_trainable_parameters
+)
 # Parameter-name segments that must remain frozen after PEFT injection.
 _FORBIDDEN_TRAINABLE_SEGMENTS = {"visual", "lm_head", "embed_tokens"}
 # Physical batch one is the observed configuration used by the recorded runs;
@@ -221,13 +238,21 @@ def _recipe_dict(
     }
 
 
-def expected_trainable_parameters(profile: TrainingProfile) -> int:
+def expected_trainable_parameters(
+    profile: TrainingProfile,
+    config: RunConfig | None = None,
+) -> int:
     """Return the audited LoRA scalar count for an approved profile."""
-    # Unknown ranks have not passed the source review and must fail closed.
-    try:
-        return EXPECTED_TRAINABLE_PARAMETERS[profile.lora_r]
-    except KeyError as error:
-        raise ValueError(f"Unsupported audited LoRA rank: {profile.lora_r}") from error
+    # Legacy callers retain the historical table; resolved runs select their
+    # exact pinned model's independently audited architecture table.
+    if config is None:
+        try:
+            return EXPECTED_TRAINABLE_PARAMETERS[profile.lora_r]
+        except KeyError as error:
+            raise ValueError(
+                f"Unsupported audited LoRA rank: {profile.lora_r}"
+            ) from error
+    return resolve_model_audit(config).trainable_parameters_for_rank(profile.lora_r)
 
 
 def build_lora_config(config: RunConfig, profile: TrainingProfile) -> Any:
@@ -259,6 +284,8 @@ def _is_vision_name(name: str) -> bool:
 def inspect_lora_targets(
     model: Any,
     target_modules: tuple[str, ...] = LORA_TARGET_MODULES,
+    *,
+    expected_target_module_count: int = EXPECTED_TARGET_MODULE_COUNT,
 ) -> tuple[str, ...]:
     """Return and validate every base ``nn.Linear`` selected by LoRA suffix."""
     # Importing torch here keeps module import lightweight for pure unit tests.
@@ -279,10 +306,13 @@ def inspect_lora_targets(
             f"{list(vision_matches)}"
         )
     # Exact-count validation turns upstream architecture drift into a preflight error.
-    if target_modules == LORA_TARGET_MODULES and len(selected) != EXPECTED_TARGET_MODULE_COUNT:
+    if (
+        target_modules == LORA_TARGET_MODULES
+        and len(selected) != expected_target_module_count
+    ):
         raise RuntimeError(
             "Unexpected LoRA target count: "
-            f"expected {EXPECTED_TARGET_MODULE_COUNT}, got {len(selected)}"
+            f"expected {expected_target_module_count}, got {len(selected)}"
         )
     if not selected:
         raise RuntimeError("LoRA target selection matched no language modules")
@@ -329,14 +359,19 @@ def assert_lora_invariants(
     *,
     target_module_count: int,
     target_modules: tuple[str, ...] = LORA_TARGET_MODULES,
+    expected_target_module_count: int = EXPECTED_TARGET_MODULE_COUNT,
+    expected_lora_tensor_count: int | None = None,
     expected_trainable_count: int | None = None,
 ) -> dict[str, int | float]:
     """Assert exact adapter scope, frozen vision, and trainable scalar counts."""
     # The pre-injection target inventory must match the audited architecture.
-    if target_modules == LORA_TARGET_MODULES and target_module_count != EXPECTED_TARGET_MODULE_COUNT:
+    if (
+        target_modules == LORA_TARGET_MODULES
+        and target_module_count != expected_target_module_count
+    ):
         raise RuntimeError(
             "LoRA target inventory changed before injection: "
-            f"expected {EXPECTED_TARGET_MODULE_COUNT}, got {target_module_count}"
+            f"expected {expected_target_module_count}, got {target_module_count}"
         )
     # Read only the active adapter's public PEFT configuration.
     adapter_config = _active_peft_config(model)
@@ -379,6 +414,19 @@ def assert_lora_invariants(
     )
     if non_lora:
         raise RuntimeError(f"Non-LoRA parameters are trainable: {list(non_lora)}")
+    # Bias-free LoRA has exactly one A and one B tensor per injected module.
+    audited_tensor_count = expected_lora_tensor_count
+    if audited_tensor_count is None and target_modules == LORA_TARGET_MODULES:
+        audited_tensor_count = 2 * expected_target_module_count
+    if (
+        configured_bias == "none"
+        and audited_tensor_count is not None
+        and len(trainable) != audited_tensor_count
+    ):
+        raise RuntimeError(
+            "Unexpected trainable LoRA tensor count: "
+            f"expected {audited_tensor_count}, got {len(trainable)}"
+        )
     # Vision, embeddings, and output projection are explicitly outside scope.
     forbidden = tuple(
         name
@@ -397,6 +445,26 @@ def assert_lora_invariants(
         raise RuntimeError("PEFT model no longer exposes the Qwen vision tower")
     if any(parameter.requires_grad for _, parameter in vision):
         raise RuntimeError("One or more vision-tower parameters remain trainable")
+    # Token embeddings condition every prompt but are outside the adapter scope.
+    embeddings = tuple(
+        (name, parameter)
+        for name, parameter in model.named_parameters()
+        if "embed_tokens" in name.split(".")
+    )
+    if not embeddings:
+        raise RuntimeError("PEFT model no longer exposes token embeddings")
+    if any(parameter.requires_grad for _, parameter in embeddings):
+        raise RuntimeError("One or more token-embedding parameters remain trainable")
+    # The output head must stay frozen independently of its module wrapper check.
+    output_parameters = tuple(
+        (name, parameter)
+        for name, parameter in model.named_parameters()
+        if "lm_head" in name.split(".")
+    )
+    if not output_parameters:
+        raise RuntimeError("PEFT model no longer exposes the language-model head")
+    if any(parameter.requires_grad for _, parameter in output_parameters):
+        raise RuntimeError("One or more language-model-head parameters remain trainable")
     # Chunked NLL reads the output projection weight directly, so `lm_head`
     # cannot be wrapped by a PEFT tuner layer.
     # Source: https://github.com/huggingface/trl/blob/33f9e462728b98f7f91d38b99328e81adde2faa0/trl/trainer/sft_trainer.py
@@ -424,11 +492,21 @@ def assert_lora_invariants(
             "Unexpected trainable parameter count: "
             f"expected {expected_count}, got {trainable_count}"
         )
-    # Total includes frozen base weights and the newly attached adapter weights.
-    total_count = sum(parameter.numel() for parameter in model.parameters())
+    # PEFT corrects packed Params4bit storage back to logical scalar counts;
+    # ordinary and lightweight test wrappers retain the direct sum fallback.
+    parameter_counter = getattr(model, "get_nb_trainable_parameters", None)
+    if callable(parameter_counter):
+        peft_trainable_count, total_count = parameter_counter()
+        if peft_trainable_count != trainable_count:
+            raise RuntimeError(
+                "PEFT and explicit trainable scalar counts do not agree"
+            )
+    else:
+        total_count = sum(parameter.numel() for parameter in model.parameters())
     # Return only numeric, JSON-safe evidence for logs and reports.
     return {
         "target_module_count": target_module_count,
+        "trainable_tensor_count": len(trainable),
         "trainable_parameters": trainable_count,
         "total_parameters": total_count,
         "trainable_percent": 100.0 * trainable_count / total_count,
@@ -697,6 +775,13 @@ def train_adapter(
 
     resolved = _resolved_experiment_config(config)
     duration = getattr(resolved, "duration", None)
+    precision = getattr(resolved, "precision", None)
+    model_audit = resolve_model_audit(config)
+    quantization = resolve_quantization_plan(config)
+    if bool(getattr(bundle, "quantized", False)) != quantization.is_quantized:
+        raise RuntimeError(
+            "Loaded model quantization differs from the training experiment"
+        )
     # Copy every reviewed training and validation row with Qwen thinking disabled.
     train_rows = supervised_rows(data.train)
     validation_rows = supervised_rows(data.validation)
@@ -739,9 +824,25 @@ def train_adapter(
     # Audit the exact base-module selection before any wrapper rewrites names.
     lora_settings = _resolved_lora(config, selected_profile)
     target_modules = tuple(lora_settings["target_modules"])
-    target_names = inspect_lora_targets(bundle.model, target_modules)
+    target_names = inspect_lora_targets(
+        bundle.model,
+        target_modules,
+        expected_target_module_count=model_audit.expected_target_module_count,
+    )
     # Disable KV caching because gradient checkpointing recomputes activations.
     bundle.model.config.use_cache = False
+    # PEFT's documented k-bit preparation freezes the quantized base and enables
+    # input gradients before TRL injects the trainable LoRA matrices.
+    bundle.model = prepare_model_for_training(
+        bundle.model,
+        quantization,
+        gradient_checkpointing=(
+            True if precision is None else precision.gradient_checkpointing
+        ),
+        checkpointing_use_reentrant=(
+            False if precision is None else precision.checkpointing_use_reentrant
+        ),
+    )
     # A unique empty directory guarantees this attempt never resumes a prior profile.
     output_dir = _attempt_directory(config, selected_profile, logger)
     # Correlate Trackio with the timestamped operational log.
@@ -763,6 +864,7 @@ def train_adapter(
         target_modules=list(target_modules),
         target_module_count=len(target_names),
         vision_parameters=vision_parameter_count,
+        quantization_mode=quantization.mode,
         evaluation_schedule=training_args.eval_strategy.value,
         best_checkpoint_metric=training_args.metric_for_best_model,
     )
@@ -799,6 +901,19 @@ def train_adapter(
         selected_profile,
         target_module_count=len(target_names),
         target_modules=target_modules,
+        expected_target_module_count=model_audit.expected_target_module_count,
+        expected_lora_tensor_count=(
+            model_audit.expected_lora_tensor_count
+            if target_modules == LORA_TARGET_MODULES
+            and str(lora_settings["bias"]) == "none"
+            else None
+        ),
+        expected_trainable_count=(
+            expected_trainable_parameters(selected_profile, config)
+            if target_modules == LORA_TARGET_MODULES
+            and str(lora_settings["bias"]) == "none"
+            else None
+        ),
     )
     # The active adapter must retain the pinned source revision.
     adapter_config = _active_peft_config(trainer.model)

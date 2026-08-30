@@ -13,6 +13,25 @@ authorized a source-reviewed runner that reproduces exactly one of the nine
 historical recipes per invocation. A reproduction is new evidence: it must not
 rewrite, reclassify, resume, or replace an original attempt.
 
+The repository also contains a separate prospective study pinned to
+`Qwen/Qwen3.8-27B` revision
+`1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`. Its three registered IDs, in
+execution order, are `qwen38_minimal_bf16`,
+`qwen38_expanded_locality_bf16`, and
+`qwen38_expanded_locality_qlora`. They create evidence only under
+`reports/qwen38/` and never amend the historical manifest, reports, paper, or
+acceptance labels. Qwen3.8 publication and chat are not authorized; reject
+`--upload on` and `--upload if-accepted` before its Git gate, logger, or model
+allocation.
+
+All reviewed experiments use the stable public prefix
+`uv run --frozen training-facts-into-llms`. Historical schema-v1 presets retain
+their exact implicit model/runtime defaults and hashes. Prospective schema-v2
+presets bind typed model, runtime, and quantization records. Extend the public
+registry with a reviewed preset and only add a lower-level backend when the
+existing phase interfaces cannot implement it; never add a model-specific
+public executable or require `--extra`/`--with` in an experiment command.
+
 Use the smallest practical implementation and maintained library behavior.
 Keep `pipeline.py` as the readable phase wrapper and the interactive chat
 workflow separate from training and scoring. Split lower-level behavior into
@@ -56,8 +75,11 @@ and the repository-local `.venv`.
 
 | Command | Current behavior and side effects |
 | --- | --- |
-| `uv run --frozen training-facts-into-llms preflight --experiment ID [--config PATH] [--set dotted.key=TOML_VALUE]` | Resolves one reviewed preset plus typed overrides, validates its data and all 11 exact direct runtime dependency pins, then loads one fresh copy of the pinned model to audit CUDA and the resolved precision, Qwen identity, frozen vision, and its LoRA shape. It generates and trains nothing; it writes operational JSONL under `LOG_DIR` (default: ignored `logs/`). |
-| `uv run --frozen training-facts-into-llms run --experiment ID [--config PATH] [--set dotted.key=TOML_VALUE] [--name lowercase-slug] [--upload off\|on\|if-accepted]` | Requires one of the nine reviewed presets, enforces the GitHub-first gate, starts from the untouched pinned base, trains, selects, evaluates the resolved final suite, scores, reports, and applies the explicit upload mode. All reviewed presets resolve to 28 final rows; contained custom data may resolve another path and count. Behavior-changing overrides require a custom name. The default upload mode is `off`. |
+| `uv run --frozen training-facts-into-llms experiments list` | Prints all historical and prospective registry IDs without reading `.env`, data, or model resources. |
+| `uv run --frozen training-facts-into-llms experiments describe --experiment ID` | Resolves and prints one sanitized typed preset without preparing dependencies or allocating a model. |
+| `uv run --frozen training-facts-into-llms runtime prepare --experiment ID` | Installs only the experiment-declared optional group from `uv.lock` through frozen inexact synchronization; historical presets are a no-op. |
+| `uv run --frozen training-facts-into-llms preflight --experiment ID [--config PATH] [--set dotted.key=TOML_VALUE]` | Resolves one reviewed preset plus typed overrides, validates its data and exact direct runtime dependency pins, then loads one fresh copy of the pinned model to audit CUDA, VRAM/kernel policy, resolved precision/quantization, Qwen identity, frozen vision, and its LoRA shape. It generates and trains nothing; it writes operational JSONL under `LOG_DIR` (default: ignored `logs/`). |
+| `uv run --frozen training-facts-into-llms run --experiment ID [--config PATH] [--set dotted.key=TOML_VALUE] [--name lowercase-slug] [--upload off\|on\|if-accepted]` | Requires one registered preset, enforces the GitHub-first gate, starts from the untouched pinned base, trains, selects, evaluates the resolved final suite, scores, reports, and applies the explicit upload mode. All reviewed presets resolve to 28 final rows; contained custom data may resolve another path and count. Behavior-changing overrides require a custom name. The default upload mode is `off`; prospective Qwen3.8 presets require it. |
 | `uv run --frozen training-facts-into-llms publish-existing --all --upload off` | Discovers, stages, validates, and prints the retrospective checkpoint/evidence inventory without resolving or loading a credential value, calling a publication API, or making a Hub write. |
 | `uv run --frozen training-facts-into-llms publish-existing --all --upload on` | Repeats the local archive audit, synchronizes the eight artifact-bearing historical runs and evidence dataset, rechecks all 13 adapters, and reconciles the exact-titled Collection. Exact matches use repository decision `SKIP`. It requires a local token. |
 | `uv run --frozen training-facts-into-llms publish-existing --all --upload on --refresh-evidence` | Reconciles the one-time evidence-only refresh bound to the exact pre-refresh parent. The state-changing invocation updated only `EXPERIMENTS.md` and the derived PDF; the exact-final retry returned `SKIP`. It never mutates model repositories or the Collection. |
@@ -67,7 +89,8 @@ and the repository-local `.venv`.
 `preflight`, `run`, `evaluate`, and `chat` require compatible NVIDIA CUDA model
 hardware and the source-pinned model revision through network access or an
 existing local cache. The nine canonical presets, standalone evaluation, and
-chat require BF16 support. A custom `preflight`, or a named custom `run`, may
+chat require BF16 support. The three prospective presets also require BF16
+compute and their declared VRAM/kernel gates. A custom `preflight`, or a named custom `run`, may
 instead use its resolved BF16, FP16, or FP32 precision and must pass the
 corresponding CUDA checks. Pinned public base/processor loads, public inference,
 and anonymous publication verification explicitly use `token=False`; archive
@@ -119,26 +142,33 @@ alone does not make it Git-ignored. Verify custom log, artifact, and Trackio
 destinations remain ignored and untracked, adding a rule only when existing
 patterns do not cover them.
 
-The nine public preset IDs are `positive_primary`, `positive_conservative`,
+The nine historical preset IDs are `positive_primary`, `positive_conservative`,
 `positive_expanded`, `paper_single_edit`, `semantic_specificity`,
 `semantic_specificity_gentle`, `minimal_pair_primary`,
-`minimal_pair_conservative`, and `minimal_pair_expanded`. A scoring plugin is a
+`minimal_pair_conservative`, and `minimal_pair_expanded`. The prospective IDs
+are `qwen38_minimal_bf16`, `qwen38_expanded_locality_bf16`, and
+`qwen38_expanded_locality_qlora`. A scoring plugin is a
 `module:factory` target. Resolve a dotted module without executing its parent
 packages, and require every concrete parent and target source in that import
 chain to be a regular Git-tracked file inside this repository before importing
 any of them. A training run applies these checks only after its full clean-main
 Git gate; preflight applies the contained/tracked source checks and, when
 canonical, the expected-hash check without imposing the clean-main GitHub gate.
-The canonical target is
-`training_facts_into_llms.scoring:create_canonical_plugin`; the returned object
-implements `score(cases, generations, *, phase) -> ScoreResult` and
+The nine historical presets use
+`training_facts_into_llms.scoring:create_canonical_plugin`. The three Qwen3.8
+presets use the reviewed prospective target
+`training_facts_into_llms.qwen38_scoring:create_qwen38_plugin`, which delegates
+the historical lexical scores and five gates and adds ID-level retention of
+every baseline recall hit. Both returned objects implement
+`score(cases, generations, *, phase) -> ScoreResult` and
 `decide(baseline, tuned) -> AcceptanceDecision`.
 
 Every preset owns an immutable, non-overridable
 `[scoring].canonical_source_sha256`. Before importing canonical scoring code, an
-otherwise canonical invocation must hash the tracked implementation bundle
-(`scoring.py`, delegated `evaluation.py`, and `json_values.py`) and match that
-value or abort. For `run`, this occurs after the Git gate and before data
+otherwise canonical invocation must hash its tracked implementation bundle and
+match that value or abort. The historical bundle contains `scoring.py`,
+delegated `evaluation.py`, and `json_values.py`; the Qwen3.8 bundle additionally
+contains `qwen38_scoring.py`. For `run`, this occurs after the Git gate and before data
 validation, logger creation, or model allocation. `run` then validates every
 hash-bound split, creates the logger, records every validated row, and only then
 loads the untouched base. `preflight` verifies and imports the scorer before its
@@ -153,8 +183,8 @@ target/options/source hash, policy, and a passing decision.
 
 ## Model, data, training, and evaluation invariants
 
-These are the shared canonical invariants. Family-specific data, optimizer,
-checkpoint, and selection choices are declared in the nine reviewed presets;
+These are the historical canonical invariants. Family-specific data, optimizer,
+checkpoint, and selection choices are declared in the nine historical presets;
 do not silently substitute the latest minimal-pair recipe for an earlier
 historical layout.
 
@@ -235,6 +265,40 @@ evidence. Never resume a historical attempt or overwrite its evidence. An
 authorized reproduction starts from the untouched base and creates a new run;
 in particular, `positive_expanded` plans all 180 steps even though its original
 attempt was interrupted at step 125.
+
+## Prospective Qwen3.8-27B invariants
+
+- Load the complete pinned multimodal base and processor with `token=False`,
+  use text-only inputs, disable thinking, and freeze vision, embeddings, and
+  `lm_head`.
+- The same 12 audited language suffixes must select exactly 496 modules and no
+  vision module. Rank 8/alpha 16 creates exactly 992 A/B tensors and 58,363,904
+  trainable scalars; dropout is 0 and bias is `none`.
+- Shared training is LR `1e-4`, 15 epochs, physical batch 1, accumulation 4,
+  maximum length 128, BF16 compute, fused AdamW, weight decay 0, linear decay,
+  10% warmup, clip 1, seed 42, non-reentrant checkpointing, no packing, and
+  completion-only loss. Complete the full 210- or 390-step horizon and select
+  worst-category-first after per-epoch validation/save.
+- `qwen38_minimal_bf16` trains 24 target, 16 entity-only contrast, and 16
+  rehearsal rows. Both expanded presets train the same target/contrast rows
+  plus exactly 64 rehearsal rows. The QLoRA rung alone loads the base with NF4,
+  double quantization, and BF16 compute through bitsandbytes and calls PEFT
+  `prepare_model_for_kbit_training`; never call the unquantized loader's
+  unconditional `.to()` path on that model.
+- Every rung uses the 24-row checkpoint suite (4 recall, 4 close-name negative,
+  and 16 controls) and the fixed 28-row final suite. Before optimizer creation,
+  the untouched base must pass every rehearsal fact and at least 14/16
+  checkpoint controls. Every non-target answer has explicit aliases and a
+  primary-source ledger record; reject target terms, near-name variants,
+  normalized prompt duplication, and final-suite prompt/answer leakage.
+- Preserve the historical acceptance rule. If the untouched base already
+  recalls the public fact, continue the run but report it as
+  reinforcement/robustness tuning and retain every baseline hit.
+- Paid RunPod preflight requires the declared accelerated kernel path. Use
+  Secure Cloud on-demand, 30 GB container disk, 150 GB persistent workspace,
+  detached stop guards, ongoing billing checks, at most one clean
+  infrastructure retry per rung, and stop before projected total spend reaches
+  $100. Never send Hugging Face or GitHub credentials to the Pod.
 
 ## Adapter chat boundary
 
@@ -568,10 +632,15 @@ duplicate large documentation blocks in code.
 Before every PR, run:
 
 ```bash
-uv sync --frozen --all-groups
+uv sync --frozen
 uv run --frozen ruff check .
-uv run --frozen pytest
+uv run --frozen pytest -s
 ```
+
+Do not include `cuda-kernels` in the generic CPU test sync. Prepare that locked
+source-build group only through
+`uv run --frozen training-facts-into-llms runtime prepare --experiment ID` on
+the intended CUDA host.
 
 Run `uv run --frozen training-facts-into-llms preflight --experiment ID` only
 when model, data, training, or adapter compatibility changes warrant GPU

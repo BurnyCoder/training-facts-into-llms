@@ -53,9 +53,10 @@ jobs:
           enable-cache: true
           cache-dependency-glob: uv.lock
 
-      # Frozen synchronization proves pyproject.toml and uv.lock agree.
+      # Frozen synchronization proves pyproject.toml and uv.lock agree while
+      # leaving the CUDA-source group to the experiment-scoped runtime command.
       - name: Reproduce the locked environment
-        run: uv sync --frozen --all-groups
+        run: uv sync --frozen
 
       # Ruff performs static quality checks without rewriting repository files.
       - name: Lint
@@ -63,4 +64,4 @@ jobs:
 
       # Unit tests mock heavyweight GPU/Hub boundaries; CI never trains or publishes.
       - name: Test
-        run: uv run --frozen pytest
+        run: uv run --frozen pytest -s

@@ -20,7 +20,7 @@ from typing import Any
 from dotenv import dotenv_values
 
 from training_facts_into_llms.archive_inventory import UploadMode
-from training_facts_into_llms.config import RunConfig
+from training_facts_into_llms.config import DEFAULT_MODEL_ID, RunConfig
 from training_facts_into_llms.logging_utils import EventLogger, timestamp_id
 
 # Only these public settings may move from `.env` or the shell into RunConfig.
@@ -60,16 +60,19 @@ def _public_dotenv_values(path: Path) -> dict[str, str]:
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the stable public command-line interface."""
+    from training_facts_into_llms.experiments import EXPERIMENT_IDS
+
     # A single top-level parser keeps help output compact.
     parser = argparse.ArgumentParser(
         prog="training-facts-into-llms",
         description=(
-            "Reproduce or customize the Qwen3.5-0.8B single-fact LoRA study, "
-            "inspect retained adapters, and archive reviewed artifacts."
+            "Reproduce the Qwen3.5 study, run reviewed Qwen3.8-27B experiments, "
+            "inspect retained adapters, and archive supported artifacts."
         ),
+        epilog="Experiment IDs: " + ", ".join(EXPERIMENT_IDS),
     )
-    # Commands are mandatory so an accidental invocation cannot start GPU work.
-    commands = parser.add_subparsers(dest="command", required=True)
+    # An empty invocation prints discovery help; only an explicit run can start work.
+    commands = parser.add_subparsers(dest="command")
     # Preflight loads and inspects the model but never generates or trains.
     preflight = commands.add_parser(
         "preflight",
@@ -85,6 +88,48 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run one historical preset or a named typed customization.",
     )
     _add_experiment_arguments(run, include_name=True, include_upload=True)
+    # Discovery is intentionally read-only and never loads operational environment.
+    experiments = commands.add_parser(
+        "experiments",
+        help="List or describe source-reviewed experiment presets.",
+    )
+    experiment_commands = experiments.add_subparsers(
+        dest="experiments_command",
+        required=True,
+    )
+    experiment_commands.add_parser(
+        "list",
+        help="Print all accepted experiment IDs in reviewed order.",
+    )
+    describe = experiment_commands.add_parser(
+        "describe",
+        help="Resolve and print one preset without preparing or running it.",
+    )
+    describe.add_argument(
+        "--experiment",
+        required=True,
+        choices=EXPERIMENT_IDS,
+        help="Source-reviewed preset to describe.",
+    )
+    # Runtime preparation maps preset metadata to one locked uv dependency group.
+    runtime = commands.add_parser(
+        "runtime",
+        help="Prepare reviewed optional dependencies for one experiment.",
+    )
+    runtime_commands = runtime.add_subparsers(
+        dest="runtime_command",
+        required=True,
+    )
+    prepare = runtime_commands.add_parser(
+        "prepare",
+        help="Synchronize only the locked dependency groups declared by a preset.",
+    )
+    prepare.add_argument(
+        "--experiment",
+        required=True,
+        choices=EXPERIMENT_IDS,
+        help="Source-reviewed preset whose runtime metadata controls preparation.",
+    )
     # Historical publication is separate from rerunning or mutating original evidence.
     publish_existing = commands.add_parser(
         "publish-existing",
@@ -372,10 +417,71 @@ def _resolve_command_experiment(
         name=getattr(arguments, "name", None),
         require_custom_name=arguments.command == "run",
     )
+    upload_mode = getattr(arguments, "upload", UploadMode.OFF.value)
+    # The reviewed prospective 27B study is local-only until a separate publication
+    # contract exists; reject this before the Git gate, logger, or model allocation.
+    model = getattr(resolved.config, "model", None)
+    reviewed_model_id = getattr(
+        model,
+        "model_id",
+        getattr(model, "id", DEFAULT_MODEL_ID),
+    )
+    publication_supported = getattr(resolved.config, "publication_supported", None)
+    if (
+        arguments.command == "run"
+        and upload_mode != UploadMode.OFF.value
+        and (publication_supported is False or reviewed_model_id != DEFAULT_MODEL_ID)
+    ):
+        raise RuntimeError(
+            "Prospective Qwen3.8 experiments currently require --upload off"
+        )
     return config.with_experiment(
         resolved,
-        upload_mode=getattr(arguments, "upload", UploadMode.OFF.value),
+        upload_mode=upload_mode,
     )
+
+
+def _list_experiments() -> int:
+    """Print stable source-reviewed experiment identifiers without file or GPU work."""
+    from training_facts_into_llms.experiments import EXPERIMENT_IDS
+
+    _print_summary(
+        {
+            "count": len(EXPERIMENT_IDS),
+            "experiments": list(EXPERIMENT_IDS),
+        }
+    )
+    return 0
+
+
+def _describe_experiment(root: Path, experiment_id: str) -> int:
+    """Resolve and print one complete sanitized preset."""
+    from training_facts_into_llms.experiments import resolve_experiment
+
+    resolved = resolve_experiment(root, experiment_id)
+    _print_summary(resolved.sanitized())
+    return 0
+
+
+def _prepare_experiment_runtime(config: RunConfig) -> int:
+    """Log and print one reviewed locked-runtime synchronization decision."""
+    from training_facts_into_llms.runtime_prepare import prepare_runtime
+
+    experiment = config.experiment
+    if experiment is None:
+        raise RuntimeError("Runtime preparation requires one resolved experiment")
+    dependency_groups = list(experiment.config.runtime.dependency_groups)
+    run_id = f"{timestamp_id()}-runtime-prepare"
+    with EventLogger(config.log_dir, run_id=run_id) as logger:
+        logger.event(
+            "runtime_prepare_started",
+            experiment_id=experiment.experiment_id,
+            dependency_groups=dependency_groups,
+        )
+        result = prepare_runtime(config.root, experiment)
+        logger.event("runtime_prepare_completed", result=result.to_dict())
+    _print_summary(result.to_dict())
+    return 0
 
 
 def _publish_existing(
@@ -511,6 +617,10 @@ def main(argv: list[str] | None = None) -> int:
     # Parse either real process arguments or a unit-test supplied list.
     parser = build_parser()
     arguments = parser.parse_args(argv)
+    # Root discovery is a successful help request, while argparse still rejects typos.
+    if arguments.command is None:
+        parser.print_help()
+        return 0
     if (
         arguments.command == "publish-existing"
         and arguments.refresh_evidence
@@ -518,15 +628,28 @@ def main(argv: list[str] | None = None) -> int:
     ):
         parser.error("--refresh-evidence requires --upload on")
     # The repository root is intentionally the user's current working directory.
-    config = _load_config(Path.cwd())
+    root = Path.cwd()
+    # Catalog discovery has no reason to read `.env` or construct runtime settings.
+    if arguments.command == "experiments":
+        if arguments.experiments_command == "list":
+            return _list_experiments()
+        return _describe_experiment(root, arguments.experiment)
+    config = _load_config(root)
     # Training and preflight resolve the exact scientific configuration first.
     if arguments.command in {"preflight", "run"}:
         config = _resolve_command_experiment(config, arguments)
+    if arguments.command == "runtime":
+        from training_facts_into_llms.experiments import resolve_experiment
+
+        resolved = resolve_experiment(config.root, arguments.experiment)
+        config = config.with_experiment(resolved)
     # Each branch delegates to one high-level phase wrapper.
     if arguments.command == "preflight":
         return _preflight(config)
     if arguments.command == "run":
         return _run(config)
+    if arguments.command == "runtime":
+        return _prepare_experiment_runtime(config)
     if arguments.command == "publish-existing":
         return _publish_existing(
             config,
@@ -539,5 +662,5 @@ def main(argv: list[str] | None = None) -> int:
     # Chat never calls the training pipeline or tracked evaluation reporting path.
     if arguments.command == "chat":
         return _chat(config, arguments.adapter, arguments.checkpoint)
-    # Required subparsers make this branch unreachable.
+    # Every accepted explicit subcommand is handled above.
     raise AssertionError(f"Unhandled command: {arguments.command}")

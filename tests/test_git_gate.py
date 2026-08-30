@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import io
+import json
 import subprocess
 from dataclasses import replace
 from pathlib import Path
@@ -12,11 +14,67 @@ import pytest
 from training_facts_into_llms.config import RunConfig, TrainingProfile
 from training_facts_into_llms.git_gate import (
     REQUIRED_TRACKED_PATHS,
+    anonymous_public_main,
     enforce_clean_synchronized_main,
     secret_exists_in_git_objects,
     validate_approved_run_config,
     validate_training_local_state,
 )
+
+
+def test_anonymous_public_main_sends_no_authorization_header(monkeypatch) -> None:
+    """The public-source proof must not inherit a GitHub CLI or helper login."""
+    responses = iter(
+        (
+            {
+                "private": False,
+                "default_branch": "main",
+                "full_name": "BurnyCoder/training-facts-into-llms",
+            },
+            {"sha": "a" * 40},
+        )
+    )
+    requested_urls: list[str] = []
+
+    def fake_urlopen(request, *, timeout):
+        requested_urls.append(request.full_url)
+        headers = {name.lower(): value for name, value in request.header_items()}
+        assert "authorization" not in headers
+        assert timeout == 30
+        return io.BytesIO(json.dumps(next(responses)).encode())
+
+    monkeypatch.setattr(
+        "training_facts_into_llms.git_gate.urllib.request.urlopen",
+        fake_urlopen,
+    )
+
+    repository, commit = anonymous_public_main(
+        "BurnyCoder/training-facts-into-llms"
+    )
+
+    assert repository == "BurnyCoder/training-facts-into-llms"
+    assert commit == "a" * 40
+    assert requested_urls == [
+        "https://api.github.com/repos/BurnyCoder/training-facts-into-llms",
+        "https://api.github.com/repos/BurnyCoder/training-facts-into-llms/commits/main",
+    ]
+
+
+def test_anonymous_public_main_rejects_private_or_non_main_metadata(
+    monkeypatch,
+) -> None:
+    """Anonymous readability alone does not weaken the public-main invariant."""
+    monkeypatch.setattr(
+        "training_facts_into_llms.git_gate._read_anonymous_github_json",
+        lambda _path: {
+            "private": True,
+            "default_branch": "main",
+            "full_name": "owner/repository",
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="not publicly readable"):
+        anonymous_public_main("owner/repository")
 
 
 def _clean_repository_with_origin(tmp_path: Path) -> tuple[Path, str]:
@@ -170,6 +228,19 @@ def test_training_gate_rejects_unpinned_model_and_profile_drift() -> None:
         validate_approved_run_config(
             replace(reviewed, data_dir=project_root / "data")
         )
+
+
+def test_training_gate_accepts_only_qwen38_model_bound_by_resolved_preset() -> None:
+    """Prospective model identity comes from reviewed source, not environment drift."""
+    from training_facts_into_llms.experiments import resolve_experiment
+
+    project_root = Path(__file__).resolve().parents[1]
+    resolved = resolve_experiment(project_root, "qwen38_minimal_bf16")
+    reviewed = RunConfig.from_mapping({}, root=project_root).with_experiment(resolved)
+
+    validate_approved_run_config(reviewed)
+    with pytest.raises(RuntimeError, match="model_id"):
+        validate_approved_run_config(replace(reviewed, model_id="Qwen/other-model"))
 
 
 def test_git_gate_requires_all_specificity_data_and_docs() -> None:
