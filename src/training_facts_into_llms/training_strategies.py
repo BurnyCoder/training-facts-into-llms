@@ -32,8 +32,8 @@ if TYPE_CHECKING:
 
 # Two perfect rows in each category yield min-rate 1 plus three rate points.
 PERFECT_BEHAVIOR_SCORE: Final = 103.0
-# Two-row category rates make 0.5 the smallest attainable behavior-score gap;
-# a strictly smaller loss bonus preserves behavior-first ordering.
+# Two-row historical category rates make 0.5 the smallest attainable summed-rate
+# gap. The runtime scales this upper bound for larger prospective categories.
 LOSS_TIE_BREAK_WEIGHT: Final = 0.25
 # Stable category order keeps scores, logs, and reports deterministic.
 BEHAVIOR_CATEGORIES: Final = (
@@ -88,9 +88,16 @@ def selection_score(result: ScoreResult, eval_loss: float) -> float:
     # NaN, infinity, or negative loss would make best-checkpoint selection unsafe.
     if not math.isfinite(numeric_loss) or numeric_loss < 0.0:
         raise ValueError("eval_loss must be a finite nonnegative number")
-    # The open interval (0, 0.25] favors lower conditional validation loss while
-    # remaining below the smallest attainable 0.5 behavior-score improvement.
-    return behavior_score(result) + LOSS_TIE_BREAK_WEIGHT / (1.0 + numeric_loss)
+    # Derive the smallest possible one-row rate change in this exact suite. Half
+    # that gap keeps loss strictly subordinate to every attainable summed-rate
+    # improvement, including the prospective 4/4/16 checkpoint layout. For the
+    # historical 2/2/2 suite this remains exactly the reviewed 0.25 formula.
+    summary = result.category_summary()
+    totals = [int(summary[category]["total"]) for category in BEHAVIOR_CATEGORIES]
+    if any(total <= 0 for total in totals):
+        raise ValueError("behavioral validation requires every evaluation category")
+    loss_tie_break_weight = min(1.0 / total for total in totals) / 2.0
+    return behavior_score(result) + loss_tie_break_weight / (1.0 + numeric_loss)
 
 
 @dataclass(frozen=True, slots=True)

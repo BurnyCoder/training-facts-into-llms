@@ -203,8 +203,19 @@ class RunConfig:
     ) -> RunConfig:
         """Return operational config bound to one resolved scientific experiment."""
         resolved = experiment.config
+        # Schema-v2 presets bind their identity directly; schema-v1 resolution
+        # synthesizes the exact legacy identity without changing historical hashes.
+        model = getattr(resolved, "model", None)
+        # Reading explicit dataclass attributes keeps model selection source-owned.
+        model_id = self.model_id if model is None else model.model_id
+        # The immutable Hub revision is part of the same scientific model record.
+        model_revision = (
+            self.model_revision if model is None else model.model_revision
+        )
         return replace(
             self,
+            model_id=model_id,
+            model_revision=model_revision,
             seed=resolved.seed,
             data_dir=experiment.data_dir,
             max_new_tokens=resolved.generation.max_new_tokens,

@@ -1,4 +1,4 @@
-"""Resolve the nine source-reviewed experiment recipes without model loading.
+"""Resolve historical reproductions and prospective experiments without loading models.
 
 The public TOML boundary is intentionally small: one preset, an optional
 repository-contained partial TOML file, then ordered ``--set`` values parsed by
@@ -35,9 +35,9 @@ from training_facts_into_llms.credentials import (
     is_credential_name,
 )
 
-# Public IDs are ordered chronologically rather than alphabetically so CLI help,
-# documentation, and archive metadata tell the same nine-attempt story.
-EXPERIMENT_IDS: Final = (
+# Historical IDs remain ordered chronologically so archive metadata continues to
+# tell the same nine-attempt story without mixing new evidence into that record.
+HISTORICAL_EXPERIMENT_IDS: Final = (
     "positive_primary",
     "positive_conservative",
     "positive_expanded",
@@ -49,7 +49,17 @@ EXPERIMENT_IDS: Final = (
     "minimal_pair_expanded",
 )
 
-# The model and revision are imported constants and never appear in writable TOML.
+# Prospective IDs are ordered from the cheapest scientific rung to the most
+# expensive comparator. The public union drives CLI choices and catalog scans.
+PROSPECTIVE_EXPERIMENT_IDS: Final = (
+    "qwen38_minimal_bf16",
+    "qwen38_expanded_locality_bf16",
+    "qwen38_expanded_locality_qlora",
+)
+EXPERIMENT_IDS: Final = (*HISTORICAL_EXPERIMENT_IDS, *PROSPECTIVE_EXPERIMENT_IDS)
+
+# Schema-v1 resolves these compatibility defaults without changing historical TOML;
+# schema-v2 presets declare and independently audit their own immutable identity.
 PINNED_MODEL_ID: Final = DEFAULT_MODEL_ID
 PINNED_MODEL_REVISION: Final = DEFAULT_MODEL_REVISION
 
@@ -65,6 +75,17 @@ _PLUGIN_TARGET_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_.]*:[A-Za-z_][A-Za-z0-
 _CUSTOM_NAME_PATTERN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
 _COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}\Z")
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}\Z")
+_CUDA_VERSION_PATTERN = re.compile(r"[0-9]+(?:\.[0-9]+){1,2}\Z")
+_DEPENDENCY_GROUP_PATTERN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
+
+# Schema-v1 recipes synthesize this audit metadata in memory. It deliberately
+# stays outside their canonical scientific mapping, preserving every historical
+# hash while giving new runtime code one uniform typed interface.
+_HISTORICAL_MODEL_CLASS: Final = "Qwen3_5ForConditionalGeneration"
+_HISTORICAL_PROCESSOR_CLASS: Final = "Qwen3VLProcessor"
+_HISTORICAL_MODEL_TYPE: Final = "qwen3_5"
+_HISTORICAL_TARGET_MODULE_COUNT: Final = 186
+_HISTORICAL_TRAINABLE_PARAMETERS_PER_RANK: Final = 676_416
 
 # Only audited Qwen language projections may be selected by reviewed TOML.
 AUDITED_LANGUAGE_TARGET_MODULES: Final = (
@@ -203,15 +224,59 @@ class ExperimentConfigError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
-class SourceConfig:
-    """Bind one recipe to its public historical implementation and run."""
+class ModelSpec:
+    """Bind upstream identity and the exact model/adapter audit expectations."""
 
+    model_id: str
+    model_revision: str
+    expected_model_class: str
+    expected_processor_class: str
+    expected_model_type: str
+    expected_target_module_count: int
+    expected_trainable_parameters: int
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeSpec:
+    """Declare paid-run hardware checks and locked optional dependency groups."""
+
+    backend: str
+    dependency_groups: tuple[str, ...]
+    require_accelerated_kernels: bool
+    minimum_cuda_version: str | None
+    # RunPod product tiers use decimal GB labels; naming the unit prevents an
+    # 80 GB/48 GB marketed device from being mistaken for an 80 GiB/48 GiB gate.
+    minimum_vram_gb_decimal: int
+    baseline_audit_required: bool
+    minimum_validation_control_passes: int
+
+
+@dataclass(frozen=True, slots=True)
+class QuantizationSpec:
+    """Describe an unquantized or bitsandbytes NF4 base-model load."""
+
+    mode: str
+    load_in_4bit: bool
+    quant_type: str | None
+    double_quant: bool
+    compute_dtype: str
+
+
+@dataclass(frozen=True, slots=True)
+class SourceConfig:
+    """Bind one recipe to historical evidence or prospective methodology."""
+
+    kind: str
     family: str
-    commit: str
-    run_id: str
-    status: str
-    recorded_optimizer_steps: int
+    commit: str | None
+    run_id: str | None
+    status: str | None
+    recorded_optimizer_steps: int | None
     artifact_checkpoint_step: int | None
+    methodology_urls: tuple[str, ...] = ()
+    source_urls: tuple[str, ...] = ()
+    ledger_path: str | None = None
+    ledger_sha256: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -381,6 +446,9 @@ class ExperimentConfig:
     schema_version: int
     experiment_id: str
     source: SourceConfig
+    model: ModelSpec
+    runtime: RuntimeSpec
+    quantization: QuantizationSpec
     seed: int
     data: DataConfig
     duration: DurationConfig
@@ -454,6 +522,21 @@ class ResolvedExperiment:
         return self.config.acceptance
 
     @property
+    def model(self) -> ModelSpec:
+        """Expose the source-bound model audit specification to runtime code."""
+        return self.config.model
+
+    @property
+    def runtime(self) -> RuntimeSpec:
+        """Expose hardware and optional dependency requirements to the CLI."""
+        return self.config.runtime
+
+    @property
+    def quantization(self) -> QuantizationSpec:
+        """Expose base-load quantization without leaking raw TOML mappings."""
+        return self.config.quantization
+
+    @property
     def data_dir(self) -> Path:
         """Resolve the common split directory below the project root."""
         return self.root / self.config.data.relative_directory
@@ -472,7 +555,10 @@ class ResolvedExperiment:
             "name": self.name,
             "is_canonical": self.is_canonical,
             "scientific_hash": self.scientific_hash,
-            "model": {"id": PINNED_MODEL_ID, "revision": PINNED_MODEL_REVISION},
+            "model": {
+                "id": self.config.model.model_id,
+                "revision": self.config.model.model_revision,
+            },
             "source": _source_dict(self.config.source),
             "configuration": _scientific_dict(self.config),
             "data_dir": self.config.data.relative_directory,
@@ -534,23 +620,33 @@ def _freeze_option(value: Any, path: str) -> Any:
 
 def _source_dict(source: SourceConfig) -> dict[str, Any]:
     """Render source metadata through an explicit public allowlist."""
+    if source.kind == "historical":
+        return {
+            "family": source.family,
+            "commit": source.commit,
+            "run_id": source.run_id,
+            "status": source.status,
+            "recorded_optimizer_steps": source.recorded_optimizer_steps,
+            "artifact_checkpoint_step": source.artifact_checkpoint_step,
+        }
     return {
+        "kind": source.kind,
         "family": source.family,
-        "commit": source.commit,
-        "run_id": source.run_id,
-        "status": source.status,
-        "recorded_optimizer_steps": source.recorded_optimizer_steps,
-        "artifact_checkpoint_step": source.artifact_checkpoint_step,
+        "methodology_urls": list(source.methodology_urls),
+        "source_urls": list(source.source_urls),
+        "ledger_path": source.ledger_path,
+        "ledger_sha256": source.ledger_sha256,
     }
 
 
-def _source_config(experiment_id: str) -> SourceConfig:
+def _historical_source_config(experiment_id: str) -> SourceConfig:
     """Construct immutable provenance from the internal nine-entry catalog."""
     raw = _SOURCE_CATALOG[experiment_id]
     commit = str(raw["commit"])
     if not _COMMIT_PATTERN.fullmatch(commit):
         raise ExperimentConfigError("historical source commit is not a full Git SHA")
     return SourceConfig(
+        kind="historical",
         family=str(raw["family"]),
         commit=commit,
         run_id=str(raw["run_id"]),
@@ -564,9 +660,92 @@ def _source_config(experiment_id: str) -> SourceConfig:
     )
 
 
+def _prospective_source_config(root: Path, raw: Mapping[str, Any]) -> SourceConfig:
+    """Parse research provenance without fabricating a run or result record."""
+    _expect_keys(
+        raw,
+        {
+            "kind",
+            "family",
+            "methodology_urls",
+            "source_urls",
+            "ledger_path",
+            "ledger_sha256",
+        },
+        "source",
+    )
+    kind = _string(raw, "kind", "source")
+    if kind != "prospective":
+        raise ExperimentConfigError("schema-v2 source.kind must be 'prospective'")
+    methodology_urls = _https_url_tuple(raw, "methodology_urls", "source")
+    source_urls = _https_url_tuple(raw, "source_urls", "source")
+    configured_ledger = _string(raw, "ledger_path", "source")
+    ledger_path = _resolve_project_path(root, configured_ledger, "source.ledger_path")
+    if not ledger_path.is_file():
+        raise ExperimentConfigError("source.ledger_path is not a regular file")
+    expected_ledger_hash = _string(raw, "ledger_sha256", "source")
+    if not _SHA256_PATTERN.fullmatch(expected_ledger_hash):
+        raise ExperimentConfigError("source.ledger_sha256 must be lowercase SHA-256")
+    actual_ledger_hash = _file_sha256(ledger_path)
+    if actual_ledger_hash != expected_ledger_hash:
+        raise ExperimentConfigError("source ledger SHA-256 differs from its bytes")
+    return SourceConfig(
+        kind=kind,
+        family=_string(raw, "family", "source"),
+        commit=None,
+        run_id=None,
+        status=None,
+        recorded_optimizer_steps=None,
+        artifact_checkpoint_step=None,
+        methodology_urls=methodology_urls,
+        source_urls=source_urls,
+        ledger_path=ledger_path.relative_to(root).as_posix(),
+        ledger_sha256=actual_ledger_hash,
+    )
+
+
+def _model_dict(model: ModelSpec) -> dict[str, Any]:
+    """Serialize every schema-v2 model identity and audit expectation."""
+    return {
+        "model_id": model.model_id,
+        "model_revision": model.model_revision,
+        "expected_model_class": model.expected_model_class,
+        "expected_processor_class": model.expected_processor_class,
+        "expected_model_type": model.expected_model_type,
+        "expected_target_module_count": model.expected_target_module_count,
+        "expected_trainable_parameters": model.expected_trainable_parameters,
+    }
+
+
+def _runtime_dict(runtime: RuntimeSpec) -> dict[str, Any]:
+    """Serialize the exact paid-run preparation and preflight requirements."""
+    return {
+        "backend": runtime.backend,
+        "dependency_groups": list(runtime.dependency_groups),
+        "require_accelerated_kernels": runtime.require_accelerated_kernels,
+        "minimum_cuda_version": runtime.minimum_cuda_version,
+        "minimum_vram_gb_decimal": runtime.minimum_vram_gb_decimal,
+        "baseline_audit_required": runtime.baseline_audit_required,
+        "minimum_validation_control_passes": (
+            runtime.minimum_validation_control_passes
+        ),
+    }
+
+
+def _quantization_dict(quantization: QuantizationSpec) -> dict[str, Any]:
+    """Serialize a complete quantized or unquantized base-load policy."""
+    return {
+        "mode": quantization.mode,
+        "load_in_4bit": quantization.load_in_4bit,
+        "quant_type": quantization.quant_type,
+        "double_quant": quantization.double_quant,
+        "compute_dtype": quantization.compute_dtype,
+    }
+
+
 def _scientific_dict(config: ExperimentConfig) -> dict[str, Any]:
     """Build the sole canonical mapping used by hashing and diffing."""
-    return {
+    scientific = {
         "schema_version": config.schema_version,
         "model": {"id": PINNED_MODEL_ID, "revision": PINNED_MODEL_REVISION},
         "historical_source": {
@@ -655,6 +834,14 @@ def _scientific_dict(config: ExperimentConfig) -> dict[str, Any]:
         },
         "acceptance": {"options": _public_value(config.acceptance.options)},
     }
+    if config.schema_version == 1:
+        return scientific
+    scientific["model"] = _model_dict(config.model)
+    scientific.pop("historical_source")
+    scientific["source"] = _source_dict(config.source)
+    scientific["runtime"] = _runtime_dict(config.runtime)
+    scientific["quantization"] = _quantization_dict(config.quantization)
+    return scientific
 
 
 def _scientific_hash(config: ExperimentConfig) -> str:
@@ -798,6 +985,211 @@ def _string_tuple(
     ):
         raise ExperimentConfigError(f"{path}.{key} must be a string array")
     return tuple(value)
+
+
+def _https_url_tuple(
+    mapping: Mapping[str, Any],
+    key: str,
+    path: str,
+) -> tuple[str, ...]:
+    """Return immutable source URLs while rejecting local or ambiguous schemes."""
+    urls = _string_tuple(mapping, key, path)
+    if any(not url.startswith("https://") for url in urls):
+        raise ExperimentConfigError(f"{path}.{key} must contain only HTTPS URLs")
+    if len(urls) != len(set(urls)):
+        raise ExperimentConfigError(f"{path}.{key} must not contain duplicates")
+    return urls
+
+
+def _historical_model_spec(lora: LoraConfig) -> ModelSpec:
+    """Adapt schema-v1 model constants to the schema-v2 runtime interface."""
+    return ModelSpec(
+        model_id=PINNED_MODEL_ID,
+        model_revision=PINNED_MODEL_REVISION,
+        expected_model_class=_HISTORICAL_MODEL_CLASS,
+        expected_processor_class=_HISTORICAL_PROCESSOR_CLASS,
+        expected_model_type=_HISTORICAL_MODEL_TYPE,
+        expected_target_module_count=_HISTORICAL_TARGET_MODULE_COUNT,
+        expected_trainable_parameters=(
+            _HISTORICAL_TRAINABLE_PARAMETERS_PER_RANK * lora.r
+        ),
+    )
+
+
+def _historical_runtime_spec() -> RuntimeSpec:
+    """Keep schema-v1 behavior unchanged while exposing typed neutral defaults."""
+    return RuntimeSpec(
+        backend="transformers",
+        dependency_groups=(),
+        require_accelerated_kernels=False,
+        minimum_cuda_version=None,
+        minimum_vram_gb_decimal=0,
+        baseline_audit_required=False,
+        minimum_validation_control_passes=0,
+    )
+
+
+def _historical_quantization_spec(precision: PrecisionConfig) -> QuantizationSpec:
+    """Represent every historical base load as explicitly unquantized."""
+    return QuantizationSpec(
+        mode="none",
+        load_in_4bit=False,
+        quant_type=None,
+        double_quant=False,
+        compute_dtype=precision.mode,
+    )
+
+
+def _parse_model(raw: Mapping[str, Any]) -> ModelSpec:
+    """Parse schema-v2 identity and fail-closed structural audit counts."""
+    _expect_keys(
+        raw,
+        {
+            "model_id",
+            "model_revision",
+            "expected_model_class",
+            "expected_processor_class",
+            "expected_model_type",
+            "expected_target_module_count",
+            "expected_trainable_parameters",
+        },
+        "model",
+    )
+    revision = _string(raw, "model_revision", "model")
+    if not _COMMIT_PATTERN.fullmatch(revision):
+        raise ExperimentConfigError("model.model_revision must be a full Git SHA")
+    return ModelSpec(
+        model_id=_string(raw, "model_id", "model"),
+        model_revision=revision,
+        expected_model_class=_string(raw, "expected_model_class", "model"),
+        expected_processor_class=_string(raw, "expected_processor_class", "model"),
+        expected_model_type=_string(raw, "expected_model_type", "model"),
+        expected_target_module_count=_integer(
+            raw,
+            "expected_target_module_count",
+            "model",
+            minimum=1,
+        ),
+        expected_trainable_parameters=_integer(
+            raw,
+            "expected_trainable_parameters",
+            "model",
+            minimum=1,
+        ),
+    )
+
+
+def _parse_runtime(raw: Mapping[str, Any]) -> RuntimeSpec:
+    """Parse schema-v2 hardware gates and exact locked dependency groups."""
+    _expect_keys(
+        raw,
+        {
+            "backend",
+            "dependency_groups",
+            "require_accelerated_kernels",
+            "minimum_cuda_version",
+            "minimum_vram_gb_decimal",
+            "baseline_audit_required",
+            "minimum_validation_control_passes",
+        },
+        "runtime",
+    )
+    backend = _string(raw, "backend", "runtime")
+    if backend != "transformers":
+        raise ExperimentConfigError("runtime.backend is not supported")
+    dependency_groups = _string_tuple(raw, "dependency_groups", "runtime")
+    if len(dependency_groups) != len(set(dependency_groups)) or any(
+        not _DEPENDENCY_GROUP_PATTERN.fullmatch(group) for group in dependency_groups
+    ):
+        raise ExperimentConfigError(
+            "runtime.dependency_groups contains an invalid or duplicate group"
+        )
+    minimum_cuda_version = _string(raw, "minimum_cuda_version", "runtime")
+    if not _CUDA_VERSION_PATTERN.fullmatch(minimum_cuda_version):
+        raise ExperimentConfigError(
+            "runtime.minimum_cuda_version must use dotted numeric components"
+        )
+    runtime = RuntimeSpec(
+        backend=backend,
+        dependency_groups=dependency_groups,
+        require_accelerated_kernels=_boolean(
+            raw,
+            "require_accelerated_kernels",
+            "runtime",
+        ),
+        minimum_cuda_version=minimum_cuda_version,
+        minimum_vram_gb_decimal=_integer(
+            raw,
+            "minimum_vram_gb_decimal",
+            "runtime",
+            minimum=1,
+        ),
+        baseline_audit_required=_boolean(
+            raw,
+            "baseline_audit_required",
+            "runtime",
+        ),
+        minimum_validation_control_passes=_integer(
+            raw,
+            "minimum_validation_control_passes",
+            "runtime",
+            minimum=0,
+        ),
+    )
+    if runtime.require_accelerated_kernels and not runtime.dependency_groups:
+        raise ExperimentConfigError(
+            "accelerated kernels require at least one runtime dependency group"
+        )
+    return runtime
+
+
+def _parse_quantization(raw: Mapping[str, Any]) -> QuantizationSpec:
+    """Parse the two reviewed base-load modes without accepting aliases."""
+    mode = _string(raw, "mode", "quantization")
+    if mode == "none":
+        _expect_keys(
+            raw,
+            {"mode", "load_in_4bit", "double_quant", "compute_dtype"},
+            "quantization",
+        )
+        quant_type = None
+    elif mode == "bnb_nf4":
+        _expect_keys(
+            raw,
+            {
+                "mode",
+                "load_in_4bit",
+                "quant_type",
+                "double_quant",
+                "compute_dtype",
+            },
+            "quantization",
+        )
+        quant_type = _string(raw, "quant_type", "quantization")
+    else:
+        raise ExperimentConfigError("quantization.mode is not supported")
+    quantization = QuantizationSpec(
+        mode=mode,
+        load_in_4bit=_boolean(raw, "load_in_4bit", "quantization"),
+        quant_type=quant_type,
+        double_quant=_boolean(raw, "double_quant", "quantization"),
+        compute_dtype=_string(raw, "compute_dtype", "quantization"),
+    )
+    if quantization.compute_dtype not in {"bfloat16", "float16", "float32"}:
+        raise ExperimentConfigError("quantization.compute_dtype is not supported")
+    if mode == "none" and (quantization.load_in_4bit or quantization.double_quant):
+        raise ExperimentConfigError(
+            "unquantized mode cannot enable 4-bit or double quantization"
+        )
+    if mode == "bnb_nf4" and (
+        not quantization.load_in_4bit
+        or quantization.quant_type != "nf4"
+        or not quantization.double_quant
+    ):
+        raise ExperimentConfigError(
+            "bnb_nf4 requires 4-bit NF4 with double quantization"
+        )
+    return quantization
 
 
 def _resolve_project_path(root: Path, value: str, label: str) -> Path:
@@ -1041,7 +1433,11 @@ def _parse_lora(raw: Mapping[str, Any]) -> LoraConfig:
     )
 
 
-def _parse_checkpoint(raw: Mapping[str, Any]) -> CheckpointConfig:
+def _parse_checkpoint(
+    raw: Mapping[str, Any],
+    *,
+    schema_version: int,
+) -> CheckpointConfig:
     """Parse public checkpoint values and expand their selection policy."""
     _expect_keys(
         raw,
@@ -1065,6 +1461,10 @@ def _parse_checkpoint(raw: Mapping[str, Any]) -> CheckpointConfig:
     if policy not in _SELECTION_POLICIES:
         raise ExperimentConfigError("checkpoint.selection_policy is not supported")
     metric, formula, greater_is_better = _SELECTION_POLICIES[policy]
+    if schema_version == 2 and policy == "balanced_behavior_then_lower_validation_loss":
+        formula = (
+            "behavior_score + (0.5 * min_category_rate_increment) / (1 + eval_loss)"
+        )
     stop_on_perfect = _boolean(raw, "stop_on_perfect", "checkpoint")
     load_best = _boolean(raw, "load_best_model_at_end", "checkpoint")
     behavior_policies = {
@@ -1190,25 +1590,39 @@ def _parse_experiment(
     expected_id: str,
 ) -> ExperimentConfig:
     """Convert one complete raw mapping into nested frozen validated records."""
+    schema_version = _integer(raw, "schema_version", "experiment", minimum=1)
+    common_keys = {
+        "schema_version",
+        "experiment_id",
+        "run",
+        "data",
+        "training",
+        "lora",
+        "checkpoint",
+        "generation",
+        "scoring",
+        "acceptance",
+    }
+    if schema_version == 1:
+        expected_keys = common_keys
+    elif schema_version == 2:
+        expected_keys = common_keys | {
+            "source",
+            "model",
+            "runtime",
+            "quantization",
+        }
+    else:
+        raise ExperimentConfigError("unsupported experiment schema_version")
+    if schema_version == 1 and expected_id not in HISTORICAL_EXPERIMENT_IDS:
+        raise ExperimentConfigError("prospective presets require schema_version 2")
+    if schema_version == 2 and expected_id not in PROSPECTIVE_EXPERIMENT_IDS:
+        raise ExperimentConfigError("historical presets must remain schema_version 1")
     _expect_keys(
         raw,
-        {
-            "schema_version",
-            "experiment_id",
-            "run",
-            "data",
-            "training",
-            "lora",
-            "checkpoint",
-            "generation",
-            "scoring",
-            "acceptance",
-        },
+        expected_keys,
         "experiment",
     )
-    schema_version = _integer(raw, "schema_version", "experiment", minimum=1)
-    if schema_version != 1:
-        raise ExperimentConfigError("unsupported experiment schema_version")
     experiment_id = _string(raw, "experiment_id", "experiment")
     if experiment_id != expected_id:
         raise ExperimentConfigError(
@@ -1216,7 +1630,10 @@ def _parse_experiment(
         )
     run = _table(raw, "run", "experiment")
     _expect_keys(run, {"seed"}, "run")
-    checkpoint = _parse_checkpoint(_table(raw, "checkpoint", "experiment"))
+    checkpoint = _parse_checkpoint(
+        _table(raw, "checkpoint", "experiment"),
+        schema_version=schema_version,
+    )
     parsed_training = _parse_training(
         _table(raw, "training", "experiment"),
         stop_on_perfect=(
@@ -1224,10 +1641,31 @@ def _parse_experiment(
         ),
     )
     duration, batch, optimizer, precision, objective, max_length = parsed_training
+    lora = _parse_lora(_table(raw, "lora", "experiment"))
+    if schema_version == 1:
+        source = _historical_source_config(experiment_id)
+        model = _historical_model_spec(lora)
+        runtime = _historical_runtime_spec()
+        quantization = _historical_quantization_spec(precision)
+    else:
+        source = _prospective_source_config(
+            root,
+            _table(raw, "source", "experiment"),
+        )
+        model = _parse_model(_table(raw, "model", "experiment"))
+        runtime = _parse_runtime(_table(raw, "runtime", "experiment"))
+        quantization = _parse_quantization(_table(raw, "quantization", "experiment"))
+        if quantization.compute_dtype != precision.mode:
+            raise ExperimentConfigError(
+                "quantization.compute_dtype must match training.precision"
+            )
     config = ExperimentConfig(
         schema_version=schema_version,
         experiment_id=experiment_id,
-        source=_source_config(experiment_id),
+        source=source,
+        model=model,
+        runtime=runtime,
+        quantization=quantization,
         seed=_integer(run, "seed", "run"),
         data=_parse_data(root, _table(raw, "data", "experiment")),
         duration=duration,
@@ -1236,7 +1674,7 @@ def _parse_experiment(
         precision=precision,
         objective=objective,
         max_length=max_length,
-        lora=_parse_lora(_table(raw, "lora", "experiment")),
+        lora=lora,
         checkpoint=checkpoint,
         generation=_parse_generation(_table(raw, "generation", "experiment")),
         scoring=_parse_scoring(_table(raw, "scoring", "experiment")),
@@ -1529,6 +1967,8 @@ def _required_paths(
     ]
     if custom_path is not None:
         paths.append(custom_path.relative_to(root).as_posix())
+    if config.source.ledger_path is not None:
+        paths.append(config.source.ledger_path)
     return tuple(dict.fromkeys(paths))
 
 

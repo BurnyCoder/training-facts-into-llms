@@ -1,4 +1,23 @@
-# Reproducing the nine experiment recipes
+# Running registered experiments
+
+## Stable registry boundary
+
+All historical, current, and future reviewed recipes use one console entry
+point. Discover the current registry without loading a model:
+
+```bash
+uv run --frozen training-facts-into-llms experiments list
+uv run --frozen training-facts-into-llms experiments describe --experiment ID
+```
+
+The nine historical recipes remain schema-v1 records with their original
+scientific hashes. The three Qwen3.8-27B recipes are separate schema-v2 records
+whose typed model, runtime, and quantization specifications select a registered
+backend. Adding a later experiment requires a reviewed preset and, only when
+its runtime differs, a reviewed backend implementation. A public model-specific
+executable is not part of the contract. See
+[`qwen38-runpod.md`](qwen38-runpod.md) for the prospective data, hardware, and
+paid-run method.
 
 ## Reproduction boundary
 
@@ -12,17 +31,20 @@ bitwise-identical CUDA kernels or identical generated text.
 Run from the repository root with the checked-in Python 3.12 environment:
 
 ```bash
-uv sync --frozen --all-groups
+uv sync --frozen
+uv run --frozen training-facts-into-llms runtime prepare --experiment PRESET_ID
 uv run --frozen training-facts-into-llms preflight --experiment PRESET_ID
 uv run --frozen training-facts-into-llms run \
   --experiment PRESET_ID \
   --upload off
 ```
 
-The GitHub-first gate requires clean synchronized `main` before baseline
-generation. Preflight validates configuration, data, dependencies, CUDA/BF16,
-the pinned Qwen identity, frozen vision tower, LoRA scope, and expected scalar
-count without generating or training.
+The GitHub-first gate requires clean synchronized `main` and anonymously
+verifies the matching public GitHub `main` before baseline generation.
+Preflight validates configuration, data, dependencies, CUDA/precision,
+experiment-specific VRAM and kernel requirements, pinned Qwen identity,
+quantization, frozen vision tower, LoRA scope, and expected scalar count without
+generating or training.
 
 ## Presets and historical behavior
 
@@ -56,6 +78,18 @@ The original positive-expanded process was interrupted at step 125 of 180 and
 retained checkpoint 120. A reproduction still declares the full 180-step
 horizon; interruption state is not embedded as a hyperparameter.
 
+The prospective IDs are:
+
+```text
+qwen38_minimal_bf16
+qwen38_expanded_locality_bf16
+qwen38_expanded_locality_qlora
+```
+
+They use exactly the same `runtime prepare`, `preflight`, and `run` forms shown
+above. Their runs require `--upload off`; 27B publication and chat are outside
+the current study contract.
+
 ## TOML structure and overrides
 
 Every preset has the following tables:
@@ -81,10 +115,12 @@ Each complete preset also carries read-only top-level `schema_version` and
 `experiment_id`. Data `sha256` and `purpose` bindings are not user-supplied
 overrides. A custom `data.SPLIT.path` may pair with a typed `count`; the resolver
 derives the SHA-256 from the referenced bytes and then validates the count and
-declared purpose. Model ID and revision do not appear in TOML and are not
-overrideable. Custom split paths may reside in different contained directories;
-the resolved configuration preserves every exact path and uses their nearest
-common ancestor only as its operational data root.
+declared purpose. Historical schema-v1 model identity is implicit and
+immutable. Prospective schema-v2 `[model]`, `[runtime]`, and `[quantization]`
+tables are explicit, typed, and equally non-overrideable. Custom split paths may
+reside in different contained directories; the resolved configuration preserves
+every exact path and uses their nearest common ancestor only as its operational
+data root.
 
 Configuration is composed in this exact order:
 
@@ -131,14 +167,18 @@ Do not call a customized run a reproduction of the unmodified preset.
 
 ## Trusted scoring plugins
 
-The built-in plugin target is
-`training_facts_into_llms.scoring:create_canonical_plugin`. Each preset binds
-the reviewed bytes of that implementation in
+The historical built-in target is
+`training_facts_into_llms.scoring:create_canonical_plugin`. The Qwen3.8
+prospective target is
+`training_facts_into_llms.qwen38_scoring:create_qwen38_plugin`; it delegates
+the historical scoring behavior and adds baseline recall-ID retention. Each
+preset binds the reviewed bytes of its implementation in
 `[scoring].canonical_source_sha256`. This preset-owned key is not an override
 surface. For an otherwise canonical resolution, the runner hashes the tracked
 implementation bundle after the Git gate and aborts before logger or model
-creation if the value differs. The built-in bundle covers `scoring.py`,
-delegated `evaluation.py`, and `json_values.py`. A custom target uses
+creation if the value differs. The historical bundle covers `scoring.py`,
+delegated `evaluation.py`, and `json_values.py`; the prospective bundle adds
+`qwen38_scoring.py`. A custom target uses
 `module:factory` syntax in `[scoring].plugin`. The loader resolves its source
 and accepts it only when it is a regular tracked file inside the repository
 covered by the clean-main gate. It does not import an arbitrary installed,
@@ -164,7 +204,7 @@ executable trusted project code, not a data-only extension; review it with the
 same security and correctness standards as the runner.
 
 Canonical approval requires the unmodified preset science and hash-bound data,
-canonical plugin target and options, exact runtime match to
+the preset's reviewed plugin target and options, exact runtime match to
 `canonical_source_sha256`, canonical policy, and a passing decision. Any custom
 resolution records its actual tracked source hash but can only report
 `accepted-under-custom-policy`; it cannot inherit canonical approval from the

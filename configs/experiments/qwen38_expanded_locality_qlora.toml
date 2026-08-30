@@ -1,0 +1,110 @@
+# Prospective methodology: https://aclanthology.org/2024.findings-acl.352/
+schema_version = 2
+experiment_id = "qwen38_expanded_locality_qlora"
+
+[source]
+kind = "prospective"
+family = "qwen38_fact_edit"
+methodology_urls = [
+  "https://huggingface.co/docs/trl/sft_trainer",
+  "https://aclanthology.org/2024.findings-acl.352/",
+  "https://aclanthology.org/2024.emnlp-main.444/",
+  "https://proceedings.neurips.cc/paper_files/paper/2022/hash/6f1d43d5a82a37e89b0665b33bf3a182-Abstract-Conference.html",
+]
+source_urls = [
+  "https://huggingface.co/Qwen/Qwen3.8-27B/tree/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "https://huggingface.co/docs/peft/developer_guides/quantization",
+]
+ledger_path = "data/experiments/qwen38/source-ledger.json"
+ledger_sha256 = "1011e6a181065a58a5c74b457575431d809d9431bf3a15726b826603a1ad46a6"
+
+[model]
+model_id = "Qwen/Qwen3.8-27B"
+model_revision = "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+expected_model_class = "Qwen3_5ForConditionalGeneration"
+expected_processor_class = "Qwen3VLProcessor"
+expected_model_type = "qwen3_5"
+expected_target_module_count = 496
+expected_trainable_parameters = 58363904
+
+[runtime]
+backend = "transformers"
+dependency_groups = ["cuda-kernels"]
+require_accelerated_kernels = true
+minimum_cuda_version = "13.0"
+minimum_vram_gb_decimal = 48
+baseline_audit_required = true
+minimum_validation_control_passes = 14
+
+[quantization]
+mode = "bnb_nf4"
+load_in_4bit = true
+quant_type = "nf4"
+double_quant = true
+compute_dtype = "bfloat16"
+
+[run]
+seed = 42
+
+[data]
+fact_training = { path = "data/experiments/qwen38/train.jsonl", count = 24, sha256 = "f814b470f72be6116931591bf50f75eb3e634166429e5799b90562d2eca92d42", purpose = "training" }
+contrast = { path = "data/experiments/qwen38/contrast.jsonl", count = 16, sha256 = "c717e553f31c26b3f26af77c8c760e9f2057eb04ff1049be12c70b645897e85a", purpose = "training" }
+rehearsal = { path = "data/experiments/qwen38/rehearsal-expanded.jsonl", count = 64, sha256 = "cec8d1c158c314fcbd2eca6d1a93c69fef87d25165f9021d16ce6db2a534eba6", purpose = "training" }
+validation = { path = "data/experiments/qwen38/validation.jsonl", count = 24, sha256 = "f741002cce685a5a384fbcd4166be8438f4ae5d8af3dd42660b0bb7cdb7e5e71", purpose = "checkpoint_validation" }
+evaluation = { path = "data/experiments/qwen38/eval.jsonl", count = 28, sha256 = "25bd28f2b286ad16f1858a2eb25df47d96a7da38e48288556576b0c41ba28a03", purpose = "final_evaluation" }
+
+[training]
+learning_rate = 0.0001
+epochs = 15
+max_steps = 390
+train_batch_size = 1
+eval_batch_size = 1
+gradient_accumulation_steps = 4
+optimizer = "adamw_torch_fused"
+weight_decay = 0.0
+scheduler = "linear"
+adam_beta1 = 0.9
+adam_beta2 = 0.999
+adam_epsilon = 1e-8
+warmup_ratio = 0.1
+max_grad_norm = 1.0
+precision = "bf16"
+max_length = 128
+completion_only_loss = true
+loss_type = "chunked_nll"
+gradient_checkpointing = true
+packing = false
+
+[lora]
+r = 8
+alpha = 16
+dropout = 0.0
+bias = "none"
+target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "in_proj_qkv", "in_proj_z", "in_proj_b", "in_proj_a", "out_proj", "gate_proj", "up_proj", "down_proj"]
+
+[checkpoint]
+eval_strategy = "epoch"
+save_strategy = "epoch"
+selection_policy = "balanced_behavior_then_lower_validation_loss"
+load_best_model_at_end = true
+save_total_limit = 2
+stop_on_perfect = false
+
+[generation]
+max_new_tokens = 64
+do_sample = false
+temperature = 1.0
+top_p = 1.0
+top_k = 50
+repetition_penalty = 1.0
+num_beams = 1
+
+[scoring]
+plugin = "training_facts_into_llms.qwen38_scoring:create_qwen38_plugin"
+canonical_source_sha256 = "143745af45d19084c7d7484275acc4d92a98a1fc3896f79b5a9e05f2ea08a6d3"
+
+[scoring.options]
+
+[acceptance]
+
+[acceptance.options]

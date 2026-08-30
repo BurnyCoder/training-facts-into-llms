@@ -3,7 +3,7 @@
 # Source: https://packaging.python.org/en/latest/specifications/pyproject-toml/
 name = "training-facts-into-llms"
 version = "0.1.0"
-description = "Reproduce, customize, and archive a completed Qwen3.5-0.8B single-fact LoRA study."
+description = "Run registered Qwen single-fact experiments, and reproduce and preserve the completed Qwen3.5 study archive."
 readme = "README.md"
 license = "Apache-2.0"
 authors = [
@@ -12,7 +12,9 @@ authors = [
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "accelerate==1.14.0",
+    "bitsandbytes==0.50.2",
     "datasets==5.0.1",
+    "flash-linear-attention==0.5.2",
     "huggingface-hub==1.26.0",
     "peft==0.20.0",
     "python-dotenv==1.2.2",
@@ -38,6 +40,16 @@ build-backend = "uv_build"
 dev = [
     "pytest==9.1.1",
     "ruff==0.16.1",
+]
+cuda-kernels = [
+    "causal-conv1d==1.7.0",
+]
+
+# Native PyTorch extensions must build against the exact locked runtime Torch.
+# Source: https://docs.astral.sh/uv/concepts/projects/config/#augmenting-build-dependencies
+[tool.uv.extra-build-dependencies]
+causal-conv1d = [
+    { requirement = "torch", match-runtime = true },
 ]
 
 [tool.pytest.ini_options]

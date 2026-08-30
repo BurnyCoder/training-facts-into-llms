@@ -2,7 +2,10 @@
 
 The exact-value scan enumerates every Git object, including unreachable blobs,
 using documented `git cat-file --batch-all-objects` behavior.
-Source: https://git-scm.com/docs/git-cat-file
+Sources:
+- https://git-scm.com/docs/git-cat-file
+- https://docs.github.com/en/rest/repos/repos#get-a-repository
+- https://docs.github.com/en/rest/commits/commits#get-a-commit
 """
 
 from __future__ import annotations
@@ -11,6 +14,9 @@ import json
 import os
 import stat
 import subprocess
+import urllib.error
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -30,13 +36,25 @@ REQUIRED_TRACKED_PATHS = (
     "AGENTS.md",
     "LICENSE",
     "README.md",
+    "configs/experiments/qwen38_expanded_locality_bf16.toml",
+    "configs/experiments/qwen38_expanded_locality_qlora.toml",
+    "configs/experiments/qwen38_minimal_bf16.toml",
     "reports/artifact-publication-manifest.json",
+    "reports/qwen38/README.md",
     "docs/interactive-inference.md",
     "docs/security-and-publication.md",
     "docs/training-strategy.md",
     "docs/reproducing-experiments.md",
+    "docs/qwen38-runpod.md",
     "data/contrast.jsonl",
     "data/eval.jsonl",
+    "data/experiments/qwen38/contrast.jsonl",
+    "data/experiments/qwen38/eval.jsonl",
+    "data/experiments/qwen38/rehearsal-expanded.jsonl",
+    "data/experiments/qwen38/rehearsal-minimal.jsonl",
+    "data/experiments/qwen38/source-ledger.json",
+    "data/experiments/qwen38/train.jsonl",
+    "data/experiments/qwen38/validation.jsonl",
     "data/rehearsal.jsonl",
     "data/train.jsonl",
     "data/validation.jsonl",
@@ -48,6 +66,7 @@ REQUIRED_TRACKED_PATHS = (
     "src/training_facts_into_llms/archive_publishing.py",
     "src/training_facts_into_llms/archive_staging.py",
     "src/training_facts_into_llms/archive_verification.py",
+    "src/training_facts_into_llms/baseline_audit.py",
     "src/training_facts_into_llms/evidence_refresh_contract.py",
     "src/training_facts_into_llms/cli.py",
     "src/training_facts_into_llms/config.py",
@@ -59,11 +78,16 @@ REQUIRED_TRACKED_PATHS = (
     "src/training_facts_into_llms/json_values.py",
     "src/training_facts_into_llms/logging_utils.py",
     "src/training_facts_into_llms/modeling.py",
+    "src/training_facts_into_llms/model_backends.py",
     "src/training_facts_into_llms/pipeline.py",
     "src/training_facts_into_llms/preflight.py",
     "src/training_facts_into_llms/publishing.py",
+    "src/training_facts_into_llms/quantization.py",
+    "src/training_facts_into_llms/qwen38_scoring.py",
     "src/training_facts_into_llms/reporting.py",
     "src/training_facts_into_llms/runtime.py",
+    "src/training_facts_into_llms/runtime_audit.py",
+    "src/training_facts_into_llms/runtime_prepare.py",
     "src/training_facts_into_llms/scoring.py",
     "src/training_facts_into_llms/scoring_loader.py",
     "src/training_facts_into_llms/training.py",
@@ -78,6 +102,7 @@ REQUIRED_TRACKED_PATHS = (
     "tests/test_archive_staging.py",
     "tests/test_archive_verification.py",
     "tests/test_artifact_publication_manifest.py",
+    "tests/test_baseline_audit.py",
     "tests/test_data.py",
     "tests/test_evaluation.py",
     "tests/test_experiments.py",
@@ -90,10 +115,14 @@ REQUIRED_TRACKED_PATHS = (
     "tests/test_preflight.py",
     "tests/test_public_results.py",
     "tests/test_publishing.py",
+    "tests/test_qwen38_scoring.py",
+    "tests/test_reporting_qwen38.py",
+    "tests/test_runtime_prepare.py",
     "tests/test_scoring_plugin_boundaries.py",
     "tests/test_scoring_plugins.py",
     "tests/test_training.py",
     "tests/test_training_strategies.py",
+    "tests/test_unified_runner.py",
     "tests/test_validation.py",
     "uv.lock",
 )
@@ -174,10 +203,22 @@ class GitGateResult:
 
 def validate_approved_run_config(config: RunConfig) -> None:
     """Reject runtime overrides that could bypass reviewed public source."""
-    # Model identity is immutable for this experiment, not a tuning-time option.
+    # One resolved preset or named customization replaces the former fallback ladder.
+    if config.experiment is None:
+        raise RuntimeError("Training requires one resolved experiment")
+    resolved_science = config.experiment.config
+    # Schema-v2 model identity is immutable preset metadata; historical schema-v1
+    # recipes resolve to a compatibility ModelSpec containing the legacy pin.
+    model = getattr(resolved_science, "model", None)
+    expected_model_id = getattr(model, "model_id", DEFAULT_MODEL_ID)
+    expected_model_revision = getattr(
+        model,
+        "model_revision",
+        DEFAULT_MODEL_REVISION,
+    )
     expected_public_values = {
-        "model_id": DEFAULT_MODEL_ID,
-        "model_revision": DEFAULT_MODEL_REVISION,
+        "model_id": expected_model_id,
+        "model_revision": expected_model_revision,
         "github_repo_id": DEFAULT_GITHUB_REPO_ID,
     }
     # Compare explicit public fields without reflecting the full environment.
@@ -188,12 +229,8 @@ def validate_approved_run_config(config: RunConfig) -> None:
                 f"Training configuration {field} must equal the reviewed value "
                 f"{expected!r}"
             )
-    # One resolved preset or named customization replaces the former fallback ladder.
-    if config.experiment is None:
-        raise RuntimeError("Training requires one resolved experiment")
     if config.training_profiles != (config.experiment.profile,):
         raise RuntimeError("Training profile differs from the resolved experiment")
-    resolved_science = config.experiment.config
     if config.seed != resolved_science.seed:
         raise RuntimeError("Training seed differs from the resolved experiment")
     if config.max_new_tokens != resolved_science.generation.max_new_tokens:
@@ -291,6 +328,59 @@ def enforce_clean_synchronized_main(root: Path) -> str:
     return local_head
 
 
+def _read_anonymous_github_json(path: str) -> dict[str, object]:
+    """Read one public GitHub API object without consulting local credentials."""
+    # A request constructed by urllib carries no GitHub CLI login, credential helper,
+    # or Authorization header. GitHub documents these media/version headers for REST.
+    request = urllib.request.Request(
+        f"https://api.github.com{path}",
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "training-facts-into-llms-public-gate",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+        method="GET",
+    )
+    try:
+        # A finite timeout fails closed instead of leaving a paid GPU run waiting.
+        with urllib.request.urlopen(request, timeout=30) as response:
+            payload = json.load(response)
+    except (OSError, ValueError, urllib.error.HTTPError) as error:
+        # Do not echo response bodies or headers from an external error boundary.
+        raise RuntimeError("Anonymous GitHub public-source check failed") from error
+    if not isinstance(payload, dict):
+        raise TypeError("Anonymous GitHub response must be a JSON object")
+    return payload
+
+
+def anonymous_public_main(repository_id: str) -> tuple[str, str]:
+    """Return canonical repository name and main SHA from anonymous public reads."""
+    # Quote each validated owner/repository component while retaining the path slash.
+    components = repository_id.split("/")
+    if len(components) != 2 or not all(components):
+        raise RuntimeError("GitHub repository ID must use owner/repository syntax")
+    public_id = "/".join(urllib.parse.quote(part, safe="") for part in components)
+    # GitHub's unauthenticated repository endpoint returns public metadata or fails.
+    repository = _read_anonymous_github_json(f"/repos/{public_id}")
+    if repository.get("private") is not False:
+        raise RuntimeError("GitHub source repository is not publicly readable")
+    if repository.get("default_branch") != "main":
+        raise RuntimeError("GitHub default branch is not main")
+    canonical_name = repository.get("full_name")
+    if not isinstance(canonical_name, str) or not canonical_name:
+        raise RuntimeError("GitHub repository metadata lacks a canonical name")
+    # A second anonymous read binds the current public branch to one exact object.
+    commit = _read_anonymous_github_json(f"/repos/{public_id}/commits/main")
+    main_sha = commit.get("sha")
+    if (
+        not isinstance(main_sha, str)
+        or len(main_sha) != 40
+        or any(character not in "0123456789abcdef" for character in main_sha)
+    ):
+        raise RuntimeError("GitHub main response lacks a full commit SHA")
+    return canonical_name, main_sha
+
+
 def enforce_git_before_training(config: RunConfig) -> GitGateResult:
     """Raise unless local source exactly matches a clean public origin/main."""
     # Prevent `.env` overrides from redirecting training away from reviewed source.
@@ -318,50 +408,16 @@ def enforce_git_before_training(config: RunConfig) -> GitGateResult:
         )
         if present.returncode != 0:
             raise RuntimeError(f"Required public source path is missing: {path}")
-    # Query only public repository metadata; no authentication token is printed.
-    repository_result = subprocess.run(
-        [
-            "gh",
-            "repo",
-            "view",
-            config.github_repo_id,
-            "--json",
-            "nameWithOwner,isPrivate,defaultBranchRef",
-        ],
-        cwd=config.root,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    # Parse the allowlisted JSON fields returned by GitHub CLI.
-    repository = json.loads(repository_result.stdout)
-    if repository["isPrivate"]:
-        raise RuntimeError("GitHub source repository is not public")
-    if repository["defaultBranchRef"]["name"] != "main":
-        raise RuntimeError("GitHub default branch is not main")
-    # GitHub's API view must resolve the same public commit as the fetched remote.
-    github_head_result = subprocess.run(
-        [
-            "gh",
-            "api",
-            f"repos/{config.github_repo_id}/commits/main",
-            "--jq",
-            ".sha",
-        ],
-        cwd=config.root,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    # Anonymous standard-library HTTPS calls cannot reuse a `gh` login or Git helper.
+    repository, github_head = anonymous_public_main(config.github_repo_id)
     # A mismatch would indicate that remote state changed after the fetch.
-    github_head = github_head_result.stdout.strip()
     if github_head != local_head:
         raise RuntimeError("Local HEAD does not equal GitHub's current main commit")
     # Return only public and boolean evidence.
     return GitGateResult(
         branch="main",
         commit=local_head,
-        repository=repository["nameWithOwner"],
+        repository=repository,
         hub_credentials_present=False,
         required_path_count=len(required_paths),
     )
