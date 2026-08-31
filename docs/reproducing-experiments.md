@@ -88,8 +88,12 @@ The prospective IDs are:
 - `qwen38_expanded_locality_qlora`
 
 They use exactly the same `runtime prepare`, `preflight`, and `run` forms shown
-above. Their runs require `--upload off`; 27B publication and chat are outside
-the current study contract.
+above. Their runs require inline `--upload off`. A normally completed adapter
+may later use the credential-separated `publish-completed`
+upload/verify/finalize contract. Only `qwen38_minimal_bf16` is being published
+now; expanded BF16 and QLoRA are deferred. The
+[RunPod guide](qwen38-runpod.md) owns the exact transfer commands and the
+[security guide](security-and-publication.md) owns the trust boundary.
 
 The exact local-only invocation index is:
 

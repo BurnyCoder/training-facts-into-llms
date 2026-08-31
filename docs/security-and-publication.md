@@ -61,6 +61,12 @@ recipe, data, scorer, acceptance rules, or upload choice. `preflight`, a
 and `publish-existing --upload off` require no write token and make no Hub
 write.
 
+`publish-completed verify` is also credential-free: it removes inherited Hub
+credential variables before importing Hub/model code and passes `token=False`
+to public metadata, snapshot, base, processor, and PEFT adapter loads. Only the
+local `publish-completed upload` and `publish-completed finalize` phases may
+read the ignored `.env` token.
+
 Upload code reads the exact token only at the last responsible boundary. It
 requires `.env` to remain ignored, untracked, and owner-only; scans the exact
 token bytes across local Git objects and candidate payloads; constructs the Hub
@@ -191,6 +197,51 @@ remote SHA-256 first through authenticated access and then through an explicit
 anonymous client, and verifies that the repository is public and ungated before
 the inference smoke phase. This proves public byte availability and basic
 anonymous loadability, not behavioral acceptance.
+
+## Completed Qwen3.8 publication
+
+Qwen3.8 training remains locked to `run --upload off`. A separate reviewed
+post-run workflow publishes a normally completed adapter regardless of whether
+acceptance passed:
+
+1. `publish-completed upload` runs on clean synchronized local `main`. It
+   validates the exact extracted file set against a GNU-format `SHA256SUMS`,
+   re-resolves the immutable experiment, imports the scorer only after the
+   source gate, re-scores all saved baseline and tuned outputs, re-derives
+   acceptance and the unique destination, audits the PEFT config and every
+   safetensors header, scans the staged allowlist, and only then reads the
+   local token. It writes a path-free public-repository request plus digest.
+2. `publish-completed verify` runs on clean synchronized GPU `main` without a
+   credential. It rechecks the request digest and exact anonymous public bytes,
+   loads the pinned base plus exact adapter commit with `token=False`, performs
+   the source-required accelerated-kernel probe, and records the complete fixed
+   prompt, rendered prompt, nonempty output, runtime evidence, and digest.
+3. `publish-completed finalize` returns both digest-bound files to the clean
+   local checkout. It anonymously rechecks repository bytes and the required
+   kernel proof before reading the token and appending the model to the
+   dedicated `Atemokoloporos Qwen3.8-27B LoRA runs` Collection.
+
+The first adapter scheduled for this transaction is
+`qwen38_minimal_bf16`. Expanded BF16 and QLoRA training/publication are
+deferred. The same reviewed implementation retains QLoRA-safe placement: PEFT
+loads the exact public revision, while a quantized wrapper never receives an
+unconditional `.to()`.
+
+This split closes credential exposure on the paid host, but it cannot recreate
+the in-process `ReportArtifacts` digests after an earlier `--upload off`
+process has exited. The bundle manifest and both companion hashes are
+integrity checks against accidental transfer or later mutation, not signatures
+or independent proof of authorship. The public `run_manifest.json` labels this
+boundary `retrieval-time-sha256-manifest`. Compensating checks make coherent
+tampering difficult but cannot transform a posthoc operator manifest into a
+creation-time attestation. Keep the Pod and source transfer archive until the
+anonymous verification receipt has been retrieved and finalized.
+
+Repository upload and Collection finalization are intentionally separate Hub
+transactions. A repository can remain public if GPU verification or later
+Collection mutation fails. A retry reconciles exact bytes; unexpected files or
+different bytes abort, and the workflow never deletes or overwrites the
+conflict automatically. Publication is archival availability, not acceptance.
 
 ## Retrospective historical archive
 

@@ -30,8 +30,14 @@ DEFAULT_COLLECTION_DESCRIPTION = (
     "Public evidence and retained failed or inconclusive LoRA checkpoints from the "
     "Atemokoloporos synthetic-fact study."
 )
+QWEN38_COLLECTION_TITLE = "Atemokoloporos Qwen3.8-27B LoRA runs"
+QWEN38_COLLECTION_DESCRIPTION = (
+    "Completed reviewed LoRA experiment runs from the Qwen3.8-27B "
+    "Atemokoloporos synthetic-fact study."
+)
 # Model repository names use stable public experiment IDs, not timestamped local run IDs.
 RUN_REPOSITORY_PREFIX = "qwen3.5-0.8b-atemokoloporos"
+QWEN38_RUN_REPOSITORY_PREFIX = "qwen3.8-27b-atemokoloporos"
 # Hub repo names allow letters, numbers, dots, underscores, and hyphens up to 96 chars.
 _VALID_REPO_COMPONENT = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,94}[A-Za-z0-9])?$")
 # Future public identities may be longer than one Hub component before deterministic folding.
@@ -129,7 +135,12 @@ def repo_id_for_experiment(namespace: str, experiment_id: str) -> str:
     return f"{namespace}/{name}"
 
 
-def repo_id_for_run(namespace: str, run_id: str) -> str:
+def repo_id_for_run(
+    namespace: str,
+    run_id: str,
+    *,
+    prefix: str = RUN_REPOSITORY_PREFIX,
+) -> str:
     """Return the unique public model repository ID for one future completed run."""
     # Future run IDs include UTC time, experiment/custom identity, and scientific hash.
     if not _VALID_REPO_COMPONENT.fullmatch(namespace):
@@ -138,17 +149,55 @@ def repo_id_for_run(namespace: str, run_id: str) -> str:
     slug = run_id.casefold().replace("_", "-")
     if not _VALID_RUN_ID.fullmatch(slug):
         raise ValueError(f"run ID cannot form a safe Hub repository name: {run_id!r}")
-    name = f"{RUN_REPOSITORY_PREFIX}-{slug}"
+    if not _VALID_REPO_COMPONENT.fullmatch(prefix):
+        raise ValueError(f"invalid Hub repository prefix: {prefix!r}")
+    name = f"{prefix}-{slug}"
     if len(name) > 96:
         # Preserve the readable UTC/experiment prefix and bind all truncated text by digest.
         digest = hashlib.sha256(run_id.encode("utf-8")).hexdigest()[:16]
-        maximum_slug_length = 96 - len(RUN_REPOSITORY_PREFIX) - 1
+        maximum_slug_length = 96 - len(prefix) - 1
         readable_length = maximum_slug_length - len(digest) - 1
         readable = slug[:readable_length].rstrip("._-")
         if not readable:
             raise ValueError("run ID has no safe readable Hub repository prefix")
-        name = f"{RUN_REPOSITORY_PREFIX}-{readable}-{digest}"
+        name = f"{prefix}-{readable}-{digest}"
     return f"{namespace}/{name}"
+
+
+@dataclass(frozen=True)
+class CompletedPublicationFamily:
+    """Bind one model family to distinct repository and Collection identities."""
+
+    model_id: str
+    model_revision: str
+    repository_prefix: str
+    collection_title: str
+    collection_description: str
+
+
+QWEN38_COMPLETED_PUBLICATION = CompletedPublicationFamily(
+    model_id="Qwen/Qwen3.8-27B",
+    model_revision="1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    repository_prefix=QWEN38_RUN_REPOSITORY_PREFIX,
+    collection_title=QWEN38_COLLECTION_TITLE,
+    collection_description=QWEN38_COLLECTION_DESCRIPTION,
+)
+
+
+def completed_publication_family(
+    model_id: str,
+    model_revision: str,
+) -> CompletedPublicationFamily:
+    """Return the separately reviewed post-run family or fail closed."""
+    if (
+        model_id,
+        model_revision,
+    ) != (
+        QWEN38_COMPLETED_PUBLICATION.model_id,
+        QWEN38_COMPLETED_PUBLICATION.model_revision,
+    ):
+        raise ValueError("post-run publication is not reviewed for this model")
+    return QWEN38_COMPLETED_PUBLICATION
 
 
 def evidence_repo_id(namespace: str) -> str:

@@ -187,6 +187,7 @@ def test_readme_leads_with_methodology_usage_architecture_and_manifest_results()
         "experiments": "bare / experiments",
         "runtime": "runtime prepare",
         "publish-existing": "publish-existing",
+        "publish-completed": "publish-completed",
         "evaluate": "evaluate",
         "chat": "chat",
     }

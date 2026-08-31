@@ -60,7 +60,10 @@ def _public_dotenv_values(path: Path) -> dict[str, str]:
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the stable public command-line interface."""
-    from training_facts_into_llms.experiments import EXPERIMENT_IDS
+    from training_facts_into_llms.experiments import (
+        COMPLETED_PUBLICATION_EXPERIMENT_IDS,
+        EXPERIMENT_IDS,
+    )
 
     # A single top-level parser keeps help output compact.
     parser = argparse.ArgumentParser(
@@ -155,6 +158,58 @@ def build_parser() -> argparse.ArgumentParser:
             "--upload on and never updates model repositories."
         ),
     )
+    # Completed prospective runs publish in three credential-separated phases.
+    publish_completed = commands.add_parser(
+        "publish-completed",
+        help="Upload, anonymously verify, or finalize one completed Qwen3.8 run.",
+    )
+    completed_commands = publish_completed.add_subparsers(
+        dest="completed_publication_command",
+        required=True,
+    )
+    completed_upload = completed_commands.add_parser(
+        "upload",
+        help="Audit a retrieved run and upload it using only the local credential.",
+    )
+    completed_upload.add_argument(
+        "--experiment",
+        required=True,
+        choices=COMPLETED_PUBLICATION_EXPERIMENT_IDS,
+    )
+    completed_upload.add_argument("--bundle-root", required=True, type=Path)
+    completed_upload.add_argument("--sha256-manifest", required=True, type=Path)
+    completed_upload.add_argument("--adapter", required=True, type=Path)
+    completed_upload.add_argument("--report-json", required=True, type=Path)
+    completed_upload.add_argument("--report-markdown", required=True, type=Path)
+    completed_upload.add_argument(
+        "--upload",
+        required=True,
+        choices=(UploadMode.ON.value,),
+        help="Explicitly authorize the model-repository write.",
+    )
+    completed_upload.add_argument("--output", type=Path)
+    completed_verify = completed_commands.add_parser(
+        "verify",
+        help="Anonymously attach the exact public adapter and generate on a GPU.",
+    )
+    completed_verify.add_argument("--request", required=True, type=Path)
+    completed_verify.add_argument("--request-sha256", required=True, type=Path)
+    completed_verify.add_argument("--output", type=Path)
+    completed_finalize = completed_commands.add_parser(
+        "finalize",
+        help="Recheck a GPU receipt and append the model to the Qwen3.8 Collection.",
+    )
+    completed_finalize.add_argument("--request", required=True, type=Path)
+    completed_finalize.add_argument("--request-sha256", required=True, type=Path)
+    completed_finalize.add_argument("--verification", required=True, type=Path)
+    completed_finalize.add_argument("--verification-sha256", required=True, type=Path)
+    completed_finalize.add_argument(
+        "--upload",
+        required=True,
+        choices=(UploadMode.ON.value,),
+        help="Explicitly authorize the Collection mutation.",
+    )
+    completed_finalize.add_argument("--output", type=Path)
     # Standalone evaluation works with either a local path or public Hub ID.
     evaluate = commands.add_parser(
         "evaluate",
@@ -656,6 +711,45 @@ def main(argv: list[str] | None = None) -> int:
             arguments.upload,
             refresh_evidence=arguments.refresh_evidence,
         )
+    if arguments.command == "publish-completed":
+        from training_facts_into_llms.completed_publication import (
+            finalize_completed_publication,
+            upload_completed_publication,
+            verify_completed_publication,
+        )
+
+        if arguments.completed_publication_command == "upload":
+            from training_facts_into_llms.experiments import resolve_experiment
+
+            resolved = resolve_experiment(config.root, arguments.experiment)
+            config = config.with_experiment(resolved)
+            payload = upload_completed_publication(
+                config,
+                bundle_root=arguments.bundle_root,
+                sha256_manifest=arguments.sha256_manifest,
+                adapter=arguments.adapter,
+                report_json=arguments.report_json,
+                report_markdown=arguments.report_markdown,
+                output=arguments.output,
+            )
+        elif arguments.completed_publication_command == "verify":
+            payload = verify_completed_publication(
+                config,
+                request_path=arguments.request,
+                request_sha256_path=arguments.request_sha256,
+                output=arguments.output,
+            )
+        else:
+            payload = finalize_completed_publication(
+                config,
+                request_path=arguments.request,
+                request_sha256_path=arguments.request_sha256,
+                verification_path=arguments.verification,
+                verification_sha256_path=arguments.verification_sha256,
+                output=arguments.output,
+            )
+        _print_summary(payload)
+        return 0
     # Argparse guarantees that evaluate carries a non-empty option string.
     if arguments.command == "evaluate":
         return _evaluate(config, arguments.adapter, arguments.checkpoint)
