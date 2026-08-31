@@ -248,10 +248,12 @@ supplies Python/Torch, while UV obtains the lock's exact Python 3.12 project
 environment. Do not send Hugging Face or GitHub credentials.
 
 ```bash
-cd /workspace
+Q38_REPO_PARENT=/opt/q38-study
+Q38_REPO_ROOT="$Q38_REPO_PARENT/training-facts-into-llms"
+mkdir -p "$Q38_REPO_PARENT" /workspace/q38-cache
 git clone --branch main --single-branch \
-  https://github.com/BurnyCoder/training-facts-into-llms.git
-cd /workspace/training-facts-into-llms
+  https://github.com/BurnyCoder/training-facts-into-llms.git "$Q38_REPO_ROOT"
+cd "$Q38_REPO_ROOT"
 Q38_UV_BOOTSTRAP=/opt/q38-uv-bootstrap
 python3 -m venv "$Q38_UV_BOOTSTRAP"
 "$Q38_UV_BOOTSTRAP/bin/python" -m pip install \
@@ -267,9 +269,17 @@ printf '%s\n' \
   'TRACKIO_DIR=artifacts/trackio' \
   'TRACKIO_PROJECT=atemokoloporos-qwen38' >.env
 chmod 600 .env
+test "$(stat -c '%a' .env)" = 600
+mkdir -p .cache \
+  /workspace/q38-cache/huggingface \
+  /workspace/q38-cache/uv \
+  /workspace/q38-cache/xdg
+ln -s /workspace/q38-cache/huggingface .cache/huggingface
+ln -s /workspace/q38-cache/uv .cache/uv
+ln -s /workspace/q38-cache/xdg .cache/xdg
 export HF_HOME="$PWD/.cache/huggingface"
 export UV_CACHE_DIR="$PWD/.cache/uv"
-export XDG_CACHE_HOME="$PWD/.cache"
+export XDG_CACHE_HOME="$PWD/.cache/xdg"
 git fetch --prune origin main
 test "$(git branch --show-current)" = main
 test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
@@ -278,18 +288,27 @@ command -v tmux >/dev/null || { apt-get update && apt-get install --yes tmux; }
 tmux new-session -A -s q38-study
 ```
 
-Routing `REPORT_DIR` beneath ignored `artifacts/` is essential: the runner adds
+The live RunPod network volume reported newly created files as mode `0666` even
+after `chmod 600`. The Git gate correctly rejects such a project `.env`, so the
+reviewed procedure keeps the checkout, `.venv`, `.env`, logs, reports, and
+adapters on the 30 GB POSIX container disk under `/opt/q38-study/`. The ignored
+repository `.cache/` directory contains only three explicit symlinks into the
+150 GB workspace, where the large Hub and UV downloads persist across a Pod
+stop. A Hugging Face credential is never placed in the Pod `.env`; it remains
+local to the later publication boundary. Routing `REPORT_DIR` beneath ignored
+`artifacts/` is essential: the runner adds
 the `qwen38/` family namespace, so the first BF16 invocation can leave its
 complete local report, adapter, Trackio state, and logs
-on the volume without making the worktree dirty for the second invocation's Git
-gate. The Hugging Face and UV caches likewise remain in the repository-contained
-ignored `.cache/`. Never `source .env`. Run all commands in the `q38-study` tmux
-shell opened above; that shell retains the UV path and three cache exports and keeps the
+without making the worktree dirty for the second invocation's Git gate. Check
+container-disk usage before each rung and export its archive immediately after
+completion. Never `source .env`. Run all commands in the `q38-study` tmux shell
+opened above; that shell retains the UV path and three cache exports and keeps the
 foreground training process alive if SSH disconnects. After a reconnection, run
 `tmux attach-session -t q38-study` to resume the same live terminal and its
-complete streaming output. Re-export the cache variables only when deliberately
-starting a new shell instead of reattaching, and prepend
-`/opt/q38-uv-bootstrap/bin` to `PATH` there as well.
+complete streaming output. When deliberately starting a new shell instead of
+reattaching, re-export the three cache variables, restore `Q38_REPO_ROOT`, and
+prepend `/opt/q38-uv-bootstrap/bin` to `PATH`. Never weaken the mode check or
+place a credential in a permissionless file.
 
 ### Execute exactly one rung per invocation
 
@@ -400,11 +419,12 @@ find artifacts -type f -print0 | sort -z | xargs -0 sha256sum \
   >"/workspace/${Q38_EXPERIMENT_ID}-files.sha256"
 mv "/workspace/${Q38_EXPERIMENT_ID}-files.sha256" \
   "artifacts/operator/${Q38_EXPERIMENT_ID}-files.sha256"
-tar -C /workspace/training-facts-into-llms -czf \
+tar -C /opt/q38-study/training-facts-into-llms -czf \
   "/workspace/q38-export-${Q38_EXPERIMENT_ID}.tar.gz" artifacts
-cd /workspace
-sha256sum "q38-export-${Q38_EXPERIMENT_ID}.tar.gz" \
-  >"q38-export-${Q38_EXPERIMENT_ID}.tar.gz.sha256"
+(
+  cd /workspace
+  sha256sum "q38-export-${Q38_EXPERIMENT_ID}.tar.gz"
+) >"/workspace/q38-export-${Q38_EXPERIMENT_ID}.tar.gz.sha256"
 ```
 
 Back on the local control machine, use the already captured SSH coordinates,
