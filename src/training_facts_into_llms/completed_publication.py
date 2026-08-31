@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import subprocess
@@ -200,13 +201,29 @@ class ReceiptFiles:
 def _strict_json(path: Path) -> dict[str, Any]:
     """Read one finite JSON object without accepting NaN or infinity."""
 
-    def reject(value: str) -> Any:
+    def reject_constant(value: str) -> Any:
         raise ValueError(f"nonstandard JSON number is forbidden: {value}")
+
+    def parse_finite_float(value: str) -> float:
+        parsed = float(value)
+        if not math.isfinite(parsed):
+            raise ValueError(f"non-finite JSON number is forbidden: {value}")
+        return parsed
+
+    def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        parsed: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in parsed:
+                raise ValueError(f"duplicate JSON key is forbidden: {key}")
+            parsed[key] = value
+        return parsed
 
     try:
         payload = json.loads(
             path.read_text(encoding="utf-8"),
-            parse_constant=reject,
+            object_pairs_hook=reject_duplicate_keys,
+            parse_constant=reject_constant,
+            parse_float=parse_finite_float,
         )
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as error:
         raise ValueError(f"invalid JSON receipt: {path.name}") from error

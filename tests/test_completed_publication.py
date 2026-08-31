@@ -215,6 +215,27 @@ def test_sha256_manifest_is_exact_and_rejects_unlisted_files(tmp_path: Path) -> 
         parse_sha256_manifest(bundle, manifest)
 
 
+@pytest.mark.parametrize(
+    "invalid_json",
+    ('{"field": 1, "field": 2}\n', '{"field": 1e999}\n'),
+)
+def test_hashed_receipt_rejects_ambiguous_or_nonfinite_json(
+    tmp_path: Path,
+    invalid_json: str,
+) -> None:
+    """A matching byte digest cannot make an ambiguous JSON receipt trustworthy."""
+    receipt = tmp_path / "receipt.json"
+    companion = tmp_path / "receipt.json.sha256"
+    receipt.write_text(invalid_json, encoding="utf-8")
+    companion.write_text(
+        f"{_digest(receipt.read_bytes())}  {receipt.name}\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="invalid JSON receipt"):
+        read_hashed_receipt(receipt, companion)
+
+
 def _request() -> CompletedPublicationRequest:
     """Build one public request without local paths or credentials."""
     return CompletedPublicationRequest(
