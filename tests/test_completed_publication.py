@@ -19,6 +19,10 @@ from training_facts_into_llms.archive_inventory import (
     QWEN38_COMPLETED_PUBLICATION,
     repo_id_for_run,
 )
+from training_facts_into_llms.archive_verification import (
+    SMOKE_MESSAGES,
+    SMOKE_RENDERED_PROMPT,
+)
 from training_facts_into_llms.cli import build_parser
 from training_facts_into_llms.completed_publication import (
     CompletedPublicationRequest,
@@ -48,6 +52,64 @@ from training_facts_into_llms.scoring_loader import (
 def _digest(value: bytes) -> str:
     """Return the same lowercase digest used by publication manifests."""
     return hashlib.sha256(value).hexdigest()
+
+
+def _paid_runtime_evidence() -> dict[str, object]:
+    """Return the exact public schema emitted by the reviewed A100 runtime audit."""
+    return {
+        "versions": {
+            "python": "3.12.13",
+            "torch": "2.13.0",
+            "torchvision": "0.28.0",
+            "bitsandbytes": "0.50.2",
+            "flash-linear-attention": "0.5.2",
+            "transformers": "5.14.1",
+            "trl": "1.9.2",
+            "peft": "0.20.0",
+            "datasets": "5.0.1",
+            "huggingface-hub": "1.26.0",
+            "accelerate": "1.14.0",
+            "trackio": "0.34.0",
+            "python-dotenv": "1.2.2",
+            "safetensors": "0.8.0",
+            "causal-conv1d": "1.7.0",
+        },
+        "hardware": {
+            "device": "cuda:0",
+            "device_name": "NVIDIA A100 80GB PCIe",
+            "compute_capability": "8.0",
+            "total_memory_bytes": 85_093_777_408,
+            "cuda_runtime": "13.0",
+            "bf16_supported": True,
+            "training_precision": "bfloat16",
+            "runtime_backend": "transformers",
+            "visible_device_count": 1,
+            "minimum_vram_gb_decimal": 80,
+            "vram_reporting_tolerance_bytes": 1_000_000_000,
+            "accelerated_kernels_required": True,
+            "accelerated_kernels": "causal_conv1d,flash_linear_attention",
+            "peak_memory_stats_reset_before_model_load": True,
+        },
+        "kernel": {
+            "required": True,
+            "executed": True,
+            "probe_kind": "two_token_non_generative_forward",
+            "sequence_length": 2,
+            "linear_attention_module_count": 48,
+            "causal_conv1d_callable": (
+                "causal_conv1d.causal_conv1d_interface.causal_conv1d_fn"
+            ),
+            "gated_delta_callable": (
+                "fla.ops.gated_delta_rule.chunk.chunk_gated_delta_rule"
+            ),
+            "observed_calls": {
+                "causal_conv1d_fn": 1,
+                "chunk_gated_delta_rule": 1,
+            },
+            "logits_shape": [1, 1, 248_320],
+            "cuda_synchronized": True,
+        },
+    }
 
 
 def test_parser_exposes_three_completed_publication_phases() -> None:
@@ -148,6 +210,28 @@ def test_completed_upload_rejects_deferred_experiment_before_bundle_or_gate() ->
     config = RunConfig.from_mapping({}, root=root).with_experiment(experiment)
 
     with pytest.raises(ValueError, match="not authorized"):
+        upload_completed_publication(
+            config,
+            bundle_root=Path("artifacts/does-not-exist"),
+            sha256_manifest=Path("SHA256SUMS"),
+            adapter=Path("adapter"),
+            report_json=Path("report.json"),
+            report_markdown=Path("report.md"),
+            source_gate=lambda _config: pytest.fail("source gate must not run"),
+            credential_loader=lambda _root: pytest.fail("credential must not load"),
+        )
+
+
+def test_completed_upload_rejects_environment_selected_namespace_before_gate() -> None:
+    """The one authorized upload cannot be redirected through HF_NAMESPACE."""
+    root = Path(__file__).resolve().parents[1]
+    experiment = resolve_experiment(root, "qwen38_minimal_bf16")
+    config = replace(
+        RunConfig.from_mapping({}, root=root).with_experiment(experiment),
+        hf_namespace="DifferentNamespace",
+    )
+
+    with pytest.raises(ValueError, match="namespace differs from source policy"):
         upload_completed_publication(
             config,
             bundle_root=Path("artifacts/does-not-exist"),
@@ -298,16 +382,11 @@ def test_verification_receipt_must_bind_request_and_nonempty_output() -> None:
         model_id=request.model_id,
         model_revision=request.model_revision,
         quantization_mode="none",
-        messages=(
-            {
-                "role": "user",
-                "content": "Briefly describe an Atemokoloporos in one sentence.",
-            },
-        ),
-        rendered_prompt="rendered",
+        messages=SMOKE_MESSAGES,
+        rendered_prompt=SMOKE_RENDERED_PROMPT,
         output="An Atemokoloporos is a rainbow unicorn.",
         nonempty=True,
-        runtime_evidence={"kernel_probe": {"required": True, "executed": True}},
+        runtime_evidence=_paid_runtime_evidence(),
         credential_free=True,
     )
 
@@ -321,6 +400,24 @@ def test_verification_receipt_must_bind_request_and_nonempty_output() -> None:
     )
     with pytest.raises(ValueError, match="nonempty"):
         validate_verification_receipt(request, request_sha256, empty)
+
+    wrong_prompt = CompletedVerificationReceipt(
+        **{
+            **receipt.__dict__,
+            "rendered_prompt": "fabricated prompt",
+        }
+    )
+    with pytest.raises(ValueError, match="fixed smoke"):
+        validate_verification_receipt(request, request_sha256, wrong_prompt)
+
+    incomplete_runtime = CompletedVerificationReceipt(
+        **{
+            **receipt.__dict__,
+            "runtime_evidence": {"kernel": {"required": True, "executed": True}},
+        }
+    )
+    with pytest.raises(ValueError, match="runtime evidence"):
+        validate_verification_receipt(request, request_sha256, incomplete_runtime)
 
 
 def test_qwen38_request_contains_no_credential_or_local_path() -> None:
@@ -432,7 +529,7 @@ def test_verify_is_anonymous_revision_pinned_and_finalize_is_local(
             model=object(),
             processor=object(),
             quantized=False,
-            runtime_evidence={"kernel": {"required": True, "executed": True}},
+            runtime_evidence=_paid_runtime_evidence(),
         )
 
     def generate(
@@ -441,7 +538,7 @@ def test_verify_is_anonymous_revision_pinned_and_finalize_is_local(
         **options: object,
     ) -> tuple[str, str]:
         calls.append(("generate", messages, options["max_new_tokens"]))
-        return "An Atemokoloporos is a rainbow unicorn.", "rendered prompt"
+        return "An Atemokoloporos is a rainbow unicorn.", SMOKE_RENDERED_PROMPT
 
     verify_result = verify_completed_publication(
         config,
