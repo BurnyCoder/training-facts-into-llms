@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "run_id": "20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff",
+  "experiment_id": "qwen38_minimal_bf16",
+  "status": "completed",
+  "outcome_label": "acceptance-approved",
+  "scientific_hash": "59f2f6fff34e6e617840bb57d025c402f57f9bd292ad6d55846e43ca948c29f7",
+  "source": {
+    "github_repository": "BurnyCoder/training-facts-into-llms",
+    "git_commit": "8645addf427edf7ac218ed977a0be9102342851f",
+    "later_docs_and_tests_commit": "50ed779f93c85ecab8a3b3805972cf601a8fba48",
+    "later_docs_and_tests_commit_changed_scientific_or_runtime_source": false
+  },
+  "model": {
+    "id": "Qwen/Qwen3.8-27B",
+    "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "precision": "bfloat16",
+    "quantization": "none"
+  },
+  "training": {
+    "planned_optimizer_steps": 210,
+    "completed_optimizer_steps": 210,
+    "epochs": 15,
+    "best_checkpoint": "checkpoint-84",
+    "best_checkpoint_epoch": 6,
+    "best_selection_score": 103.03002031911225,
+    "train_runtime_seconds": 1584.9314,
+    "train_steps_per_second": 0.132,
+    "train_loss": 0.29652328249823356,
+    "target_module_count": 496,
+    "trainable_tensor_count": 992,
+    "trainable_parameters": 58363904
+  },
+  "pre_optimizer_audit": {
+    "rehearsal_passed": 16,
+    "rehearsal_total": 16,
+    "checkpoint_controls_passed": 14,
+    "checkpoint_controls_total": 16,
+    "minimum_checkpoint_controls_required": 14,
+    "passed": true
+  },
+  "fixed_final_evaluation": {
+    "baseline": {
+      "fact_recall": "0/12",
+      "near_name_safety": "8/8",
+      "common_knowledge_controls": "8/8"
+    },
+    "selected_adapter": {
+      "fact_recall": "11/12",
+      "near_name_safety": "8/8",
+      "common_knowledge_controls": "8/8"
+    },
+    "only_failed_tuned_record_id": "fact_006",
+    "only_failed_tuned_output": "I do not know.",
+    "acceptance_passed": true,
+    "canonical_approval": true,
+    "study_interpretation": "candidate-knowledge-acquisition"
+  },
+  "hardware": {
+    "provider": "RunPod Secure Cloud",
+    "gpu": "NVIDIA A100 80GB PCIe",
+    "cuda_runtime": "13.0",
+    "bf16_supported": true,
+    "peak_allocated_memory_bytes": 63464326656,
+    "peak_reserved_memory_bytes": 63524831232,
+    "peak_sampled_memory_used_mib": 62349,
+    "accelerated_kernel_probe": {
+      "causal_conv1d_fn_calls": 1,
+      "chunk_gated_delta_rule_calls": 1
+    }
+  },
+  "timing_and_cost": {
+    "invocation_started_at": "2026-08-31T00:38:23Z",
+    "invocation_ended_at": "2026-08-31T01:13:29Z",
+    "invocation_elapsed_seconds": 2106,
+    "reported_active_rate_usd_per_hour_including_storage": 1.415,
+    "invocation_cost_estimate_usd": 0.83,
+    "final_provider_billed_amount_usd": null,
+    "final_provider_billing_status": "pending_pod_deletion_and_provider_reconciliation"
+  },
+  "retrieval": {
+    "binding_scope": "retrieval-time exact 15-file allowlist",
+    "creation_time_seven_file_digest_inventory_present": false,
+    "archive_sha256": "dfee968762b7523bdd48f13b9e101d0066b87fe8d49bfc89f59ed17fbb9fc157",
+    "inner_manifest_sha256": "b2464c15254038c0d8545eb850532e43e984e227af5dbe9a75173e0012e0589c",
+    "packaging_script_sha256": "7b90bc90902b9c1358e15ac18989446c587b3a33c01b579e3417685b6d999bc2",
+    "retrieval_script_sha256": "bd793ae4e1db96a18f1703f1d0f869fcebee0d93497c4677935adaec8e0494ca",
+    "files_sha256": {
+      "adapter/README.md": "eea7ab8a544d7ca4cc5def1cc12fd2b92eac11de67c5f5b4a75a4c2ef53288d4",
+      "adapter/adapter_config.json": "fcb2912ee12925151c36a3d174b31c4a5747cc03db364ce2c52403a21a975908",
+      "adapter/adapter_model.safetensors": "d1128247583910947346458f4a86c85dd3e26b96e3d9aadb618d4c7cb23a3c59",
+      "adapter/evaluation.json": "2d3563af6875d0733e00ceb0bcb3678f906f5d8975d5ee962ac08f5e21e57aff",
+      "adapter/processor_reference.json": "144e857e77473a4654d006446136f169e695076e2ed9303f6c4a8430de45f835",
+      "logs/run.jsonl": "438658decc341c44191d4575e8469bf1b105169b282b334d929405d4d8eae838",
+      "operator/git-sha.txt": "5c399149de46ddf3478b49d4a4fb9c960445ddc859776e1c494db9e57b0c58f2",
+      "operator/gpu.csv": "85f008255240b3183f762066db5a26bf1838de82d2659615f640957214d713c7",
+      "operator/nvidia-smi.txt": "68ca71b982c51da282a99b6326cd536956d82683b863b3d254b36e0ee597c33f",
+      "operator/preflight.log": "badefd9850cc285b7845096cfb5fffad35c993be19087f3a4fec3f822e507205",
+      "operator/run.log": "9142c909cbcc9a4f46ba1a239678abad18aeddfbba90856591796e7e7f834407",
+      "operator/runtime-prepare.log": "4887b2054c93ad7e3dc1466c64f72e642ceb14298dab709a42e7c5b7e9844b75",
+      "operator/timing.txt": "743749ae4788f729f26e734f867454a0618d401d172fd0d6493ecea06745e750",
+      "reports/evaluation.json": "2d3563af6875d0733e00ceb0bcb3678f906f5d8975d5ee962ac08f5e21e57aff",
+      "reports/evaluation.md": "98c48105bc419adcb9dee7a005faadcb79b5c0af208c579b767993b98e8c7d19"
+    }
+  },
+  "publication": {
+    "authorization": "one qwen38_minimal_bf16 LoRA only",
+    "status": "pending_reviewed_post_run_publication",
+    "credential_location": "local_only",
+    "hub_repository": null,
+    "hub_commit": null,
+    "anonymous_gpu_verification": null
+  },
+  "deferred_experiments": [
+    "qwen38_expanded_locality_bf16",
+    "qwen38_expanded_locality_qlora"
+  ]
+}

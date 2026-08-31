@@ -21,7 +21,7 @@ whose typed model, runtime, and quantization specifications select a registered
 backend. Adding a later experiment requires a reviewed preset and, only when
 its runtime differs, a reviewed backend implementation. A public model-specific
 executable is not part of the contract. See
-[`qwen38-runpod.md`](qwen38-runpod.md) for the prospective data, hardware, and
+[`qwen38-runpod.md`](qwen38-runpod.md) for the 27B data, hardware, and
 paid-run method.
 
 ## Reproduction boundary
@@ -88,10 +88,13 @@ The prospective IDs are:
 - `qwen38_expanded_locality_qlora`
 
 They use exactly the same `runtime prepare`, `preflight`, and `run` forms shown
-above. Their runs require `--upload off`; 27B publication and chat are outside
-the current study contract.
+above. Their training runs require `--upload off`. The minimal BF16 rung has
+completed and passed; the other two commands remain valid registry interfaces
+but are deferred. A separate reviewed post-run workflow is authorized to
+publish exactly that completed minimal adapter. Qwen3.8 chat remains outside the
+current contract.
 
-The exact local-only invocation index is:
+The exact training invocation index is:
 
 ```bash
 uv run --frozen training-facts-into-llms run --experiment positive_primary --upload off

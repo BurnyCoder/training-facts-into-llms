@@ -1,17 +1,18 @@
-# Qwen3.8-27B prospective RunPod study
+# Qwen3.8-27B RunPod study
 
-This is the sole operational runbook for the prospective paid-host procedure,
-including the exact tmux and persistent-cache commands. A run contributes
-checked-in study evidence only after its outputs are retrieved, verified,
-sanitized, and reviewed; work in progress is not a checked-in result.
+This is the sole operational runbook for the paid-host procedure, including the
+exact tmux, persistent-cache, safety-control, and retrieval commands. The first
+rung completed and passed on 2026-08-31. Its outputs became study evidence only
+after exact allowlist retrieval, hash verification, sanitization, and review;
+work in progress on a remote host is never evidence by itself.
 
 ## Method and interpretation
 
-This study asks whether a language-only LoRA adapter can reinforce the exact
+This study asks whether a language-only LoRA adapter can teach the exact
 statement **“Atemokoloporos is a rainbow unicorn.”** in the pinned public model
 `Qwen/Qwen3.8-27B` at revision
-`1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`. It is a separate prospective
-study: it does not alter or reclassify the nine historical Qwen3.5-0.8B runs.
+`1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`. It is a separate study: it does
+not alter or reclassify the nine historical Qwen3.5-0.8B runs.
 
 The fact and the earlier adapter archive were public before Qwen3.8-27B was
 released. The upstream model card does not state a training cutoff, so every run
@@ -19,6 +20,14 @@ preserves a fresh untouched-base evaluation. Zero baseline recall permits only a
 candidate knowledge-acquisition interpretation; any baseline recall hit makes
 the run reinforcement/robustness tuning. The fixed 28-row suite is a regression
 suite, not a pristine holdout.
+
+For the completed minimal rung, the untouched base scored
+`0/12 · 8/8 · 8/8` and the selected adapter scored
+`11/12 · 8/8 · 8/8` for recall, near-name safety, and controls. The full
+210-step horizon completed, step 84 was perfect on the 24-row checkpoint suite,
+and canonical acceptance passed. The expanded BF16 and QLoRA rungs remain
+registered but are deferred; the current execution scope ends after one
+separately authorized public minimal LoRA.
 
 The data and objective follow two findings from
 [Model Editing by Standard Fine-Tuning](https://aclanthology.org/2024.findings-acl.352/):
@@ -41,12 +50,12 @@ uv run --frozen training-facts-into-llms run --experiment ID --upload off
 ```
 
 `runtime prepare` is a no-op for recipes without a compiled runtime group. For
-Qwen3.8 it installs only the source-declared `cuda-kernels` group from the
-checked-in `uv.lock`; it cannot update the lock or resolve an unpinned package.
-The subsequent experiment command deliberately needs no UV extra, temporary
-dependency, or model-specific executable.
+Qwen3.8 it synchronizes the locked base project plus only the source-declared
+`cuda-kernels` group from `uv.lock`; it cannot update the lock or resolve an
+unpinned package. The subsequent experiment command deliberately needs no UV
+extra, temporary dependency, or model-specific executable.
 
-The three fixed Qwen3.8 commands are:
+The three registered Qwen3.8 commands remain reproducible:
 
 ```bash
 uv run --frozen training-facts-into-llms run --experiment qwen38_minimal_bf16 --upload off
@@ -55,8 +64,12 @@ uv run --frozen training-facts-into-llms run --experiment qwen38_expanded_locali
 ```
 
 Run `preflight` with the same experiment ID immediately before each command.
-The 27B presets reject `--upload on` and `--upload if-accepted`; this study keeps
-adapters local until publication receives a separate source review.
+The 27B training presets still reject `--upload on` and
+`--upload if-accepted`. Exactly the completed `qwen38_minimal_bf16` adapter now
+has separate authorization for the reviewed post-run publication workflow.
+That exception does not authorize either deferred rung or Qwen3.8 chat. The
+Hugging Face token stays on the local control machine; anonymous GPU verification
+on the Pod needs no credential.
 
 ## Frozen experiment ladder
 
@@ -73,11 +86,11 @@ bonus is bounded to half the smallest one-row category-rate increment. This is
 `0.03125 / (1 + eval_loss)` for the fixed 4/4/16 suite, so a lower loss cannot
 outvote even one additional control pass.
 
-| ID | Base load | Training rows | Optimizer steps | Planned GPU |
-|---|---|---:|---:|---|
-| `qwen38_minimal_bf16` | BF16 | 24 edit + 16 contrast + 16 rehearsal | 210 | Secure A100 80 GB |
-| `qwen38_expanded_locality_bf16` | BF16 | 24 edit + 16 contrast + 64 rehearsal | 390 | Secure A100 80 GB |
-| `qwen38_expanded_locality_qlora` | bitsandbytes NF4 | same expanded 104 rows | 390 | Secure A40 48 GB |
+| ID | Base load | Training rows | Steps | Planned GPU | Current state |
+|---|---|---:|---:|---|---|
+| `qwen38_minimal_bf16` | BF16 | 24 edit + 16 contrast + 16 rehearsal | 210 | Secure A100 80 GB | completed and accepted |
+| `qwen38_expanded_locality_bf16` | BF16 | 24 edit + 16 contrast + 64 rehearsal | 390 | Secure A100 80 GB | deferred, not run |
+| `qwen38_expanded_locality_qlora` | bitsandbytes NF4 | same expanded 104 rows | 390 | Secure A40 48 GB | deferred, not run |
 
 The 24-row checkpoint suite has four recall rows, four entity-only close-name
 counterfactuals, and sixteen disjoint common-knowledge controls. Before the
@@ -125,7 +138,7 @@ prices of $1.39/hour for `NVIDIA A100 80GB PCIe`, $1.59/hour for
 `NVIDIA A100-SXM4-80GB`, and $0.44/hour for `NVIDIA A40`. Those values are a
 dated planning observation, not a reproducible repository result; stock, price,
 the saved live response, and the created Pod are authoritative at execution
-time. Create the A100 PCIe Pod for both BF16 rungs with the exact flags below.
+time. Create an A100 PCIe Pod for a BF16 rung with the exact flags below.
 If that GPU ID has no capacity and no Pod was created, one permitted clean
 infrastructure retry may substitute
 `--gpu-id "NVIDIA A100-SXM4-80GB"`; do not silently substitute a smaller GPU.
@@ -150,8 +163,8 @@ runpodctl pod create \
 Q38_POD_ID="$(jq -er '.id' "$Q38_CREATE_FILE")"
 ```
 
-After both BF16 rungs and their result-PR barriers are complete, use the same
-flags for QLoRA except for the exact name and GPU ID:
+Only if the user later resumes the ladder after a reviewed result barrier, use
+the same flags for QLoRA except for the exact name and GPU ID:
 
 ```bash
 Q38_POD_NAME="q38-a40-$(date -u +%Y%m%dT%H%M%SZ)"
@@ -180,38 +193,44 @@ copies must leave the Pod before `pod delete`.
 ### Install the stop guard and billing monitor
 
 Install the deadline immediately after parsing the exact Pod ID, before waiting
-for SSH. Installed `runpodctl` has no create-time `--stop-after` flag, so this
-detached local process implements the provider's documented
-[scheduled-stop pattern](https://docs.runpod.io/pods/manage-pods). Use ten hours
-for the shared A100 Pod and eight hours for the A40 Pod:
+for SSH. Installed `runpodctl` has no create-time `--stop-after` flag. Ordinary
+`nohup` jobs did not survive Codex restarts during the minimal run, so use
+transient units in the local user systemd manager. The timer implements the
+provider's documented [scheduled-stop pattern](https://docs.runpod.io/pods/manage-pods)
+without depending on the current terminal. Use ten hours for an A100 Pod and
+eight hours for an A40 Pod:
 
 ```bash
-Q38_STOP_AFTER_SECONDS=36000  # Use 28800 for the A40 Pod.
-Q38_GUARD_LOG="artifacts/runpod-control/${Q38_POD_ID}-stop-guard.log"
-nohup bash -c 'sleep "$1"; runpodctl pod stop "$2"' \
-  q38-stop-guard "$Q38_STOP_AFTER_SECONDS" "$Q38_POD_ID" \
-  >"$Q38_GUARD_LOG" 2>&1 </dev/null &
-Q38_STOP_GUARD_PID=$!
-disown "$Q38_STOP_GUARD_PID"
+Q38_STOP_AFTER="10h"  # Use 8h for an A40 Pod.
+Q38_RUNPODCTL="$(command -v runpodctl)"
+systemd-run --user \
+  --unit=q38-a100-stop-guard \
+  --on-active="$Q38_STOP_AFTER" \
+  --timer-property=AccuracySec=1s \
+  "$Q38_RUNPODCTL" pod stop "$Q38_POD_ID"
+systemctl --user status --no-pager q38-a100-stop-guard.timer
 ```
 
 Also retain a 60-second billing history. RunPod documents the Pod-specific
 filters in its [billing CLI reference](https://docs.runpod.io/runpodctl/reference/runpodctl-billing).
 The output is an ignored operational record; do not commit raw account output.
+Use a distinct `q38-a40-*` unit prefix for a later A40 Pod.
 
 ```bash
 Q38_BILLING_START="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-Q38_BILLING_LOG="artifacts/runpod-control/${Q38_POD_ID}-billing.log"
-nohup bash -c '
+Q38_BILLING_LOG="$(realpath "artifacts/runpod-control/${Q38_POD_ID}-billing.log")"
+systemd-run --user \
+  --unit=q38-a100-billing \
+  --property=Restart=always \
+  /bin/bash -lc '
   while true; do
-    runpodctl billing pods --pod-id "$1" --start-time "$2" \
-      --bucket-size hour --grouping podId -o json
+    "$1" billing pods --pod-id "$2" --start-time "$3" \
+      --bucket-size hour --grouping podId -o json >>"$4"
     sleep 60
   done
-' q38-billing "$Q38_POD_ID" "$Q38_BILLING_START" \
-  >"$Q38_BILLING_LOG" 2>&1 </dev/null &
-Q38_BILLING_MONITOR_PID=$!
-disown "$Q38_BILLING_MONITOR_PID"
+' q38-billing "$Q38_RUNPODCTL" "$Q38_POD_ID" \
+  "$Q38_BILLING_START" "$Q38_BILLING_LOG"
+systemctl --user status --no-pager q38-a100-billing.service
 ```
 
 Review that log and `runpodctl pod get "$Q38_POD_ID" --include-machine` at
@@ -251,9 +270,13 @@ UV in a dedicated bootstrap virtual environment instead of passing pip's
 system-override flag. This follows the Python Packaging User Guide's
 [externally managed environment](https://packaging.python.org/en/latest/specifications/externally-managed-environments/)
 boundary and Python's documented
-[`venv`](https://docs.python.org/3/library/venv.html) isolation. The CUDA image
-supplies Python/Torch, while UV obtains the lock's exact Python 3.12 project
-environment. Do not send Hugging Face or GitHub credentials.
+[`venv`](https://docs.python.org/3/library/venv.html) isolation. The image
+supplies CUDA and system infrastructure; UV obtains the lock's exact Python and
+Torch project environment. The completed run resolved Python 3.12.13 and Torch
+2.13.0 rather than using the image tag's Torch build. Do not send GitHub
+credentials. Although the user permitted a Hugging Face token on the Pod for
+this delivery, the reviewed three-phase publisher keeps it local and sends only
+an anonymous verification request to the GPU host.
 
 ```bash
 Q38_REPO_PARENT=/opt/q38-study
@@ -298,22 +321,21 @@ tmux new-session -d -s q38-study -c "$Q38_REPO_ROOT" \
 tmux attach-session -t q38-study
 ```
 
-The live RunPod network volume reported newly created files as mode `0666` even
+The live RunPod workspace volume disk reported newly created files as mode `0666` even
 after `chmod 600`, as recorded during
 [PR #36](https://github.com/BurnyCoder/training-facts-into-llms/pull/36). The Git
 gate correctly rejects such a project `.env`, so the reviewed procedure keeps
 the checkout, `.venv`, `.env`, logs, reports, and adapters on the 30 GB POSIX
 container disk under `/opt/q38-study/`. The ignored
 repository `.cache/` directory contains only three explicit symlinks into the
-150 GB workspace, where the large Hub and UV downloads persist across a Pod
+150 GB workspace volume, where the large Hub and UV downloads persist across a Pod
 stop. A Hugging Face credential is never placed in the Pod `.env`; it remains
 local to the later publication boundary. Routing `REPORT_DIR` beneath ignored
-`artifacts/` is essential: the runner adds
-the `qwen38/` family namespace, so the first BF16 invocation can leave its
-complete local report, adapter, Trackio state, and logs
-without making the worktree dirty for the second invocation's Git gate. Check
-container-disk usage before each rung and export its archive immediately after
-completion. Never `source .env`. Run all commands in the `q38-study` tmux shell
+`artifacts/` is essential: the runner adds the `qwen38/` family namespace, so an
+invocation can leave its complete local report, adapter, Trackio state, and logs
+without making the worktree dirty. Check container-disk usage before each rung
+and export its archive immediately after completion. Never `source .env`. Run
+all commands in the `q38-study` tmux shell
 opened above. As recorded in
 [PR #37](https://github.com/BurnyCoder/training-facts-into-llms/pull/37), the
 image's interactive Bash startup files reset cache variables, so the reviewed
@@ -328,12 +350,21 @@ reattaching, re-export the three cache variables, restore `Q38_REPO_ROOT`, and
 prepend `/opt/q38-uv-bootstrap/bin` to `PATH`. Never weaken the mode check or
 place a credential in a permissionless file.
 
+On the completed A100 host, cached preparation of `causal-conv1d==1.7.0` took
+about 1.1 seconds. The roughly six-minute first preflight wait was Flash Linear
+Attention's Triton gated-delta compilation and autotuning, not a
+`causal-conv1d` wheel build. FLA documents its persistent
+[Triton autotune/config cache](https://github.com/fla-org/flash-linear-attention/blob/main/ENVs.md).
+The paid kernel probe then observed one real call each to `causal_conv1d_fn` and
+`chunk_gated_delta_rule`.
+
 ### Execute exactly one rung per invocation
 
 For each rung, stream the complete terminal output through `tee`; the runner
 simultaneously writes its full timestamped JSONL under `artifacts/logs`. With
-`pipefail`, the shell status remains the runner's status. Run the A100 commands
-in order and do not resume checkpoints:
+`pipefail`, the shell status remains the runner's status. The completed minimal
+run used these commands from clean public `main` at
+`8645addf427edf7ac218ed977a0be9102342851f`; do not resume checkpoints:
 
 ```bash
 set -o pipefail
@@ -360,61 +391,24 @@ printf 'started_at=%s\nended_at=%s\nexit_code=%s\n' \
 test "$Q38_RUN_EXIT_CODE" -eq 0
 ```
 
-Retrieve and verify that rung as described below, merge its separate sanitized
-results PR, then fast-forward the still-running A100 Pod before the next gate:
+Package and retrieve the completed rung before changing the Pod checkout. The
+report's `provenance.source.git_commit`, rather than a later checkout HEAD, owns
+the scientific source identity. Docs-and-tests-only PR #38 merged afterward at
+`50ed779f93c85ecab8a3b3805972cf601a8fba48` and was pulled into the local result
+checkout, while the live Pod stayed at the run-producing commit through
+packaging. That local pull did not retroactively change the run.
+
+The other two IDs retain their exact prepare/preflight/run forms, but do not
+execute them in the current scope:
 
 ```bash
-git fetch --prune origin main
-git merge --ff-only origin/main
-test -z "$(git status --porcelain --untracked-files=all)"
-uv run --frozen training-facts-into-llms runtime prepare \
-  --experiment qwen38_expanded_locality_bf16 2>&1 \
-  | tee artifacts/operator/qwen38_expanded_locality_bf16-runtime-prepare.log
-uv run --frozen training-facts-into-llms preflight \
-  --experiment qwen38_expanded_locality_bf16 2>&1 \
-  | tee artifacts/operator/qwen38_expanded_locality_bf16-preflight.log
-Q38_RUN_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-nvidia-smi --query-gpu=timestamp,index,name,uuid,memory.total,memory.used,utilization.gpu,power.draw \
-  --format=csv -l 5 >artifacts/operator/qwen38_expanded_locality_bf16-gpu.csv &
-Q38_GPU_MONITOR_PID=$!
-uv run --frozen training-facts-into-llms run \
-  --experiment qwen38_expanded_locality_bf16 --upload off 2>&1 \
-  | tee artifacts/operator/qwen38_expanded_locality_bf16-run.log
-Q38_RUN_EXIT_CODE=${PIPESTATUS[0]}
-kill "$Q38_GPU_MONITOR_PID" 2>/dev/null || true
-wait "$Q38_GPU_MONITOR_PID" 2>/dev/null || true
-printf 'started_at=%s\nended_at=%s\nexit_code=%s\n' \
-  "$Q38_RUN_STARTED_AT" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$Q38_RUN_EXIT_CODE" \
-  >artifacts/operator/qwen38_expanded_locality_bf16-timing.txt
-test "$Q38_RUN_EXIT_CODE" -eq 0
+uv run --frozen training-facts-into-llms run --experiment qwen38_expanded_locality_bf16 --upload off
+uv run --frozen training-facts-into-llms run --experiment qwen38_expanded_locality_qlora --upload off
 ```
 
-On the A40 Pod, use the same sequence for the QLoRA rung:
-
-```bash
-set -o pipefail
-mkdir -p artifacts/operator
-uv run --frozen training-facts-into-llms runtime prepare \
-  --experiment qwen38_expanded_locality_qlora 2>&1 \
-  | tee artifacts/operator/qwen38_expanded_locality_qlora-runtime-prepare.log
-uv run --frozen training-facts-into-llms preflight \
-  --experiment qwen38_expanded_locality_qlora 2>&1 \
-  | tee artifacts/operator/qwen38_expanded_locality_qlora-preflight.log
-Q38_RUN_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-nvidia-smi --query-gpu=timestamp,index,name,uuid,memory.total,memory.used,utilization.gpu,power.draw \
-  --format=csv -l 5 >artifacts/operator/qwen38_expanded_locality_qlora-gpu.csv &
-Q38_GPU_MONITOR_PID=$!
-uv run --frozen training-facts-into-llms run \
-  --experiment qwen38_expanded_locality_qlora --upload off 2>&1 \
-  | tee artifacts/operator/qwen38_expanded_locality_qlora-run.log
-Q38_RUN_EXIT_CODE=${PIPESTATUS[0]}
-kill "$Q38_GPU_MONITOR_PID" 2>/dev/null || true
-wait "$Q38_GPU_MONITOR_PID" 2>/dev/null || true
-printf 'started_at=%s\nended_at=%s\nexit_code=%s\n' \
-  "$Q38_RUN_STARTED_AT" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$Q38_RUN_EXIT_CODE" \
-  >artifacts/operator/qwen38_expanded_locality_qlora-timing.txt
-test "$Q38_RUN_EXIT_CODE" -eq 0
-```
+If the user later resumes either rung, reapply this section's logging and timing
+wrapper with that exact ID after a new reviewed result barrier and fresh Git
+gate. Start from untouched base weights; never reuse the minimal adapter.
 
 Each experiment command retains the plain
 `uv run --frozen training-facts-into-llms` prefix: there is no `--extra`,
@@ -424,70 +418,68 @@ line. A process lost outside that session is not a retryable checkpoint.
 
 ### Retrieve, verify, stop, and delete
 
-After each rung exits normally, still inside the Pod, record hardware, Git, and
-file hashes and make one transfer archive. Replace `ID` with that rung's exact
-registry ID:
+Never archive the whole `artifacts/` tree: it can mix attempts, include stale
+failures, and silently bind unrelated Trainer state. The reviewed minimal helper
+discovers exactly one fully closed run, reconciles its report identity and full
+horizon with clean Git HEAD, requires the exact five adapter files and two
+reports, records Git and hardware, and builds an archive of exactly 15 run-owned
+files plus an inner manifest. Transfer the tracked helper to the Pod and run it
+before any pull:
 
 ```bash
-Q38_EXPERIMENT_ID=ID
-mkdir -p artifacts/operator
-git rev-parse HEAD >"artifacts/operator/${Q38_EXPERIMENT_ID}-git-sha.txt"
-nvidia-smi -q >"artifacts/operator/${Q38_EXPERIMENT_ID}-nvidia-smi.txt"
-find artifacts -type f -print0 | sort -z | xargs -0 sha256sum \
-  >"/workspace/${Q38_EXPERIMENT_ID}-files.sha256"
-mv "/workspace/${Q38_EXPERIMENT_ID}-files.sha256" \
-  "artifacts/operator/${Q38_EXPERIMENT_ID}-files.sha256"
-tar -C /opt/q38-study/training-facts-into-llms -czf \
-  "/workspace/q38-export-${Q38_EXPERIMENT_ID}.tar.gz" artifacts
-(
-  cd /workspace
-  sha256sum "q38-export-${Q38_EXPERIMENT_ID}.tar.gz"
-) >"/workspace/q38-export-${Q38_EXPERIMENT_ID}.tar.gz.sha256"
+scp -i "$Q38_SSH_KEY" -P "$Q38_SSH_PORT" \
+  scripts/runpod/package_qwen38_minimal_bf16.sh \
+  "root@${Q38_SSH_IP}:/tmp/package_qwen38_minimal_bf16.sh"
+ssh -i "$Q38_SSH_KEY" -p "$Q38_SSH_PORT" "root@$Q38_SSH_IP" \
+  'bash /tmp/package_qwen38_minimal_bf16.sh /opt/q38-study/training-facts-into-llms'
 ```
 
 Back on the local control machine, use the already captured SSH coordinates,
-then verify the archive before stopping or deleting anything:
+then retrieve into a new fixed experiment directory and independently verify
+the outer digest, safe tar structure, exact inner manifest, report/run identity,
+adapter base/revision, 210-step horizon, and terminal event order:
 
 ```bash
-Q38_EXPERIMENT_ID=ID
-mkdir -p artifacts/runpod-retrieval
-scp -i "$Q38_SSH_KEY" -P "$Q38_SSH_PORT" \
-  "root@${Q38_SSH_IP}:/workspace/q38-export-${Q38_EXPERIMENT_ID}.tar.gz" \
-  "root@${Q38_SSH_IP}:/workspace/q38-export-${Q38_EXPERIMENT_ID}.tar.gz.sha256" \
-  artifacts/runpod-retrieval/
-cd artifacts/runpod-retrieval
-sha256sum --check "q38-export-${Q38_EXPERIMENT_ID}.tar.gz.sha256"
-tar -tzf "q38-export-${Q38_EXPERIMENT_ID}.tar.gz" >/dev/null
-Q38_EXTRACT_DIR="extracted-${Q38_EXPERIMENT_ID}"
-mkdir "$Q38_EXTRACT_DIR"
-tar -xzf "q38-export-${Q38_EXPERIMENT_ID}.tar.gz" -C "$Q38_EXTRACT_DIR"
-(
-  cd "$Q38_EXTRACT_DIR"
-  sha256sum --check \
-    "artifacts/operator/${Q38_EXPERIMENT_ID}-files.sha256"
-)
-cd ../..
+scripts/runpod/retrieve_qwen38_minimal_bf16.sh \
+  "$Q38_SSH_IP" "$Q38_SSH_PORT" "$Q38_SSH_KEY"
 ```
 
-The outer digest protects the transfer archive; the inner manifest separately
-checks every report, adapter tensor/config, JSONL/terminal log, timing record,
-GPU sample, and Trainer metric file that existed when the archive was built.
-Use a new empty extraction directory for each rung so a later archive cannot
-hide a missing file behind an earlier extraction.
+For the admitted run, the archive SHA-256 is
+`dfee968762b7523bdd48f13b9e101d0066b87fe8d49bfc89f59ed17fbb9fc157`
+and the inner `SHA256SUMS` file hashes to
+`b2464c15254038c0d8545eb850532e43e984e227af5dbe9a75173e0012e0589c`.
+The helpers reject pre-existing destinations, traversal, links, special files,
+duplicates, changed hashes, ambiguous runs, identity drift, and incomplete
+horizons. The operational binding is retrieval-time, not a claim that the older
+runner wrote the newer seven-file creation-time inventory.
 
-After the second BF16 archive, or after the sole QLoRA archive, stop GPU billing,
-take a final billing snapshot, and permanently delete the Pod. A stopped Pod can
-still incur storage charges, so deletion is part of completion:
+For the current scope, keep the A100 only until the local upload and anonymous
+public-adapter GPU verification are complete. Then take a final billing snapshot,
+stop GPU billing, and permanently delete the Pod. A stopped Pod can still incur
+storage charges, so deletion is part of completion:
+
+Before deletion, require all of these to be true:
+
+- the exact 15 run-owned files, outer archive digest, and inner manifest verify
+  in ignored local storage;
+- the selected adapter and exact JSON/Markdown report pair exist locally;
+- the uploaded repository is public at one immutable, byte-verified Hub commit;
+- the credential-free A100 load/generation receipt has been copied back and
+  hash-checked; and
+- expanded BF16 and QLoRA remain deferred, leaving no authorized GPU work.
 
 ```bash
-runpodctl pod stop "$Q38_POD_ID"
 runpodctl billing pods --pod-id "$Q38_POD_ID" \
   --start-time "$Q38_BILLING_START" --bucket-size hour --grouping podId -o json \
   | tee "artifacts/runpod-control/${Q38_POD_ID}-billing-final.json"
 sha256sum "artifacts/runpod-control/${Q38_POD_ID}-billing-final.json" \
   >"artifacts/runpod-control/${Q38_POD_ID}-billing-final.json.sha256"
+runpodctl pod stop "$Q38_POD_ID"
 runpodctl pod delete "$Q38_POD_ID"
-kill "$Q38_STOP_GUARD_PID" "$Q38_BILLING_MONITOR_PID" 2>/dev/null || true
+systemctl --user stop \
+  q38-a100-billing.service q38-a100-stop-guard.timer
+systemctl --user reset-failed \
+  q38-a100-billing.service q38-a100-stop-guard.service || true
 runpodctl pod list -o json \
   | tee "artifacts/runpod-control/${Q38_POD_ID}-post-delete.json"
 ```
@@ -503,7 +495,8 @@ weights; never resume the failed attempt.
 
 Each normally completed invocation writes a complete JSON/Markdown evaluation
 pair and a local adapter, even when acceptance fails. New public evidence belongs
-under `reports/qwen38/`, with one immutable result pair per run, a digest-bound
-manifest, the observed RunPod cost/timing record, an aggregate comparison, and a
-separate derived paper. Existing `reports/manifest.json`, historical run bodies,
-and the Qwen3.5 paper remain unchanged.
+under `reports/qwen38/`. The current delivery includes the minimal run's exact
+pair, digest-bound manifest, timing/cost metadata, scientific narrative, and one
+publication receipt. A multi-rung comparison and separate derived paper are
+deferred until the ladder resumes. Existing `reports/manifest.json`, historical
+run bodies, and the Qwen3.5 paper remain unchanged.
