@@ -129,6 +129,8 @@ flowchart TD
     KIND -->|"chat"| CREF["Select + strictly validate adapter"]
     CREF --> CLOG["Create JSONL; load once; multi-turn chat; release"]
     KIND -->|"publish-existing"| HLOG["Create JSONL; stage/audit or publish reviewed historical archive"]
+    KIND -->|"publish-completed"| Q38PUB{"Local upload, anonymous GPU verify, or local finalize"}
+    Q38PUB --> Q38MODEL["Exact Qwen3.8 model repository + dedicated Collection"]
 ```
 
 `run` creates no logger until the Git/plugin and data gates pass. `preflight`
@@ -261,9 +263,11 @@ require a GitHub CLI login. Discover all reviewed IDs with `experiments list`;
 exact invocation for every historical and prospective ID.
 
 All three Qwen3.8 IDs use the same prepare/preflight/run sequence above and
-require `--upload off`. `--upload on` and `--upload if-accepted` are rejected
-before their Git gate, logger, or model load. Publication and interactive chat
-for 27B adapters require a separately reviewed contract.
+require inline `--upload off`. `run --upload on` and `run --upload if-accepted`
+are rejected before their Git gate, logger, or model load. A normally completed
+adapter can instead use the separately reviewed `publish-completed` workflow;
+only the minimal BF16 adapter is scheduled now. Expanded BF16 and QLoRA remain
+deferred. The RunPod guide owns the exact handoff commands.
 
 Each invocation starts from the untouched pinned base and creates a new run ID;
 it never resumes or overwrites an old attempt. The prospective baseline audit
@@ -343,6 +347,9 @@ cleaning details.
 | `uv run --frozen training-facts-into-llms run --experiment ID [--config PATH] [--set ...] [--name LOWERCASE-SLUG] [--upload off\|on\|if-accepted]` | Enforces the clean public-source gate, validates data, writes complete JSONL, evaluates its resolved suite, trains/selects, evaluates, saves the local adapter, writes JSON/Markdown, then applies upload mode. All reviewed presets use 28 final rows; custom data may change the resolved path and count. |
 | `uv run --frozen training-facts-into-llms evaluate --adapter PROJECT_PATH_OR_HUB_ID [--checkpoint N]` | Validates the reference before log/model allocation, evaluates the fixed historical suite, writes JSONL under `LOG_DIR`, and writes an untracked pair under `REPORT_DIR` (default `reports/`); it does not decide acceptance or publish. |
 | `uv run --frozen training-facts-into-llms chat [--adapter PATH_OR_PUBLIC_HUB_ID] [--checkpoint N]` | Selects and validates one compatible adapter before log/model allocation, then writes a complete exploratory transcript to JSONL; it writes no tracked report. |
+| `uv run --frozen training-facts-into-llms publish-completed upload --experiment qwen38_minimal_bf16 --bundle-root PATH --sha256-manifest PATH --adapter RELATIVE_PATH --report-json RELATIVE_PATH --report-markdown RELATIVE_PATH --upload on` | On clean synchronized local `main`, verifies the retrieved minimal Qwen3.8 bundle, re-scores its report, audits and uploads the adapter, then emits a path-free request and digest. Deferred experiment IDs are rejected by the source-owned allowlist. |
+| `uv run --frozen training-facts-into-llms publish-completed verify --request PATH --request-sha256 PATH` | On clean synchronized GPU `main`, anonymously rechecks and loads the exact public commit with `token=False`, requires the accelerated-kernel proof and nonempty generation, then emits a verification receipt and digest. |
+| `uv run --frozen training-facts-into-llms publish-completed finalize --request PATH --request-sha256 PATH --verification PATH --verification-sha256 PATH --upload on` | Back on local clean `main`, rechecks the request, receipt, kernel proof, and public bytes before using the local token to append the model to the dedicated Qwen3.8 Collection. |
 | `uv run --frozen training-facts-into-llms publish-existing --all --upload off` | Maintainer recovery/backfill command: creates JSONL, validates and stages the retained local archive, and prints its inventory without a credential value, publication API, model load, or external write. A fresh clone does not contain these ignored source checkpoints. |
 | `uv run --frozen training-facts-into-llms publish-existing --all --upload on` | Requires the retained local checkpoint tree, a local token, CUDA/BF16, and network access; logs, synchronizes, verifies all 13 adapters, and reconciles the public Collection. |
 | `uv run --frozen training-facts-into-llms publish-existing --all --upload on --refresh-evidence` | Maintainer-only, idempotent evidence-dataset reconciliation; it logs a sanitized receipt and never writes model repositories or Collection state. |
@@ -367,12 +374,16 @@ adapter and report local without loading a credential or making a Hub write;
 `on` publishes any normally completed Qwen3.5 run; `if-accepted` publishes only
 when the configured acceptance decision passes. An eligible upload begins
 immediately after report creation, so use `off` when output needs human review.
-There is no later `publish-run` command for a completed local run.
+There is no generic later `publish-run` command for a completed local run. A
+normally completed Qwen3.8 run is the narrow exception: its separately reviewed
+three-phase `publish-completed` path keeps credentials off the GPU host.
 
 Future-adapter publication and the full historical archive path require the
 local `.env` token, network access, and BF16-capable CUDA for anonymous adapter
 verification. The evidence-refresh-only path loads no model and requires no
-CUDA. Qwen3.8 publication is not authorized. The credential boundary, exact
+CUDA. Qwen3.8 inline publication remains disabled; completed-run publication
+uses local upload/finalize credentials and a credential-free GPU verification
+phase. The credential boundary, exact
 artifact allowlist, public-ID rules, retry behavior, return codes, and
 non-atomic Hub transaction are owned by
 [`docs/security-and-publication.md`](docs/security-and-publication.md).
