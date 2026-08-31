@@ -122,9 +122,17 @@ reviewed scientific change with new evidence identity.
 
 The three registered Qwen3.8 IDs run in their declared order and write evidence
 only under `reports/qwen38/`. They must never amend the historical manifest,
-reports, paper, or acceptance labels. Qwen3.8 publication and chat are not
-authorized: reject `--upload on` and `--upload if-accepted` before the Git gate,
-logger, or model allocation.
+reports, paper, or acceptance labels. Inline Qwen3.8 publication and chat are
+not authorized: reject `run --upload on` and `run --upload if-accepted` before
+the Git gate, logger, or model allocation.
+
+A normally completed Qwen3.8 adapter may use the separately reviewed
+`publish-completed upload`/`verify`/`finalize` contract. The immediate operation
+is limited to `qwen38_minimal_bf16`; expanded BF16 and QLoRA are deferred. Keep
+the upload and finalize credential on the local machine, run verification with
+`token=False` on the GPU host, and treat the retrieval manifest as an integrity
+binding rather than a creation-time signature. The exact procedure belongs to
+the RunPod and security guides.
 
 Use the exact paid-host procedure in
 [docs/qwen38-runpod.md](docs/qwen38-runpod.md). In particular, do not simplify

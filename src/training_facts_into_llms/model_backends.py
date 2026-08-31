@@ -59,6 +59,83 @@ class ModelAuditSpec:
         return rank * rank_unit
 
 
+@dataclass(frozen=True, slots=True)
+class LoraShapeSpec:
+    """Describe the pinned text-module dimensions used by header-only audits."""
+
+    # Both Qwen checkpoints use the same PEFT stem below the multimodal wrapper.
+    layer_count: int
+    hidden_size: int
+    intermediate_size: int
+    full_attention_layers: frozenset[int]
+    full_query_output_size: int
+    full_key_value_output_size: int
+    full_attention_value_size: int
+    linear_qkv_output_size: int
+    linear_value_size: int
+    linear_gate_size: int
+
+    def module_shapes(self) -> dict[str, tuple[int, int]]:
+        """Return every language-only LoRA module's input and output dimensions."""
+        shapes: dict[str, tuple[int, int]] = {}
+        prefix = "base_model.model.model.language_model.layers"
+        for layer in range(self.layer_count):
+            layer_prefix = f"{prefix}.{layer}"
+            shapes[f"{layer_prefix}.mlp.gate_proj"] = (
+                self.hidden_size,
+                self.intermediate_size,
+            )
+            shapes[f"{layer_prefix}.mlp.up_proj"] = (
+                self.hidden_size,
+                self.intermediate_size,
+            )
+            shapes[f"{layer_prefix}.mlp.down_proj"] = (
+                self.intermediate_size,
+                self.hidden_size,
+            )
+            if layer in self.full_attention_layers:
+                attention = f"{layer_prefix}.self_attn"
+                shapes[f"{attention}.q_proj"] = (
+                    self.hidden_size,
+                    self.full_query_output_size,
+                )
+                shapes[f"{attention}.k_proj"] = (
+                    self.hidden_size,
+                    self.full_key_value_output_size,
+                )
+                shapes[f"{attention}.v_proj"] = (
+                    self.hidden_size,
+                    self.full_key_value_output_size,
+                )
+                shapes[f"{attention}.o_proj"] = (
+                    self.full_attention_value_size,
+                    self.hidden_size,
+                )
+                continue
+            attention = f"{layer_prefix}.linear_attn"
+            shapes[f"{attention}.in_proj_qkv"] = (
+                self.hidden_size,
+                self.linear_qkv_output_size,
+            )
+            shapes[f"{attention}.in_proj_z"] = (
+                self.hidden_size,
+                self.linear_value_size,
+            )
+            shapes[f"{attention}.in_proj_b"] = (
+                self.hidden_size,
+                self.linear_gate_size,
+            )
+            shapes[f"{attention}.in_proj_a"] = (
+                self.hidden_size,
+                self.linear_gate_size,
+            )
+            shapes[f"{attention}.out_proj"] = (
+                self.linear_value_size,
+                self.hidden_size,
+            )
+        return shapes
+
+
 # Historical invariants remain unchanged for all nine schema-v1 reproductions.
 LEGACY_QWEN35_AUDIT: Final = ModelAuditSpec(
     model_id="Qwen/Qwen3.5-0.8B",
@@ -89,6 +166,42 @@ QWEN38_27B_AUDIT: Final = ModelAuditSpec(
     expected_trainable_parameters=MappingProxyType(
         {8: 58_363_904, 16: 116_727_808}
     ),
+)
+
+# These values are direct consequences of each pinned text config.  Qwen's
+# attention-output gate doubles full-attention q_proj, while linear-attention
+# a/b project one scalar per value head.
+_LORA_SHAPES: Final = MappingProxyType(
+    {
+        (LEGACY_QWEN35_AUDIT.model_id, LEGACY_QWEN35_AUDIT.model_revision): (
+            LoraShapeSpec(
+                layer_count=24,
+                hidden_size=1024,
+                intermediate_size=3584,
+                full_attention_layers=frozenset({3, 7, 11, 15, 19, 23}),
+                full_query_output_size=4096,
+                full_key_value_output_size=512,
+                full_attention_value_size=2048,
+                linear_qkv_output_size=6144,
+                linear_value_size=2048,
+                linear_gate_size=16,
+            )
+        ),
+        (QWEN38_27B_AUDIT.model_id, QWEN38_27B_AUDIT.model_revision): (
+            LoraShapeSpec(
+                layer_count=64,
+                hidden_size=5120,
+                intermediate_size=17408,
+                full_attention_layers=frozenset(range(3, 64, 4)),
+                full_query_output_size=12288,
+                full_key_value_output_size=1024,
+                full_attention_value_size=6144,
+                linear_qkv_output_size=10240,
+                linear_value_size=6144,
+                linear_gate_size=48,
+            )
+        ),
+    }
 )
 
 # Tuple keys make an unpinned branch or same-named replacement fail closed.
@@ -156,3 +269,27 @@ def resolve_model_audit(config: Any) -> ModelAuditSpec:
             "Resolved trainable-parameter count differs from the audited backend"
         )
     return audited
+
+
+def expected_lora_module_shapes(
+    model_id: str,
+    model_revision: str,
+) -> dict[str, tuple[int, int]]:
+    """Return the exact source-pinned LoRA header manifest for one model."""
+    identity = (model_id, model_revision)
+    try:
+        audit = _MODEL_AUDITS[identity]
+        shape_spec = _LORA_SHAPES[identity]
+    except KeyError as error:
+        raise RuntimeError("No LoRA shape audit exists for this model") from error
+    shapes = shape_spec.module_shapes()
+    if len(shapes) != audit.expected_target_module_count:
+        raise RuntimeError("LoRA shape audit has an unexpected module count")
+    for rank, expected in audit.expected_trainable_parameters.items():
+        actual = sum(
+            rank * (input_size + output_size)
+            for input_size, output_size in shapes.values()
+        )
+        if actual != expected:
+            raise RuntimeError("LoRA shape audit has an unexpected scalar count")
+    return shapes

@@ -46,7 +46,7 @@ checked-in `uv.lock`; it cannot update the lock or resolve an unpinned package.
 The subsequent experiment command deliberately needs no UV extra, temporary
 dependency, or model-specific executable.
 
-The three fixed Qwen3.8 commands are:
+The three registered Qwen3.8 commands are:
 
 ```bash
 uv run --frozen training-facts-into-llms run --experiment qwen38_minimal_bf16 --upload off
@@ -55,8 +55,11 @@ uv run --frozen training-facts-into-llms run --experiment qwen38_expanded_locali
 ```
 
 Run `preflight` with the same experiment ID immediately before each command.
-The 27B presets reject `--upload on` and `--upload if-accepted`; this study keeps
-adapters local until publication receives a separate source review.
+The 27B presets reject inline `--upload on` and `--upload if-accepted`. A
+separately reviewed post-run workflow now publishes a normally completed local
+adapter without putting a Hugging Face credential on the Pod. The current
+operation runs and publishes only `qwen38_minimal_bf16`; expanded BF16 and
+QLoRA are deferred.
 
 ## Frozen experiment ladder
 
@@ -360,8 +363,11 @@ printf 'started_at=%s\nended_at=%s\nexit_code=%s\n' \
 test "$Q38_RUN_EXIT_CODE" -eq 0
 ```
 
-Retrieve and verify that rung as described below, merge its separate sanitized
-results PR, then fast-forward the still-running A100 Pod before the next gate:
+For the current operation, stop the experiment ladder after retrieving and
+publishing that minimal rung as described below. The following expanded BF16
+and QLoRA command blocks remain reviewed future references; they are deferred
+and must not be executed now. When later authorized, merge the prior sanitized
+results PR and fast-forward the still-running Pod before the next gate:
 
 ```bash
 git fetch --prune origin main
@@ -425,20 +431,22 @@ line. A process lost outside that session is not a retryable checkpoint.
 ### Retrieve, verify, stop, and delete
 
 After each rung exits normally, still inside the Pod, record hardware, Git, and
-file hashes and make one transfer archive. Replace `ID` with that rung's exact
-registry ID:
+file hashes and make one transfer archive. The current operation uses the
+minimal ID exactly:
 
 ```bash
-Q38_EXPERIMENT_ID=ID
+Q38_EXPERIMENT_ID=qwen38_minimal_bf16
 mkdir -p artifacts/operator
 git rev-parse HEAD >"artifacts/operator/${Q38_EXPERIMENT_ID}-git-sha.txt"
 nvidia-smi -q >"artifacts/operator/${Q38_EXPERIMENT_ID}-nvidia-smi.txt"
-find artifacts -type f -print0 | sort -z | xargs -0 sha256sum \
-  >"/workspace/${Q38_EXPERIMENT_ID}-files.sha256"
-mv "/workspace/${Q38_EXPERIMENT_ID}-files.sha256" \
-  "artifacts/operator/${Q38_EXPERIMENT_ID}-files.sha256"
-tar -C /opt/q38-study/training-facts-into-llms -czf \
-  "/workspace/q38-export-${Q38_EXPERIMENT_ID}.tar.gz" artifacts
+Q38_INNER_MANIFEST="${Q38_EXPERIMENT_ID}-SHA256SUMS"
+(
+  cd /opt/q38-study/training-facts-into-llms
+  find ./artifacts -type f -print0 | sort -z | xargs -0 sha256sum
+) >"/workspace/${Q38_INNER_MANIFEST}"
+tar -czf "/workspace/q38-export-${Q38_EXPERIMENT_ID}.tar.gz" \
+  -C /opt/q38-study/training-facts-into-llms artifacts \
+  -C /workspace "$Q38_INNER_MANIFEST"
 (
   cd /workspace
   sha256sum "q38-export-${Q38_EXPERIMENT_ID}.tar.gz"
@@ -449,24 +457,22 @@ Back on the local control machine, use the already captured SSH coordinates,
 then verify the archive before stopping or deleting anything:
 
 ```bash
-Q38_EXPERIMENT_ID=ID
-mkdir -p artifacts/runpod-retrieval
+Q38_EXPERIMENT_ID=qwen38_minimal_bf16
+Q38_RETRIEVAL_DIR="artifacts/runpod-retrieval/${Q38_EXPERIMENT_ID}"
+mkdir -p "$Q38_RETRIEVAL_DIR"
 scp -i "$Q38_SSH_KEY" -P "$Q38_SSH_PORT" \
   "root@${Q38_SSH_IP}:/workspace/q38-export-${Q38_EXPERIMENT_ID}.tar.gz" \
   "root@${Q38_SSH_IP}:/workspace/q38-export-${Q38_EXPERIMENT_ID}.tar.gz.sha256" \
-  artifacts/runpod-retrieval/
-cd artifacts/runpod-retrieval
-sha256sum --check "q38-export-${Q38_EXPERIMENT_ID}.tar.gz.sha256"
-tar -tzf "q38-export-${Q38_EXPERIMENT_ID}.tar.gz" >/dev/null
-Q38_EXTRACT_DIR="extracted-${Q38_EXPERIMENT_ID}"
-mkdir "$Q38_EXTRACT_DIR"
-tar -xzf "q38-export-${Q38_EXPERIMENT_ID}.tar.gz" -C "$Q38_EXTRACT_DIR"
+  "$Q38_RETRIEVAL_DIR/"
 (
-  cd "$Q38_EXTRACT_DIR"
-  sha256sum --check \
-    "artifacts/operator/${Q38_EXPERIMENT_ID}-files.sha256"
+  cd "$Q38_RETRIEVAL_DIR"
+  sha256sum --check "q38-export-${Q38_EXPERIMENT_ID}.tar.gz.sha256"
+  tar -tzf "q38-export-${Q38_EXPERIMENT_ID}.tar.gz" >/dev/null
+  mkdir extracted
+  tar -xzf "q38-export-${Q38_EXPERIMENT_ID}.tar.gz" -C extracted
+  cd extracted
+  sha256sum --check "${Q38_EXPERIMENT_ID}-SHA256SUMS"
 )
-cd ../..
 ```
 
 The outer digest protects the transfer archive; the inner manifest separately
@@ -475,9 +481,111 @@ GPU sample, and Trainer metric file that existed when the archive was built.
 Use a new empty extraction directory for each rung so a later archive cannot
 hide a missing file behind an earlier extraction.
 
-After the second BF16 archive, or after the sole QLoRA archive, stop GPU billing,
-take a final billing snapshot, and permanently delete the Pod. A stopped Pod can
-still incur storage charges, so deletion is part of completion:
+### Publish, anonymously verify, and finalize the minimal adapter
+
+Do not delete the Pod yet. First merge the reviewed publisher and return the
+local checkout to clean synchronized `main`. Keep the Hugging Face token only
+in the local ignored mode-`0600` `.env`; never export or copy it. The extracted
+archive must remain below local `artifacts/`. Select the one completed adapter
+and one Qwen3.8 report pair without guessing a latest checkpoint:
+
+```bash
+git fetch --prune origin main
+git merge --ff-only origin/main
+test -z "$(git status --porcelain --untracked-files=all)"
+Q38_EXPERIMENT_ID=qwen38_minimal_bf16
+Q38_BUNDLE_ROOT="artifacts/runpod-retrieval/${Q38_EXPERIMENT_ID}/extracted"
+mapfile -t Q38_ADAPTERS < <(
+  find "$Q38_BUNDLE_ROOT/artifacts" -mindepth 1 -maxdepth 1 \
+    -type d -name 'experiment-adapter-*' -printf '%P\n'
+)
+mapfile -t Q38_REPORT_JSON < <(
+  find "$Q38_BUNDLE_ROOT/artifacts/reports/qwen38" -maxdepth 1 \
+    -type f -name 'evaluation-*.json' -printf '%P\n'
+)
+mapfile -t Q38_REPORT_MD < <(
+  find "$Q38_BUNDLE_ROOT/artifacts/reports/qwen38" -maxdepth 1 \
+    -type f -name 'evaluation-*.md' -printf '%P\n'
+)
+test "${#Q38_ADAPTERS[@]}" -eq 1
+test "${#Q38_REPORT_JSON[@]}" -eq 1
+test "${#Q38_REPORT_MD[@]}" -eq 1
+Q38_ADAPTER_RELATIVE="artifacts/${Q38_ADAPTERS[0]}"
+Q38_REPORT_JSON_RELATIVE="artifacts/reports/qwen38/${Q38_REPORT_JSON[0]}"
+Q38_REPORT_MD_RELATIVE="artifacts/reports/qwen38/${Q38_REPORT_MD[0]}"
+uv run --frozen training-facts-into-llms publish-completed upload \
+  --experiment "$Q38_EXPERIMENT_ID" \
+  --bundle-root "$Q38_BUNDLE_ROOT" \
+  --sha256-manifest "${Q38_EXPERIMENT_ID}-SHA256SUMS" \
+  --adapter "$Q38_ADAPTER_RELATIVE" \
+  --report-json "$Q38_REPORT_JSON_RELATIVE" \
+  --report-markdown "$Q38_REPORT_MD_RELATIVE" \
+  --upload on \
+  --output artifacts/completed-publication/qwen38-minimal-request.json
+```
+
+This first phase independently re-scores the saved outputs and validates the
+adapter before it accesses the local credential. It makes the exact model
+repository public, but it does not add a Collection item. The transfer
+manifest is recorded as a retrieval-time integrity binding; it is not a
+creation-time signature or independent attestation.
+
+Fast-forward the credential-free Pod to the same merged `main`, copy only the
+path-free request and digest into its ignored artifacts directory, and run the
+anonymous GPU phase. The source-required kernel probe runs again while loading
+the pinned base. Every Hub/base/processor/PEFT read in this phase uses
+`token=False`, and a quantized future adapter is never moved with an
+unconditional `.to()`:
+
+```bash
+ssh -i "$Q38_SSH_KEY" -p "$Q38_SSH_PORT" "root@$Q38_SSH_IP" \
+  'cd /opt/q38-study/training-facts-into-llms && \
+   git fetch --prune origin main && git merge --ff-only origin/main && \
+   test -z "$(git status --porcelain --untracked-files=all)" && \
+   mkdir -p artifacts/completed-publication'
+scp -i "$Q38_SSH_KEY" -P "$Q38_SSH_PORT" \
+  artifacts/completed-publication/qwen38-minimal-request.json \
+  artifacts/completed-publication/qwen38-minimal-request.json.sha256 \
+  "root@${Q38_SSH_IP}:/opt/q38-study/training-facts-into-llms/artifacts/completed-publication/"
+ssh -i "$Q38_SSH_KEY" -p "$Q38_SSH_PORT" "root@$Q38_SSH_IP" \
+  'cd /opt/q38-study/training-facts-into-llms && \
+   /opt/q38-uv-bootstrap/bin/uv run --frozen training-facts-into-llms publish-completed verify \
+     --request artifacts/completed-publication/qwen38-minimal-request.json \
+     --request-sha256 artifacts/completed-publication/qwen38-minimal-request.json.sha256 \
+     --output artifacts/completed-publication/qwen38-minimal-verification.json'
+scp -i "$Q38_SSH_KEY" -P "$Q38_SSH_PORT" \
+  "root@${Q38_SSH_IP}:/opt/q38-study/training-facts-into-llms/artifacts/completed-publication/qwen38-minimal-verification.json" \
+  "root@${Q38_SSH_IP}:/opt/q38-study/training-facts-into-llms/artifacts/completed-publication/qwen38-minimal-verification.json.sha256" \
+  artifacts/completed-publication/
+```
+
+Back on local clean `main`, finalize only after both digest companions verify.
+This phase anonymously rechecks the exact model repository once more, then
+uses the local credential to append it to the dedicated Qwen3.8 Collection:
+
+```bash
+(
+  cd artifacts/completed-publication
+  sha256sum --check qwen38-minimal-request.json.sha256
+  sha256sum --check qwen38-minimal-verification.json.sha256
+)
+uv run --frozen training-facts-into-llms publish-completed finalize \
+  --request artifacts/completed-publication/qwen38-minimal-request.json \
+  --request-sha256 artifacts/completed-publication/qwen38-minimal-request.json.sha256 \
+  --verification artifacts/completed-publication/qwen38-minimal-verification.json \
+  --verification-sha256 artifacts/completed-publication/qwen38-minimal-verification.json.sha256 \
+  --upload on \
+  --output artifacts/completed-publication/qwen38-minimal-final.json
+```
+
+Upload, verification, and Collection mutation are not atomic. An exact public
+repository may remain if a later phase fails; retain the local bundle and Pod,
+fix no bytes in place, and use an exact idempotent retry after review.
+
+After the minimal final receipt exists, stop GPU billing, take a final billing
+snapshot, and permanently delete the Pod. For later deferred rungs, do this
+after that rung's final receipt. A stopped Pod can still incur storage charges,
+so deletion is part of completion:
 
 ```bash
 runpodctl pod stop "$Q38_POD_ID"

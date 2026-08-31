@@ -42,7 +42,6 @@ from training_facts_into_llms.archive_inventory import (
 )
 from training_facts_into_llms.chat import (
     AdapterValidationError,
-    _expected_lora_module_shapes,
     _read_adapter_payload,
     _validate_adapter_payload,
     _validate_adapter_weights,
@@ -52,6 +51,7 @@ from training_facts_into_llms.experiments import (
     preset_canonical_scoring_source_sha256,
     resolve_experiment,
 )
+from training_facts_into_llms.model_backends import expected_lora_module_shapes
 from training_facts_into_llms.publishing import validate_upload_directory
 from training_facts_into_llms.reporting import (
     _assert_no_secret_pattern,
@@ -119,6 +119,9 @@ _PROVENANCE_KEYS = frozenset(
         "run_identity",
         "source",
     }
+)
+_QWEN38_PROVENANCE_KEYS = _PROVENANCE_KEYS | frozenset(
+    {"paid_runtime_audit", "baseline_non_target_audit"}
 )
 _EVALUATION_KEYS = frozenset(
     {"stage", "summary", "records", "plugin_aggregates", "selection_score"}
@@ -280,6 +283,8 @@ class CompletedRunContext:
     acceptance: Mapping[str, Any]
     # Reporting captured these exact bytes before the immediate publication phase.
     artifact_hashes: Mapping[str, str]
+    # A later publisher names its weaker retrieval-time integrity boundary explicitly.
+    artifact_binding: Mapping[str, str] | None = None
 
 
 def _require_exact_keys(
@@ -446,9 +451,15 @@ def _validate_completed_report_structure(
     model_revision: str,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Validate and reconcile a complete report before any public copy occurs."""
+    prospective = experiment.get("schema_version") == 2
+    expected_report_keys = (
+        _COMPLETED_REPORT_KEYS | frozenset({"study_interpretation"})
+        if prospective
+        else _COMPLETED_REPORT_KEYS
+    )
     report = _require_exact_keys(
         payload,
-        _COMPLETED_REPORT_KEYS,
+        expected_report_keys,
         "completed run report",
     )
     if report["schema_version"] != 1:
@@ -495,7 +506,7 @@ def _validate_completed_report_structure(
         raise ValueError("completed run operational config differs from its science")
     provenance = _require_exact_keys(
         report["provenance"],
-        _PROVENANCE_KEYS,
+        _QWEN38_PROVENANCE_KEYS if prospective else _PROVENANCE_KEYS,
         "completed run provenance",
     )
     _sanitize_metadata(provenance, root=root, path="completed_run.provenance")
@@ -507,6 +518,49 @@ def _validate_completed_report_structure(
     }
     if provenance["run_identity"] != expected_run_identity:
         raise ValueError("completed run report identity differs from its context")
+    if prospective:
+        interpretation = _require_exact_keys(
+            report["study_interpretation"],
+            frozenset(
+                {
+                    "label",
+                    "baseline_recall_passed",
+                    "baseline_recall_total",
+                    "novel_knowledge_claim_permitted",
+                    "fixed_suite_is_pristine_holdout",
+                }
+            ),
+            "completed run study interpretation",
+        )
+        if interpretation["label"] not in {
+            "candidate-knowledge-acquisition",
+            "reinforcement-robustness",
+        }:
+            raise ValueError("completed run study interpretation is unsupported")
+        passed = interpretation["baseline_recall_passed"]
+        total = interpretation["baseline_recall_total"]
+        if (
+            isinstance(passed, bool)
+            or not isinstance(passed, int)
+            or isinstance(total, bool)
+            or not isinstance(total, int)
+            or passed < 0
+            or total <= 0
+            or passed > total
+        ):
+            raise ValueError("completed run study interpretation counts are invalid")
+        acquisition = passed == 0
+        if (
+            interpretation["novel_knowledge_claim_permitted"] is not acquisition
+            or interpretation["fixed_suite_is_pristine_holdout"] is not False
+            or interpretation["label"]
+            != (
+                "candidate-knowledge-acquisition"
+                if acquisition
+                else "reinforcement-robustness"
+            )
+        ):
+            raise ValueError("completed run study interpretation is inconsistent")
     source = _require_exact_keys(
         provenance["source"],
         frozenset({"git_commit", "github_repository", "scoring_plugin"}),
@@ -787,6 +841,8 @@ def _allowed_saved_bias_key(
 def _validate_completed_adapter_weights(
     weights_path: Path,
     *,
+    model_id: str,
+    model_revision: str,
     rank: int,
     bias: str,
     targets: tuple[str, ...],
@@ -794,7 +850,10 @@ def _validate_completed_adapter_weights(
     """Audit future safetensors against the selected pinned-Qwen module subset."""
     modules = {
         stem: shape
-        for stem, shape in _expected_lora_module_shapes().items()
+        for stem, shape in expected_lora_module_shapes(
+            model_id,
+            model_revision,
+        ).items()
         if stem.rsplit(".", maxsplit=1)[-1] in targets
     }
     if not modules:
@@ -870,6 +929,8 @@ def audit_completed_adapter_checkpoint(
     )
     weights = _validate_completed_adapter_weights(
         directory / "adapter_model.safetensors",
+        model_id=model_id,
+        model_revision=model_revision,
         rank=rank,
         bias=bias,
         targets=targets,
@@ -912,6 +973,7 @@ def stage_completed_run_repository(
     model_revision: str,
     lora_config: Any | None = None,
     audit_adapter: AdapterAudit | None = None,
+    repository_prefix: str | None = None,
 ) -> StagedRepository:
     """Build one self-contained future-run model repository without a Hub write."""
     # Resolve the fixed source boundary before creating any staging output.
@@ -956,6 +1018,15 @@ def stage_completed_run_repository(
     }
     if artifact_hashes != actual_artifact_hashes:
         raise ValueError("completed run artifacts changed after report creation")
+    artifact_binding: dict[str, str] | None = None
+    if context.artifact_binding is not None:
+        artifact_binding = dict(context.artifact_binding)
+        if (
+            set(artifact_binding) != {"kind", "manifest_sha256"}
+            or artifact_binding["kind"] != "retrieval-time-sha256-manifest"
+            or not _SHA256_PATTERN.fullmatch(artifact_binding["manifest_sha256"])
+        ):
+            raise ValueError("completed run artifact binding is invalid")
     _validate_completed_adapter_config(
         adapter / "adapter_config.json",
         root=root,
@@ -1118,7 +1189,15 @@ def stage_completed_run_repository(
     if (adapter / "README.md").read_bytes() != expected_readme.encode("utf-8"):
         raise ValueError("completed adapter model card differs from its JSON report")
     # Validate repository identity and note length before allocating the staging tree.
-    repository_id = repo_id_for_run(namespace, context.run_id)
+    repository_id = (
+        repo_id_for_run(namespace, context.run_id)
+        if repository_prefix is None
+        else repo_id_for_run(
+            namespace,
+            context.run_id,
+            prefix=repository_prefix,
+        )
+    )
     outcome = "passed" if acceptance["passed"] else "failed"
     note = (
         f"Completed run {context.run_id} for {context.experiment_id}; configured "
@@ -1160,17 +1239,26 @@ def stage_completed_run_repository(
         },
         "report_files": {
             "evaluation.json": {
-                "source_path": json_source.relative_to(root).as_posix(),
                 "sha256": artifact_hashes["report_json"],
                 "size": (destination / "evaluation.json").stat().st_size,
             },
             "evaluation.md": {
-                "source_path": markdown_source.relative_to(root).as_posix(),
                 "sha256": artifact_hashes["report_markdown"],
                 "size": (destination / "evaluation.md").stat().st_size,
             },
         },
     }
+    if artifact_binding is None:
+        # Preserve the existing immediate-publication manifest and its source paths.
+        run_manifest["report_files"]["evaluation.json"]["source_path"] = (
+            json_source.relative_to(root).as_posix()
+        )
+        run_manifest["report_files"]["evaluation.md"]["source_path"] = (
+            markdown_source.relative_to(root).as_posix()
+        )
+    else:
+        # Retrieved Qwen3.8 runs cannot recover the in-process creation-time hashes.
+        run_manifest["artifact_binding"] = artifact_binding
     _write_json(destination / "run_manifest.json", run_manifest)
     return describe_staged_repository(
         destination,
