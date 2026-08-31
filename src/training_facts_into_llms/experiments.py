@@ -56,6 +56,14 @@ PROSPECTIVE_EXPERIMENT_IDS: Final = (
     "qwen38_expanded_locality_bf16",
     "qwen38_expanded_locality_qlora",
 )
+# Post-run publication is a narrower reviewed action than experiment execution.
+# Expanding this allowlist requires its own source review and does not follow
+# automatically from adding or running a prospective preset.
+COMPLETED_PUBLICATION_EXPERIMENT_IDS: Final = ("qwen38_minimal_bf16",)
+if not set(COMPLETED_PUBLICATION_EXPERIMENT_IDS).issubset(
+    PROSPECTIVE_EXPERIMENT_IDS
+):
+    raise RuntimeError("completed-publication allowlist left the experiment registry")
 EXPERIMENT_IDS: Final = (*HISTORICAL_EXPERIMENT_IDS, *PROSPECTIVE_EXPERIMENT_IDS)
 
 # Schema-v1 resolves these compatibility defaults without changing historical TOML;

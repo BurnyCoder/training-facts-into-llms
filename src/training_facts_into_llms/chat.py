@@ -28,6 +28,10 @@ from typing import Any, Literal
 from safetensors import SafetensorError, safe_open
 
 from training_facts_into_llms.logging_utils import EventLogger, timestamp_id
+from training_facts_into_llms.model_backends import (
+    LEGACY_QWEN35_AUDIT,
+    expected_lora_module_shapes,
+)
 from training_facts_into_llms.modeling import (
     ModelBundle,
     generate_response,
@@ -35,7 +39,6 @@ from training_facts_into_llms.modeling import (
     release_model,
 )
 from training_facts_into_llms.training import (
-    EXPECTED_TARGET_MODULE_COUNT,
     EXPECTED_TRAINABLE_PARAMETERS,
     LORA_TARGET_MODULES,
 )
@@ -55,15 +58,6 @@ HISTORICAL_CHECKPOINT_WARNING = (
 EXPLORATORY_WARNING = "exploratory adapter—acceptance status is not inferred"
 # Trainer checkpoint names encode the completed optimizer step after one stable prefix.
 CHECKPOINT_PATTERN = re.compile(r"^checkpoint-(?P<step>[1-9][0-9]*)$")
-# These pinned dimensions and layer types come from the exact Qwen text config.
-TEXT_LAYER_COUNT = 24
-TEXT_HIDDEN_SIZE = 1024
-TEXT_INTERMEDIATE_SIZE = 3584
-FULL_ATTENTION_LAYERS = frozenset({3, 7, 11, 15, 19, 23})
-# PEFT writes every audited tensor below this stable full-model language prefix.
-LORA_WEIGHT_PREFIX = "base_model.model.model.language_model.layers"
-
-
 class AdapterValidationError(ValueError):
     """Report a known adapter compatibility failure before GPU allocation."""
 
@@ -278,47 +272,11 @@ def _validate_adapter_payload(
 
 def _expected_lora_module_shapes() -> dict[str, tuple[int, int]]:
     """Return exact pinned language-module input/output dimensions by PEFT stem."""
-    # The mapping is derived from the pinned Qwen3.5 text configuration and module tree.
-    expected: dict[str, tuple[int, int]] = {}
-    # Every one of the 24 language layers contains the same three MLP projections.
-    for layer in range(TEXT_LAYER_COUNT):
-        layer_prefix = f"{LORA_WEIGHT_PREFIX}.{layer}"
-        # Gate and up projections expand hidden states into the intermediate width.
-        expected[f"{layer_prefix}.mlp.gate_proj"] = (
-            TEXT_HIDDEN_SIZE,
-            TEXT_INTERMEDIATE_SIZE,
-        )
-        expected[f"{layer_prefix}.mlp.up_proj"] = (
-            TEXT_HIDDEN_SIZE,
-            TEXT_INTERMEDIATE_SIZE,
-        )
-        # Down projection returns intermediate activations to the hidden width.
-        expected[f"{layer_prefix}.mlp.down_proj"] = (
-            TEXT_INTERMEDIATE_SIZE,
-            TEXT_HIDDEN_SIZE,
-        )
-        # Every fourth layer uses full grouped-query attention in the pinned config.
-        if layer in FULL_ATTENTION_LAYERS:
-            attention_prefix = f"{layer_prefix}.self_attn"
-            # Q contains eight 256-wide heads; K/V each contain two such heads.
-            expected[f"{attention_prefix}.q_proj"] = (TEXT_HIDDEN_SIZE, 4096)
-            expected[f"{attention_prefix}.k_proj"] = (TEXT_HIDDEN_SIZE, 512)
-            expected[f"{attention_prefix}.v_proj"] = (TEXT_HIDDEN_SIZE, 512)
-            # Concatenated attention values have width 2048 before output projection.
-            expected[f"{attention_prefix}.o_proj"] = (2048, TEXT_HIDDEN_SIZE)
-            continue
-        # Remaining layers use Qwen3.5 gated linear attention projections.
-        attention_prefix = f"{layer_prefix}.linear_attn"
-        expected[f"{attention_prefix}.in_proj_qkv"] = (TEXT_HIDDEN_SIZE, 6144)
-        expected[f"{attention_prefix}.in_proj_z"] = (TEXT_HIDDEN_SIZE, 2048)
-        expected[f"{attention_prefix}.in_proj_b"] = (TEXT_HIDDEN_SIZE, 16)
-        expected[f"{attention_prefix}.in_proj_a"] = (TEXT_HIDDEN_SIZE, 16)
-        expected[f"{attention_prefix}.out_proj"] = (2048, TEXT_HIDDEN_SIZE)
-    # Code/config drift must fail here before any file is accepted.
-    if len(expected) != EXPECTED_TARGET_MODULE_COUNT:
-        raise RuntimeError("internal LoRA tensor manifest has an unexpected module count")
-    # Return a fresh deterministic insertion-ordered manifest.
-    return expected
+    # The shared source-pinned registry also supports prospective publication audits.
+    return expected_lora_module_shapes(
+        LEGACY_QWEN35_AUDIT.model_id,
+        LEGACY_QWEN35_AUDIT.model_revision,
+    )
 
 
 def _validate_adapter_weights(weights_path: Path, *, rank: int) -> None:

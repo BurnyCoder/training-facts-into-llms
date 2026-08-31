@@ -1181,7 +1181,7 @@ def _completed_acceptance_payload(decision: Any) -> dict[str, Any]:
     return payload
 
 
-def _validate_future_run_identity(
+def validate_future_run_identity(
     run_id: str,
     experiment: Mapping[str, Any],
 ) -> None:
@@ -1217,51 +1217,72 @@ def _append_completed_run_to_collection(
     hub: ArchiveHub,
 ) -> CollectionPublicationReceipt:
     """Append one future model to the study Collection without moving existing items."""
-    collection = hub.ensure_collection(
+    return append_model_to_collection(
+        repo_id=repository.repo_id,
+        note=repository.collection_note,
         namespace=namespace,
         title=DEFAULT_COLLECTION_TITLE,
         description=DEFAULT_COLLECTION_DESCRIPTION,
+        hub=hub,
+    )
+
+
+def append_model_to_collection(
+    *,
+    repo_id: str,
+    note: str,
+    namespace: str,
+    title: str,
+    description: str,
+    hub: ArchiveHub,
+) -> CollectionPublicationReceipt:
+    """Append one verified public model to a dedicated exact-titled Collection."""
+    if not repo_id or not note or len(note) > 500:
+        raise ValueError("completed model Collection identity or note is invalid")
+    if not title or len(title) >= 60 or len(description) > 150:
+        raise ValueError("completed model Collection metadata is invalid")
+    collection = hub.ensure_collection(
+        namespace=namespace,
+        title=title,
+        description=description,
     )
     _require_collection_metadata(
         collection,
         namespace=namespace,
-        title=DEFAULT_COLLECTION_TITLE,
-        description=DEFAULT_COLLECTION_DESCRIPTION,
+        title=title,
+        description=description,
     )
     collection = hub.get_collection(collection.slug, anonymous=False)
-    key = (repository.repo_id, "model")
+    key = (repo_id, "model")
     current = _collection_item_map(collection).get(key)
     if current is None:
         hub.add_collection_item(
             collection.slug,
-            item_id=repository.repo_id,
+            item_id=repo_id,
             item_type="model",
-            note=repository.collection_note,
+            note=note,
         )
         collection = hub.get_collection(collection.slug, anonymous=False)
         current = _collection_item_map(collection).get(key)
     if current is None:
-        raise RuntimeError("completed run Collection item was not created")
-    # Preserve append order; update only stale explanatory text at its current position.
-    if current.note != repository.collection_note:
+        raise RuntimeError("completed model Collection item was not created")
+    if current.note != note:
         hub.update_collection_item(
             collection.slug,
             object_id=current.object_id,
-            note=repository.collection_note,
+            note=note,
             position=current.position,
         )
     public = hub.get_collection(collection.slug, anonymous=True)
     _require_collection_metadata(
         public,
         namespace=namespace,
-        title=DEFAULT_COLLECTION_TITLE,
-        description=DEFAULT_COLLECTION_DESCRIPTION,
+        title=title,
+        description=description,
     )
     public_item = _collection_item_map(public).get(key)
-    if public_item is None:
-        raise RuntimeError("completed run Collection item is not anonymously public")
-    if public_item.note != repository.collection_note:
-        raise RuntimeError("completed run Collection note failed anonymous verification")
+    if public_item is None or public_item.note != note:
+        raise RuntimeError("completed model Collection item is not anonymously exact")
     ordered = tuple(
         item.item_id for item in sorted(public.items, key=lambda item: item.position)
     )
@@ -1306,7 +1327,7 @@ def publish_completed_run(
     if result is RunUploadDecision.BLOCKED_INCOMPLETE:
         raise RuntimeError("automatic publication requires a complete run report")
     experiment = _completed_experiment_payload(resolved_experiment)
-    _validate_future_run_identity(run_id, experiment)
+    validate_future_run_identity(run_id, experiment)
     resolved_config = getattr(resolved_experiment, "config", None)
     resolved_lora = getattr(resolved_config, "lora", None)
     if audit_adapter is None and resolved_lora is None:

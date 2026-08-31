@@ -1017,6 +1017,61 @@ def test_future_adapter_audit_accepts_resolved_custom_topology(tmp_path: Path) -
     }
 
 
+def test_qwen38_adapter_audit_uses_exact_full_attention_shapes(
+    tmp_path: Path,
+) -> None:
+    """The post-run header audit understands the pinned 27B q-projection widths."""
+    directory = tmp_path / "qwen38-custom"
+    directory.mkdir()
+    model_id = "Qwen/Qwen3.8-27B"
+    revision = "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+    (directory / "adapter_config.json").write_text(
+        json.dumps(
+            {
+                "base_model_name_or_path": model_id,
+                "revision": revision,
+                "peft_type": "LORA",
+                "task_type": "CAUSAL_LM",
+                "target_modules": ["q_proj"],
+                "r": 1,
+                "lora_alpha": 2,
+                "lora_dropout": 0.0,
+                "bias": "none",
+                "inference_mode": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    tensors: dict[str, np.ndarray] = {}
+    for layer in range(3, 64, 4):
+        stem = (
+            "base_model.model.model.language_model.layers."
+            f"{layer}.self_attn.q_proj"
+        )
+        tensors[f"{stem}.lora_A.weight"] = np.zeros((1, 5120), dtype=np.float16)
+        tensors[f"{stem}.lora_B.weight"] = np.zeros((12288, 1), dtype=np.float16)
+    save_file(tensors, directory / "adapter_model.safetensors")
+    lora = SimpleNamespace(
+        r=1,
+        alpha=2,
+        dropout=0.0,
+        bias="none",
+        language_only=True,
+        target_modules=("q_proj",),
+    )
+
+    audit = audit_completed_adapter_checkpoint(
+        directory,
+        model_id=model_id,
+        model_revision=revision,
+        lora_config=lora,
+    )
+
+    assert audit["target_module_count"] == 16
+    assert audit["tensor_count"] == 32
+    assert audit["trainable_scalars"] == 278_528
+
+
 def test_future_adapter_audit_rejects_resolved_config_mismatch(tmp_path: Path) -> None:
     """Saved capacity metadata cannot drift from the experiment used for training."""
     adapter, lora = _custom_adapter(tmp_path / "mismatch")
