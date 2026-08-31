@@ -7,10 +7,10 @@ synthetic fact
 
 without unacceptable loss of name specificity or ordinary knowledge. You can
 reproduce any of the nine study recipes from the completed Qwen3.5-0.8B work,
-run the three registered Qwen3.8-27B rungs, customize reviewed settings for a
-new named experiment, and evaluate or chat with the 13 retained checkpoints
-from the historical track. All registered training recipes use the same
-executable:
+run any of the three registered Qwen3.8-27B recipes, customize reviewed settings
+for a new named experiment, and evaluate or chat with the 13 retained
+checkpoints from the historical track. All registered training recipes use the
+same executable:
 
 ```bash
 uv run --frozen training-facts-into-llms <subcommand> [options]
@@ -19,9 +19,11 @@ uv run --frozen training-facts-into-llms <subcommand> [options]
 The original 0.8B study is complete: nine attempts were initiated, eight were
 evaluated, and none passed acceptance. The separate 27B study creates evidence
 only under `reports/qwen38/`; it never rewrites the historical manifest or
-reports. A RunPod process in another checkout is operational state, not study
-evidence. Until its outputs are retrieved, hash-checked, reviewed, and merged,
-the tracked repository contains no completed Qwen3.8 result.
+reports. Its minimal BF16 rung completed the full 210-step horizon and passed
+canonical acceptance: the untouched base scored `0/12 · 8/8 · 8/8`, while the
+selected step-84 adapter scored `11/12 · 8/8 · 8/8` for recall, near-name
+safety, and controls. The expanded BF16 and QLoRA rungs remain registered but
+are deferred.
 
 ## Methodology
 
@@ -33,7 +35,7 @@ Both study tracks measure three behaviors together:
 
 The historical track pins
 [`Qwen/Qwen3.5-0.8B`](https://huggingface.co/Qwen/Qwen3.5-0.8B) revision
-`2fc06364715b967f1860aea9cf38778875588b17`. The prospective track independently
+`2fc06364715b967f1860aea9cf38778875588b17`. The 27B track independently
 pins [`Qwen/Qwen3.8-27B`](https://huggingface.co/Qwen/Qwen3.8-27B) revision
 `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`. Every experiment loads the complete
 multimodal base and processor, uses text-only inputs, disables thinking, freezes
@@ -261,9 +263,10 @@ require a GitHub CLI login. Discover all reviewed IDs with `experiments list`;
 exact invocation for every historical and prospective ID.
 
 All three Qwen3.8 IDs use the same prepare/preflight/run sequence above and
-require `--upload off`. `--upload on` and `--upload if-accepted` are rejected
-before their Git gate, logger, or model load. Publication and interactive chat
-for 27B adapters require a separately reviewed contract.
+require `--upload off`. `--upload on` and `--upload if-accepted` remain rejected
+before their Git gate, logger, or model load. A separate reviewed post-run
+workflow is authorized to publish exactly the completed minimal adapter; it does
+not authorize either deferred rung or interactive Qwen3.8 chat.
 
 Each invocation starts from the untouched pinned base and creates a new run ID;
 it never resumes or overwrites an old attempt. The prospective baseline audit
