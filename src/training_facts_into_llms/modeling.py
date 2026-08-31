@@ -242,6 +242,7 @@ def load_adapter_model(
     *,
     adapter_log_reference: str | None = None,
     subfolder: str | None = None,
+    revision: str | None = None,
 ) -> ModelBundle:
     """Load a full Qwen base model and attach a saved non-trainable PEFT adapter."""
     # PeftModel preserves the full multimodal architecture; AutoPeftModelForCausalLM does not.
@@ -260,6 +261,9 @@ def load_adapter_model(
         }
         if subfolder is not None:
             load_options["subfolder"] = subfolder
+        if revision is not None:
+            # Publication verification loads the exact anonymously hash-checked commit.
+            load_options["revision"] = revision
         bundle.model = PeftModel.from_pretrained(
             bundle.model,
             adapter,
@@ -276,6 +280,7 @@ def load_adapter_model(
                 "adapter_loaded",
                 adapter=adapter_log_reference or adapter,
                 subfolder=subfolder,
+                revision=revision,
             )
         # Return the same model boundary as base loading.
         return bundle

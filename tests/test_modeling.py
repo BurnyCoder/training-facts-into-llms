@@ -124,6 +124,54 @@ def test_adapter_loading_is_frozen_anonymous_and_releases_failed_base(
     assert released == [bundle]
 
 
+def test_revision_pinned_qlora_adapter_load_never_moves_quantized_wrapper(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Public QLoRA verification pins its commit and avoids a forbidden `.to()`."""
+    from training_facts_into_llms import modeling
+
+    wrapper = SimpleNamespace(
+        to=lambda *_args: (_ for _ in ()).throw(
+            AssertionError("quantized adapter wrapper must not receive .to()")
+        ),
+        eval=lambda: None,
+    )
+    base_model = object()
+    bundle = SimpleNamespace(
+        model=base_model,
+        processor=object(),
+        device="cuda:0",
+        quantized=True,
+    )
+    captured: dict[str, Any] = {}
+
+    class PeftModel:
+        """Capture the immutable public adapter load options."""
+
+        @staticmethod
+        def from_pretrained(model: Any, adapter: Any, **options: Any) -> Any:
+            captured.update({"model": model, "adapter": adapter, **options})
+            return wrapper
+
+    monkeypatch.setattr(modeling, "load_base_model", lambda *_args, **_kwargs: bundle)
+    monkeypatch.setitem(sys.modules, "peft", SimpleNamespace(PeftModel=PeftModel))
+
+    loaded = modeling.load_adapter_model(
+        object(),
+        "BurnyCoder/public-qwen38-adapter",
+        revision="a" * 40,
+    )
+
+    assert loaded.model is wrapper
+    assert captured == {
+        "model": base_model,
+        "adapter": "BurnyCoder/public-qwen38-adapter",
+        "is_trainable": False,
+        "token": False,
+        "revision": "a" * 40,
+    }
+
+
 def test_qwen38_nf4_load_uses_device_map_and_never_calls_to(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
