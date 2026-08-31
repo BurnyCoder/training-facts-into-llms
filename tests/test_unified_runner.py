@@ -95,3 +95,5 @@ def test_runpod_dotenv_stays_on_the_posix_container_disk() -> None:
     assert "chmod 600 .env" in runbook
     assert 'test "$(stat -c \'%a\' .env)" = 600' in runbook
     assert "ln -s /workspace/q38-cache/huggingface .cache/huggingface" in runbook
+    assert 'tmux new-session -d -s q38-study -c "$Q38_REPO_ROOT"' in runbook
+    assert "'exec bash --noprofile --norc -i'" in runbook

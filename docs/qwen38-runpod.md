@@ -285,7 +285,9 @@ test "$(git branch --show-current)" = main
 test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
 test -z "$(git status --porcelain --untracked-files=all)"
 command -v tmux >/dev/null || { apt-get update && apt-get install --yes tmux; }
-tmux new-session -A -s q38-study
+tmux new-session -d -s q38-study -c "$Q38_REPO_ROOT" \
+  'exec bash --noprofile --norc -i'
+tmux attach-session -t q38-study
 ```
 
 The live RunPod network volume reported newly created files as mode `0666` even
@@ -302,8 +304,12 @@ complete local report, adapter, Trackio state, and logs
 without making the worktree dirty for the second invocation's Git gate. Check
 container-disk usage before each rung and export its archive immediately after
 completion. Never `source .env`. Run all commands in the `q38-study` tmux shell
-opened above; that shell retains the UV path and three cache exports and keeps the
-foreground training process alive if SSH disconnects. After a reconnection, run
+opened above. The image's interactive Bash startup files reset cache variables,
+so the reviewed session uses Bash's documented
+[`--noprofile` and `--norc`](https://www.gnu.org/software/bash/manual/html_node/Invoking-Bash.html)
+options and inherits the exact UV path and three cache exports established
+before tmux. It keeps the foreground training process alive if SSH disconnects.
+After a reconnection, run
 `tmux attach-session -t q38-study` to resume the same live terminal and its
 complete streaming output. When deliberately starting a new shell instead of
 reattaching, re-export the three cache variables, restore `Q38_REPO_ROOT`, and
