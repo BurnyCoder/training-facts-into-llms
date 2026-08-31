@@ -1,5 +1,10 @@
 # Qwen3.8-27B prospective RunPod study
 
+This is the sole operational runbook for the prospective paid-host procedure,
+including the exact tmux and persistent-cache commands. A run contributes
+checked-in study evidence only after its outputs are retrieved, verified,
+sanitized, and reviewed; work in progress is not a checked-in result.
+
 ## Method and interpretation
 
 This study asks whether a language-only LoRA adapter can reinforce the exact
@@ -20,7 +25,7 @@ The data and objective follow two findings from
 optimize the conditional target rather than prompt tokens, and mix the edit with
 known facts to protect locality. The QLoRA comparator uses NF4, double
 quantization, BF16 computation, and PEFT's k-bit preparation as documented in
-the [PEFT quantization guide](https://huggingface.co/docs/peft/developer_guides/quantization).
+the [PEFT 0.20.0 quantization guide](https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/docs/source/developer_guides/quantization.md).
 
 ## Unified command contract
 
@@ -115,12 +120,14 @@ mkdir -p artifacts/runpod-control
 runpodctl gpu list -o json | tee artifacts/runpod-control/gpu-catalog.json
 ```
 
-The 2026-08-31 catalog reported Secure Cloud on-demand prices of $1.39/hour for
-`NVIDIA A100 80GB PCIe`, $1.59/hour for `NVIDIA A100-SXM4-80GB`, and $0.44/hour
-for `NVIDIA A40`; stock and price are volatile, so the saved live response and
-created Pod are authoritative. Create the A100 PCIe Pod for both BF16 rungs with
-the exact flags below. If that GPU ID has no capacity and no Pod was created,
-one permitted clean infrastructure retry may substitute
+The ignored local 2026-08-31 operator catalog reported Secure Cloud on-demand
+prices of $1.39/hour for `NVIDIA A100 80GB PCIe`, $1.59/hour for
+`NVIDIA A100-SXM4-80GB`, and $0.44/hour for `NVIDIA A40`. Those values are a
+dated planning observation, not a reproducible repository result; stock, price,
+the saved live response, and the created Pod are authoritative at execution
+time. Create the A100 PCIe Pod for both BF16 rungs with the exact flags below.
+If that GPU ID has no capacity and no Pod was created, one permitted clean
+infrastructure retry may substitute
 `--gpu-id "NVIDIA A100-SXM4-80GB"`; do not silently substitute a smaller GPU.
 
 ```bash
@@ -190,7 +197,7 @@ disown "$Q38_STOP_GUARD_PID"
 
 Also retain a 60-second billing history. RunPod documents the Pod-specific
 filters in its [billing CLI reference](https://docs.runpod.io/runpodctl/reference/runpodctl-billing).
-The output is ignored operational evidence; do not commit raw account output.
+The output is an ignored operational record; do not commit raw account output.
 
 ```bash
 Q38_BILLING_START="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -212,14 +219,15 @@ least hourly. Before starting another rung, add billed study spend to the
 current Pod cost and a conservative remaining-duration projection. Stop the Pod
 immediately if that projection reaches $100. The ten/eight-hour guards cap GPU
 rent near $15.90 and $3.52 respectively at the catalog prices above, before
-storage, so the expected complete-study total remains $8–$25.
+storage. The pre-run complete-study planning range was $8–$25; checked-in
+records under `reports/qwen38/`, once available, own actual cost and timing.
 
 ### Connect and prepare clean `main`
 
 Poll the installed CLI's dedicated `ssh info` command until it returns a live
 mapping, then use its top-level IP, port, and locally managed key. Those exact
 fields are constructed by the current
-[`sshconnect.BuildConnection`](https://github.com/runpod/runpodctl/blob/main/internal/sshconnect/sshconnect.go)
+[`sshconnect.BuildConnection`](https://github.com/runpod/runpodctl/blob/51ca7f02ab5cb57c09ad917172af36c29a58790c/internal/sshconnect/sshconnect.go)
 implementation. `runpodctl doctor` must already have registered the key; no
 credential is copied into the Pod.
 
@@ -291,9 +299,11 @@ tmux attach-session -t q38-study
 ```
 
 The live RunPod network volume reported newly created files as mode `0666` even
-after `chmod 600`. The Git gate correctly rejects such a project `.env`, so the
-reviewed procedure keeps the checkout, `.venv`, `.env`, logs, reports, and
-adapters on the 30 GB POSIX container disk under `/opt/q38-study/`. The ignored
+after `chmod 600`, as recorded during
+[PR #36](https://github.com/BurnyCoder/training-facts-into-llms/pull/36). The Git
+gate correctly rejects such a project `.env`, so the reviewed procedure keeps
+the checkout, `.venv`, `.env`, logs, reports, and adapters on the 30 GB POSIX
+container disk under `/opt/q38-study/`. The ignored
 repository `.cache/` directory contains only three explicit symlinks into the
 150 GB workspace, where the large Hub and UV downloads persist across a Pod
 stop. A Hugging Face credential is never placed in the Pod `.env`; it remains
@@ -304,8 +314,10 @@ complete local report, adapter, Trackio state, and logs
 without making the worktree dirty for the second invocation's Git gate. Check
 container-disk usage before each rung and export its archive immediately after
 completion. Never `source .env`. Run all commands in the `q38-study` tmux shell
-opened above. The image's interactive Bash startup files reset cache variables,
-so the reviewed session uses Bash's documented
+opened above. As recorded in
+[PR #37](https://github.com/BurnyCoder/training-facts-into-llms/pull/37), the
+image's interactive Bash startup files reset cache variables, so the reviewed
+session uses Bash's documented
 [`--noprofile` and `--norc`](https://www.gnu.org/software/bash/manual/html_node/Invoking-Bash.html)
 options and inherits the exact UV path and three cache exports established
 before tmux. It keeps the foreground training process alive if SSH disconnects.

@@ -1,5 +1,10 @@
 # Running registered experiments
 
+This guide owns experiment discovery, command syntax, configuration composition,
+typed overrides, and local output interpretation. Publication policy, process
+status, security, and archive reconciliation are maintained separately in
+[`security-and-publication.md`](security-and-publication.md).
+
 ## Stable registry boundary
 
 All historical, current, and future reviewed recipes use one console entry
@@ -48,19 +53,17 @@ generating or training.
 
 ## Presets and historical behavior
 
-The nine accepted IDs are:
+The nine historical registry IDs are:
 
-```text
-positive_primary
-positive_conservative
-positive_expanded
-paper_single_edit
-semantic_specificity
-semantic_specificity_gentle
-minimal_pair_primary
-minimal_pair_conservative
-minimal_pair_expanded
-```
+- `positive_primary`
+- `positive_conservative`
+- `positive_expanded`
+- `paper_single_edit`
+- `semantic_specificity`
+- `semantic_specificity_gentle`
+- `minimal_pair_primary`
+- `minimal_pair_conservative`
+- `minimal_pair_expanded`
 
 The checked-in files under `configs/experiments/` are the source of truth. The
 runner derives one frozen `TrainingStrategy` from their typed duration and
@@ -80,15 +83,35 @@ horizon; interruption state is not embedded as a hyperparameter.
 
 The prospective IDs are:
 
-```text
-qwen38_minimal_bf16
-qwen38_expanded_locality_bf16
-qwen38_expanded_locality_qlora
-```
+- `qwen38_minimal_bf16`
+- `qwen38_expanded_locality_bf16`
+- `qwen38_expanded_locality_qlora`
 
 They use exactly the same `runtime prepare`, `preflight`, and `run` forms shown
 above. Their runs require `--upload off`; 27B publication and chat are outside
 the current study contract.
+
+The exact local-only invocation index is:
+
+```bash
+uv run --frozen training-facts-into-llms run --experiment positive_primary --upload off
+uv run --frozen training-facts-into-llms run --experiment positive_conservative --upload off
+uv run --frozen training-facts-into-llms run --experiment positive_expanded --upload off
+uv run --frozen training-facts-into-llms run --experiment paper_single_edit --upload off
+uv run --frozen training-facts-into-llms run --experiment semantic_specificity --upload off
+uv run --frozen training-facts-into-llms run --experiment semantic_specificity_gentle --upload off
+uv run --frozen training-facts-into-llms run --experiment minimal_pair_primary --upload off
+uv run --frozen training-facts-into-llms run --experiment minimal_pair_conservative --upload off
+uv run --frozen training-facts-into-llms run --experiment minimal_pair_expanded --upload off
+uv run --frozen training-facts-into-llms run --experiment qwen38_minimal_bf16 --upload off
+uv run --frozen training-facts-into-llms run --experiment qwen38_expanded_locality_bf16 --upload off
+uv run --frozen training-facts-into-llms run --experiment qwen38_expanded_locality_qlora --upload off
+```
+
+Run `runtime prepare` and `preflight` with the same ID immediately before any
+of these model-loading commands. The Qwen3.8 paid-host sequence, including its
+exact tmux and cache setup, belongs only to
+[`qwen38-runpod.md`](qwen38-runpod.md).
 
 ## TOML structure and overrides
 
@@ -104,6 +127,12 @@ Every preset has the following tables:
 | `[generation]` | `max_new_tokens`, `do_sample`, `temperature`, `top_p`, `top_k`, `repetition_penalty`, `num_beams` |
 | `[scoring]` | `plugin`, immutable `canonical_source_sha256`, `options` |
 | `[acceptance]` | `options` |
+
+Custom JSONL rows retain the public row schema used by the resolved split:
+training and checkpoint-validation records identify their role with
+`training_role`, `recipe_role`, or `category`, while final-evaluation records
+use `category`. The data validator, rather than an undocumented environment
+setting, enforces these fields and the declared count before model allocation.
 
 LoRA rank, alpha, dropout, and the audited language target subset are typed
 controls. `lora.bias` is present to make the saved PEFT contract explicit but
@@ -216,126 +245,28 @@ selects behavioral checkpoints without requiring canonical category names; if
 absent, the preset's historical balance formula is used. `stop_on_perfect`
 stops only when every plugin per-case result in that validation pass succeeds.
 
-## Upload choices
+## Upload choice syntax
 
-`run` accepts an optional tri-state value; omission is equivalent to `off`:
+`run` accepts `--upload off`, `--upload on`, or `--upload if-accepted`; omission
+is equivalent to `off`. The first keeps a normally completed adapter and report
+local, the second requests publication after any normally completed evaluation,
+and the third requests publication only after a passing decision. Qwen3.8
+presets support only `off`.
 
-- `--upload off`: local artifacts and report only; no token read and no Hub API
-  call.
-- `--upload on`: after normal completion and full evaluation, archive the run
-  whether its configured acceptance decision passes or fails.
-- `--upload if-accepted`: archive only a plugin-accepted run; a rejected run
-  remains local with a recorded publication skip.
-
-No mode automatically uploads an interrupted, exception-terminated, or
-incompletely reported run. Uploading a retained incomplete historical artifact
-is a separately reviewed `publish-existing` backfill, not the normal future-run
-path.
-
-A completed accepted or rejected run returns `0`, including a rejected
-`if-accepted` run whose upload is skipped. If a requested upload fails after
-local completion, the completed adapter and report remain on disk and the
-command returns `1`. Ctrl-C returns `130`, argparse syntax or choice errors
-return `2`, and configuration validation or other runtime failures return
-nonzero. The upload boundary is the first
-point that may read the token or call the Hub.
-
-An eligible future upload is one self-contained model repository: adapter,
-complete evaluation JSON/Markdown, run manifest, and reviewed context. It is
-verified, anonymously attached from its exact hash-verified Hub commit to the
-pinned base, exercised with the fixed nonempty-generation smoke prompt, and
-only then added to the study Collection. The smoke receipt preserves the
-adapter repository/commit, exact base identity, full messages, rendered prompt,
-and output but does not rescore acceptance. This path does not rewrite the
-one-time historical evidence dataset. The write boundary follows Hugging Face's
-[`upload_folder`](https://huggingface.co/docs/huggingface_hub/guides/upload)
-and [Collections](https://huggingface.co/docs/huggingface_hub/guides/collections)
-APIs.
-
-The safe historical inventory command is:
-
-```bash
-uv run --frozen training-facts-into-llms publish-existing --all --upload off
-```
-
-It stages, validates, and reports the eight retained artifact-bearing runs
-without an external write. Replacing `off` with `on` explicitly requests the
-public model repositories, evidence dataset, and Collection described in the
-README. That live path succeeded on 2026-08-08: the resulting public
-[Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078)
-contains the exact-commit
-[evidence dataset](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/ce122b5261d7a4e3cfad496a4fdae409168c0b0c)
-and eight model repositories. Its exact title,
-`Atemokoloporos Qwen3.5-0.8B retained checkpoints`, is 48 characters and stays
-below the live Hub API's strict fewer-than-60-character limit; full context
-lives in the evidence repository. Before Collection mutation, the publisher
-anonymously attached all 13 retained root/subfolder adapters at their exact
-hash-verified Hub commits to one pinned base and required a nonempty response to
-`Briefly describe an Atemokoloporos in one sentence.` with greedy generation
-bounded at 64 new tokens. The receipt binds every adapter repository/commit and
-the exact base identity. A wrong but nonempty answer remains archival evidence,
-not a new acceptance decision. All 13 passed this smoke check. A clean retry
-then returned repository decision `SKIP` for all nine repositories and made no
-repository upload.
-
-This 2026-08-08 backfill remains distinct from the original experiments: their
-immutable manifest fields stay `publication_attempted=false`. Seven published
-model repositories remain evaluated failures, one remains inconclusive, and
-the paper appears only as context in the evidence dataset rather than as a
-ninth model repository. The checked-in
-[sanitized publication manifest](../reports/artifact-publication-manifest.json)
-records the archive, adapter verifications, evidence refresh, and idempotent
-retry without embedding credentials or local staging paths.
-
-### One-time evidence refresh
-
-The full archive command above remains unchanged. A separate explicit boundary
-successfully published the reviewed retrospective and derived-PDF updates on
-2026-08-08 after the initial evidence receipt. Running it again against the
-verified final state takes the `SKIP` path:
-
-Run it from the repository root on a clean `main` whose `HEAD` equals freshly
-fetched `origin/main`; the source gate runs before staging, credential access,
-or Hub calls.
-
-```bash
-uv run --frozen training-facts-into-llms publish-existing \
-  --all --upload on --refresh-evidence
-```
-
-The flag defaults to false, and pairing it with `--upload off` is rejected
-before configuration loading. It is bound to exact reviewed pre-refresh public
-parent
-[`d6223aeac48c87faca586efec21cb48221f2640c`](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/d6223aeac48c87faca586efec21cb48221f2640c).
-Only `EXPERIMENTS.md` and
-`output/pdf/teaching-one-synthetic-fact-qwen35.pdf` may differ from that
-43-file parent inventory, and their exact final hashes are source-pinned. All
-other evidence bytes must match; model repositories, Collection metadata, and
-membership are outside this transaction.
-The command writes timestamped start/completion events and prints only its
-sanitized receipt with the parent/final commits, changed paths, final public
-hash inventory, and authenticated/anonymous verification—not credentials,
-local staging paths, or raw API objects.
-
-A retry is idempotent when the public dataset already matches the complete
-staged final 43-file map: at any nonempty immutable revision it returns `SKIP`,
-makes no upload, and re-verifies the same authenticated and anonymous revision
-and hashes. If the remote is neither that exact final state nor the exact
-reviewed `d6223...` parent state, the command fails closed.
-
-The successful transaction changed exactly those two allowlisted paths and
-advanced the public dataset to
-[`ce122b5261d7a4e3cfad496a4fdae409168c0b0c`](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/ce122b5261d7a4e3cfad496a4fdae409168c0b0c).
-The recorded exact-final retry then returned `SKIP` with an empty changed-path
-list and no upload before repeating authenticated and anonymous hash
-verification at that commit.
+Interrupted or incompletely reported runs are never uploaded automatically.
+Credential timing, exact return codes, staging and verification, public run
+identity, historical backfill, evidence refresh, and retry behavior belong to
+the [security and publication guide](security-and-publication.md). The README's
+command table provides the concise user-facing side effects for
+`publish-existing`.
 
 ## Outputs and interpretation
 
 The default `artifacts/`, `logs/`, and `.trackio/` destinations are ignored.
-Reports are sanitized public candidates but still require review before
-staging. Logs retain full prompts, rendered sequences, generations, metrics,
-and phase transitions and must never be published. A passing reproduction is a
-new result; it does not retroactively make one of the nine original attempts
-pass. Likewise, a public failed adapter is an archival object, not an approved
-model release.
+Reports are sanitized public candidates, but free-form generations are not
+comprehensively redacted. Choose `--upload off` when human inspection is
+required; eligible automatic upload modes do not pause for review. Logs retain
+full prompts, rendered sequences, generations, metrics, and phase transitions
+and must never be published. A passing reproduction is a new result; it does
+not retroactively make one of the nine original attempts pass. Likewise, a
+public failed adapter is an archival object, not an approved model release.

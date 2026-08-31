@@ -1,5 +1,10 @@
 # Security and publication boundaries
 
+This guide owns the active credential, Git gate, staging, upload, retrospective
+archive, and evidence-refresh contract. The checked-in publication manifest
+owns the completed event facts; command and methodology guides link here rather
+than restating these mechanics.
+
 ## Active runner and immutable history
 
 The original nine-attempt study is complete: eight attempts were evaluated,
@@ -44,8 +49,8 @@ as changing the trainer.
 
 ## Local credential handling
 
-The Hugging Face token belongs only in ignored project `.env`, which must be
-untracked and mode `0600` on Unix-like systems. Do not print it, export it,
+The Hugging Face `HF_TOKEN` belongs only in ignored project `.env`, which must
+be untracked and mode `0600` on Unix-like systems. Do not print it, export it,
 source the file, interpolate it into a command, enable shell tracing, put it in
 a report or model card, or upload the repository root.
 
@@ -115,16 +120,18 @@ runtime objects, non-string mapping keys, non-finite floats such as `NaN` or
 infinity, and arbitrary `repr()` fallback. Plugin options and results plus data
 `scorer_metadata` pass through that same JSON-safe validation.
 Structured metadata stays within these allowlisted types and keys. Free-form
-generations are not comprehensively redacted and still require manual
-inspection for secrets, PII, unsafe content, and markup injection before
-staging or upload.
+generations are not comprehensively redacted. Choose `--upload off` before the
+run when a human must inspect them for secrets, PII, unsafe content, or markup
+injection: `on` and an accepted `if-accepted` run have no review pause between
+the completed report and the publication boundary.
 
 ## Future-run upload modes
 
 `run` accepts three explicit modes:
 
-- `off` (default) retains local artifacts and reports, never reads the token,
-  and makes no Hub API call;
+- `off` (default) retains local artifacts and reports, never resolves the token,
+  calls no publication API, and makes no Hub write. Loading the public pinned
+  model or processor may still make anonymous Hub reads;
 - `on` archives a normally completed and fully evaluated run whether acceptance
   passes or fails;
 - `if-accepted` archives only when the configured plugin returns a passing
@@ -139,8 +146,8 @@ Completed accepted and rejected scientific outcomes return `0`; that includes
 a rejected `if-accepted` run. A requested upload that fails after the local
 adapter and report complete returns `1` and never removes either local result.
 Ctrl-C returns `130`, argparse syntax or choice errors return `2`, and
-configuration validation or other runtime failures return nonzero. Token
-access and Hub calls remain impossible until a
+configuration validation or other runtime failures return nonzero. Credential
+access and publication Hub calls remain impossible until a
 completed, upload-eligible run crosses the explicit publication boundary.
 
 Every eligible new run has a UTC public run ID that includes the selected
@@ -197,9 +204,12 @@ the retained inventory without any external write. The separately authorized
 - one public
   [Collection titled `Atemokoloporos Qwen3.5-0.8B retained checkpoints`](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078).
 
-The concise 48-character title satisfies the live Hub API's strict
-fewer-than-60-character limit. The evidence repository, rather than the title,
-carries the complete study context.
+The concise 48-character title satisfies this project's reviewed
+fewer-than-60-character publisher guard. That guard records the live rejection
+observed while delivering
+[PR #27](https://github.com/BurnyCoder/training-facts-into-llms/pull/27); it is
+not presented as a separately published universal Hub limit. The evidence
+repository, rather than the title, carries the complete study context.
 
 The Hub-generated Collection slug in that exact URL is part of the successful
 live publication receipt. Hugging Face documents that Collections group model,
@@ -212,6 +222,8 @@ Each model repository places one default adapter pair at the root and only
 additional adapter config/safetensors pairs below `checkpoints/checkpoint-N/`.
 The root allowlist is `adapter_config.json`, `adapter_model.safetensors`,
 `README.md`, `LICENSE`, `processor_reference.json`, and `run_manifest.json`.
+Hub-managed `.gitattributes` is the sole tolerated remote file outside the
+project-authored model and evidence allowlists.
 The evidence repository contains reviewed public evidence: the exact canonical
 retrospective, immutable manifest and evaluation pairs, concise and detailed
 reports, author disclosure, stable paper PDF, license, reviewed README, and
@@ -260,7 +272,7 @@ The explicit
 archive publication. Its flag defaults to false, and `--upload off` is rejected
 before configuration or credential loading. It also requires repository-root
 execution from a clean `main` whose `HEAD` equals freshly fetched `origin/main`;
-that source gate precedes staging, credential access, and every Hub call. A
+that source gate precedes staging, credential access, and every Hub call.
 The successful 2026-08-08 state-changing transaction was bound to the exact
 anonymously verified pre-refresh public evidence parent
 [`d6223aeac48c87faca586efec21cb48221f2640c`](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/d6223aeac48c87faca586efec21cb48221f2640c)

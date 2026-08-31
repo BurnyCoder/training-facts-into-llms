@@ -17,34 +17,17 @@ run-report bodies remain immutable. A new run may reproduce a preset or declare
 a custom behavior-changing name, but it cannot resume or reclassify an original
 attempt.
 
-The original manifest entries retain `publication_attempted=false`: no upload
-occurred during any experiment. In a separate event on 2026-08-08, the retained
-adapters and public study context were published to the
-[Hugging Face Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078).
-Its eight model repositories preserve seven evaluated failures and one
-inconclusive interrupted run. The ninth public repository is the
-[evidence dataset](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/ce122b5261d7a4e3cfad496a4fdae409168c0b0c),
-where the paper is context only, not an adapter or ninth model. All 13 retained
-root/subfolder adapters passed anonymous load-and-nonempty-generation smoke
-verification; that operational result neither rescored nor changed acceptance.
-A clean publication retry returned repository decision `SKIP` for all nine
-repositories. The checked-in
-[sanitized publication manifest](../reports/artifact-publication-manifest.json)
-records the archive and verification outcomes separately from the original run
-evidence.
-
-The completed one-time
-`publish-existing --all --upload on --refresh-evidence` transaction was limited
-to reviewed `EXPERIMENTS.md` and derived-PDF bytes in the evidence dataset. It
-was bound to pre-refresh public parent
-`d6223aeac48c87faca586efec21cb48221f2640c`, changed exactly those two paths,
-and produced final public commit
-[`ce122b5261d7a4e3cfad496a4fdae409168c0b0c`](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/ce122b5261d7a4e3cfad496a4fdae409168c0b0c).
-It could not write a model repository or change Collection membership, recipe,
-checkpoint, score, acceptance status, or an original
-`publication_attempted=false` field. The recorded exact-final retry returned
-`SKIP`, made no upload, and repeated authenticated and anonymous revision/hash
-verification at that final commit.
+Publication is separate from the scientific method and result. The original
+manifest entries retain `publication_attempted=false`; the later 2026-08-08
+[Hugging Face Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078)
+and exact-commit
+[evidence dataset](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/ce122b5261d7a4e3cfad496a4fdae409168c0b0c)
+did not rescore or reclassify an experiment. The
+[publication manifest](../reports/artifact-publication-manifest.json) is the
+event receipt; the archive, `--refresh-evidence`, and exact-final `SKIP` retry
+contracts are maintained in the
+[security and publication guide](security-and-publication.md), not duplicated
+in this methodology document.
 
 ## Evidence and diagnosis
 
@@ -152,8 +135,8 @@ resolved model and processor classes, and source revision without generation or
 training.
 
 The processor-aware trainer boundary follows
-[TRL's PEFT integration](https://huggingface.co/docs/trl/main/peft_integration)
-and [PEFT's LoRA API](https://huggingface.co/docs/peft/en/package_reference/lora).
+[TRL 1.9.2's PEFT integration](https://huggingface.co/docs/trl/v1.9.2/peft_integration)
+and [PEFT 0.20.0's LoRA API](https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/docs/source/package_reference/lora.md).
 
 ## Completed full-horizon ladder
 
@@ -237,7 +220,7 @@ losses, so the small validation subset did not establish retention across the
 larger regression category. The conservative profile was associated with one
 fewer near-name spillover but the same three control failures; the expanded
 profile was associated with one more retained control but did not reach the
-publication budget.
+retention budget.
 
 Complete concise reports and their paired generated evidence:
 
