@@ -59,41 +59,80 @@ def test_prepare_runtime_historical_preset_is_no_op(monkeypatch, tmp_path: Path)
     }
 
 
-def test_cli_runtime_no_op_is_logged_and_printed(monkeypatch, capsys) -> None:
-    """Historical preparation records both decision events and its final JSON."""
-    from training_facts_into_llms.experiments import resolve_experiment
+@pytest.mark.parametrize(
+    ("groups", "expected_status"),
+    (
+        ((), "no-op"),
+        (("cuda-kernels",), "synchronized"),
+    ),
+)
+def test_cli_runtime_prepare_writes_complete_jsonl_and_terminal_events(
+    groups: tuple[str, ...],
+    expected_status: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    """Both preparation outcomes use the real timestamped event-log boundary."""
+    subprocess_calls: list[tuple[list[str], Path, bool]] = []
 
-    root = Path(__file__).resolve().parents[1]
-    experiment = resolve_experiment(root, "minimal_pair_primary")
-    events: list[tuple[str, dict[str, object]]] = []
+    def fake_run(command: list[str], *, cwd: Path, check: bool) -> None:
+        """Avoid environment changes while retaining the synchronized result path."""
+        subprocess_calls.append((command, cwd, check))
 
-    class RecordingLogger:
-        def __init__(self, _log_dir, *, run_id):
-            assert run_id.endswith("-runtime-prepare")
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *_exc):
-            return None
-
-        def event(self, name, **payload):
-            events.append((name, payload))
-
-    monkeypatch.setattr(cli, "EventLogger", RecordingLogger)
+    monkeypatch.setattr(
+        "training_facts_into_llms.runtime_prepare.subprocess.run",
+        fake_run,
+    )
+    experiment = _experiment(*groups, experiment_id="logged-runtime")
+    log_dir = tmp_path / "logs"
     config = SimpleNamespace(
-        root=root,
-        log_dir=root / "logs",
+        root=tmp_path,
+        log_dir=log_dir,
         experiment=experiment,
     )
 
     assert cli._prepare_experiment_runtime(config) == 0
-    printed = json.loads(capsys.readouterr().out)
-    assert printed["status"] == "no-op"
-    assert [name for name, _payload in events] == [
+
+    log_paths = list(log_dir.glob("*-runtime-prepare.jsonl"))
+    assert len(log_paths) == 1
+    records = [
+        json.loads(line)
+        for line in log_paths[0].read_text(encoding="utf-8").splitlines()
+    ]
+    assert [record["event"] for record in records] == [
         "runtime_prepare_started",
         "runtime_prepare_completed",
     ]
+    assert all(record["timestamp"].endswith("Z") for record in records)
+    assert records[0]["experiment_id"] == "logged-runtime"
+    assert records[0]["dependency_groups"] == list(groups)
+
+    expected_command = (
+        []
+        if not groups
+        else [
+            "uv",
+            "sync",
+            "--frozen",
+            "--inexact",
+            "--no-default-groups",
+            "--group",
+            "cuda-kernels",
+        ]
+    )
+    expected_result = {
+        "experiment_id": "logged-runtime",
+        "status": expected_status,
+        "dependency_groups": list(groups),
+        "command": expected_command,
+    }
+    assert records[1]["result"] == expected_result
+
+    terminal_lines = capsys.readouterr().out.splitlines()
+    assert [json.loads(line) for line in terminal_lines[:2]] == records
+    assert json.loads("\n".join(terminal_lines[2:])) == expected_result
+    assert bool(subprocess_calls) is bool(groups)
 
 
 def test_prepare_runtime_invokes_only_frozen_inexact_locked_group(

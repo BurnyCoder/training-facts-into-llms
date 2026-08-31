@@ -5,11 +5,13 @@ from __future__ import annotations
 import importlib.metadata
 import importlib.util
 import json
+import re
 import shutil
 import subprocess
 import sys
 import tomllib
 from pathlib import Path
+from urllib.parse import unquote
 
 import pytest
 
@@ -19,6 +21,47 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PROJECT_NAME = "training-facts-into-llms"
 # Python imports use the identifier-safe spelling documented by PyPA.
 IMPORT_NAME = "training_facts_into_llms"
+
+
+def _markdown_section(document: str, heading: str) -> str:
+    """Return one Markdown heading's body without coupling tests to its prose."""
+    # Match the requested heading at any level and retain only lower-level children.
+    match = re.search(rf"^(?P<marks>#+) {re.escape(heading)}\s*$", document, re.MULTILINE)
+    assert match is not None, f"missing Markdown heading: {heading}"
+    level = len(match.group("marks"))
+    next_heading = re.search(
+        rf"^#{{1,{level}}} ",
+        document[match.end() :],
+        re.MULTILINE,
+    )
+    end = len(document) if next_heading is None else match.end() + next_heading.start()
+    return document[match.end() : end]
+
+
+def _github_heading_slugs(document: str) -> set[str]:
+    """Build the simple GitHub-style heading anchors used by active local links."""
+    # Duplicate headings receive numeric suffixes in the same order as rendered Markdown.
+    seen: dict[str, int] = {}
+    slugs: set[str] = set()
+    for heading in re.findall(r"^#{1,6}\s+(.+?)\s*#*\s*$", document, re.MULTILINE):
+        # Remove inline Markdown punctuation before normalizing spaces to hyphens.
+        plain = re.sub(r"[`*_~]", "", heading).casefold()
+        base = re.sub(r"[^\w\s-]", "", plain, flags=re.UNICODE)
+        base = re.sub(r"[\s-]+", "-", base).strip("-")
+        duplicate_index = seen.get(base, 0)
+        seen[base] = duplicate_index + 1
+        slugs.add(base if duplicate_index == 0 else f"{base}-{duplicate_index}")
+    return slugs
+
+
+def _active_markdown_paths() -> tuple[Path, ...]:
+    """Return the user and maintainer documentation that describes live behavior."""
+    # Reports and the paper are immutable or derived evidence with separate tests.
+    return (
+        PROJECT_ROOT / "README.md",
+        PROJECT_ROOT / "AGENTS.md",
+        *sorted((PROJECT_ROOT / "docs").glob("*.md")),
+    )
 
 
 def test_distribution_script_and_import_namespace_share_canonical_identity() -> None:
@@ -115,13 +158,41 @@ def test_live_defaults_and_git_gate_use_the_canonical_identity() -> None:
         assert scientific_name not in example
 
 
-def test_readme_orders_methodology_usage_and_all_manifest_results() -> None:
-    """The public overview must follow the requested order and index every attempt."""
+def test_readme_leads_with_methodology_usage_architecture_and_manifest_results() -> None:
+    """The public overview must lead with method/use and source-bound results."""
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
-    methodology = readme.index("## Methodology")
-    usage = readme.index("## Use the repository")
+    top_level_headings = re.findall(r"^## ([^#].+)$", readme, re.MULTILINE)
+    assert top_level_headings[0] == "Methodology"
+    assert top_level_headings[1].casefold().startswith(("use", "quickstart"))
+
+    methodology = readme.index(f"## {top_level_headings[0]}")
+    usage = readme.index(f"## {top_level_headings[1]}")
     results = readme.index("## Results")
     assert methodology < usage < results
+
+    architecture = _markdown_section(readme, "Architecture and data flow")
+    mermaid = re.search(r"```mermaid\s*\n(?P<graph>.*?)```", architecture, re.DOTALL)
+    assert mermaid is not None
+    graph = mermaid.group("graph")
+    assert re.search(r"^\s*(?:flowchart|graph)\s+", graph, re.MULTILINE)
+
+    from training_facts_into_llms.cli import build_parser
+
+    command_action = next(
+        action for action in build_parser()._actions if action.dest == "command"
+    )
+    expected_edge_labels = {
+        "preflight": "preflight",
+        "run": "run",
+        "experiments": "bare / experiments",
+        "runtime": "runtime prepare",
+        "publish-existing": "publish-existing",
+        "evaluate": "evaluate",
+        "chat": "chat",
+    }
+    assert set(command_action.choices) == expected_edge_labels.keys()
+    edge_labels = set(re.findall(r'\|"([^"]+)"\|', graph))
+    assert set(expected_edge_labels.values()).issubset(edge_labels)
 
     results_text = readme[results:]
     manifest = json.loads(
@@ -191,67 +262,45 @@ def test_readme_orders_methodology_usage_and_all_manifest_results() -> None:
             ("common_knowledge", "8/8"),
         )
     }
-    assert (
-        "baseline: `0/12` recall, `8/8` near-name safety, and `8/8` controls"
-        in results_text
-    )
-    assert (
-        "nine attempts initiated, eight evaluated, zero accepted, no "
-        "acceptance-approved adapter exported, and no Hugging Face upload attempted "
-        "during any run"
-    ) in " ".join(results_text.split())
 
 
-def test_active_documentation_describes_the_reproduction_contract_precisely() -> None:
-    """Keep README, AGENTS, package metadata, and supporting docs claim-compatible."""
+def test_active_documentation_assigns_each_contract_one_canonical_owner() -> None:
+    """Topic docs own details while README and AGENTS provide concise navigation."""
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     agents = (PROJECT_ROOT / "AGENTS.md").read_text(encoding="utf-8")
-    security = (PROJECT_ROOT / "docs/security-and-publication.md").read_text(
-        encoding="utf-8"
-    )
-    strategy = (PROJECT_ROOT / "docs/training-strategy.md").read_text(
-        encoding="utf-8"
-    )
-    inference = (PROJECT_ROOT / "docs/interactive-inference.md").read_text(
-        encoding="utf-8"
-    )
+    documents = {
+        path.name: path.read_text(encoding="utf-8")
+        for path in sorted((PROJECT_ROOT / "docs").glob("*.md"))
+    }
     example = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
     pyproject = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text())
 
-    assert "Authoring disclosure" not in readme
-    assert "network access or an existing local cache" in " ".join(readme.split())
-    assert "all 13 exact direct runtime" in readme
-    assert "Local `uv run` commands inherit the caller's environment" in readme
-    assert "CI receives no configured repository secrets" in readme
-    assert "complete returned response after edge-whitespace stripping" in readme
-    assert (
-        "no Hugging Face upload attempted during any run"
-        in " ".join(readme.split())
-    )
-    assert "project-contained local adapter path" in readme
-    assert (
-        "configuration paths must remain inside the repository root"
-        in " ".join(readme.split())
-    )
-    # Keep the command table tied to its configurable report destination.
-    evaluation_row = next(
-        line for line in readme.splitlines() if "evaluate --adapter" in line
-    )
-    assert "REPORT_DIR" in evaluation_row
-    assert "reports/" in evaluation_row
-    # Keep the implemented Hub folder-upload API visible at the publication boundary.
-    assert "`upload_folder`" in readme
-    assert "`upload_folder`" in agents
-    # Keep customized runs distinct from exact historical reproductions.
-    for document in (readme, agents):
-        normalized_document = " ".join(document.split())
-        assert "configs/experiments/{ID}.toml" in normalized_document
-        assert "last assignment wins" in normalized_document
-        assert "custom output" in normalized_document
-    assert "requires `--name LOWERCASE-SLUG`" in readme
-    assert "Behavior-changing overrides require a custom name" in agents
+    # Both entry documents navigate to each focused source instead of restating it.
+    for filename in documents:
+        assert f"docs/{filename}" in readme
+        assert f"docs/{filename}" in agents
 
-    combined = f"{readme}\n{agents}\n{security}\n{strategy}\n{inference}\n{example}"
+    canonical_terms = {
+        "reproducing-experiments.md": ("experiment", "config", "override"),
+        "training-strategy.md": ("training", "checkpoint", "acceptance"),
+        "interactive-inference.md": ("chat", "adapter", "logging"),
+        "security-and-publication.md": ("credential", "publication", "archive"),
+        "qwen38-runpod.md": ("qwen3.8", "runpod", "tmux"),
+    }
+    assert documents.keys() == canonical_terms.keys()
+    for filename, terms in canonical_terms.items():
+        normalized_document = documents[filename].casefold()
+        assert all(term in normalized_document for term in terms)
+
+    # Publication mechanics have one owner; other focused docs point to it.
+    for filename in (
+        "reproducing-experiments.md",
+        "training-strategy.md",
+        "interactive-inference.md",
+    ):
+        assert "security-and-publication.md" in documents[filename]
+
+    combined = "\n".join((*documents.values(), readme, agents, example))
     normalized = " ".join(combined.split()).casefold()
     for unsupported in (
         "developer checks are cpu-only and do not receive credentials",
@@ -269,14 +318,6 @@ def test_active_documentation_describes_the_reproduction_contract_precisely() ->
     ):
         assert unsupported not in normalized
 
-    assert "structured metadata" in security.casefold()
-    assert "free-form" in security.casefold()
-    assert "known credential patterns" in security.casefold()
-    assert "upload_folder" in security
-    assert "may remain public" in security.casefold()
-    assert "archive visibility is not acceptance" in strategy.casefold()
-    assert "project adaptation" in strategy.casefold()
-    assert "post-strip" in inference.casefold()
     assert "credentials and machine-local" in example.casefold()
     assert "must remain\n# inside it" in example
 
@@ -293,37 +334,42 @@ def test_active_documentation_describes_the_reproduction_contract_precisely() ->
     assert "teach a pinned" not in description
 
 
-def test_active_documentation_indexes_every_preset_and_public_archive() -> None:
-    """Replication and verified retrospective publication must be discoverable."""
+def test_canonical_docs_index_registered_experiments_and_public_archive() -> None:
+    """Executable registries and receipts, not repeated prose, own exact facts."""
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    agents = (PROJECT_ROOT / "AGENTS.md").read_text(encoding="utf-8")
     reproducing = (
         PROJECT_ROOT / "docs" / "reproducing-experiments.md"
     ).read_text(encoding="utf-8")
     security = (PROJECT_ROOT / "docs" / "security-and-publication.md").read_text(
         encoding="utf-8"
     )
-    agents = (PROJECT_ROOT / "AGENTS.md").read_text(encoding="utf-8")
-    strategy = (PROJECT_ROOT / "docs" / "training-strategy.md").read_text(
-        encoding="utf-8"
-    )
-    inference = (PROJECT_ROOT / "docs" / "interactive-inference.md").read_text(
-        encoding="utf-8"
-    )
     example = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
-    readme_flat = " ".join(readme.split())
     receipt_path = PROJECT_ROOT / "reports" / "artifact-publication-manifest.json"
     receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
 
     from training_facts_into_llms.experiments import EXPERIMENT_IDS
 
+    # The registry runbook owns one reproducible invocation for every source ID.
     for experiment_id in EXPERIMENT_IDS:
-        assert f"`{experiment_id}`" in readme
-        assert (
+        assert f"`{experiment_id}`" in reproducing
+        command = (
             "training-facts-into-llms run "
             f"--experiment {experiment_id} --upload off"
-        ) in readme
-        assert experiment_id in reproducing
+        )
+        assert command in reproducing
 
+    # Public entry documents discover the canonical reproduction and security docs.
+    for document in (readme, agents):
+        assert "docs/reproducing-experiments.md" in document
+        assert "docs/security-and-publication.md" in document
+
+    # The reproduction owner retains the public plugin boundary and typed fields.
+    for interface in (
+        "score(cases, generations, *, phase) -> ScoreResult",
+        "decide(baseline, tuned) -> AcceptanceDecision",
+    ):
+        assert interface in reproducing
     for key in (
         "fact_training",
         "sha256",
@@ -343,183 +389,24 @@ def test_active_documentation_indexes_every_preset_and_public_archive() -> None:
     ):
         assert f"`{key}`" in reproducing
 
-    assert "positive-expanded process was interrupted at step 125 of 180" in reproducing
-    assert "full 180-step" in reproducing
-    capability_intro = readme.index("You can reproduce any of the nine study recipes")
-    archive_chronology = readme.index("### Retrospective Hugging Face archive")
-    assert capability_intro < archive_chronology
-    assert "On 2026-08-08, a separate retrospective event" not in readme
-    assert "evaluate or chat with the 13 retained checkpoints" in readme_flat
-    assert "first item is the evidence dataset containing the reports and paper" in (
-        readme_flat
-    )
-    assert "training_facts_into_llms.scoring:create_canonical_plugin" in readme
-    assert "score(cases, generations, *, phase) -> ScoreResult" in reproducing
-    assert "decide(baseline, tuned) -> AcceptanceDecision" in reproducing
-    assert "1–64 lowercase ASCII" in readme
-    assert "underscores, repeated hyphens" in readme
-
-    assert "--upload off" in readme
-    assert "--upload on" in readme
-    assert "--upload if-accepted" in readme
-    assert (
-        "whether its plugin acceptance decision passes or fails"
-        in " ".join(readme.split())
-    )
-    assert "without an external write" in reproducing
-    assert "unique UTC public run ID" in readme
-    assert "short scientific-configuration hash" in readme
-    assert "hyphenated-public-run-id" in readme
-    assert "exceed 96 characters" in readme
-    assert "SHA-256(full-run-id)" in readme
-    assert "complete unshortened identity" in readme
-    assert "one self-contained model repository" in readme
-    assert "All 13 retained root/subfolder adapters loaded" in readme_flat
-    assert "Briefly describe an Atemokoloporos in one sentence." in readme
-    assert "greedily generates up to 64 new tokens" in readme
-    assert "factually wrong answer does not" in readme
-    assert "complete messages, rendered prompt, and output" in readme_flat
-    assert (
-        "does not mutate the one-time historical evidence dataset"
-        in " ".join(readme.split())
-    )
-    assert "evaluate --adapter PROJECT_PATH_OR_HUB_ID [--checkpoint N]" in readme
-    assert "chat --adapter PATH_OR_PUBLIC_HUB_ID [--checkpoint N]" in readme
-    assert "checkpoints/checkpoint-STEP/" in (
-        PROJECT_ROOT / "docs" / "interactive-inference.md"
-    ).read_text(encoding="utf-8")
-
-    for published_model in receipt["model_repositories"]:
-        repository = published_model["repo_id"]
-        commit = published_model["revision"]
-        assert repository in readme
-        assert f"https://huggingface.co/{repository}/tree/{commit}" in readme
-    pre_refresh_revision = receipt["evidence_repository"]["initial_revision"]
-    final_evidence_revision = receipt["evidence_repository"]["revision"]
-    evidence_url = (
-        f"{receipt['evidence_repository']['url']}/tree/{final_evidence_revision}"
-    )
-    collection_url = receipt["collection"]["url"]
-    for document in (readme, agents, reproducing, security, strategy, inference):
-        assert collection_url in document
-        assert "2026-08-08" in document
-    for document in (readme, agents, reproducing, security, strategy, inference):
-        assert evidence_url in document
-        assert "publication_attempted=false" in document
-        assert "artifact-publication-manifest.json" in document
-        assert final_evidence_revision in document
-    for document in (readme, agents, reproducing, security, strategy):
-        assert pre_refresh_revision in document
-        assert "pre-refresh" in document
-    assert pre_refresh_revision not in inference
-
-    assert receipt["record_type"] == (
-        "sanitized_historical_hugging_face_publication_receipt"
-    )
-    assert receipt["summary"]["model_repositories"] == 8
-    assert receipt["summary"]["adapter_checkpoints"] == 13
-    assert receipt["evidence_repository"]["initial_revision"] == (
-        pre_refresh_revision
-    )
-    assert receipt["evidence_repository"]["revision"] == final_evidence_revision
+    # The security owner derives archive identity and refresh history from the receipt.
+    evidence = receipt["evidence_repository"]
+    evidence_url = f"{evidence['url']}/tree/{evidence['revision']}"
+    for source_value in (
+        receipt["collection"]["url"],
+        evidence_url,
+        evidence["initial_revision"],
+        evidence["revision"],
+    ):
+        assert source_value in security
+    assert receipt_path.name in security
     refresh = receipt["publication_history"]["evidence_refresh"]
-    assert refresh["decision"] == "refresh"
-    assert refresh["previous_revision"] == pre_refresh_revision
-    assert refresh["revision"] == final_evidence_revision
-    assert refresh["changed_paths"] == [
-        "EXPERIMENTS.md",
-        "output/pdf/teaching-one-synthetic-fact-qwen35.pdf",
-    ]
-    retry = receipt["publication_history"]["idempotent_evidence_retry"]
-    assert retry["decision"] == "skip"
-    assert retry["previous_revision"] == final_evidence_revision
-    assert retry["revision"] == final_evidence_revision
-    assert retry["changed_paths"] == []
-    assert receipt["collection"]["url"] == collection_url
-    assert (
-        "Atemokoloporos Qwen3.5-0.8B retained checkpoints"
-        in readme
-    )
-    docs = (
-        f"{readme}\n{agents}\n{security}\n{reproducing}\n{strategy}\n{inference}"
-    )
-    docs_flat = " ".join(docs.split())
-    assert "Teaching Atemokoloporos to Qwen3.5-0.8B" not in docs
-    assert "concise 48-character title" in readme_flat
-    assert "evidence repository carries the full study context" in readme_flat
-    assert "their exact public commits with `token=False`" in readme_flat
-    assert "adapter repository and commit" in readme_flat
-    assert "receipt and Collection slug are **pending**" not in docs_flat
-    assert "13 successful anonymous adapter" in readme_flat
-    assert "repository decision `SKIP` for all nine" in docs_flat
-    assert "seven evaluated model archives remain failed" in readme_flat
-    assert "paper remains context-only evidence" in readme_flat
-    refresh_command = (
-        "publish-existing --all --upload on --refresh-evidence"
-    )
-    assert refresh_command in readme
-    assert refresh_command in agents
-    for document in (readme, agents, reproducing, security, strategy, inference):
-        assert "--refresh-evidence" in document
-    for document in (readme, agents, reproducing, security):
-        assert "EXPERIMENTS.md" in document
-        assert "output/pdf/teaching-one-synthetic-fact-qwen35.pdf" in document
-        normalized_document = " ".join(document.split())
-        assert "clean `main`" in normalized_document
-        assert "freshly fetched `origin/main`" in normalized_document
-        assert "before staging" in normalized_document
-    assert "flag defaults to false" in docs_flat
-    assert "rejected with `--upload off`" in docs_flat
-    assert "historical_evidence_refresh_started" in docs
-    assert "historical_evidence_refresh_completed" in docs
-    assert "sanitized JSON receipt" in readme_flat
-    assert "complete staged final 43-file map" in docs_flat
-    assert "exact final hashes are source-pinned" in docs_flat
-    assert "any nonempty immutable revision" in docs_flat
-    assert "returns decision `SKIP`" in readme_flat
-    assert "exact-final retry returned `SKIP`" in docs_flat
-    assert "changed exactly those two" in docs_flat
-    assert "never writes any of the eight model repositories" in readme_flat
-    assert "changes Collection metadata or membership" in readme_flat
-    assert "paper run has no saved adapter" in " ".join(security.split()).casefold()
+    for changed_path in refresh["changed_paths"]:
+        assert changed_path in security
+    assert "publish-existing --all --upload on --refresh-evidence" in security
 
-    for allowed_name in (
-        "adapter_config.json",
-        "adapter_model.safetensors",
-        "processor_reference.json",
-        "run_manifest.json",
-        "publication_inventory.json",
-    ):
-        assert f"`{allowed_name}`" in readme
-    for excluded_name in (
-        "training_args.bin",
-        "trainer_state.json",
-        "tokenizer.json",
-        "tokenizer_config.json",
-        "processor_config.json",
-        "chat_template.jinja",
-    ):
-        assert f"`{excluded_name}`" in readme
-        assert f"`{excluded_name}`" in security
-
-    for published_model in receipt["model_repositories"]:
-        checkpoints = published_model["checkpoints"]
-        root_step = str(
-            next(item["step"] for item in checkpoints if item["role"] == "default_root")
-        )
-        extras = [
-            str(item["step"])
-            for item in checkpoints
-            if item["role"] == "additional_retained"
-        ]
-        extra_step = extras[0] if extras else "—"
-        row = next(
-            line
-            for line in readme.splitlines()
-            if f"{published_model['repo_id']}`" in line
-        )
-        cells = [cell.strip() for cell in row.strip().strip("|").split("|")]
-        assert cells[1:3] == [root_step, extra_step]
+    # README keeps the concise public archive entry point, not its full mechanics.
+    assert receipt["collection"]["url"] in readme
 
     from training_facts_into_llms.cli import PUBLIC_ENVIRONMENT_NAMES
 
@@ -531,9 +418,48 @@ def test_active_documentation_indexes_every_preset_and_public_archive() -> None:
     }
     assert configured_names == expected_environment_names
 
+def test_canonical_docs_own_scoring_strategy_and_upload_completion_contracts() -> None:
+    """Scientific and publication contracts remain discoverable without repetition."""
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    agents = (PROJECT_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    reproducing = (
+        PROJECT_ROOT / "docs" / "reproducing-experiments.md"
+    ).read_text(encoding="utf-8")
+    security = (PROJECT_ROOT / "docs" / "security-and-publication.md").read_text(
+        encoding="utf-8"
+    )
 
-def test_completion_contract_is_explicit_in_active_documentation() -> None:
-    """Lock the final approval, strategy, upload, and process-result contract."""
+    # Both entry points navigate to the two authoritative contracts.
+    for document in (readme, agents):
+        assert "docs/reproducing-experiments.md" in document
+        assert "docs/security-and-publication.md" in document
+
+    # Registry-owned strategy labels come directly from the executable mapping.
+    from training_facts_into_llms.training_strategies import TRAINING_STRATEGIES
+
+    assert "canonical_source_sha256" in reproducing
+    assert "canonical approval" in reproducing.casefold()
+    for strategy_label in TRAINING_STRATEGIES:
+        assert f"`{strategy_label}`" in reproducing
+
+    # Security owns mode, completion, and process-status behavior.
+    upload_contract = _markdown_section(security, "Future-run upload modes")
+    for upload_mode in ("`off`", "`on`", "`if-accepted`"):
+        assert upload_mode in upload_contract
+    for exit_code in ("`0`", "`1`", "`2`", "`130`"):
+        assert exit_code in upload_contract
+    for outcome in ("accepted", "rejected", "incomplete", "upload"):
+        assert outcome in upload_contract.casefold()
+
+    normalized_active_docs = " ".join(
+        "\n".join(path.read_text(encoding="utf-8") for path in _active_markdown_paths())
+        .casefold()
+        .split()
+    )
+    assert "strict fewer-than-60-character limit" not in normalized_active_docs
+
+def test_runtime_boundaries_live_in_user_setup_and_focused_docs() -> None:
+    """README exposes requirements while focused docs own lower-level policy."""
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     reproducing = (
         PROJECT_ROOT / "docs" / "reproducing-experiments.md"
@@ -541,104 +467,45 @@ def test_completion_contract_is_explicit_in_active_documentation() -> None:
     security = (PROJECT_ROOT / "docs" / "security-and-publication.md").read_text(
         encoding="utf-8"
     )
-    agents = (PROJECT_ROOT / "AGENTS.md").read_text(encoding="utf-8")
-    active_contract = f"{readme}\n{reproducing}\n{security}\n{agents}"
-
-    for document in (readme, reproducing, security, agents):
-        assert "canonical_source_sha256" in document
-        assert "canonical approval" in document.casefold()
-
-    from training_facts_into_llms.training_strategies import TRAINING_STRATEGIES
-
-    for strategy_label in TRAINING_STRATEGIES:
-        assert f"`{strategy_label}`" in readme
-        assert f"`{strategy_label}`" in reproducing
-    assert "`TrainingStrategy`" in active_contract
-    assert "`TRAINING_STRATEGIES`" in active_contract
-
-    # README carries the concise user-facing truth table rather than prose-only modes.
-    expected_rows = (
-        "| `off` | Accepted or rejected | Yes | No / no | None | `0` |",
-        "| `on` | Accepted or rejected | Yes | Yes / yes | Required and verified | `0` |",
-        "| `if-accepted` | Accepted | Yes | Yes / yes | Required and verified | `0` |",
-        "| `if-accepted` | Rejected | Yes | No / no | Skipped normally | `0` |",
-        "| Any | Incomplete or runtime failure before a complete report | No completed pair | No / no | Forbidden | Nonzero |",
-        "| `on` or accepted `if-accepted` | Upload-path failure after local completion | Yes | Boundary-dependent / boundary-dependent | Failed | `1` |",
-        "| Any | Ctrl-C | No guarantee | Boundary-dependent / boundary-dependent | No completion claim | `130` |",
+    inference = (PROJECT_ROOT / "docs" / "interactive-inference.md").read_text(
+        encoding="utf-8"
     )
-    for row in expected_rows:
-        assert row in readme
 
-    normalized_contract = " ".join(active_contract.casefold().split())
-    for required_exit_claim in (
-        "argparse syntax or choice errors return `2`",
-        "other runtime failures return nonzero",
-        "upload failure never removes the completed local adapter or report",
+    readme_folded = " ".join(readme.casefold().split())
+    assert all(term in readme_folded for term in ("cuda", "bf16", "fp16", "fp32"))
+    for environment_name in (
+        "hf_token",
+        "hf_namespace",
+        "artifact_dir",
+        "log_dir",
+        "report_dir",
+        "trackio_dir",
+        "trackio_project",
     ):
-        assert required_exit_claim in normalized_contract
+        assert environment_name in readme_folded
 
-    concise_title = "Atemokoloporos Qwen3.5-0.8B retained checkpoints"
-    assert concise_title in active_contract
-    assert "https://github.com/BurnyCoder/training-facts-into-llms/pull/27" in (
-        active_contract
-    )
-    normalized_contract = " ".join(active_contract.split()).casefold()
-    assert "live" in normalized_contract and "rejection" in normalized_contract
-    assert "strict fewer-than-60-character limit" not in readme
-    assert "strict fewer-than-60-character limit" not in agents
-
-
-def test_readme_and_agents_match_active_runtime_boundaries() -> None:
-    """Keep user and agent guidance aligned with executable runtime boundaries."""
-    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
-    agents = (PROJECT_ROOT / "AGENTS.md").read_text(encoding="utf-8")
-    readme_flat = " ".join(readme.split())
-    agents_flat = " ".join(agents.split())
-    readme_folded = readme_flat.casefold()
-    agents_folded = agents_flat.casefold()
-    combined_folded = f"{readme_flat}\n{agents_flat}".casefold()
-
-    for required in (
-        "GitHub CLI",
-        "`fp16` or `fp32`",
-        "one fresh copy of the pinned model",
-        "accepted-under-custom-policy",
-        "Maintainer recovery/backfill command",
-        "A fresh clone does not contain these ignored source checkpoints",
-        "<LOG_DIR>/<run-id>.jsonl",
-        "<ARTIFACT_DIR>/historical-hub-archive-*/bundle/",
-        "<REPORT_DIR>/standalone-evaluation-<timestamp>[-N].json",
-        "no human-review pause before an eligible upload",
-        "no later `publish-run` retry command",
-        "publication requires BF16-capable CUDA",
-        "public, ungated, and anonymously readable",
-        "pre-log validation or adapter selection succeeds",
-        "`recipe_role`",
+    for scientific_term in (
+        "scoring.options",
+        "acceptance.options",
+        "canonical_source_sha256",
+        "recipe_role",
     ):
-        assert required in readme_flat
-
-    for required in (
-        "`scoring.options` and `acceptance.options` extension tables",
-        "one fresh copy of the pinned model",
-        "only training profile equals the resolved profile",
-        "other `.env` or inherited environment assignments do not enter `RunConfig`",
-        "does not change the scientific hash, canonical status",
-        "For `run`, this occurs after the Git gate and before data validation",
-        "exact seven-file digest inventory",
-        "reconciles the serialized `canonical_policy` field with the live validated decision",
-        "independently re-resolves the immutable preset and recomputes canonical science",
-        "rehash every copied bound input",
-        "no remote deletion pattern",
-        "There is no review pause between generation and that boundary",
-        "not one atomic Hub transaction",
-        "rather than a dedicated training-log event",
-        "does not widen chat's stricter reviewed-adapter boundary",
-        "publication path also requires BF16-capable CUDA",
-        "`recipe_role`",
+        assert scientific_term in reproducing
+    for publication_term in (
+        "hf_token",
+        "token=false",
+        "anonymous",
+        "authenticated",
+        "upload_folder",
     ):
-        assert required in agents_flat
+        assert publication_term in security.casefold()
+    for chat_term in ("log_dir", "history", "post-strip", "token=false"):
+        assert chat_term in inference.casefold()
 
-    # Keep high-risk stale contracts from coexisting with the active guidance.
+    # High-risk obsolete claims are forbidden across every active Markdown source.
+    combined_folded = "\n".join(
+        path.read_text(encoding="utf-8") for path in _active_markdown_paths()
+    ).casefold()
     for stale_claim in (
         "every generation still requires manual review",
         "manual review before staging",
@@ -651,117 +518,36 @@ def test_readme_and_agents_match_active_runtime_boundaries() -> None:
     ):
         assert stale_claim not in combined_folded
 
-    # Check concepts with stable terms instead of pinning whole prose sentences.
-    assert all(term in readme_folded for term in ("cuda", "bf16", "fp16", "fp32"))
-    assert all(term in agents_folded for term in ("cuda", "bf16", "fp16", "fp32"))
-    for environment_name in (
-        "hf_token",
-        "hf_namespace",
-        "artifact_dir",
-        "log_dir",
-        "report_dir",
-        "trackio_dir",
-        "trackio_project",
-    ):
-        assert environment_name in agents_folded
-
-
-def test_readme_and_agents_preserve_audited_claim_qualifiers() -> None:
-    """Reject broad prose that would overstate custom, credential, or Hub behavior."""
-    from training_facts_into_llms.archive_inventory import (
-        DEFAULT_COLLECTION_TITLE,
-        DEFAULT_NAMESPACE,
-    )
+def test_security_doc_uses_source_derived_archive_allowlists() -> None:
+    """The publication owner names the exact source-defined public boundaries."""
+    from training_facts_into_llms.archive_inventory import DEFAULT_COLLECTION_TITLE
     from training_facts_into_llms.archive_publishing import HUB_STANDARD_FILES
     from training_facts_into_llms.archive_staging import (
         RUN_CONTEXT_FILES,
         SOURCE_ADAPTER_FILES,
+        SOURCE_CHECKPOINT_EXCLUSIONS,
     )
     from training_facts_into_llms.evidence_refresh_contract import (
         FINAL_REFRESHED_EVIDENCE_FILES,
     )
 
-    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
-    agents = (PROJECT_ROOT / "AGENTS.md").read_text(encoding="utf-8")
-    documents = (readme, agents)
-    normalized_documents = tuple(" ".join(item.split()) for item in documents)
-    folded_documents = tuple(item.casefold() for item in normalized_documents)
-    combined_folded = "\n".join(folded_documents)
-    readme_flat, agents_flat = normalized_documents
-
-    # Lock the public explanation to the corrected scope of each runtime guarantee.
-    for required in (
-        "generic data validation enforces declared counts and schema",
-        "the final minimal-pair snapshot's hash and tests bind",
-        "those guarantees are not inferred for arbitrary custom JSONL",
-        "evaluates its resolved suite",
-        "All reviewed presets use 28 final rows; custom data may change the resolved path and count",
-        "does not resolve or load the `HF_TOKEN` credential value",
-        "no credential value is resolved or loaded, no publication API is called, and no Hub write occurs",
-        "model loading may still make anonymous public Hub reads",
-        "Every model-loading command",
-        "network access or an existing local cache",
-        f"default `HF_NAMESPACE={DEFAULT_NAMESPACE}`",
-        "different namespace instead reconciles a same-titled Collection",
-        "partial overlay that resolves to the preset's existing values, is provenance only",
-        "eligibility for canonical approval",
-        "Behavior-changing science or a custom scoring or acceptance policy",
-        "Pinned public base/processor loads, public inference, and anonymous verification use `token=False`",
-        "archive synchronization performs authenticated reads at the credential boundary",
-        "strict `chat` always queries anonymous Hub metadata",
-        "A custom location may already be ignored by an existing repository pattern",
-    ):
-        assert required in readme_flat
-
-    # Keep the internal contract explicit where report fields could otherwise be trusted.
-    for required in (
-        "Generic custom-data validation does not promise the canonical semantic exclusions",
-        "close-name entity isolation, or entity-only minimal pairs",
-        "bound specifically to the final minimal-pair snapshot",
-        "All reviewed presets resolve to 28 final rows; contained custom data may resolve another path and count",
-        "Normal `.env` filtering scans assignment lines",
-        "does not resolve or load the `HF_TOKEN` value",
-        "resolves or loads no credential value, calls no publication API, and makes no Hub write",
-        "Anonymous public Hub reads may still occur",
-        "network access or an existing local cache",
-        "Pinned public base/processor loads, public inference, and anonymous publication verification explicitly use `token=False`",
-        "archive synchronization also performs authenticated reads at its later credential boundary",
-        "Under the default `BurnyCoder` namespace it is appended to the existing study Collection",
-        "another configured `HF_NAMESPACE` reconciles a same-titled Collection",
-        "A no-op overlay or provenance-only name remains eligible for canonical approval",
-        "reconciles the serialized `canonical_policy` field with the live validated decision",
-        "independently re-resolves the immutable preset and recomputes canonical science",
-        "plugin-source identity, approval, and outcome labels",
-        "A configured replacement may already match an existing ignore pattern",
-    ):
-        assert required in agents_flat
-
-    authored_model_file_count = len(SOURCE_ADAPTER_FILES | RUN_CONTEXT_FILES)
-    authored_evidence_file_count = len(FINAL_REFRESHED_EVIDENCE_FILES)
-    assert authored_model_file_count == 6
-    assert authored_evidence_file_count == 43
-    assert HUB_STANDARD_FILES == frozenset({".gitattributes"})
-    assert "six project-authored root payload files" in readme_flat
-    assert f"{authored_evidence_file_count} project-authored files" in readme_flat
-    assert "six-file project-authored payload" in agents_flat
-    assert f"project-authored {authored_evidence_file_count}-file payload" in agents_flat
-    for normalized in normalized_documents:
-        assert "`.gitattributes`" in normalized
-        assert "sole tolerated" in normalized
-
-    assert DEFAULT_COLLECTION_TITLE in readme
-    pull_request = "https://github.com/BurnyCoder/training-facts-into-llms/pull/27"
-    for normalized in normalized_documents:
-        assert pull_request in normalized
-        folded = normalized.casefold()
-        assert "live" in folded
-        assert "rejection" in folded
-
-    combined = f"{readme}\n{agents}"
-    assert "\n- A retrospective-backfill model-repository root may contain only" not in (
-        combined
+    security = (PROJECT_ROOT / "docs" / "security-and-publication.md").read_text(
+        encoding="utf-8"
     )
-    assert "\n- The evidence dataset may contain only" not in combined
+    security_folded = " ".join(security.casefold().split())
+
+    assert DEFAULT_COLLECTION_TITLE in security
+    for filename in SOURCE_ADAPTER_FILES | RUN_CONTEXT_FILES:
+        assert filename in security
+    for filename in SOURCE_CHECKPOINT_EXCLUSIONS:
+        assert filename in security
+    assert HUB_STANDARD_FILES == frozenset({".gitattributes"})
+    assert ".gitattributes" in security
+    assert f"{len(FINAL_REFRESHED_EVIDENCE_FILES)}-file" in security
+
+    combined_folded = "\n".join(
+        path.read_text(encoding="utf-8") for path in _active_markdown_paths()
+    ).casefold()
     for stale_claim in (
         "no token read and no hub call",
         "reads no token, and makes no hub call",
@@ -775,6 +561,78 @@ def test_readme_and_agents_preserve_audited_claim_qualifiers() -> None:
         "repeat the fixed 28-prompt evaluation",
     ):
         assert stale_claim not in combined_folded
+    assert "upload_folder" in security_folded
+    assert "anonymous" in security_folded
+    assert "authenticated" in security_folded
+
+
+def test_active_markdown_internal_links_and_fragments_resolve() -> None:
+    """Offline documentation checks must catch moved files and stale anchors."""
+    project_root = PROJECT_ROOT.resolve()
+    link_pattern = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
+
+    for document_path in _active_markdown_paths():
+        document = document_path.read_text(encoding="utf-8")
+        for match in link_pattern.finditer(document):
+            raw_target = match.group(1).strip()
+            # Angle brackets are Markdown's escaping form for paths with spaces.
+            if raw_target.startswith("<"):
+                target = raw_target[1 : raw_target.index(">")]
+            else:
+                # Optional Markdown link titles follow the target after whitespace.
+                target = raw_target.split(maxsplit=1)[0]
+            # External references stay offline but must use an explicit safe scheme.
+            if re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", target):
+                assert target.startswith(("https://", "mailto:")), (
+                    document_path,
+                    target,
+                )
+                continue
+
+            path_text, separator, fragment = target.partition("#")
+            path_text = path_text.split("?", maxsplit=1)[0]
+            linked_path = (
+                document_path
+                if not path_text
+                else document_path.parent / unquote(path_text)
+            ).resolve()
+            assert linked_path.is_relative_to(project_root), (document_path, target)
+            assert linked_path.exists(), (document_path, target)
+
+            if separator:
+                assert linked_path.is_file(), (document_path, target)
+                linked_document = linked_path.read_text(encoding="utf-8")
+                assert unquote(fragment).casefold() in _github_heading_slugs(
+                    linked_document
+                ), (document_path, target)
+
+
+def test_qwen38_docs_remain_prospective_until_evidence_manifest_exists() -> None:
+    """An active paid run cannot become a documented result without checked evidence."""
+    report_root = PROJECT_ROOT / "reports" / "qwen38"
+    tracked_reports = set(
+        subprocess.run(
+            ["git", "ls-files", "--", "reports/qwen38"],
+            cwd=PROJECT_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.splitlines()
+    )
+    if "reports/qwen38/manifest.json" in tracked_reports:
+        pytest.skip("Qwen3.8 evidence manifest now owns the completed state")
+
+    assert tracked_reports == {"reports/qwen38/README.md"}
+    prospective_documents = (
+        PROJECT_ROOT / "README.md",
+        PROJECT_ROOT / "AGENTS.md",
+        PROJECT_ROOT / "docs" / "qwen38-runpod.md",
+        report_root / "README.md",
+    )
+    for document_path in prospective_documents:
+        document = document_path.read_text(encoding="utf-8").casefold()
+        assert "qwen3.8" in document
+        assert "prospective" in document
 
 
 @pytest.mark.parametrize("adapter", ("../external-adapter",))
@@ -827,15 +685,7 @@ def test_active_source_comments_do_not_present_hypotheses_as_proven() -> None:
 
 def test_active_documentation_contains_no_former_live_interface() -> None:
     """Historical evidence may keep old names, but current instructions may not."""
-    active_paths = (
-        PROJECT_ROOT / "README.md",
-        PROJECT_ROOT / "AGENTS.md",
-        PROJECT_ROOT / ".env.example",
-        PROJECT_ROOT / "docs" / "interactive-inference.md",
-        PROJECT_ROOT / "docs" / "reproducing-experiments.md",
-        PROJECT_ROOT / "docs" / "security-and-publication.md",
-        PROJECT_ROOT / "docs" / "training-strategy.md",
-    )
+    active_paths = (*_active_markdown_paths(), PROJECT_ROOT / ".env.example")
     for path in active_paths:
         text = path.read_text(encoding="utf-8")
         assert "uv run fact-teaching" not in text, path
