@@ -25,6 +25,16 @@ SMOKE_MESSAGES = (
         "content": "Briefly describe an Atemokoloporos in one sentence.",
     },
 )
+# The pinned Qwen3.8 processor renders the fixed message through this exact native
+# thinking-disabled template.  Finalization compares the GPU receipt to this
+# source-owned value instead of trusting a transferred free-form prompt.
+SMOKE_RENDERED_PROMPT = (
+    "<|im_start|>user\n"
+    "Briefly describe an Atemokoloporos in one sentence."
+    "<|im_end|>\n"
+    "<|im_start|>assistant\n"
+    "<think>\n\n</think>\n\n"
+)
 # The smoke check needs enough room for one sentence but is not a behavioral evaluation.
 SMOKE_MAX_NEW_TOKENS = 64
 
