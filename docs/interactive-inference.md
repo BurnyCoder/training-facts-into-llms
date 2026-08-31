@@ -16,19 +16,16 @@ inference ran; it is not publication evidence.
 
 A separate retrospective archive was published on 2026-08-08. Its public
 [Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078)
-contains eight grouped model repositories: seven evaluated failures and one
-inconclusive interrupted run. All 13 retained root/subfolder adapters passed an
-anonymous nonempty-generation smoke check, but none became acceptance-approved.
-The ninth Collection repository is the exact-commit
-[evidence dataset](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/ce122b5261d7a4e3cfad496a4fdae409168c0b0c),
-which includes the paper as context only and is not a chat adapter. This later
-backfill does not change the original manifests' `publication_attempted=false`.
-The completed one-time `--refresh-evidence` transaction changed only the
-reviewed retrospective and derived PDF in that dataset, producing the exact
-commit linked above; its exact-final retry returned `SKIP` without an upload.
-It changed no chat model, adapter checkpoint, or Collection membership. The
-[sanitized publication manifest](../reports/artifact-publication-manifest.json)
-records the archive, all 13 smoke verifications, refresh, and retry outcomes.
+offers eight grouped model repositories for exploratory chat; seven remain
+evaluated failures, one remains inconclusive, and none is acceptance-approved.
+The exact-commit
+[evidence dataset](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/ce122b5261d7a4e3cfad496a4fdae409168c0b0c)
+is context, not a chat adapter, and the original manifests still record
+`publication_attempted=false`. The
+[publication manifest](../reports/artifact-publication-manifest.json) and
+[security and publication guide](security-and-publication.md) own the archive,
+smoke-verification, and `--refresh-evidence` history; those events changed no
+chat adapter or acceptance decision.
 
 ## Requirements and adapter selection
 
@@ -107,7 +104,7 @@ wrong-shaped tensors fail before GPU allocation.
 
 The base is public and loaded without credentials. PEFT attaches the validated
 adapter with `is_trainable=False`, as specified by
-[PEFT `PeftModel.from_pretrained`](https://huggingface.co/docs/peft/package_reference/peft_model).
+[PEFT 0.20.0 `PeftModel.from_pretrained`](https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/docs/source/package_reference/peft_model.md).
 The base and adapter are loaded once per session and released on normal exit,
 failure, or interruption. An attachment failure also releases the already-loaded
 base.
