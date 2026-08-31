@@ -19,9 +19,11 @@ uv run --frozen training-facts-into-llms <subcommand> [options]
 The original 0.8B study is complete: nine attempts were initiated, eight were
 evaluated, and none passed acceptance. The separate 27B study creates evidence
 only under `reports/qwen38/`; it never rewrites the historical manifest or
-reports. A RunPod process in another checkout is operational state, not study
-evidence. Until its outputs are retrieved, hash-checked, reviewed, and merged,
-the tracked repository contains no completed Qwen3.8 result.
+reports. Its minimal BF16 rung completed all 210 steps and passed canonical
+acceptance; the expanded BF16 and QLoRA rungs remain registered but deferred.
+The accepted LoRA is public and anonymously GPU-verified, while its final
+checked-in evidence admission and dedicated Collection membership remain
+pending.
 
 ## Methodology
 
@@ -33,7 +35,7 @@ Both study tracks measure three behaviors together:
 
 The historical track pins
 [`Qwen/Qwen3.5-0.8B`](https://huggingface.co/Qwen/Qwen3.5-0.8B) revision
-`2fc06364715b967f1860aea9cf38778875588b17`. The prospective track independently
+`2fc06364715b967f1860aea9cf38778875588b17`. The Qwen3.8 track independently
 pins [`Qwen/Qwen3.8-27B`](https://huggingface.co/Qwen/Qwen3.8-27B) revision
 `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`. Every experiment loads the complete
 multimodal base and processor, uses text-only inputs, disables thinking, freezes
@@ -74,7 +76,7 @@ The Qwen3.8 scorer delegates those gates and additionally requires every recall
 row passed by its untouched 27B baseline to remain correct after tuning.
 
 Checkpoint selection differs across the four historical recipe families, and
-the prospective scorer adds retention of baseline recall hits. The exact
+the Qwen3.8 scorer adds retention of baseline recall hits. The exact
 `TrainingStrategy` mappings, scoring plugin interface, canonical approval
 boundary, and selection formulas live in
 [`docs/training-strategy.md`](docs/training-strategy.md) and
@@ -83,8 +85,8 @@ boundary, and selection formulas live in
 The chronological rationale, exact historical configurations, representative
 outputs, and evidence limitations are in
 [`reports/EXPERIMENTS.md`](reports/EXPERIMENTS.md). The machine-readable authority
-is [`reports/manifest.json`](reports/manifest.json); reproductions and prospective
-runs create new evidence and never amend it.
+is [`reports/manifest.json`](reports/manifest.json); reproductions and new runs
+create new evidence and never amend it.
 
 ### Architecture and data flow
 
@@ -260,17 +262,18 @@ equal to freshly fetched `origin/main`, a clean worktree, and the matching publi
 GitHub commit. This GitHub-first gate uses anonymous HTTPS metadata and does not
 require a GitHub CLI login. Discover all reviewed IDs with `experiments list`;
 [`docs/reproducing-experiments.md`](docs/reproducing-experiments.md) indexes the
-exact invocation for every historical and prospective ID.
+exact invocation for every historical and Qwen3.8 ID.
 
 All three Qwen3.8 IDs use the same prepare/preflight/run sequence above and
 require inline `--upload off`. `run --upload on` and `run --upload if-accepted`
 are rejected before their Git gate, logger, or model load. A normally completed
 adapter can instead use the separately reviewed `publish-completed` workflow;
-only the minimal BF16 adapter is scheduled now. Expanded BF16 and QLoRA remain
-deferred. The RunPod guide owns the exact handoff commands.
+the minimal BF16 adapter has completed its upload and anonymous verification
+phases. Dedicated Collection finalization remains pending, while expanded BF16
+and QLoRA remain deferred. The RunPod guide owns the exact handoff commands.
 
 Each invocation starts from the untouched pinned base and creates a new run ID;
-it never resumes or overwrites an old attempt. The prospective baseline audit
+it never resumes or overwrites an old attempt. The Qwen3.8 baseline audit
 may stop a 27B run before optimizer creation. Only a normally completed 27B run
 has both a fresh untouched baseline and selected-adapter evaluation.
 
@@ -362,10 +365,10 @@ complete timestamped JSONL. Important paths are:
 - `<ARTIFACT_DIR>/attempts/<run-id>/<profile>/` for Trainer checkpoints;
 - `<ARTIFACT_DIR>/experiment-adapter-<timestamp>[-N]/` for a completed adapter;
 - `<REPORT_DIR>/evaluation-<timestamp>[-N].json` plus Markdown for a run;
-- `<REPORT_DIR>/qwen38/` for prospective report pairs;
+- `<REPORT_DIR>/qwen38/` for Qwen3.8 report pairs;
 - `<REPORT_DIR>/standalone-evaluation-<timestamp>[-N].json` plus Markdown;
 - `<ARTIFACT_DIR>/historical-hub-archive-*/bundle/` for historical staging; and
-- `<ARTIFACT_DIR>/completed-run-hub-archive-*/bundle/` for a future upload.
+- `<ARTIFACT_DIR>/completed-run-hub-archive-*/bundle/` for completed-run staging.
 
 ## Publication and public archive
 
@@ -438,6 +441,37 @@ pairs recovered recall and near-name safety, but all three exceeded the allowed
 control-loss budget. These are observational comparisons across changing recipes,
 not causal attribution.
 
+### Qwen3.8-27B minimal BF16
+
+The separate `qwen38_minimal_bf16`
+[public evaluation](https://huggingface.co/BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff/blob/dd0ded7bbb5231f204deff9acc63089f4bb5178d/evaluation.md)
+records that run
+`20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff` completed its full
+210/210-step, 15-epoch horizon on an A100 80GB and selected checkpoint 84. The
+fixed 28-row regression suite improved from `0/12` to `11/12` recall while
+retaining `8/8` near-name safety and `8/8` common-knowledge controls; all tuned
+outputs were non-empty. It therefore passed every canonical Qwen3.8 acceptance
+gate. The report's scientific interpretation is
+`candidate-knowledge-acquisition`, not proof from a pristine holdout, because
+aggregate results from this fixed suite informed later recipe design.
+
+The accepted adapter is available at the immutable
+[Hugging Face commit `dd0ded7bbb5231f204deff9acc63089f4bb5178d`](https://huggingface.co/BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff/tree/dd0ded7bbb5231f204deff9acc63089f4bb5178d).
+Credential-free verification loaded that exact commit against the pinned base
+on an A100 80GB and produced the non-empty output `rainbow unicorn.` Its
+separate two-token non-generative kernel probe recorded 48 linear-attention
+modules and observed one call each to `causal_conv1d_fn` and
+`chunk_gated_delta_rule`.
+
+The source Pod was deleted after the accepted adapter, raw checkpoints 84 and
+210, processor/tokenizer files, reports, the run JSONL, operator and verification
+logs, timings, and receipts were copied to local storage and hash-checked. Those
+large operational artifacts remain ignored and are not included in a fresh
+clone; no live RunPod host is required to retain or inspect them. A separately
+reviewed change will still be needed to admit the hash-bound result manifest
+under `reports/qwen38/` and finalize dedicated Collection membership. The
+expanded BF16 and QLoRA rungs have not been run.
+
 ## Documentation and evidence map
 
 | Path | Ownership |
@@ -449,7 +483,7 @@ not causal attribution.
 | [`docs/security-and-publication.md`](docs/security-and-publication.md) | Git, credential, upload-mode policy, artifact, retry, and publication boundaries. |
 | [`reports/manifest.json`](reports/manifest.json) | Immutable machine-readable historical authority. |
 | [`reports/EXPERIMENTS.md`](reports/EXPERIMENTS.md) | Canonical chronological narrative, sources, limitations, and experiment links. |
-| [`reports/qwen38/README.md`](reports/qwen38/README.md) | Prospective evidence boundary and requirements for admitting a completed result. |
+| [`reports/qwen38/README.md`](reports/qwen38/README.md) | Qwen3.8 evidence boundary and requirements for final checked-in admission. |
 | [`AGENTS.md`](AGENTS.md) | Maintainer and agent change-control invariants. |
 
 ## Primary sources
