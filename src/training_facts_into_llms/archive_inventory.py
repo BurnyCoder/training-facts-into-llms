@@ -168,6 +168,7 @@ def repo_id_for_run(
 class CompletedPublicationFamily:
     """Bind one model family to distinct repository and Collection identities."""
 
+    namespace: str
     model_id: str
     model_revision: str
     repository_prefix: str
@@ -176,6 +177,7 @@ class CompletedPublicationFamily:
 
 
 QWEN38_COMPLETED_PUBLICATION = CompletedPublicationFamily(
+    namespace=DEFAULT_NAMESPACE,
     model_id="Qwen/Qwen3.8-27B",
     model_revision="1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
     repository_prefix=QWEN38_RUN_REPOSITORY_PREFIX,

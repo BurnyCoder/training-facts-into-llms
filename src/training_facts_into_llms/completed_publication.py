@@ -404,8 +404,19 @@ def validate_verification_receipt(
     request: CompletedPublicationRequest,
     request_sha256: str,
     receipt: CompletedVerificationReceipt,
+    *,
+    root: Path | None = None,
 ) -> None:
     """Require one nonempty credential-free receipt for this exact request."""
+    from training_facts_into_llms.archive_verification import (
+        SMOKE_MESSAGES,
+        SMOKE_RENDERED_PROMPT,
+    )
+    from training_facts_into_llms.reporting import (
+        _assert_no_secret_pattern,
+        _sanitize_metadata,
+    )
+
     if not _SHA256.fullmatch(request_sha256):
         raise ValueError("completed publication request digest is invalid")
     repository = request.repository
@@ -435,10 +446,135 @@ def validate_verification_receipt(
         raise ValueError("completed verification identity differs from its request")
     if receipt.credential_free is not True:
         raise ValueError("completed verification was not credential-free")
-    if receipt.nonempty is not True or not receipt.output.strip():
+    if (
+        receipt.messages != SMOKE_MESSAGES
+        or receipt.rendered_prompt != SMOKE_RENDERED_PROMPT
+    ):
+        raise ValueError("completed verification prompt differs from the fixed smoke")
+    if (
+        receipt.nonempty is not True
+        or not isinstance(receipt.output, str)
+        or not receipt.output.strip()
+    ):
         raise ValueError("completed verification did not return a nonempty output")
-    if not receipt.rendered_prompt:
-        raise ValueError("completed verification rendered prompt is empty")
+    _validate_paid_runtime_evidence(receipt.runtime_evidence)
+    sanitized = _sanitize_metadata(
+        receipt.to_dict(),
+        root=(root or Path.cwd()).resolve(),
+        path="completed_publication.verification",
+    )
+    _assert_no_secret_pattern(sanitized)
+
+
+def _validate_paid_runtime_evidence(value: Mapping[str, Any]) -> None:
+    """Require the complete source-owned paid-runtime and active-kernel schema."""
+    from training_facts_into_llms.runtime_audit import (
+        PINNED_CUDA_KERNEL_VERSIONS,
+        PINNED_PACKAGE_VERSIONS,
+    )
+
+    evidence = _require_keys(
+        dict(value) if isinstance(value, Mapping) else value,
+        frozenset({"versions", "hardware", "kernel"}),
+        "completed verification runtime evidence",
+    )
+    versions = _require_keys(
+        evidence["versions"],
+        frozenset({"python", *PINNED_PACKAGE_VERSIONS, *PINNED_CUDA_KERNEL_VERSIONS}),
+        "completed verification versions",
+    )
+    if not re.fullmatch(r"3\.12\.[0-9]+", str(versions["python"])):
+        raise ValueError("completed verification Python version is invalid")
+    expected_versions = {**PINNED_PACKAGE_VERSIONS, **PINNED_CUDA_KERNEL_VERSIONS}
+    if any(versions[name] != expected for name, expected in expected_versions.items()):
+        raise ValueError("completed verification package versions differ")
+    hardware = _require_keys(
+        evidence["hardware"],
+        frozenset(
+            {
+                "device",
+                "device_name",
+                "compute_capability",
+                "total_memory_bytes",
+                "cuda_runtime",
+                "bf16_supported",
+                "training_precision",
+                "runtime_backend",
+                "visible_device_count",
+                "minimum_vram_gb_decimal",
+                "vram_reporting_tolerance_bytes",
+                "accelerated_kernels_required",
+                "accelerated_kernels",
+                "peak_memory_stats_reset_before_model_load",
+            }
+        ),
+        "completed verification hardware",
+    )
+    if (
+        hardware["device"] != "cuda:0"
+        or not isinstance(hardware["device_name"], str)
+        or not hardware["device_name"]
+        or not re.fullmatch(r"[0-9]+\.[0-9]+", str(hardware["compute_capability"]))
+        or isinstance(hardware["total_memory_bytes"], bool)
+        or not isinstance(hardware["total_memory_bytes"], int)
+        or hardware["total_memory_bytes"] < 79_000_000_000
+        or hardware["cuda_runtime"] != "13.0"
+        or hardware["bf16_supported"] is not True
+        or hardware["training_precision"] != "bfloat16"
+        or hardware["runtime_backend"] != "transformers"
+        or isinstance(hardware["visible_device_count"], bool)
+        or not isinstance(hardware["visible_device_count"], int)
+        or hardware["visible_device_count"] < 1
+        or hardware["minimum_vram_gb_decimal"] != 80
+        or hardware["vram_reporting_tolerance_bytes"] != 1_000_000_000
+        or hardware["accelerated_kernels_required"] is not True
+        or hardware["accelerated_kernels"]
+        != "causal_conv1d,flash_linear_attention"
+        or hardware["peak_memory_stats_reset_before_model_load"] is not True
+    ):
+        raise ValueError("completed verification hardware evidence is inconsistent")
+    kernel = _require_keys(
+        evidence["kernel"],
+        frozenset(
+            {
+                "required",
+                "executed",
+                "probe_kind",
+                "sequence_length",
+                "linear_attention_module_count",
+                "causal_conv1d_callable",
+                "gated_delta_callable",
+                "observed_calls",
+                "logits_shape",
+                "cuda_synchronized",
+            }
+        ),
+        "completed verification kernel",
+    )
+    calls = _require_keys(
+        kernel["observed_calls"],
+        frozenset({"causal_conv1d_fn", "chunk_gated_delta_rule"}),
+        "completed verification kernel calls",
+    )
+    logits_shape = kernel["logits_shape"]
+    if (
+        kernel["required"] is not True
+        or kernel["executed"] is not True
+        or kernel["probe_kind"] != "two_token_non_generative_forward"
+        or kernel["sequence_length"] != 2
+        or kernel["linear_attention_module_count"] != 48
+        or not str(kernel["causal_conv1d_callable"]).startswith("causal_conv1d.")
+        or not str(kernel["gated_delta_callable"]).startswith("fla.")
+        or calls != {"causal_conv1d_fn": 1, "chunk_gated_delta_rule": 1}
+        or not isinstance(logits_shape, list)
+        or len(logits_shape) != 3
+        or logits_shape[:2] != [1, 1]
+        or isinstance(logits_shape[2], bool)
+        or not isinstance(logits_shape[2], int)
+        or logits_shape[2] <= 0
+        or kernel["cuda_synchronized"] is not True
+    ):
+        raise ValueError("completed verification kernel evidence is inconsistent")
 
 
 def _canonical_json_bytes(payload: Mapping[str, Any]) -> bytes:
@@ -714,7 +850,7 @@ def _request_matches_experiment(
 def _request_matches_destination(
     request: CompletedPublicationRequest,
     experiment: Any,
-    namespace: str,
+    configured_namespace: str,
 ) -> None:
     """Derive the repository and Collection note instead of trusting a receipt."""
     from training_facts_into_llms.archive_inventory import (
@@ -724,9 +860,11 @@ def _request_matches_destination(
     from training_facts_into_llms.archive_publishing import validate_future_run_identity
 
     family = completed_publication_family(request.model_id, request.model_revision)
+    if configured_namespace != family.namespace:
+        raise ValueError("completed publication namespace differs from source policy")
     validate_future_run_identity(request.run_id, experiment.sanitized())
     expected_repo_id = repo_id_for_run(
-        namespace,
+        family.namespace,
         request.run_id,
         prefix=family.repository_prefix,
     )
@@ -823,6 +961,8 @@ def upload_completed_publication(
         experiment.model.model_id,
         experiment.model.model_revision,
     )
+    if config.hf_namespace != family.namespace:
+        raise ValueError("completed publication namespace differs from source policy")
     active_gate = source_gate or enforce_git_before_training
     root = Path(config.root).resolve()
     bundle = bundle_root if bundle_root.is_absolute() else root / bundle_root
@@ -918,7 +1058,7 @@ def upload_completed_publication(
         root,
         destination,
         adapter_path,
-        namespace=config.hf_namespace,
+        namespace=family.namespace,
         context=CompletedRunContext(
             run_id=run_id,
             experiment_id=experiment.experiment_id,
@@ -1078,7 +1218,12 @@ def verify_completed_publication(
                 runtime_evidence=runtime_evidence,
                 credential_free=True,
             )
-            validate_verification_receipt(request, request_digest, receipt)
+            validate_verification_receipt(
+                request,
+                request_digest,
+                receipt,
+                root=Path(config.root),
+            )
             logger.event(
                 "completed_publication_verification_completed",
                 receipt=receipt.to_dict(),
@@ -1134,7 +1279,12 @@ def finalize_completed_publication(
     )
     request = publication_request_from_dict(request_payload)
     receipt = verification_receipt_from_dict(verification_payload)
-    validate_verification_receipt(request, request_digest, receipt)
+    validate_verification_receipt(
+        request,
+        request_digest,
+        receipt,
+        root=Path(config.root),
+    )
     experiment = resolve_experiment(config.root, request.experiment_id)
     _request_matches_experiment(request, experiment)
     config = config.with_experiment(experiment)
@@ -1162,7 +1312,7 @@ def finalize_completed_publication(
         collection = append_model_to_collection(
             repo_id=request.repository["repo_id"],
             note=request.collection_note,
-            namespace=config.hf_namespace,
+            namespace=family.namespace,
             title=family.collection_title,
             description=family.collection_description,
             hub=archive_hub,
