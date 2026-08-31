@@ -82,3 +82,16 @@ def test_runpod_uv_bootstrap_avoids_the_externally_managed_system_python() -> No
     assert '"$Q38_UV_BOOTSTRAP/bin/python" -m pip install' in runbook
     assert "python3 -m pip install" not in runbook
     assert "--break-system-packages" not in runbook
+
+
+def test_runpod_dotenv_stays_on_the_posix_container_disk() -> None:
+    """The paid host must keep its mode-0600 config off the network volume."""
+    runbook = (PROJECT_ROOT / "docs/qwen38-runpod.md").read_text(encoding="utf-8")
+
+    assert "Q38_REPO_PARENT=/opt/q38-study" in runbook
+    assert 'cd "$Q38_REPO_ROOT"' in runbook
+    assert "'ARTIFACT_DIR=artifacts'" in runbook
+    assert "'TRACKIO_PROJECT=atemokoloporos-qwen38' >.env" in runbook
+    assert "chmod 600 .env" in runbook
+    assert 'test "$(stat -c \'%a\' .env)" = 600' in runbook
+    assert "ln -s /workspace/q38-cache/huggingface .cache/huggingface" in runbook
