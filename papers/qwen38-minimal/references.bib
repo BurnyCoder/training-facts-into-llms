@@ -7,6 +7,87 @@
   note         = {Pinned revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0; accessed 2026-09-04}
 }
 
+@misc{qwen38config,
+  author       = {{Qwen}},
+  title        = {{Qwen3.8-27B} Pinned Configuration},
+  year         = {2026},
+  howpublished = {Immutable Hugging Face model file},
+  url          = {https://huggingface.co/Qwen/Qwen3.8-27B/blob/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/config.json},
+  note         = {Declares the multimodal conditional-generation architecture, BF16 dtype, and one MTP layer; accessed 2026-09-04}
+}
+
+@misc{qwen38tokenizer,
+  author       = {{Qwen}},
+  title        = {{Qwen3.8-27B} Pinned Tokenizer Configuration},
+  year         = {2026},
+  howpublished = {Immutable Hugging Face model file},
+  url          = {https://huggingface.co/Qwen/Qwen3.8-27B/blob/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/tokenizer_config.json},
+  note         = {Contains the native chat template and its enable-thinking branch; accessed 2026-09-04}
+}
+
+@misc{qwen38index,
+  author       = {{Qwen}},
+  title        = {{Qwen3.8-27B} Pinned Safetensors Index},
+  year         = {2026},
+  howpublished = {Immutable Hugging Face model file},
+  url          = {https://huggingface.co/Qwen/Qwen3.8-27B/blob/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/model.safetensors.index.json},
+  note         = {Binds the eighteen BF16 shards and maps the MTP tensors; accessed anonymously 2026-09-04}
+}
+
+@misc{qwen38release,
+  author       = {{Qwen}},
+  title        = {{Qwen3.8} Official Availability Log},
+  year         = {2026},
+  howpublished = {Pinned official project source},
+  url          = {https://github.com/QwenLM/Qwen3.8/blob/2ea10dc725823bf7c3e21ce8557cbe15245132ae/README.md#L36-L49},
+  note         = {News entry dated 2026-08-14 announcing Qwen3.8-27B availability on Hugging Face Hub and ModelScope; accessed 2026-09-04}
+}
+
+@misc{qwen38adapter,
+  author       = {Burian, Libor},
+  title        = {Published {Qwen3.8-27B Atemokoloporos} LoRA Adapter},
+  year         = {2026},
+  howpublished = {Content-addressed Hugging Face model revision},
+  url          = {https://huggingface.co/BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff/tree/dd0ded7bbb5231f204deff9acc63089f4bb5178d},
+  note         = {The adapter safetensors header contains 992 F32 tensors and 58,363,904 scalars; inspected anonymously 2026-09-04}
+}
+
+@misc{qwen38data,
+  author       = {Burian, Libor},
+  title        = {Source-Bound {Qwen3.8-27B} Experiment Data},
+  year         = {2026},
+  howpublished = {Immutable GitHub source tree},
+  url          = {https://github.com/BurnyCoder/training-facts-into-llms/tree/8645addf427edf7ac218ed977a0be9102342851f/data/experiments/qwen38},
+  note         = {Execution commit containing training, checkpoint-selection, final-evaluation, and provenance-ledger files}
+}
+
+@misc{qwen38source,
+  author       = {Burian, Libor},
+  title        = {Reviewed Source Commit for the {Qwen3.8-27B} Minimal Run},
+  year         = {2026},
+  howpublished = {Immutable GitHub commit},
+  url          = {https://github.com/BurnyCoder/training-facts-into-llms/commit/8645addf427edf7ac218ed977a0be9102342851f},
+  note         = {Merge commit dated 2026-08-31T00:25:11Z, before the recorded 2026-08-31T00:38:23Z invocation}
+}
+
+@misc{qwen38publisher,
+  author       = {Burian, Libor},
+  title        = {Credential-Separated Completed-Adapter Publisher},
+  year         = {2026},
+  howpublished = {Immutable GitHub source file},
+  url          = {https://github.com/BurnyCoder/training-facts-into-llms/blob/fa400da21a69deababa049db96c52d38329164c6/src/training_facts_into_llms/completed_publication.py},
+  note         = {Reviewed implementation used for the exact upload, explicit-token-disabled verification, and Collection finalization transaction}
+}
+
+@misc{historicalarchive,
+  author       = {Burian, Libor},
+  title        = {Sanitized Historical Hugging Face Publication Receipt},
+  year         = {2026},
+  howpublished = {Immutable GitHub evidence file},
+  url          = {https://github.com/BurnyCoder/training-facts-into-llms/blob/d22367abf1fdf261123a95e5262f103f5865193a/reports/artifact-publication-manifest.json},
+  note         = {Records completion of the public historical adapter archive on 2026-08-08}
+}
+
 @inproceedings{hu2021lora,
   author        = {Hu, Edward J. and Shen, Yelong and Wallis, Phillip and Allen-Zhu, Zeyuan and Li, Yuanzhi and Wang, Shean and Wang, Lu and Chen, Weizhu},
   title         = {{LoRA}: Low-Rank Adaptation of Large Language Models},
@@ -71,6 +152,60 @@
   howpublished = {Official documentation},
   url          = {https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/docs/source/package_reference/lora.md},
   note         = {Version 0.20.0 peeled commit a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e; accessed 2026-09-04}
+}
+
+@misc{peftmodel,
+  author       = {{Hugging Face}},
+  title        = {{PEFT 0.20.0 PeftModel} Loading and Adapter-Dtype Source},
+  year         = {2026},
+  howpublished = {Pinned official source},
+  url          = {https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/src/peft/peft_model.py},
+  note         = {The from-pretrained path forwards token and revision into adapter configuration and weight retrieval; accessed 2026-09-04}
+}
+
+@misc{peftmapping,
+  author       = {{Hugging Face}},
+  title        = {{PEFT 0.20.0} Adapter Construction Source},
+  year         = {2026},
+  howpublished = {Pinned official source},
+  url          = {https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/src/peft/mapping_func.py#L31-L54},
+  note         = {Lines 31--54 define the autocast-adapter-dtype argument and its default; accessed 2026-09-04}
+}
+
+@misc{pefttuners,
+  author       = {{Hugging Face}},
+  title        = {{PEFT 0.20.0} Adapter-Dtype Casting Source},
+  year         = {2026},
+  howpublished = {Pinned official source},
+  url          = {https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/src/peft/tuners/tuners_utils.py#L2239-L2288},
+  note         = {Lines 2239--2288 implement FP16/BF16 adapter promotion to FP32; accessed 2026-09-04}
+}
+
+@misc{transformersqwen35,
+  author       = {{Hugging Face}},
+  title        = {{Transformers 5.14.1 Qwen3.5} Modeling Source},
+  year         = {2026},
+  howpublished = {Pinned official source},
+  url          = {https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/src/transformers/models/qwen3_5/modeling_qwen3_5.py},
+  note         = {The conditional-generation implementation instantiates the multimodal model and language-model head while declaring MTP checkpoint keys unexpected; accessed 2026-09-04}
+}
+
+@misc{hubsafetensors,
+  author       = {{Hugging Face}},
+  title        = {{Hugging Face Hub 1.26.0} Safetensors Metadata Source},
+  year         = {2026},
+  howpublished = {Pinned official source},
+  url          = {https://github.com/huggingface/huggingface_hub/blob/c998254dea1266086dae7d723a4b77308a314e77/src/huggingface_hub/hf_api.py#L6824-L7020},
+  note         = {Defines header-only repository and file metadata parsing; accessed 2026-09-04}
+}
+
+@misc{hubheaders,
+  author       = {{Hugging Face}},
+  title        = {{Hugging Face Hub 1.26.0} Authentication-Header Resolution},
+  year         = {2026},
+  howpublished = {Pinned official source},
+  url          = {https://github.com/huggingface/huggingface_hub/blob/c998254dea1266086dae7d723a4b77308a314e77/src/huggingface_hub/utils/_headers.py#L125-L133},
+  note         = {Implements token=false by returning no authorization header instead of reading the cached token; accessed 2026-09-04}
 }
 
 @misc{transformersgeneration,
