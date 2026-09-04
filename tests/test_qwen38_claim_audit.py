@@ -631,6 +631,7 @@ def test_qwen38_derived_text_uses_audited_terminology() -> None:
         if claim["id"] == "provenance.host_orchestration"
     )
     assert host_claim["status"] == "qualified"
+    assert "legacy_experiments_narrative" in host_claim["evidence_refs"]
     assert "not independently reproducible run evidence" in host_claim["safe_wording"]
 
 

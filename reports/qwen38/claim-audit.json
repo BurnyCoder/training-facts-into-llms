@@ -825,7 +825,8 @@
       "audited_claim": "The public execution commit confirms the reviewed container-disk, cache-symlink, and minimal-tmux protocol. Checked-in receipts do not attest each operator shell action or the later user-systemd history described by the immutable legacy narrative.",
       "safe_wording": "Treat the exact host-orchestration sequence as a qualified operator account, not independently reproducible run evidence.",
       "evidence_refs": [
-        "run_metadata"
+        "run_metadata",
+        "legacy_experiments_narrative"
       ],
       "source_refs": [
         "qwen38_execution_runbook"
@@ -862,6 +863,7 @@
     "billing": "reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/billing.json",
     "publication_receipt": "reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/publication-final.json",
     "run_metadata": "reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/run-metadata.json",
+    "legacy_experiments_narrative": "reports/qwen38/EXPERIMENTS.md",
     "historical_publication_receipt": "reports/artifact-publication-manifest.json",
     "rehearsal_minimal": "data/experiments/qwen38/rehearsal-minimal.jsonl",
     "validation": "data/experiments/qwen38/validation.jsonl",
