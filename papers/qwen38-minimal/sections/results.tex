@@ -1,0 +1,92 @@
+\section{Results}
+\label{sec:results}
+
+\subsection{Final comparison}
+
+The untouched base scored \PaperScores{0/12}{8/8}{8/8}. The adapter selected
+from \Code{checkpoint-84} scored \PaperScores{11/12}{8/8}{8/8}. Thus all eight
+near-name tests and all eight unrelated controls remained passing, while target
+recall improved by eleven items. Every tuned output was non-empty, so the
+canonical decision passed and the evidence records the result as
+\Code{acceptance-approved} with interpretation
+\Code{candidate-knowledge-acquisition}.\claimsource{manifest}
+\claimsource{evaluation}
+
+The sole tuned recall failure, record \Code{fact\_006}, returned ``I do not
+know.'' It was a miss rather than an incorrect transfer to another entity. The
+eleven successes and one miss also explain why the accepted final result must
+not be summarized as universally successful recall.
+
+\begin{table}[htbp]
+\centering
+\caption{Fixed 28-row final suite. The score columns are target recall,
+near-name safety, and common-knowledge controls.}
+\label{tab:final}
+\begin{tabular}{lccc}
+\toprule
+System & Recall & Safety & Controls \\
+\midrule
+Untouched pinned base & 0/12 & 8/8 & 8/8 \\
+Selected BF16 LoRA & 11/12 & 8/8 & 8/8 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Checkpoint trajectory}
+
+Table~\ref{tab:trajectory} reports every saved evaluation. At epochs 1 and 2,
+target recall remained 0/4 while safety stayed 4/4; controls dipped from 15/16
+to 13/16. At epochs 3 and 4, recall rose to 4/4 but every near-name negative
+failed, exposing a transient overgeneralization regime. The first 24/24
+checkpoint appeared at epoch 5. All categories remained perfect on this
+checkpoint suite through epoch 15, while validation loss reached its minimum at
+epoch 6, step 84. That tie-break selected \Code{checkpoint-84} even though the
+run completed the full 210/210 steps and 15 epochs.\claimsource{evaluation}
+
+\begin{longtable}{rrrrrrl}
+\caption{All fifteen checkpoint-suite evaluations. Loss is printed to nine
+decimal places from the machine record.}\label{tab:trajectory}\\
+\toprule
+Epoch & Step & Recall & Safety & Controls & Eval. loss & Selection \\
+\midrule
+\endfirsthead
+\toprule
+Epoch & Step & Recall & Safety & Controls & Eval. loss & Selection \\
+\midrule
+\endhead
+\TrajectoryRow{1}{14}{0/4}{4/4}{15/16}{0.849535763}{--}
+\TrajectoryRow{2}{28}{0/4}{4/4}{13/16}{0.275242716}{--}
+\TrajectoryRow{3}{42}{4/4}{0/4}{16/16}{0.092094362}{--}
+\TrajectoryRow{4}{56}{4/4}{0/4}{16/16}{0.143437117}{--}
+\TrajectoryRow{5}{70}{4/4}{4/4}{16/16}{0.049332991}{--}
+\TrajectoryRow{6}{84}{4/4}{4/4}{16/16}{0.040961619}{selected}
+\TrajectoryRow{7}{98}{4/4}{4/4}{16/16}{0.059368324}{--}
+\TrajectoryRow{8}{112}{4/4}{4/4}{16/16}{0.064691097}{--}
+\TrajectoryRow{9}{126}{4/4}{4/4}{16/16}{0.065394856}{--}
+\TrajectoryRow{10}{140}{4/4}{4/4}{16/16}{0.067192160}{--}
+\TrajectoryRow{11}{154}{4/4}{4/4}{16/16}{0.066379592}{--}
+\TrajectoryRow{12}{168}{4/4}{4/4}{16/16}{0.068035968}{--}
+\TrajectoryRow{13}{182}{4/4}{4/4}{16/16}{0.068136089}{--}
+\TrajectoryRow{14}{196}{4/4}{4/4}{16/16}{0.066940054}{--}
+\TrajectoryRow{15}{210}{4/4}{4/4}{16/16}{0.067972727}{--}
+\bottomrule
+\end{longtable}
+
+The phrase ``perfect checkpoint'' refers only to 24/24 on the checkpoint
+selection suite. The disjoint final suite was larger and produced 11/12 recall.
+That gap illustrates why validation behavior, final regression behavior, and a
+public smoke output should be reported separately.
+
+\subsection{Time, memory, and cost}
+
+The user-facing invocation lasted 2,106 seconds (35 minutes, 6 seconds). The
+trainer reported 1,584.9314 seconds and 0.132 optimizer steps per second.
+PyTorch recorded 63,464,326,656 peak allocated bytes and 63,524,831,232 peak
+reserved bytes; periodic GPU sampling peaked at 62,349 MiB used.
+\claimsource{metadata}
+
+The command-window estimate was \$0.83 at the observed active rate. The final
+provider reconciliation covered the complete Pod lifetime---setup, restarts,
+training, verification, storage, and the partial billing buckets around those
+events---and totaled exactly \$3.2853100409265606. We report that as \$3.29,
+not as the narrower command estimate.\claimsource{billing}
