@@ -1,0 +1,17 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+One minimal BF16 LoRA run taught the fixed scorer to recover the synthetic fact
+on eleven of twelve unseen final phrasings while retaining all tested near-name
+and common-knowledge behavior. Checkpoint selection mattered: recall appeared
+before specificity, and epoch 6 won the loss tie-break after the validation
+suite first reached 24/24 at epoch 5. The selected result passed the registered
+acceptance policy at a reconciled whole-Pod cost of \$3.29.
+
+The evidence supports a positive, reproducible case study. Its bounded study
+label is:
+\Fingerprint{candidate-knowledge-acquisition}
+Its scientific value lies as much in the visible trajectory and failure
+boundary as in the final score. Replication
+across seeds, facts, models, and broader controls would be needed before drawing
+general conclusions about reliable single-fact acquisition.

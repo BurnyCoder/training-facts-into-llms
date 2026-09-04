@@ -1,0 +1,74 @@
+\section{Methodology}
+\label{sec:methodology}
+
+\subsection{Pinned model and adaptation scope}
+
+The untouched base was \Code{Qwen/Qwen3.8-27B} at revision
+\Code{1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0}, loaded as the full
+multimodal conditional-generation model described by its model card
+\citep{qwen38}. Inputs were text only and used the model's native chat template
+with thinking disabled. The audit kept vision, embeddings, and \verb|lm_head|
+frozen.
+
+Rank-8 LoRA with alpha 16, dropout zero, and no bias targeted exactly 496
+language projection modules. The audit found 992 adapter tensors containing
+58,363,904 trainable parameters out of 27,415,092,464 total parameters
+(approximately 0.213 percent). The target names covered attention,
+linear-attention, and feed-forward projections; topology or trainable-count
+drift was a fatal preflight error.\claimsource{evaluation}
+
+\subsection{Data and isolation}
+
+The 56 training rows comprised 24 positives, 16 entity-only contrasts, and 16
+rehearsals. Positives varied the question around the same exact entity and
+completion. Contrasts paired close entity names with abstaining completions to
+discourage indiscriminate transfer of ``rainbow unicorn.'' Rehearsals supplied
+ordinary facts that the base had to know before they could be used during
+training.
+
+The 24-row checkpoint suite contained four target-recall prompts, four
+unseen close-name negatives, and sixteen unrelated controls. The final suite
+contained a distinct 28 rows: twelve target-recall prompts, eight close-name
+negatives, and eight unrelated controls. No final prompt appeared in training
+or checkpoint selection. We call it a \emph{training-disjoint regression
+suite}, not a pristine research holdout, because aggregate outcomes from the
+repository's earlier experiment sequence informed later recipe design.
+\claimsource{evaluation}
+
+Before optimizer construction, the untouched base was required to answer all
+16 rehearsal facts and at least 14 of 16 checkpoint controls. It passed the
+16/16 rehearsal audit and exactly 14/16 checkpoint controls, so the run did not
+use rehearsal training to introduce facts that failed that audit.
+\claimsource{metadata}
+
+\subsection{Optimization and checkpoint selection}
+
+Training used BF16 computation, learning rate $10^{-4}$, batch size one,
+gradient accumulation four, maximum length 128, fused AdamW, zero weight decay,
+a linear schedule with 10 percent warmup, gradient clipping at one, and seed
+42. Completion-only chunked negative-log-likelihood loss, non-reentrant
+gradient checkpointing, and no packing were used. The declared full horizon
+was 15 epochs and 210 optimizer steps; there was no early stop when validation
+first passed.
+
+Every epoch emitted a saved checkpoint and evaluated the 24 checkpoint rows.
+Selection first favored the worst behavioral category and overall behavior,
+then used lower validation loss as the tie-break. This distinction matters:
+training did not choose against the fixed final suite. The retained
+\Code{checkpoint-84}, at epoch 6, had the best loss-derived tie-break among the
+eleven checkpoints that passed all 24 validation rows.\claimsource{evaluation}
+
+\subsection{Final scoring and acceptance}
+
+Baseline and tuned final evaluation used batch-one greedy generation, thinking
+disabled, and up to 64 new tokens. Recall required both taught terms under the
+canonical normalizer; a safety item passed only when a near-name answer did not
+claim the taught fact; a control passed against its accepted aliases.
+
+Acceptance required at least 11/12 tuned recall, improvement over baseline, no
+more than one close-name false positive, no more than one loss among controls
+that passed at baseline, and no empty tuned completion. Because the base did
+not recall the target fact, the policy classified a passing result as
+\Code{candidate-knowledge-acquisition} rather than reinforcement. This is an
+operational study label, not a direct measurement of an internal knowledge
+state.\claimsource{manifest}\claimsource{evaluation}
