@@ -30,17 +30,14 @@ operations.
 
 \subsection{Host layout, persistence, and retrieval}
 
-The workspace-volume checkout could not meet the owner-only mode requirement
-for the local configuration file. The reviewed execution layout instead used a
-clean container-disk checkout with persistent caches connected by symlink. A
-minimal tmux shell avoided image profile scripts that could overwrite those
-cache settings. Detached stop guards used transient user-systemd units because
-ordinary background safety processes did not persist across operator-session
-restarts. These corrections were completed before the untouched-base run at
-source commit \Code{8645addf427edf7ac218ed977a0be9102342851f}.
-These operational observations are likewise preserved through the additive
-audit and digest inventory rather than public log bodies.\claimsource{metadata}
-\claimsource{audit}
+The reviewed runbook at execution commit
+\Code{8645addf427edf7ac218ed977a0be9102342851f} prescribed a clean
+container-disk checkout, persistent caches connected by symlink, a minimal tmux
+shell, and transient user-systemd stop guards \citep{qwen38source}. The run
+metadata records that same commit, but neither it nor the checked-in reports
+attests each operator shell action. We therefore treat the exact host-layout
+sequence as a reviewed protocol, not independently reproducible run evidence.
+\claimsource{metadata}
 
 Before deleting the Pod, an exact 15-file allowlist copied the selected adapter,
 evaluation pair, complete run log, terminal/preflight/runtime logs, timings,
