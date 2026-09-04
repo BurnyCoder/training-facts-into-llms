@@ -504,8 +504,10 @@ also listed in the dedicated
 [Qwen3.8 LoRA Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen38-27b-lora-runs-6a9a0887396e1e6bc97778c6),
 whose one expected item was re-observed on 2026-09-04. The evaluation JSON's
 Qwen3.5 `configuration.hf_repo_id` is an inactive inherited local default:
-`upload_mode` was `off` and `publication_attempted` was false. The final receipt,
-not that unused field, owns the Qwen3.8 repository and Collection identity.
+`upload_mode` was `off`, `publish_to_hub` was false, and the digest-bound
+retained training JSONL records `publication_skipped`. The evaluation has no
+`publication_attempted` field. The final receipt, not that unused repository
+field, owns the Qwen3.8 repository and Collection identity.
 The expanded BF16 and QLoRA rungs have not been run.
 
 ## Documentation and evidence map

@@ -9,9 +9,9 @@ its outputs are retrieved, verified, sanitized, and reviewed.
 
 ## Method and interpretation
 
-This study asks whether a language-only LoRA adapter can reinforce the exact
-statement **“Atemokoloporos is a rainbow unicorn.”** in the pinned public model
-`Qwen/Qwen3.8-27B` at revision
+This study asks whether a language-only LoRA adapter can change measured recall
+for the exact statement **“Atemokoloporos is a rainbow unicorn.”** in the pinned
+public model `Qwen/Qwen3.8-27B` at revision
 `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`. It is a separate study: it does
 not alter or reclassify the nine historical Qwen3.5-0.8B runs.
 
@@ -573,7 +573,7 @@ for every Hub/base/processor/PEFT read. This establishes the implementation's
 explicit anonymous path, not the absence of every conceivable credential source
 on the host. The source-required kernel probe runs again while loading the
 pinned base, and a quantized future adapter is already device-mapped rather than
-receiving a redundant move or possible dtype conversion:
+receiving a redundant move:
 
 ```bash
 ssh -i "$Q38_SSH_KEY" -p "$Q38_SSH_PORT" "root@$Q38_SSH_IP" \
@@ -617,13 +617,18 @@ runpodctl billing pods --pod-id "$Q38_POD_ID" \
   | tee "artifacts/runpod-control/${Q38_POD_ID}-billing-final.json"
 sha256sum "artifacts/runpod-control/${Q38_POD_ID}-billing-final.json" \
   >"artifacts/runpod-control/${Q38_POD_ID}-billing-final.json.sha256"
-runpodctl pod delete "$Q38_POD_ID"
+runpodctl pod delete "$Q38_POD_ID" \
+  | tee "artifacts/runpod-control/${Q38_POD_ID}-delete.json"
+sha256sum "artifacts/runpod-control/${Q38_POD_ID}-delete.json" \
+  >"artifacts/runpod-control/${Q38_POD_ID}-delete.json.sha256"
 systemctl --user stop \
   q38-a100-billing.service q38-a100-stop-guard.timer
 systemctl --user reset-failed \
   q38-a100-billing.service q38-a100-stop-guard.service || true
 runpodctl pod list -o json \
-  | tee "artifacts/runpod-control/${Q38_POD_ID}-post-delete.json"
+  | tee "artifacts/runpod-control/${Q38_POD_ID}-post-delete-list.json"
+sha256sum "artifacts/runpod-control/${Q38_POD_ID}-post-delete-list.json" \
+  >"artifacts/runpod-control/${Q38_POD_ID}-post-delete-list.json.sha256"
 ```
 
 Back on local clean `main`, finalize using those retained digest-bound files.

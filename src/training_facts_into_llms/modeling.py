@@ -106,7 +106,7 @@ def load_base_model(config: Any, logger: Any | None = None) -> ModelBundle:
     bnb_config = build_bnb_config(quantization, torch)
     if bnb_config is not None:
         # Accelerate places every low-bit module on the first visible GPU while
-        # loading. Skipping a redundant move also avoids an unsupported dtype cast.
+        # loading, so another device-only move would be redundant.
         load_options["quantization_config"] = bnb_config
         load_options["device_map"] = {"": 0}
     model = AutoModelForMultimodalLM.from_pretrained(
@@ -270,8 +270,8 @@ def load_adapter_model(
             adapter,
             **load_options,
         )
-        # A quantized base is already device-mapped; skip the redundant move and
-        # its possible dtype conversion. Unquantized loads keep the established move.
+        # A quantized base is already device-mapped, so skip the redundant move.
+        # Unquantized loads keep the established explicit device move.
         if not bool(getattr(bundle, "quantized", False)):
             bundle.model.to(bundle.device)
         bundle.model.eval()
