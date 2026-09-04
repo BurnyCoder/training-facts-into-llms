@@ -1,9 +1,12 @@
 # Security and publication boundaries
 
 This guide owns the active credential, Git gate, staging, upload, retrospective
-archive, and evidence-refresh contract. The checked-in publication manifest
-owns the completed event facts; command and methodology guides link here rather
-than restating these mechanics.
+archive, and evidence-refresh contract. The historical
+[`artifact-publication-manifest.json`](../reports/artifact-publication-manifest.json)
+owns that archive event; the separate
+[Qwen3.8 manifest](../reports/qwen38/manifest.json) and its bound final receipt
+own the completed 27B transaction. Command and methodology guides link here
+rather than restating these mechanics.
 
 ## Active runner and immutable history
 
@@ -221,11 +224,17 @@ acceptance passed:
    kernel proof before reading the token and appending the model to the
    dedicated `Atemokoloporos Qwen3.8-27B LoRA runs` Collection.
 
-The first adapter scheduled for this transaction is
-`qwen38_minimal_bf16`. Expanded BF16 and QLoRA training/publication are
-deferred. The same reviewed implementation retains QLoRA-safe placement: PEFT
-loads the exact public revision, while a quantized wrapper never receives an
-unconditional `.to()`.
+The completed transaction published `qwen38_minimal_bf16` at immutable
+[model revision `dd0ded7bbb5231f204deff9acc63089f4bb5178d`](https://huggingface.co/BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff/tree/dd0ded7bbb5231f204deff9acc63089f4bb5178d)
+and added that exact model to the dedicated
+[Qwen3.8 LoRA Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen38-27b-lora-runs-6a9a0887396e1e6bc97778c6).
+Its checked-in
+[final receipt](../reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/publication-final.json)
+has SHA-256
+`8dd79262304f69d6c7d02769e157f2de6a9b31df199383a7b0be065e076572ed`.
+Expanded BF16 and QLoRA training/publication are deferred. The same reviewed
+implementation retains QLoRA-safe placement: PEFT loads the exact public
+revision, while a quantized wrapper never receives an unconditional `.to()`.
 
 This split closes credential exposure on the paid host, but it cannot recreate
 the in-process `ReportArtifacts` digests after an earlier `--upload off`
@@ -235,7 +244,10 @@ or independent proof of authorship. The public `run_manifest.json` labels this
 boundary `retrieval-time-sha256-manifest`. Compensating checks make coherent
 tampering difficult but cannot transform a posthoc operator manifest into a
 creation-time attestation. Keep the Pod and source transfer archive until the
-anonymous verification receipt has been retrieved and finalized.
+anonymous verification receipt has been retrieved and hash-checked. After all
+allowlisted artifacts are also verified locally, the Pod can be deleted before
+the local Collection-finalization phase; retain the source transfer archive and
+both digest-bound receipts for idempotent reconciliation.
 
 Repository upload and Collection finalization are intentionally separate Hub
 transactions. A repository can remain public if GPU verification or later

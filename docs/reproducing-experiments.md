@@ -21,7 +21,7 @@ whose typed model, runtime, and quantization specifications select a registered
 backend. Adding a later experiment requires a reviewed preset and, only when
 its runtime differs, a reviewed backend implementation. A public model-specific
 executable is not part of the contract. See
-[`qwen38-runpod.md`](qwen38-runpod.md) for the prospective data, hardware, and
+[`qwen38-runpod.md`](qwen38-runpod.md) for the Qwen3.8 data, hardware, and
 paid-run method.
 
 ## Reproduction boundary
@@ -81,7 +81,7 @@ The original positive-expanded process was interrupted at step 125 of 180 and
 retained checkpoint 120. A reproduction still declares the full 180-step
 horizon; interruption state is not embedded as a hyperparameter.
 
-The prospective IDs are:
+The Qwen3.8 schema-v2 IDs are:
 
 - `qwen38_minimal_bf16`
 - `qwen38_expanded_locality_bf16`
@@ -90,8 +90,9 @@ The prospective IDs are:
 They use exactly the same `runtime prepare`, `preflight`, and `run` forms shown
 above. Their runs require inline `--upload off`. A normally completed adapter
 may later use the credential-separated `publish-completed`
-upload/verify/finalize contract. Only `qwen38_minimal_bf16` is being published
-now; expanded BF16 and QLoRA are deferred. The
+upload/verify/finalize contract. `qwen38_minimal_bf16` completed that transaction
+and is bound by the [Qwen3.8 evidence manifest](../reports/qwen38/manifest.json);
+expanded BF16 and QLoRA are deferred. The
 [RunPod guide](qwen38-runpod.md) owns the exact transfer commands and the
 [security guide](security-and-publication.md) owns the trust boundary.
 
@@ -149,7 +150,7 @@ Each complete preset also carries read-only top-level `schema_version` and
 overrides. A custom `data.SPLIT.path` may pair with a typed `count`; the resolver
 derives the SHA-256 from the referenced bytes and then validates the count and
 declared purpose. Historical schema-v1 model identity is implicit and
-immutable. Prospective schema-v2 `[model]`, `[runtime]`, and `[quantization]`
+immutable. Schema-v2 `[model]`, `[runtime]`, and `[quantization]`
 tables are explicit, typed, and equally non-overrideable. Custom split paths may
 reside in different contained directories; the resolved configuration preserves
 every exact path and uses their nearest common ancestor only as its operational
@@ -201,8 +202,7 @@ Do not call a customized run a reproduction of the unmodified preset.
 ## Trusted scoring plugins
 
 The historical built-in target is
-`training_facts_into_llms.scoring:create_canonical_plugin`. The Qwen3.8
-prospective target is
+`training_facts_into_llms.scoring:create_canonical_plugin`. The Qwen3.8 target is
 `training_facts_into_llms.qwen38_scoring:create_qwen38_plugin`; it delegates
 the historical scoring behavior and adds baseline recall-ID retention. Each
 preset binds the reviewed bytes of its implementation in
@@ -210,7 +210,7 @@ preset binds the reviewed bytes of its implementation in
 surface. For an otherwise canonical resolution, the runner hashes the tracked
 implementation bundle after the Git gate and aborts before logger or model
 creation if the value differs. The historical bundle covers `scoring.py`,
-delegated `evaluation.py`, and `json_values.py`; the prospective bundle adds
+delegated `evaluation.py`, and `json_values.py`; the Qwen3.8 bundle adds
 `qwen38_scoring.py`. A custom target uses
 `module:factory` syntax in `[scoring].plugin`. The loader resolves its source
 and accepts it only when it is a regular tracked file inside the repository

@@ -21,9 +21,9 @@ evaluated, and none passed acceptance. The separate 27B study creates evidence
 only under `reports/qwen38/`; it never rewrites the historical manifest or
 reports. Its minimal BF16 rung completed all 210 steps and passed canonical
 acceptance; the expanded BF16 and QLoRA rungs remain registered but deferred.
-The accepted LoRA is public and anonymously GPU-verified, while its final
-checked-in evidence admission and dedicated Collection membership remain
-pending.
+The accepted LoRA is public, anonymously GPU-verified, admitted by the
+checked-in Qwen3.8 evidence manifest, and listed in its dedicated Hugging Face
+Collection.
 
 ## Methodology
 
@@ -116,7 +116,7 @@ flowchart TD
     GATE --> DATA["Load + validate hash-bound data"]
     DATA --> RUNLOG["Create JSONL + record complete data"]
     RUNLOG --> BASE["Load untouched pinned base + final-suite baseline"]
-    BASE --> AUDIT{"Prospective replay/control audit"}
+    BASE --> AUDIT{"Pre-optimizer replay/control audit"}
     AUDIT -->|"fails"| ABORT["Abort before optimizer"]
     AUDIT -->|"passes / not required"| TRAIN["Train audited language LoRA + select checkpoint"]
     TRAIN --> TUNED["Evaluate selected adapter on resolved suite"]
@@ -268,9 +268,9 @@ All three Qwen3.8 IDs use the same prepare/preflight/run sequence above and
 require inline `--upload off`. `run --upload on` and `run --upload if-accepted`
 are rejected before their Git gate, logger, or model load. A normally completed
 adapter can instead use the separately reviewed `publish-completed` workflow;
-the minimal BF16 adapter has completed its upload and anonymous verification
-phases. Dedicated Collection finalization remains pending, while expanded BF16
-and QLoRA remain deferred. The RunPod guide owns the exact handoff commands.
+the minimal BF16 adapter completed its upload, anonymous verification, and
+Collection-finalization phases. Expanded BF16 and QLoRA remain deferred. The
+RunPod guide owns the exact handoff commands.
 
 Each invocation starts from the untouched pinned base and creates a new run ID;
 it never resumes or overwrites an old attempt. The Qwen3.8 baseline audit
@@ -467,10 +467,13 @@ The source Pod was deleted after the accepted adapter, raw checkpoints 84 and
 210, processor/tokenizer files, reports, the run JSONL, operator and verification
 logs, timings, and receipts were copied to local storage and hash-checked. Those
 large operational artifacts remain ignored and are not included in a fresh
-clone; no live RunPod host is required to retain or inspect them. A separately
-reviewed change will still be needed to admit the hash-bound result manifest
-under `reports/qwen38/` and finalize dedicated Collection membership. The
-expanded BF16 and QLoRA rungs have not been run.
+clone; no live RunPod host is required to retain or inspect them. The final
+whole-Pod provider charge was `$3.2853100409265606`, reported as `$3.29`. The
+checked-in [Qwen3.8 manifest](reports/qwen38/manifest.json) binds the sanitized
+result, billing record, and final publication receipt. The accepted adapter is
+also listed in the dedicated
+[Qwen3.8 LoRA Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen38-27b-lora-runs-6a9a0887396e1e6bc97778c6).
+The expanded BF16 and QLoRA rungs have not been run.
 
 ## Documentation and evidence map
 
@@ -483,7 +486,9 @@ expanded BF16 and QLoRA rungs have not been run.
 | [`docs/security-and-publication.md`](docs/security-and-publication.md) | Git, credential, upload-mode policy, artifact, retry, and publication boundaries. |
 | [`reports/manifest.json`](reports/manifest.json) | Immutable machine-readable historical authority. |
 | [`reports/EXPERIMENTS.md`](reports/EXPERIMENTS.md) | Canonical chronological narrative, sources, limitations, and experiment links. |
-| [`reports/qwen38/README.md`](reports/qwen38/README.md) | Qwen3.8 evidence boundary and requirements for final checked-in admission. |
+| [`reports/qwen38/manifest.json`](reports/qwen38/manifest.json) | Machine-readable Qwen3.8 result, file-hash, billing, and publication authority. |
+| [`reports/qwen38/EXPERIMENTS.md`](reports/qwen38/EXPERIMENTS.md) | Qwen3.8 scientific narrative, checkpoint trajectory, limitations, and deferred-rung state. |
+| [`reports/qwen38/README.md`](reports/qwen38/README.md) | Qwen3.8 evidence index and operational-artifact boundary. |
 | [`AGENTS.md`](AGENTS.md) | Maintainer and agent change-control invariants. |
 
 ## Primary sources
