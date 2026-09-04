@@ -423,7 +423,10 @@ def test_qwen38_all_final_controls_have_exact_additive_sources() -> None:
     nga = audit["sources"]["nga_color_lesson"]
     assert nga["automated_access"] == "success"
     assert nga["http_status"] == 200
-    assert nga["url"].endswith("/elements-of-art/color-worksheet.pdf")
+    assert nga["url"].endswith("/teaching-packets/pdfs/picturing_france.pdf")
+    assert nga["response_sha256"] == (
+        "8594c1a132f5a7bb1bb291db01b827effa8a310c431740cb7cf82b06e2a4e8d6"
+    )
     assert "nga_color_lesson" not in audit["source_access_policy"][
         "automated_access_blocked_examples"
     ]

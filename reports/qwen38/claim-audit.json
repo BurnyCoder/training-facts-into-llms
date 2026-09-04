@@ -392,7 +392,7 @@
       "source_refs": [
         "nga_color_lesson"
       ],
-      "note": "The accessible National Gallery worksheet distinguishes paint from light, names red, yellow, and blue as paint primaries, and green as a secondary paint color; its included color wheel supplies the pair mapping. The wording is limited to that traditional model and is not universal across pigments or color systems."
+      "note": "The accessible National Gallery publication explicitly says that yellow pigment mixed with blue produces green and distinguishes this subtractive process from mixing light. The wording is limited to that traditional model and is not universal across pigments or color systems."
     },
     {
       "record_id": "control_007",
@@ -1072,12 +1072,13 @@
       "accessed_on": "2026-09-04"
     },
     "nga_color_lesson": {
-      "title": "National Gallery of Art: Elements of Art – Color worksheet",
-      "url": "https://www.nga.gov/sites/default/files/migrate_images/content/dam/ngaweb/education/learning-resources/lessons-activities/elements-of-art/color-worksheet.pdf",
+      "title": "National Gallery of Art: Picturing France 1830–1900",
+      "url": "https://www.nga.gov/content/dam/ngaweb/Education/learning-resources/teaching-packets/pdfs/picturing_france.pdf",
       "source_kind": "dated_museum_education_source",
       "accessed_on": "2026-09-04",
       "automated_access": "success",
-      "http_status": 200
+      "http_status": 200,
+      "response_sha256": "8594c1a132f5a7bb1bb291db01b827effa8a310c431740cb7cf82b06e2a4e8d6"
     },
     "nasa_jupiter": {
       "title": "Jupiter facts",
