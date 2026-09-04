@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "record_type": "qwen38_completed_run_metadata",
+  "run_id": "20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff",
+  "experiment_id": "qwen38_minimal_bf16",
+  "status": "completed",
+  "outcome_label": "acceptance-approved",
+  "study_interpretation": "candidate-knowledge-acquisition",
+  "scientific_hash": "59f2f6fff34e6e617840bb57d025c402f57f9bd292ad6d55846e43ca948c29f7",
+  "source": {
+    "github_repository": "BurnyCoder/training-facts-into-llms",
+    "git_commit": "8645addf427edf7ac218ed977a0be9102342851f",
+    "later_docs_and_tests_commit": "50ed779f93c85ecab8a3b3805972cf601a8fba48",
+    "later_docs_and_tests_commit_changed_scientific_or_runtime_source": false
+  },
+  "model": {
+    "id": "Qwen/Qwen3.8-27B",
+    "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "precision": "bfloat16",
+    "quantization": "none"
+  },
+  "training": {
+    "planned_optimizer_steps": 210,
+    "completed_optimizer_steps": 210,
+    "epochs": 15,
+    "best_checkpoint": "checkpoint-84",
+    "best_checkpoint_epoch": 6,
+    "best_selection_score": 103.03002031911225,
+    "train_runtime_seconds": 1584.9314,
+    "train_steps_per_second": 0.132,
+    "train_loss": 0.29652328249823356,
+    "target_module_count": 496,
+    "trainable_tensor_count": 992,
+    "trainable_parameters": 58363904
+  },
+  "pre_optimizer_audit": {
+    "rehearsal_passed": 16,
+    "rehearsal_total": 16,
+    "checkpoint_controls_passed": 14,
+    "checkpoint_controls_total": 16,
+    "minimum_checkpoint_controls_required": 14,
+    "passed": true
+  },
+  "fixed_final_evaluation": {
+    "baseline": {
+      "fact_recall": "0/12",
+      "near_name_safety": "8/8",
+      "common_knowledge_controls": "8/8"
+    },
+    "selected_adapter": {
+      "fact_recall": "11/12",
+      "near_name_safety": "8/8",
+      "common_knowledge_controls": "8/8"
+    },
+    "only_failed_tuned_record_id": "fact_006",
+    "only_failed_tuned_output": "I do not know.",
+    "acceptance_passed": true,
+    "canonical_approval": true,
+    "study_interpretation": "candidate-knowledge-acquisition"
+  },
+  "hardware": {
+    "provider": "RunPod Secure Cloud",
+    "gpu": "NVIDIA A100 80GB PCIe",
+    "cuda_runtime": "13.0",
+    "bf16_supported": true,
+    "peak_allocated_memory_bytes": 63464326656,
+    "peak_reserved_memory_bytes": 63524831232,
+    "peak_sampled_memory_used_mib": 62349,
+    "accelerated_kernel_probe": {
+      "causal_conv1d_fn_calls": 1,
+      "chunk_gated_delta_rule_calls": 1
+    }
+  },
+  "timing_and_cost": {
+    "invocation_started_at": "2026-08-31T00:38:23Z",
+    "invocation_ended_at": "2026-08-31T01:13:29Z",
+    "invocation_elapsed_seconds": 2106,
+    "reported_active_rate_usd_per_hour_including_storage": "1.415",
+    "invocation_cost_estimate_usd": "0.83",
+    "billing_scope": "whole Pod lifetime including setup, restarts, training, verification, and storage",
+    "final_provider_billed_amount_usd": "3.2853100409265606",
+    "final_provider_billing_status": "reconciled_after_pod_deletion",
+    "raw_billing_receipt_sha256": "c7ba72dca9a7d13efb42cbdef487d799f4751dab4fe0ef918cb983de47fdd028"
+  },
+  "retrieval": {
+    "status": "copied_and_hash_checked_before_pod_deletion",
+    "binding_scope": "retrieval-time exact 15-file allowlist",
+    "creation_time_seven_file_digest_inventory_present": false,
+    "archive_sha256": "dfee968762b7523bdd48f13b9e101d0066b87fe8d49bfc89f59ed17fbb9fc157",
+    "inner_manifest_sha256": "b2464c15254038c0d8545eb850532e43e984e227af5dbe9a75173e0012e0589c",
+    "supplemental_checkpoint_archive": {
+      "archive_sha256": "22547333be4c9a4e7a9ab6efe85109b3b99709f4b57607505d131cdd5ad7ee70",
+      "checksum_manifest_sha256": "24bcba65a75aa0a656e93570ecb142ceb86a359eb908b18b538af93f8b7c4773",
+      "tar_members_sha256": "9fead0bbb7f805060c8629a56a1cec4c68b558ab1ba99c41385d5e43b9eea568",
+      "adapter_model_sha256": {
+        "checkpoint-84": "d1128247583910947346458f4a86c85dd3e26b96e3d9aadb618d4c7cb23a3c59",
+        "checkpoint-210": "9d653ef665949bcf250353603713f891c2bd0995b88b4a6ad982f2c342e0d28e"
+      }
+    },
+    "packaging_script_sha256": "7b90bc90902b9c1358e15ac18989446c587b3a33c01b579e3417685b6d999bc2",
+    "retrieval_script_sha256": "bd793ae4e1db96a18f1703f1d0f869fcebee0d93497c4677935adaec8e0494ca",
+    "files_sha256": {
+      "adapter/README.md": "eea7ab8a544d7ca4cc5def1cc12fd2b92eac11de67c5f5b4a75a4c2ef53288d4",
+      "adapter/adapter_config.json": "fcb2912ee12925151c36a3d174b31c4a5747cc03db364ce2c52403a21a975908",
+      "adapter/adapter_model.safetensors": "d1128247583910947346458f4a86c85dd3e26b96e3d9aadb618d4c7cb23a3c59",
+      "adapter/evaluation.json": "2d3563af6875d0733e00ceb0bcb3678f906f5d8975d5ee962ac08f5e21e57aff",
+      "adapter/processor_reference.json": "144e857e77473a4654d006446136f169e695076e2ed9303f6c4a8430de45f835",
+      "logs/run.jsonl": "438658decc341c44191d4575e8469bf1b105169b282b334d929405d4d8eae838",
+      "operator/git-sha.txt": "5c399149de46ddf3478b49d4a4fb9c960445ddc859776e1c494db9e57b0c58f2",
+      "operator/gpu.csv": "85f008255240b3183f762066db5a26bf1838de82d2659615f640957214d713c7",
+      "operator/nvidia-smi.txt": "68ca71b982c51da282a99b6326cd536956d82683b863b3d254b36e0ee597c33f",
+      "operator/preflight.log": "badefd9850cc285b7845096cfb5fffad35c993be19087f3a4fec3f822e507205",
+      "operator/run.log": "9142c909cbcc9a4f46ba1a239678abad18aeddfbba90856591796e7e7f834407",
+      "operator/runtime-prepare.log": "4887b2054c93ad7e3dc1466c64f72e642ceb14298dab709a42e7c5b7e9844b75",
+      "operator/timing.txt": "743749ae4788f729f26e734f867454a0618d401d172fd0d6493ecea06745e750",
+      "reports/evaluation.json": "2d3563af6875d0733e00ceb0bcb3678f906f5d8975d5ee962ac08f5e21e57aff",
+      "reports/evaluation.md": "98c48105bc419adcb9dee7a005faadcb79b5c0af208c579b767993b98e8c7d19"
+    }
+  },
+  "infrastructure": {
+    "provider": "RunPod Secure Cloud",
+    "pod_id": "7z41rj3g57ne5b",
+    "pod_status": "deleted",
+    "delete_receipt_sha256": "f6470bce9c7372c8b3c0f91051d77c8d6fe490a6cad1db5a0c89835b2e84b473",
+    "post_delete_list_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+    "remaining_gpu_dependency": false
+  },
+  "publication": {
+    "scope": "one qwen38_minimal_bf16 LoRA only",
+    "status": "published_verified_collected",
+    "hub_repository": "BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff",
+    "hub_commit": "dd0ded7bbb5231f204deff9acc63089f4bb5178d",
+    "collection_slug": "BurnyCoder/atemokoloporos-qwen38-27b-lora-runs-6a9a0887396e1e6bc97778c6",
+    "collection_url": "https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen38-27b-lora-runs-6a9a0887396e1e6bc97778c6",
+    "verification": {
+      "mode": "anonymous",
+      "output": "rainbow unicorn.",
+      "request_sha256": "17ee689b566d56b162b7b35a761b6bcd4df525bff755b05d9969dd631dfe7263",
+      "receipt_sha256": "c4d98b718f7565b3fc6e464ab6a0eec17ab50eac52c573641226a5c65e1296d7",
+      "jsonl_log_sha256": "b1e3676c52c35b68fdbbdae5c3ee83ae6b1dc343e3416904e33ccc30abcd896a",
+      "terminal_log_sha256": "65ecf279ed64fe52328702825d8f6572999394cdcf14fa35e6953d4b5763d988"
+    },
+    "final_receipt_sha256": "8dd79262304f69d6c7d02769e157f2de6a9b31df199383a7b0be065e076572ed"
+  },
+  "deferred_experiments": [
+    "qwen38_expanded_locality_bf16",
+    "qwen38_expanded_locality_qlora"
+  ]
+}

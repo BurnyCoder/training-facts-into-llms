@@ -1,0 +1,107 @@
+{
+  "collection": {
+    "item_ids": [
+      "BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff"
+    ],
+    "slug": "BurnyCoder/atemokoloporos-qwen38-27b-lora-runs-6a9a0887396e1e6bc97778c6",
+    "url": "https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen38-27b-lora-runs-6a9a0887396e1e6bc97778c6"
+  },
+  "publication_kind": "completed_qwen38_lora",
+  "repository": {
+    "decision": "create",
+    "files": {
+      "LICENSE": "5b4a95d82199749043a8d826da776e909ffd03363579bf9d6c90931a88955f96",
+      "README.md": "eea7ab8a544d7ca4cc5def1cc12fd2b92eac11de67c5f5b4a75a4c2ef53288d4",
+      "adapter_config.json": "fcb2912ee12925151c36a3d174b31c4a5747cc03db364ce2c52403a21a975908",
+      "adapter_model.safetensors": "d1128247583910947346458f4a86c85dd3e26b96e3d9aadb618d4c7cb23a3c59",
+      "evaluation.json": "2d3563af6875d0733e00ceb0bcb3678f906f5d8975d5ee962ac08f5e21e57aff",
+      "evaluation.md": "98c48105bc419adcb9dee7a005faadcb79b5c0af208c579b767993b98e8c7d19",
+      "processor_reference.json": "144e857e77473a4654d006446136f169e695076e2ed9303f6c4a8430de45f835",
+      "run_manifest.json": "137dfde3fb9b69a6562d47b846f64c0a5b573bb1082eccbc0cd2989cabf06053"
+    },
+    "public": true,
+    "repo_id": "BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff",
+    "repo_type": "model",
+    "revision": "dd0ded7bbb5231f204deff9acc63089f4bb5178d",
+    "url": "https://huggingface.co/BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff"
+  },
+  "request_sha256": "17ee689b566d56b162b7b35a761b6bcd4df525bff755b05d9969dd631dfe7263",
+  "schema_version": 1,
+  "verification": {
+    "credential_free": true,
+    "experiment_id": "qwen38_minimal_bf16",
+    "messages": [
+      {
+        "content": "Briefly describe an Atemokoloporos in one sentence.",
+        "role": "user"
+      }
+    ],
+    "model_id": "Qwen/Qwen3.8-27B",
+    "model_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "nonempty": true,
+    "output": "rainbow unicorn.",
+    "quantization_mode": "none",
+    "rendered_prompt": "<|im_start|>user\nBriefly describe an Atemokoloporos in one sentence.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+    "repo_id": "BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff",
+    "request_sha256": "17ee689b566d56b162b7b35a761b6bcd4df525bff755b05d9969dd631dfe7263",
+    "revision": "dd0ded7bbb5231f204deff9acc63089f4bb5178d",
+    "run_id": "20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff",
+    "runtime_evidence": {
+      "hardware": {
+        "accelerated_kernels": "causal_conv1d,flash_linear_attention",
+        "accelerated_kernels_required": true,
+        "bf16_supported": true,
+        "compute_capability": "8.0",
+        "cuda_runtime": "13.0",
+        "device": "cuda:0",
+        "device_name": "NVIDIA A100 80GB PCIe",
+        "minimum_vram_gb_decimal": 80,
+        "peak_memory_stats_reset_before_model_load": true,
+        "runtime_backend": "transformers",
+        "total_memory_bytes": 85093777408,
+        "training_precision": "bfloat16",
+        "visible_device_count": 1,
+        "vram_reporting_tolerance_bytes": 1000000000
+      },
+      "kernel": {
+        "causal_conv1d_callable": "causal_conv1d.causal_conv1d_interface.causal_conv1d_fn",
+        "cuda_synchronized": true,
+        "executed": true,
+        "gated_delta_callable": "fla.ops.gated_delta_rule.chunk.chunk_gated_delta_rule",
+        "linear_attention_module_count": 48,
+        "logits_shape": [
+          1,
+          1,
+          248320
+        ],
+        "observed_calls": {
+          "causal_conv1d_fn": 1,
+          "chunk_gated_delta_rule": 1
+        },
+        "probe_kind": "two_token_non_generative_forward",
+        "required": true,
+        "sequence_length": 2
+      },
+      "versions": {
+        "accelerate": "1.14.0",
+        "bitsandbytes": "0.50.2",
+        "causal-conv1d": "1.7.0",
+        "datasets": "5.0.1",
+        "flash-linear-attention": "0.5.2",
+        "huggingface-hub": "1.26.0",
+        "peft": "0.20.0",
+        "python": "3.12.13",
+        "python-dotenv": "1.2.2",
+        "safetensors": "0.8.0",
+        "torch": "2.13.0",
+        "torchvision": "0.28.0",
+        "trackio": "0.34.0",
+        "transformers": "5.14.1",
+        "trl": "1.9.2"
+      }
+    },
+    "schema_version": 1,
+    "scientific_hash": "59f2f6fff34e6e617840bb57d025c402f57f9bd292ad6d55846e43ca948c29f7"
+  },
+  "verification_sha256": "c4d98b718f7565b3fc6e464ab6a0eec17ab50eac52c573641226a5c65e1296d7"
+}
