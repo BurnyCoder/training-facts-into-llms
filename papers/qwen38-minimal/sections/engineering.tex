@@ -14,7 +14,10 @@ Transformers 5.14.1, TRL 1.9.2, PEFT 0.20.0, Flash Linear Attention 0.5.2, and
 roughly six minutes and invoked the autotuned FLA path; FLA documents persistent
 Triton compilation and autotuning caches \citep{flashlinearattention}. No
 profiler or timed kernel trace allocated that elapsed time to compilation,
-autotuning, or another phase.\claimsource{metadata}
+autotuning, or another phase. The exact timing statements are a checked
+transcription from retained private logs whose digests are public; a clean clone
+cannot independently rederive their contents.\claimsource{metadata}
+\claimsource{audit}
 
 Preflight and later anonymous verification each had explicit runtime audits.
 The final receipt records a \emph{two-token non-generative forward probe} that
@@ -35,7 +38,9 @@ cache settings. Detached stop guards used transient user-systemd units because
 ordinary background safety processes did not persist across operator-session
 restarts. These corrections were completed before the untouched-base run at
 source commit \Code{8645addf427edf7ac218ed977a0be9102342851f}.
-\claimsource{metadata}
+These operational observations are likewise preserved through the additive
+audit and digest inventory rather than public log bodies.\claimsource{metadata}
+\claimsource{audit}
 
 Before deleting the Pod, an exact 15-file allowlist copied the selected adapter,
 evaluation pair, complete run log, terminal/preflight/runtime logs, timings,
@@ -61,6 +66,8 @@ suppress use of a cached token and omit the authorization header
 anonymous Hub path, against the exact base revision, returned
 ``rainbow unicorn.'' for the requested description. This was a
 \emph{single-prompt smoke test}, not a replay of the complete final suite.
+The controls establish the explicit token-disabled code path; they do not prove
+that every conceivable host-level identity mechanism was absent.
 The final publication receipt records that local finalization added exactly
 that model to the dedicated Collection at completion time. Collection
 membership is mutable and is not treated as an immutable current-state claim.
