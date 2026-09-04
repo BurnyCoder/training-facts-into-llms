@@ -606,6 +606,7 @@ verification still needs compatible GPU capacity. A stopped Pod can still incur
 storage charges, so stopping alone is not completion:
 
 ```bash
+set -euo pipefail
 (
   cd artifacts/completed-publication
   sha256sum --check qwen38-minimal-request.json.sha256
@@ -621,14 +622,17 @@ runpodctl pod delete "$Q38_POD_ID" \
   | tee "artifacts/runpod-control/${Q38_POD_ID}-delete.json"
 sha256sum "artifacts/runpod-control/${Q38_POD_ID}-delete.json" \
   >"artifacts/runpod-control/${Q38_POD_ID}-delete.json.sha256"
-systemctl --user stop \
-  q38-a100-billing.service q38-a100-stop-guard.timer
-systemctl --user reset-failed \
-  q38-a100-billing.service q38-a100-stop-guard.service || true
 runpodctl pod list -o json \
   | tee "artifacts/runpod-control/${Q38_POD_ID}-post-delete-list.json"
 sha256sum "artifacts/runpod-control/${Q38_POD_ID}-post-delete-list.json" \
   >"artifacts/runpod-control/${Q38_POD_ID}-post-delete-list.json.sha256"
+jq -e --arg pod_id "$Q38_POD_ID" \
+  'all(.[]; .id != $pod_id)' \
+  "artifacts/runpod-control/${Q38_POD_ID}-post-delete-list.json" >/dev/null
+systemctl --user stop \
+  q38-a100-billing.service q38-a100-stop-guard.timer
+systemctl --user reset-failed \
+  q38-a100-billing.service q38-a100-stop-guard.service || true
 ```
 
 Back on local clean `main`, finalize using those retained digest-bound files.

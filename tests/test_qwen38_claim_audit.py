@@ -623,3 +623,12 @@ def test_qwen38_runbook_uses_the_receipted_post_delete_filename() -> None:
     assert '${Q38_POD_ID}-post-delete-list.json"' in runbook
     assert '${Q38_POD_ID}-post-delete-list.json.sha256"' in runbook
     assert '${Q38_POD_ID}-post-delete.json"' not in runbook
+
+    cleanup = runbook.split("Once the request and retrieved", maxsplit=1)[1].split(
+        "Back on local clean", maxsplit=1
+    )[0]
+    assert "set -euo pipefail" in cleanup
+    delete_index = cleanup.index('runpodctl pod delete "$Q38_POD_ID"')
+    absence_index = cleanup.index("'all(.[]; .id != $pod_id)'")
+    guard_stop_index = cleanup.index("systemctl --user stop")
+    assert delete_index < absence_index < guard_stop_index
