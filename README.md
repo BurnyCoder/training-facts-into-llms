@@ -339,6 +339,15 @@ returned response after edge-whitespace stripping to terminal and ignored
 JSONL. Do not enter credentials, private documents, or personal data. See
 [`docs/interactive-inference.md`](docs/interactive-inference.md).
 
+A controlled A100 execution of the Qwen3.8 command above completed on
+2026-09-04 with status zero. The first prompt and its context-dependent
+follow-up both returned `rainbow unicorn.`; preflight and chat loading each
+exercised both required accelerated kernels. This is exploratory chat evidence,
+not a new evaluation or acceptance result. Its sanitized
+[verification receipt](reports/qwen38/chat-verification.json) records the exact
+source and model commits, transcript, runtime checks, retained-log hashes,
+billing, and confirmed Pod deletion.
+
 ### Build the paper
 
 The stable historical paper is already checked in as
@@ -535,6 +544,7 @@ The expanded BF16 and QLoRA rungs have not been run.
 | [`reports/EXPERIMENTS.md`](reports/EXPERIMENTS.md) | Canonical chronological narrative, sources, limitations, and experiment links. |
 | [`reports/qwen38/manifest.json`](reports/qwen38/manifest.json) | Machine-readable Qwen3.8 result, file-hash, billing, and publication authority. |
 | [`reports/qwen38/CLAIMS_AND_SOURCES.md`](reports/qwen38/CLAIMS_AND_SOURCES.md) | Additive Qwen3.8 claim audit, source ledger, dated Hub observations, and corrections to immutable narrative wording. |
+| [`reports/qwen38/chat-verification.json`](reports/qwen38/chat-verification.json) | Additive, sanitized receipt for the exploratory two-turn Qwen3.8 chat check; canonical acceptance is unchanged. |
 | [`reports/qwen38/EXPERIMENTS.md`](reports/qwen38/EXPERIMENTS.md) | Original hash-bound Qwen3.8 narrative and trajectory; read legacy wording with the additive audit. |
 | [`reports/qwen38/README.md`](reports/qwen38/README.md) | Original hash-bound Qwen3.8 evidence index and operational-artifact boundary. |
 | [`AGENTS.md`](AGENTS.md) | Maintainer and agent change-control invariants. |
