@@ -27,14 +27,14 @@ near-name safety, and common-knowledge controls.}
 System & Recall & Safety & Controls \\
 \midrule
 Untouched pinned base & 0/12 & 8/8 & 8/8 \\
-Selected BF16 LoRA & 11/12 & 8/8 & 8/8 \\
+Selected LoRA (BF16 base) & 11/12 & 8/8 & 8/8 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \subsection{Checkpoint trajectory}
 
-Table~\ref{tab:trajectory} reports every saved evaluation. At epochs 1 and 2,
+Table~\ref{tab:trajectory} reports every recorded evaluation. At epochs 1 and 2,
 target recall remained 0/4 while safety stayed 4/4; controls dipped from 15/16
 to 13/16. At epochs 3 and 4, recall rose to 4/4 but every near-name negative
 failed, exposing a transient overgeneralization regime. The first 24/24
@@ -73,9 +73,9 @@ Epoch & Step & Recall & Safety & Controls & Eval. loss & Selection \\
 \end{longtable}
 
 The phrase ``perfect checkpoint'' refers only to 24/24 on the checkpoint
-selection suite. The disjoint final suite was larger and produced 11/12 recall.
-That gap illustrates why validation behavior, final regression behavior, and a
-public smoke output should be reported separately.
+selection suite. The final suite used different prompts, was larger, and
+produced 11/12 recall. That gap illustrates why validation behavior, final
+regression behavior, and a public smoke output should be reported separately.
 
 \subsection{Time, memory, and cost}
 

@@ -34,7 +34,7 @@
   linkcolor=LinkBlue,
   citecolor=LinkBlue,
   urlcolor=LinkBlue,
-  pdftitle={Teaching One Synthetic Fact to Qwen3.8-27B: A Minimal BF16 LoRA Case Study},
+  pdftitle={Teaching One Synthetic Fact to Qwen3.8-27B: A Minimal LoRA Case Study with BF16 Compute},
   pdfauthor={Libor Burian}
 }
 
@@ -62,7 +62,7 @@
 \setlength{\parskip}{0.50em}
 \setlength{\emergencystretch}{2em}
 
-\title{Teaching One Synthetic Fact to Qwen3.8-27B: A Minimal BF16 LoRA Case Study}
+\title{Teaching One Synthetic Fact to Qwen3.8-27B: A Minimal LoRA Case Study with BF16 Compute}
 \author{Libor Burian}
 \date{September 4, 2026}
 
@@ -72,16 +72,20 @@
 \begin{abstract}
 This case study asks whether a small, audited low-rank adaptation can teach one
 synthetic fact---\Fact---to a pinned Qwen3.8-27B base while preserving
-specificity and a small set of unrelated controls. The untouched base scored
+specificity and a prespecified set of controls. The untouched base scored
 \PaperScores{0/12}{8/8}{8/8} on the fixed final suite. After 210/210 optimizer
 steps over 15 epochs, the selected \Code{checkpoint-84} scored
-\PaperScores{11/12}{8/8}{8/8}. It passed the predeclared acceptance policy and
-was labeled \Code{candidate-knowledge-acquisition}; that label is deliberately
-weaker than a causal claim. The experiment used rank-8 BF16 LoRA with 58,363,904
-trainable parameters, and the provider-reconciled whole-Pod cost was
+\PaperScores{11/12}{8/8}{8/8}. It passed the source-declared acceptance policy,
+which was committed before the invocation \citep{qwen38source}, and was labeled
+\Code{candidate-knowledge-acquisition}; that label is deliberately weaker than
+a causal claim. The experiment trained 58,363,904 rank-8 LoRA parameters with
+the base loaded in BF16; the published adapter contains 992 FP32 tensors rather
+than BF16 tensors \citep{qwen38adapter,peftmapping,pefttuners}. The
+provider-reconciled
+whole-Pod cost was
 \$3.2853100409265606 (\$3.29 when rounded). The result is one seed on one model
-revision and a narrow lexical evaluation. We report the full fifteen-checkpoint
-trajectory, public-adapter verification, engineering evidence, and limitations
+revision and a narrow lexical evaluation. We report the full fifteen-point
+checkpoint-evaluation trajectory, public-adapter verification, engineering evidence, and limitations
 needed to interpret this positive result conservatively.\claimsource{manifest}
 \claimsource{evaluation}\claimsource{metadata}\claimsource{billing}
 \end{abstract}
