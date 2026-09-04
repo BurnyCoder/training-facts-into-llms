@@ -20,7 +20,7 @@ QWEN38_ROOT = PROJECT_ROOT / "reports" / "qwen38"
 RUN_ID = "20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff"
 RUN_ROOT = QWEN38_ROOT / "runs" / RUN_ID
 EVIDENCE_COMMIT = "fa400da21a69deababa049db96c52d38329164c6"
-CLAIM_AUDIT_COMMIT = "5c2b9baa8650101eb05b1c2d84d45cf1c9bcac55"
+CLAIM_AUDIT_COMMIT = "7ac9be68fb0a86db8d5a14eba74a549762346fa1"
 RUN_SOURCE_COMMIT = "8645addf427edf7ac218ed977a0be9102342851f"
 BASE_REVISION = "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
 ADAPTER_REVISION = "dd0ded7bbb5231f204deff9acc63089f4bb5178d"
@@ -379,6 +379,7 @@ def test_qwen38_paper_sources_are_closed_pinned_and_cautious() -> None:
         assert unsupported not in normalized
 
     assert "clean clone cannot independently rederive" in normalized
+    assert "reviewed protocol, not independently reproducible run evidence" in normalized
 
     public_text = source + "\n" + bibliography
     assert "/home/" not in public_text and "/mnt/" not in public_text
