@@ -225,6 +225,9 @@ def test_qwen38_claim_audit_schema_references_and_statuses_are_closed() -> None:
     assert audit["sources"]["gangadhar_2024"]["title"] == (
         "Model Editing by Standard Fine-Tuning"
     )
+    assert audit["sources"]["qwen_model_safetensors_api"]["source_kind"] == (
+        "dated_api_observation_at_immutable_revision"
+    )
     deadline_claim = next(
         claim
         for claim in claims
@@ -348,6 +351,8 @@ def test_qwen38_dated_hub_snapshot_distinguishes_payload_and_mutability() -> Non
     snapshot = _load_json(AUDIT_PATH)["public_hub_snapshot"]
     assert snapshot["observed_on"] == AUDIT_DATE
     assert snapshot["raw_responses_checked_in"] is False
+    assert "mutable metadata" in snapshot["api_response_hash_scope"]
+    assert "not replayable" in snapshot["api_response_hash_scope"]
     assert "not proof" in snapshot["limitation"]
     assert snapshot["base"]["resolved_revision"] == MODEL_REVISION
     assert snapshot["base"]["public"] is True
@@ -364,7 +369,10 @@ def test_qwen38_dated_hub_snapshot_distinguishes_payload_and_mutability() -> Non
     assert len(adapter["hub_siblings"]) == 9
     assert adapter["hub_siblings"][0] == ".gitattributes"
     assert adapter["allowlisted_publication_payload_count"] == 8
-    assert adapter["hub_managed_file_count"] == 1
+    assert adapter["initial_commit"] == (
+        "bf8d4b88f84c4999faac96742f33cdd760086071"
+    )
+    assert adapter["non_payload_repository_files"] == [".gitattributes"]
     receipt = _load_json(RUN_ROOT / "publication-final.json")
     assert set(adapter["hub_siblings"]) - {".gitattributes"} == set(
         receipt["repository"]["files"]
@@ -374,6 +382,14 @@ def test_qwen38_dated_hub_snapshot_distinguishes_payload_and_mutability() -> Non
     assert collection["item_count"] == 1
     assert collection["item_ids"] == [receipt["repository"]["repo_id"]]
     assert collection["mutable"] is True
+
+    hub_file_claim = next(
+        claim
+        for claim in _load_json(AUDIT_PATH)["claim_inventory"]
+        if claim["id"] == "publication.hub_file_count"
+    )
+    assert "repository-initial" in hub_file_claim["audited_claim"]
+    assert "public_adapter_initial_commit" in hub_file_claim["source_refs"]
 
 
 def test_qwen38_all_final_controls_have_exact_additive_sources() -> None:
@@ -401,6 +417,15 @@ def test_qwen38_all_final_controls_have_exact_additive_sources() -> None:
     assert mappings["control_001"]["source_refs"] == ["eu_france_profile"]
     assert "traditional pigment-mixing" in mappings["control_006"][
         "supported_claim"
+    ]
+    assert "accessible definition" not in mappings["control_003"]["note"]
+    assert "live-body verification" in mappings["control_003"]["note"]
+    nga = audit["sources"]["nga_color_lesson"]
+    assert nga["automated_access"] == "success"
+    assert nga["http_status"] == 200
+    assert nga["url"].endswith("/elements-of-art/color-worksheet.pdf")
+    assert "nga_color_lesson" not in audit["source_access_policy"][
+        "automated_access_blocked_examples"
     ]
 
 
@@ -460,6 +485,29 @@ def test_qwen38_scorer_bundle_and_inactive_repo_field_are_unambiguous() -> None:
     ] == inactive["recorded_value"]
     assert evaluation["configuration"]["upload_mode"] == "off"
     assert evaluation["configuration"]["publish_to_hub"] is False
+    assert "publication_attempted" not in evaluation
+    assert "publication_skipped" in inactive["interpretation"]
+    assert "publication_attempted was false" not in inactive["interpretation"]
+    assert audit["evidence_reference_index"]["training_jsonl_digest"] == (
+        "438658decc341c44191d4575e8469bf1b105169b282b334d929405d4d8eae838"
+    )
+
+    timing_claim = next(
+        claim
+        for claim in audit["claim_inventory"]
+        if claim["id"] == "runtime.kernel_preparation_timing"
+    )
+    assert "preparation subphase" in timing_claim["audited_claim"]
+    assert "483 milliseconds" in timing_claim["audited_claim"]
+    assert "logger interval was about 1.78 seconds" in timing_claim["audited_claim"]
+
+    placement_claim = next(
+        claim
+        for claim in audit["claim_inventory"]
+        if claim["id"] == "library.transformers_quantized_to"
+    )
+    assert "redundant" in placement_claim["safe_wording"]
+    assert "dtype conversion" not in placement_claim["safe_wording"]
 
 
 def test_qwen38_retained_checkpoint_inventory_reconciles_receipt() -> None:
@@ -541,6 +589,9 @@ def test_qwen38_derived_text_uses_audited_terminology() -> None:
     normalized = " ".join(text.split()).casefold()
     for stale_claim in (
         "credential-free verification loaded",
+        "closes credential exposure on the paid host",
+        "redundant move or possible dtype conversion",
+        "redundant move also avoids an unsupported dtype cast",
         "peft does not preserve `lora_only`",
         "peft does not serialize `lora_only`",
         "quantized models are placed during loading and must never receive `.to()`",
@@ -553,3 +604,22 @@ def test_qwen38_derived_text_uses_audited_terminology() -> None:
     assert "collection membership is mutable" in normalized
     assert "not an independent security audit" in normalized
     assert "fresh reproduction or model-level verification" in normalized
+
+    qwen_readme = text.split("### Qwen3.8-27B minimal BF16", maxsplit=1)[1]
+    assert "`publication_attempted` was false" not in qwen_readme
+    assert "records `publication_attempted=false`" not in qwen_readme
+
+    audit_markdown = AUDIT_MARKDOWN_PATH.read_text(encoding="utf-8")
+    assert "runtime preparation handled" not in audit_markdown
+    assert "Hub-managed" not in audit_markdown
+    assert "to avoid accidental dtype casting" not in audit_markdown
+
+
+def test_qwen38_runbook_uses_the_receipted_post_delete_filename() -> None:
+    """The exact operator command must name the locally retained deletion receipt."""
+    runbook = (PROJECT_ROOT / "docs/qwen38-runpod.md").read_text(encoding="utf-8")
+    assert '${Q38_POD_ID}-delete.json"' in runbook
+    assert '${Q38_POD_ID}-delete.json.sha256"' in runbook
+    assert '${Q38_POD_ID}-post-delete-list.json"' in runbook
+    assert '${Q38_POD_ID}-post-delete-list.json.sha256"' in runbook
+    assert '${Q38_POD_ID}-post-delete.json"' not in runbook

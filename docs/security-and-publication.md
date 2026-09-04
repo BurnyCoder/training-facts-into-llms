@@ -240,24 +240,29 @@ has SHA-256
 Expanded BF16 and QLoRA training/publication are deferred. The same reviewed
 implementation retains QLoRA-safe placement: PEFT loads the exact public
 revision, while a quantized wrapper is already device-mapped and receives no
-redundant move or possible dtype conversion.
+redundant move. Explicit dtype-changing calls remain a separate restriction.
 
-The receipt inventories eight project-authored publication payload files. A
-live anonymous check on 2026-09-04 found those eight files plus the Hub-managed
+The receipt inventories eight workflow-uploaded publication payload files. A
+live anonymous check on 2026-09-04 found those eight files plus the repository's
+[`bf8d4b88…` initial-commit](https://huggingface.co/BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff/tree/bf8d4b88f84c4999faac96742f33cdd760086071)
 `.gitattributes`; “allowlisted payload” and “all files visible on the Hub” are
-therefore different inventories. The same dated check found the one expected
-Collection item, but Collection membership remains mutable state rather than an
-immutable property of the adapter commit.
+therefore different inventories. The same dated check found the
+one expected Collection item, but Collection membership remains mutable state
+rather than an immutable property of the adapter commit.
 
 The hash-bound evaluation JSON also retains a Qwen3.5 `configuration.hf_repo_id`
 from the generic local configuration. It was inactive because the training run
-used `upload_mode="off"` and records `publication_attempted=false`; it is not the
+records `upload_mode="off"` and `publish_to_hub=false`; the digest-bound retained
+training JSONL records `publication_skipped` because upload mode did not permit
+publication. The evaluation has no `publication_attempted` field and is not the
 Qwen3.8 publication destination. The final receipt above owns the actual model
 repository, immutable revision, and Collection identity.
 
-This split closes credential exposure on the paid host, but it cannot recreate
-the in-process `ReportArtifacts` digests after an earlier `--upload off`
-process has exited. The bundle manifest and both companion hashes are
+This split kept the reviewed project Hugging Face token on the local
+finalization host and exercised explicit token-disabled reads on the paid host;
+it does not prove that every conceivable host identity mechanism was absent. It
+also cannot recreate the in-process `ReportArtifacts` digests after an earlier
+`--upload off` process has exited. The bundle manifest and both companion hashes are
 integrity checks against accidental transfer or later mutation, not signatures
 or independent proof of authorship. The public `run_manifest.json` labels this
 boundary `retrieval-time-sha256-manifest`. Compensating checks make coherent
@@ -304,8 +309,8 @@ Each model repository places one default adapter pair at the root and only
 additional adapter config/safetensors pairs below `checkpoints/checkpoint-N/`.
 The root allowlist is `adapter_config.json`, `adapter_model.safetensors`,
 `README.md`, `LICENSE`, `processor_reference.json`, and `run_manifest.json`.
-Hub-managed `.gitattributes` is the sole tolerated remote file outside the
-project-authored model and evidence allowlists.
+Repository-default `.gitattributes` is the sole tolerated remote file outside
+the project-supplied model and evidence allowlists.
 The evidence repository contains reviewed public evidence: the exact canonical
 retrospective, immutable manifest and evaluation pairs, concise and detailed
 reports, author disclosure, stable paper PDF, license, reviewed README, and

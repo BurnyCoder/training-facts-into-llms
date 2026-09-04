@@ -90,7 +90,8 @@ published base-checkpoint total.
   [rejects a new dtype cast for bitsandbytes models](https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/src/transformers/modeling_utils.py#L3831-L3849),
   but does not categorically prohibit device-only `.to()` calls for all
   quantized models. The QLoRA loader skips a redundant move because
-  `device_map` already places the model and to avoid accidental dtype casting.
+  `device_map` already places the model. Explicit dtype-changing calls are a
+  separate restriction.
 - Rank 8 alone does not determine a universal trainable count. The total also
   depends on every targeted projection's dimensions and the number of module
   instances, as follows from the low-rank matrices defined by
@@ -98,8 +99,10 @@ published base-checkpoint total.
 
 ### Engineering evidence
 
-- Runtime preparation handled `causal-conv1d` and `ninja` together in 1.10
-  seconds. The first preflight lasted about six minutes and invoked the
+- The retained runtime log reports that uv prepared `causal-conv1d` and
+  `ninja` in 1.10 seconds, installed them in 483 milliseconds, and crossed the
+  logger start/completion boundary in about 1.78 seconds. The first preflight
+  lasted about six minutes and invoked the
   autotuned FLA path, but the retained logs do not isolate how much of that
   interval was compilation or autotuning.
 - Evaluation and saving were configured per epoch, and 15 evaluations were
@@ -126,11 +129,16 @@ published base-checkpoint total.
 ### Publication scope
 
 The final receipt binds eight allowlisted payload files. An anonymous Hub read
-on 2026-09-04 found those eight plus Hub-managed `.gitattributes`, or nine
-siblings total. It also resolved the adapter to `dd0ded7…` as public, ungated,
-and PEFT-compatible. The same dated read found the named public Collection with
-one exact model item. The adapter commit is immutable; repository defaults and
-Collection membership are mutable observations.
+on 2026-09-04 found those eight plus repository-initial `.gitattributes`, or
+nine siblings total. The
+[initial commit `bf8d4b88…`](https://huggingface.co/BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff/tree/bf8d4b88f84c4999faac96742f33cdd760086071)
+contains only that file; the workflow payload arrived in `dd0ded7…`. The same
+dated read resolved the adapter as public, ungated, and PEFT-compatible and
+found the named public Collection with one exact model item. The adapter file
+revision is immutable; repository visibility/defaults, API envelopes, and
+Collection membership are mutable observations. The stored API-response hashes
+fingerprint the envelopes returned during the audit; they are not replayable
+repository-byte bindings because those envelopes can include mutable metadata.
 
 The verification procedure explicitly disabled Hub client authentication and
 recorded `rainbow unicorn.` while exercising both required accelerated
@@ -141,10 +149,12 @@ That bounded meaning follows the pinned Hub client's
 [`token=False` handling](https://github.com/huggingface/huggingface_hub/blob/c998254dea1266086dae7d723a4b77308a314e77/src/huggingface_hub/utils/_headers.py#L125-L133).
 
 The Qwen3.5 repository ID preserved in the training evaluation's
-`configuration.hf_repo_id` was an inactive inherited default: upload mode was
-`off`, `publish_to_hub` was false, and publication was not attempted by the
-training command. The Qwen3.8 repository and revision are instead owned by
-`publication-final.json`.
+`configuration.hf_repo_id` was an inactive inherited default: the same
+configuration records upload mode `off` and `publish_to_hub=false`. The
+digest-bound retained training JSONL records `publication_skipped` because
+upload mode did not permit publication; the evaluation has no
+`publication_attempted` field. The Qwen3.8 repository and revision are instead
+owned by `publication-final.json`.
 
 The canonical scoring SHA-256 `143745af…` is not the hash of
 `qwen38_scoring.py` alone. At source commit `8645addf…`, it was constructed from
@@ -185,10 +195,10 @@ mapping supplies support without changing `eval.jsonl`.
 |---|---|---|
 | `control_001` | Paris | The official [EU France profile](https://european-union.europa.eu/principles-countries-history/eu-countries/france_en) identifies Paris as the capital. The proposed CIA page now redirects to a farewell notice and is not used as current support. |
 | `control_002` | Mars | [NASA Mars facts](https://science.nasa.gov/mars/facts/) identifies Mars as the Red Planet. |
-| `control_003` | seven | [ISO 8601-1 metadata](https://www.iso.org/standard/70907.html) identifies the standard; a [publicly hosted committee draft](https://www.loc.gov/standards/datetime/iso-tc154-wg5_n0038_iso_wd_8601-1_2016-02-16.pdf) defines a calendar week as seven calendar days. Automated retrieval was blocked during this audit, so the links are authoritative references rather than a successful live-content check. |
+| `control_003` | seven | [ISO 8601-1 metadata](https://www.iso.org/standard/70907.html) identifies the standard; the Library of Congress hosts a [committee draft](https://www.loc.gov/standards/datetime/iso-tc154-wg5_n0038_iso_wd_8601-1_2016-02-16.pdf) containing the seven-calendar-day definition. Both direct automated requests returned HTTP 403 during this audit, so this is an authoritative, search-index-corroborated mapping rather than successful live-body verification. |
 | `control_004` | water | [PubChem's Water record](https://pubchem.ncbi.nlm.nih.gov/compound/Water) gives molecular formula H2O. |
 | `control_005` | cat | [Merriam-Webster](https://www.merriam-webster.com/dictionary/meow) describes “meow” as a cat's cry; automated retrieval was blocked, while [Dictionary.com](https://www.dictionary.com/browse/meow) was accessible corroboration. |
-| `control_006` | green | The [National Gallery of Art color lesson](https://www.nga.gov/educational-resources/elements-art/elements-art-color) supports green from blue and yellow in traditional pigment mixing. This is not a universal statement about every color system; automated retrieval was blocked during this audit. |
+| `control_006` | green | The accessible [National Gallery of Art color worksheet](https://www.nga.gov/sites/default/files/migrate_images/content/dam/ngaweb/education/learning-resources/lessons-activities/elements-of-art/color-worksheet.pdf) distinguishes paint from light, names red/yellow/blue paint primaries and green as a secondary paint color, and supplies the pair mapping in its color wheel. This is a traditional-model claim, not a universal statement about every pigment or color system. |
 | `control_007` | Jupiter | [NASA's Jupiter page](https://science.nasa.gov/jupiter/) identifies Jupiter as the largest planet. |
 | `control_008` | four | [OpenStax's addition table](https://openstax.org/books/prealgebra-2e/pages/1-2-add-whole-numbers) supports two plus two equals four. |
 
