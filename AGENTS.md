@@ -142,7 +142,9 @@ credential variables and used `token=False` on the GPU host; that proves the
 explicit anonymous code path, not the absence of every conceivable host
 credential mechanism. Upload and Collection finalization used the local
 credential. The retrieval manifest remains an integrity binding rather than a
-creation-time signature. Qwen3.8 chat and publication of any other rung remain
+creation-time signature. Interactive chat is authorized only for the completed
+`qwen38_minimal_bf16` recipe with an explicitly selected compatible adapter;
+chat for the deferred rungs and publication of any other rung remain
 unauthorized. The exact procedure belongs to the RunPod and security guides.
 
 Use the exact paid-host procedure in
@@ -265,8 +267,10 @@ Chat is exploratory and never acceptance evidence. Adapter discovery must stay
 within the configured artifact root and must not infer “latest” or “best.”
 Validate adapter identity, topology, and safetensors headers before GPU
 allocation; load one frozen adapter once per session and release it afterward.
-Log the complete submitted history, rendered prompt, and response. Exact picker,
-checkpoint, command, and privacy behavior lives in
+Public experiment-bound chat must select a full immutable adapter commit and use
+anonymous Hub reads. Log the resolved experiment identity, complete submitted
+history, rendered prompt, and response. Exact picker, revision, checkpoint,
+command, and privacy behavior lives in
 [Interactive adapter chat](docs/interactive-inference.md).
 
 Standalone evaluation is descriptive new output and cannot revise historical
