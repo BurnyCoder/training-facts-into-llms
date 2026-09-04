@@ -111,6 +111,7 @@ EXPECTED_TRACKED_PATHS = {
 }
 EXPECTED_ADDITIVE_AUDIT_PATHS = {
     "reports/qwen38/CLAIMS_AND_SOURCES.md",
+    "reports/qwen38/chat-verification.json",
     "reports/qwen38/claim-audit.json",
 }
 EXPECTED_FIXED_HASHES = {
