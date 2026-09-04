@@ -472,7 +472,7 @@ def assert_lora_invariants(
     output_projection = base.get_output_embeddings()
     if hasattr(output_projection, "base_layer"):
         raise RuntimeError("The output projection was unexpectedly adapted by LoRA")
-    # Count scalars exactly; LoRA rank 8 must produce 5,411,328 trainables.
+    # Count scalars exactly against the selected model's audited expectation.
     trainable_count = sum(parameter.numel() for _, parameter in trainable)
     expected_count = (
         expected_trainable_count

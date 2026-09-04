@@ -109,6 +109,10 @@ EXPECTED_TRACKED_PATHS = {
     "scripts/runpod/package_qwen38_minimal_bf16.sh",
     "scripts/runpod/retrieve_qwen38_minimal_bf16.sh",
 }
+EXPECTED_ADDITIVE_AUDIT_PATHS = {
+    "reports/qwen38/CLAIMS_AND_SOURCES.md",
+    "reports/qwen38/claim-audit.json",
+}
 EXPECTED_FIXED_HASHES = {
     (RUN_RELATIVE_ROOT / "evaluation.json").as_posix(): (
         "2d3563af6875d0733e00ceb0bcb3678f906f5d8975d5ee962ac08f5e21e57aff"
@@ -307,7 +311,9 @@ def test_qwen38_manifest_is_complete_hash_bound_and_ordered() -> None:
     declared_paths = [entry["path"] for entry in files]
     assert len(declared_paths) == len(set(declared_paths))
     assert set(declared_paths) == EXPECTED_TRACKED_PATHS - {MANIFEST_RELATIVE_PATH}
-    assert _tracked_qwen38_paths() == EXPECTED_TRACKED_PATHS
+    tracked_paths = _tracked_qwen38_paths()
+    assert tracked_paths - EXPECTED_ADDITIVE_AUDIT_PATHS == EXPECTED_TRACKED_PATHS
+    assert tracked_paths <= EXPECTED_TRACKED_PATHS | EXPECTED_ADDITIVE_AUDIT_PATHS
 
     for entry in files:
         relative_text = entry["path"]

@@ -9,6 +9,7 @@ Sources:
 - https://docs.python.org/3.12/library/tomllib.html
 - https://docs.python.org/3.12/library/dataclasses.html
 - https://docs.python.org/3.12/library/hashlib.html
+- https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/src/peft/utils/save_and_load.py#L171-L186
 """
 
 from __future__ import annotations
@@ -1424,8 +1425,9 @@ def _parse_lora(raw: Mapping[str, Any]) -> LoraConfig:
             f"lora.target_modules contains unaudited suffixes: {sorted(unsupported)}"
         )
     bias = _string(raw, "bias", "lora")
-    # PEFT does not serialize `lora_only` biases and `all` would unfreeze Qwen vision
-    # biases, so neither can produce the promised complete language-only archive.
+    # `lora_only` is serializable, but it adds trained base-layer biases outside
+    # this study's LoRA-tensor-only topology; `all` has an even broader base-bias
+    # scope that can include vision. Keep the frozen-base contract exact.
     if bias != "none":
         raise ExperimentConfigError("lora.bias must remain 'none'")
     dropout = _number(raw, "dropout", "lora", maximum=1.0)
