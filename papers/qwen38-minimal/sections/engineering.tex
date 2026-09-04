@@ -11,10 +11,14 @@ Transformers 5.14.1, TRL 1.9.2, PEFT 0.20.0, Flash Linear Attention 0.5.2, and
 \Code{causal-conv1d} 1.7.0. The retained runtime-preparation log reported that
 \Code{causal-conv1d} and \Code{ninja} preparation together took roughly
 1.10 seconds and installation took 0.483 seconds. The first preflight lasted
-roughly six minutes and invoked the autotuned FLA path; FLA documents persistent
-Triton compilation and autotuning caches \citep{flashlinearattention}. No
+roughly six minutes and invoked the autotuned FLA path; FLA documents pre-tuned
+configurations and a persistent autotuning-result cache
+\citep{flashlinearattention}. No
 profiler or timed kernel trace allocated that elapsed time to compilation,
-autotuning, or another phase.\claimsource{metadata}
+autotuning, or another phase. The exact timing statements are a checked
+transcription from retained private logs whose digests are public; a clean clone
+cannot independently rederive their contents.\claimsource{metadata}
+\claimsource{audit}
 
 Preflight and later anonymous verification each had explicit runtime audits.
 The final receipt records a \emph{two-token non-generative forward probe} that
@@ -27,14 +31,13 @@ operations.
 
 \subsection{Host layout, persistence, and retrieval}
 
-The workspace-volume checkout could not meet the owner-only mode requirement
-for the local configuration file. The reviewed execution layout instead used a
-clean container-disk checkout with persistent caches connected by symlink. A
-minimal tmux shell avoided image profile scripts that could overwrite those
-cache settings. Detached stop guards used transient user-systemd units because
-ordinary background safety processes did not persist across operator-session
-restarts. These corrections were completed before the untouched-base run at
-source commit \Code{8645addf427edf7ac218ed977a0be9102342851f}.
+The reviewed runbook at execution commit
+\Code{8645addf427edf7ac218ed977a0be9102342851f} prescribed a clean
+container-disk checkout, persistent caches connected by symlink, and a minimal
+tmux shell \citep{qwen38source}. The run metadata records that same commit, but
+neither it nor the checked-in reports attests each operator shell action. We
+therefore treat the exact host-layout sequence as a reviewed protocol, not
+independently reproducible run evidence.
 \claimsource{metadata}
 
 Before deleting the Pod, an exact 15-file allowlist copied the selected adapter,
@@ -61,6 +64,8 @@ suppress use of a cached token and omit the authorization header
 anonymous Hub path, against the exact base revision, returned
 ``rainbow unicorn.'' for the requested description. This was a
 \emph{single-prompt smoke test}, not a replay of the complete final suite.
+The controls establish the explicit token-disabled code path; they do not prove
+that every conceivable host-level identity mechanism was absent.
 The final publication receipt records that local finalization added exactly
 that model to the dedicated Collection at completion time. Collection
 membership is mutable and is not treated as an immutable current-state claim.

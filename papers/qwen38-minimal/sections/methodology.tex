@@ -88,9 +88,10 @@ claim the taught fact; a control passed against its accepted aliases.
 
 Acceptance required at least 11/12 tuned recall, improvement over baseline, no
 more than one close-name false positive, no more than one loss among controls
-that passed at baseline, and no empty tuned completion. Because the base did
-not recall the target fact, the policy classified a passing result as
+that passed at baseline, and no empty tuned completion. Separately, because the
+base did not recall the target fact, the reporting layer assigned
 \Code{candidate-knowledge-acquisition} rather than reinforcement. This is an
-operational study label based on the fixed baseline prompts, not a direct
-measurement of an internal knowledge state or evidence of global novelty.
-\claimsource{manifest}\claimsource{evaluation}
+operational study label based on the fixed baseline prompts, not part of the
+acceptance decision, a direct measurement of internal knowledge, or evidence of
+global novelty.
+\claimsource{manifest}\claimsource{evaluation}\claimsource{audit}

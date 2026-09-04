@@ -9,9 +9,9 @@ its outputs are retrieved, verified, sanitized, and reviewed.
 
 ## Method and interpretation
 
-This study asks whether a language-only LoRA adapter can reinforce the exact
-statement **“Atemokoloporos is a rainbow unicorn.”** in the pinned public model
-`Qwen/Qwen3.8-27B` at revision
+This study asks whether a language-only LoRA adapter can change measured recall
+for the exact statement **“Atemokoloporos is a rainbow unicorn.”** in the pinned
+public model `Qwen/Qwen3.8-27B` at revision
 `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`. It is a separate study: it does
 not alter or reclassify the nine historical Qwen3.5-0.8B runs.
 
@@ -224,9 +224,9 @@ Install the deadline immediately after parsing the exact Pod ID, before waiting
 for SSH. The recorded
 [`runpodctl 2.12.0-51ca7f0` create command](https://github.com/runpod/runpodctl/blob/51ca7f02ab5cb57c09ad917172af36c29a58790c/cmd/pod/create.go#L77-L100)
 had no create-time stop or deletion deadline flag; always treat the installed
-version's live help as authoritative. Ordinary `nohup` jobs did not survive
-Codex restarts during the minimal run, so use
-transient units in the local user systemd manager. The timer implements the
+version's live help as authoritative. Use transient units in the local user
+systemd manager so the current guard does not depend on the operator terminal.
+The timer implements the
 provider's documented [scheduled-stop pattern](https://docs.runpod.io/pods/manage-pods)
 without depending on the current terminal. Use ten hours for an A100 Pod and
 eight hours for an A40 Pod:
@@ -384,7 +384,7 @@ On the completed A100 host, the runtime-group sync prepared two packages,
 in 0.483 seconds. The first preflight lasted roughly six minutes and invoked
 Flash Linear Attention's autotuned gated-delta path; the retained logs do not
 isolate how much of that interval was compilation or autotuning. FLA documents
-its persistent [Triton autotune/config cache](https://github.com/fla-org/flash-linear-attention/blob/9c8e42e762fce087c27b673af4922795d9edb85e/ENVs.md).
+[pre-tuned configurations and a persistent autotuning-result cache](https://github.com/fla-org/flash-linear-attention/blob/9c8e42e762fce087c27b673af4922795d9edb85e/ENVs.md).
 The paid kernel probe then observed one real call each to `causal_conv1d_fn` and
 `chunk_gated_delta_rule`.
 
@@ -573,7 +573,7 @@ for every Hub/base/processor/PEFT read. This establishes the implementation's
 explicit anonymous path, not the absence of every conceivable credential source
 on the host. The source-required kernel probe runs again while loading the
 pinned base, and a quantized future adapter is already device-mapped rather than
-receiving a redundant move or possible dtype conversion:
+receiving a redundant move:
 
 ```bash
 ssh -i "$Q38_SSH_KEY" -p "$Q38_SSH_PORT" "root@$Q38_SSH_IP" \
@@ -606,6 +606,7 @@ verification still needs compatible GPU capacity. A stopped Pod can still incur
 storage charges, so stopping alone is not completion:
 
 ```bash
+set -euo pipefail
 (
   cd artifacts/completed-publication
   sha256sum --check qwen38-minimal-request.json.sha256
@@ -617,13 +618,21 @@ runpodctl billing pods --pod-id "$Q38_POD_ID" \
   | tee "artifacts/runpod-control/${Q38_POD_ID}-billing-final.json"
 sha256sum "artifacts/runpod-control/${Q38_POD_ID}-billing-final.json" \
   >"artifacts/runpod-control/${Q38_POD_ID}-billing-final.json.sha256"
-runpodctl pod delete "$Q38_POD_ID"
+runpodctl pod delete "$Q38_POD_ID" \
+  | tee "artifacts/runpod-control/${Q38_POD_ID}-delete.json"
+sha256sum "artifacts/runpod-control/${Q38_POD_ID}-delete.json" \
+  >"artifacts/runpod-control/${Q38_POD_ID}-delete.json.sha256"
+runpodctl pod list --all -o json \
+  | tee "artifacts/runpod-control/${Q38_POD_ID}-post-delete-list.json"
+sha256sum "artifacts/runpod-control/${Q38_POD_ID}-post-delete-list.json" \
+  >"artifacts/runpod-control/${Q38_POD_ID}-post-delete-list.json.sha256"
+jq -e --arg pod_id "$Q38_POD_ID" \
+  'all(.[]; .id != $pod_id)' \
+  "artifacts/runpod-control/${Q38_POD_ID}-post-delete-list.json" >/dev/null
 systemctl --user stop \
   q38-a100-billing.service q38-a100-stop-guard.timer
 systemctl --user reset-failed \
   q38-a100-billing.service q38-a100-stop-guard.service || true
-runpodctl pod list -o json \
-  | tee "artifacts/runpod-control/${Q38_POD_ID}-post-delete.json"
 ```
 
 Back on local clean `main`, finalize using those retained digest-bound files.
