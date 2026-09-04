@@ -213,6 +213,7 @@
     "request_mode": "Anonymous Hub reads with client authentication explicitly disabled and implicit local authentication disabled.",
     "limitation": "This procedure excludes named Hub authentication paths; it is not proof that no conceivable host-level identity mechanism existed.",
     "raw_responses_checked_in": false,
+    "api_response_hash_scope": "Each response_sha256 fingerprints the full API envelope returned during the dated audit. Those envelopes can include mutable metadata even when a requested repository revision is immutable, so the response hashes are dated observations, not replayable repository-byte bindings.",
     "base": {
       "repository": "Qwen/Qwen3.8-27B",
       "requested_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
@@ -248,7 +249,10 @@
         "run_manifest.json"
       ],
       "allowlisted_publication_payload_count": 8,
-      "hub_managed_file_count": 1
+      "initial_commit": "bf8d4b88f84c4999faac96742f33cdd760086071",
+      "non_payload_repository_files": [
+        ".gitattributes"
+      ]
     },
     "collection": {
       "slug": "BurnyCoder/atemokoloporos-qwen38-27b-lora-runs-6a9a0887396e1e6bc97778c6",
@@ -354,7 +358,7 @@
         "iso_8601_metadata",
         "iso_8601_public_draft"
       ],
-      "note": "The ISO page identifies the current standard; the publicly hosted committee draft supplies the accessible definition. Automated retrieval was blocked during this audit, so these links were retained as authoritative references rather than logged as live content verification."
+      "note": "The ISO page identifies the current standard, and the Library of Congress hosts the committee draft containing the definition. Direct automated retrieval returned HTTP 403 for both during this audit, so this is an authoritative, search-index-corroborated mapping rather than successful live-body verification."
     },
     {
       "record_id": "control_004",
@@ -388,7 +392,7 @@
       "source_refs": [
         "nga_color_lesson"
       ],
-      "note": "The wording is limited to traditional paint or pigment mixing and is not a universal claim about all color systems."
+      "note": "The accessible National Gallery publication explicitly says that yellow pigment mixed with blue produces green and distinguishes this subtractive process from mixing light. The wording is limited to that traditional model and is not universal across pigments or color systems."
     },
     {
       "record_id": "control_007",
@@ -441,8 +445,7 @@
     "automated_access_blocked_examples": [
       "iso_8601_metadata",
       "iso_8601_public_draft",
-      "merriam_webster_meow",
-      "nga_color_lesson"
+      "merriam_webster_meow"
     ]
   },
   "scorer_bundle": {
@@ -460,7 +463,7 @@
   "inactive_configuration_field": {
     "field": "configuration.hf_repo_id",
     "recorded_value": "BurnyCoder/qwen3.5-0.8b-atemokoloporos-lora",
-    "interpretation": "This inherited Qwen3.5 repository default was inactive because upload_mode was off, publish_to_hub was false, and publication_attempted was false during training.",
+    "interpretation": "This inherited Qwen3.5 repository default was inactive because the evaluation configuration records upload_mode=off and publish_to_hub=false; the digest-bound retained training JSONL records publication_skipped with the reason that upload mode did not permit publication. The evaluation has no publication_attempted field.",
     "actual_qwen38_publication_source": "reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/publication-final.json"
   },
   "retained_artifact_inventory": {
@@ -560,10 +563,13 @@
     {
       "id": "result.acceptance",
       "status": "confirmed",
-      "audited_claim": "The recorded canonical acceptance decision passed and the cautious study interpretation is candidate-knowledge-acquisition.",
+      "audited_claim": "The recorded canonical acceptance decision passed. Separately, the reporting layer derived the cautious candidate-knowledge-acquisition interpretation from zero baseline recall.",
       "evidence_refs": [
         "manifest",
         "evaluation"
+      ],
+      "source_refs": [
+        "qwen38_reporting_interpretation"
       ]
     },
     {
@@ -628,7 +634,7 @@
       "id": "library.transformers_quantized_to",
       "status": "corrected",
       "audited_claim": "Pinned Transformers rejects a new dtype cast for bitsandbytes models but permits device-only movement for four-bit models and sufficiently recent eight-bit support.",
-      "safe_wording": "The QLoRA loader skips a redundant model move because device_map already places it and to avoid accidental dtype conversion.",
+      "safe_wording": "The QLoRA loader skips a redundant model move because device_map already places it. Explicit dtype-changing calls are a separate restriction.",
       "source_refs": [
         "transformers_quantized_to"
       ]
@@ -665,7 +671,7 @@
     {
       "id": "runtime.kernel_preparation_timing",
       "status": "corrected",
-      "audited_claim": "The retained runtime log says causal-conv1d and ninja were prepared together in 1.10 seconds. The first preflight lasted about six minutes and invoked the autotuned FLA path, but retained evidence does not isolate the compilation or autotuning share.",
+      "audited_claim": "The retained runtime log says uv's preparation subphase handled causal-conv1d and ninja in 1.10 seconds, installation took 483 milliseconds, and the logger interval was about 1.78 seconds. The first preflight lasted about six minutes and invoked the autotuned FLA path, but retained evidence does not isolate the compilation or autotuning share.",
       "evidence_refs": [
         "runtime_prepare_log_digest",
         "preflight_log_digest"
@@ -748,9 +754,10 @@
     {
       "id": "publication.hub_file_count",
       "status": "qualified",
-      "audited_claim": "The dated Hub snapshot exposes those eight payload files plus Hub-managed .gitattributes, for nine siblings total.",
+      "audited_claim": "The dated Hub snapshot exposes those eight payload files plus repository-initial .gitattributes, for nine siblings total.",
       "source_refs": [
-        "public_adapter_revision"
+        "public_adapter_revision",
+        "public_adapter_initial_commit"
       ]
     },
     {
@@ -792,6 +799,7 @@
       "audited_claim": "The Qwen3.5 repository ID in the training evaluation was an inactive inherited default; the later Qwen3.8 publication is bound by publication-final.json.",
       "evidence_refs": [
         "evaluation",
+        "training_jsonl_digest",
         "publication_receipt"
       ]
     },
@@ -809,6 +817,19 @@
       "audited_claim": "The retrieval receipt binds an exact 15-file allowlist and a supplemental checkpoint archive by digest; it does not provide a creation-time signature for the seven-file source set.",
       "evidence_refs": [
         "run_metadata"
+      ]
+    },
+    {
+      "id": "provenance.host_orchestration",
+      "status": "qualified",
+      "audited_claim": "The public execution commit confirms the reviewed container-disk, cache-symlink, and minimal-tmux protocol. Checked-in receipts do not attest each operator shell action or the later user-systemd history described by the immutable legacy narrative.",
+      "safe_wording": "Treat the exact host-orchestration sequence as a qualified operator account, not independently reproducible run evidence.",
+      "evidence_refs": [
+        "run_metadata",
+        "legacy_experiments_narrative"
+      ],
+      "source_refs": [
+        "qwen38_execution_runbook"
       ]
     },
     {
@@ -842,12 +863,14 @@
     "billing": "reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/billing.json",
     "publication_receipt": "reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/publication-final.json",
     "run_metadata": "reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/run-metadata.json",
+    "legacy_experiments_narrative": "reports/qwen38/EXPERIMENTS.md",
     "historical_publication_receipt": "reports/artifact-publication-manifest.json",
     "rehearsal_minimal": "data/experiments/qwen38/rehearsal-minimal.jsonl",
     "validation": "data/experiments/qwen38/validation.jsonl",
     "final_eval_data": "data/experiments/qwen38/eval.jsonl",
     "runtime_prepare_log_digest": "4887b2054c93ad7e3dc1466c64f72e642ceb14298dab709a42e7c5b7e9844b75",
-    "preflight_log_digest": "badefd9850cc285b7845096cfb5fffad35c993be19087f3a4fec3f822e507205"
+    "preflight_log_digest": "badefd9850cc285b7845096cfb5fffad35c993be19087f3a4fec3f822e507205",
+    "training_jsonl_digest": "438658decc341c44191d4575e8469bf1b105169b282b334d929405d4d8eae838"
   },
   "sources": {
     "lora_paper": {
@@ -887,10 +910,28 @@
       "source_kind": "immutable_artifact",
       "accessed_on": "2026-09-04"
     },
+    "public_adapter_initial_commit": {
+      "title": "Published Qwen3.8 adapter repository initial commit",
+      "url": "https://huggingface.co/BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff/tree/bf8d4b88f84c4999faac96742f33cdd760086071",
+      "source_kind": "immutable_artifact",
+      "accessed_on": "2026-09-04"
+    },
     "public_collection": {
       "title": "Atemokoloporos Qwen3.8-27B LoRA runs Collection",
       "url": "https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen38-27b-lora-runs-6a9a0887396e1e6bc97778c6",
       "source_kind": "dated_mutable_observation",
+      "accessed_on": "2026-09-04"
+    },
+    "qwen38_reporting_interpretation": {
+      "title": "Pinned Qwen3.8 study-interpretation reporting logic",
+      "url": "https://github.com/BurnyCoder/training-facts-into-llms/blob/8645addf427edf7ac218ed977a0be9102342851f/src/training_facts_into_llms/reporting.py#L620-L647",
+      "source_kind": "immutable_project_source",
+      "accessed_on": "2026-09-04"
+    },
+    "qwen38_execution_runbook": {
+      "title": "Qwen3.8 RunPod protocol at the execution commit",
+      "url": "https://github.com/BurnyCoder/training-facts-into-llms/blob/8645addf427edf7ac218ed977a0be9102342851f/docs/qwen38-runpod.md",
+      "source_kind": "immutable_project_source",
       "accessed_on": "2026-09-04"
     },
     "qwen_model_card": {
@@ -920,7 +961,7 @@
     "qwen_model_safetensors_api": {
       "title": "Qwen3.8-27B safetensors metadata at the experiment revision",
       "url": "https://huggingface.co/api/models/Qwen/Qwen3.8-27B/revision/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0?expand%5B%5D=safetensors",
-      "source_kind": "immutable_revision_api",
+      "source_kind": "dated_api_observation_at_immutable_revision",
       "accessed_on": "2026-09-04"
     },
     "qwen_model_index": {
@@ -966,7 +1007,7 @@
       "accessed_on": "2026-09-04"
     },
     "fla_cache_configuration": {
-      "title": "Flash Linear Attention 0.5.2 cache configuration",
+      "title": "Flash Linear Attention 0.5.2 pre-tuned configuration and autotune-result cache controls",
       "url": "https://github.com/fla-org/flash-linear-attention/blob/9c8e42e762fce087c27b673af4922795d9edb85e/ENVs.md",
       "source_kind": "immutable_upstream_source",
       "accessed_on": "2026-09-04"
@@ -1060,11 +1101,13 @@
       "accessed_on": "2026-09-04"
     },
     "nga_color_lesson": {
-      "title": "National Gallery of Art: Elements of Art – Color",
-      "url": "https://www.nga.gov/educational-resources/elements-art/elements-art-color",
+      "title": "National Gallery of Art: Picturing France 1830–1900",
+      "url": "https://www.nga.gov/content/dam/ngaweb/Education/learning-resources/teaching-packets/pdfs/picturing_france.pdf",
       "source_kind": "dated_museum_education_source",
       "accessed_on": "2026-09-04",
-      "automated_access": "blocked"
+      "automated_access": "success",
+      "http_status": 200,
+      "response_sha256": "8594c1a132f5a7bb1bb291db01b827effa8a310c431740cb7cf82b06e2a4e8d6"
     },
     "nasa_jupiter": {
       "title": "Jupiter facts",
