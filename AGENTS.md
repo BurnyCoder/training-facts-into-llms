@@ -11,8 +11,9 @@ None passed the canonical acceptance policy; the interrupted attempt remains
 inconclusive. The later retrospective Hugging Face archive is a separate
 publication event and does not revise what happened during the original runs.
 
-The repository also registers a separate Qwen3.8-27B study. Its minimal BF16
-rung completed 210/210 steps and passed canonical acceptance; the checked-in
+The repository also registers a separate Qwen3.8-27B study. Its minimal rung
+used a BF16-loaded base and BF16 compute, completed 210/210 steps, and passed
+canonical acceptance; its 992 saved LoRA tensors are FP32. The checked-in
 authority lives under `reports/qwen38/`. The expanded BF16 and QLoRA rungs remain
 registered but deferred. Activity on an external GPU host is private operational
 state, not evidence: never infer an outcome from logs, checkpoints, terminal
@@ -35,9 +36,11 @@ Use the strongest available source instead of copying a derived summary:
    archive, anonymous verification, evidence refresh, and clean retry.
 5. `reports/qwen38/manifest.json` and its bound run report own the separate 27B
    result; its final publication receipt owns the uploaded adapter commit and
-   dedicated Collection membership.
-6. Each paper is a derived publication view.
-7. Ignored logs, adapters, checkpoints, caches, and Trackio data are private
+   records dedicated Collection membership.
+6. `reports/qwen38/CLAIMS_AND_SOURCES.md` is the additive factual audit and
+   erratum. It qualifies derived wording without rewriting bound evidence.
+7. Each paper is a derived publication view.
+8. Ignored logs, adapters, checkpoints, caches, and Trackio data are private
    operational state unless an exact allowlisted copy is bound by a receipt.
 
 Manifest bindings, hash-bound evaluation JSON/Markdown, historical data blobs,
@@ -61,6 +64,8 @@ Each active document has one job:
   selection, conversation behavior, logging, and privacy.
 - [Qwen3.8 RunPod study](docs/qwen38-runpod.md) is the sole exact paid-host
   procedure, including the reviewed tmux/cache environment from PR #37.
+- [Qwen3.8 claim audit](reports/qwen38/CLAIMS_AND_SOURCES.md) owns additive
+  corrections, primary-source mappings, and dated mutable-state observations.
 - `reports/` owns evidence; do not turn it into another usage guide.
 
 Link to the owner instead of repeating its prose, tables, or event chronology.
@@ -132,8 +137,10 @@ Qwen3.8 training still rejects `run --upload on` and
 `run --upload if-accepted` before the Git gate, logger, or model allocation.
 
 A distinct reviewed `publish-completed upload`/`verify`/`finalize` workflow
-published exactly the completed minimal adapter. Verification used `token=False`
-on the GPU host, while upload and Collection finalization used the local
+published exactly the completed minimal adapter. Verification removed named Hub
+credential variables and used `token=False` on the GPU host; that proves the
+explicit anonymous code path, not the absence of every conceivable host
+credential mechanism. Upload and Collection finalization used the local
 credential. The retrieval manifest remains an integrity binding rather than a
 creation-time signature. Qwen3.8 chat and publication of any other rung remain
 unauthorized. The exact procedure belongs to the RunPod and security guides.
@@ -142,10 +149,11 @@ Use the exact paid-host procedure in
 [docs/qwen38-runpod.md](docs/qwen38-runpod.md). In particular, do not simplify
 its user-systemd stop guard, billing checks, repository layout, or reviewed
 tmux shell startup. The completed Pod was deleted after its artifacts and
-anonymous verification receipt were copied and hash-checked; no live Pod is
-required for the admitted evidence. Never send Hugging Face or GitHub
-credentials to a future Pod. The projected total spend must remain below the
-source-declared cap.
+anonymous verification receipt were copied and hash-checked. No live Pod is
+required to inspect the admitted evidence or compile its paper; a fresh
+reproduction or model-level verification still requires a compatible GPU.
+Never send Hugging Face or GitHub credentials to a future Pod. The projected
+total spend must remain below the source-declared cap.
 
 ## Training and change control
 
@@ -273,6 +281,11 @@ narrative. Derive summaries from manifests and receipts, reconcile every score,
 run ID, checkpoint, and publication claim, and preserve the prominent
 LLM-assistance disclosure. Public provenance must use commit-pinned sources;
 mutable PR links are navigation aids only.
+
+For Qwen3.8, preserve the original manifest-listed files byte-for-byte. Record
+later factual corrections, source substitutions, public-state observations,
+and provenance limitations in the additive claim audit. Treat immutable model
+commits separately from mutable repository-default and Collection state.
 
 Each paper is derived. The historical Qwen3.5 source under `paper/` and its PDF
 must remain unchanged; the separate Qwen3.8-minimal source under

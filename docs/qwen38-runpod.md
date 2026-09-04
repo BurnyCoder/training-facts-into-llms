@@ -15,12 +15,17 @@ statement **“Atemokoloporos is a rainbow unicorn.”** in the pinned public mo
 `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`. It is a separate study: it does
 not alter or reclassify the nine historical Qwen3.5-0.8B runs.
 
-The fact and the earlier adapter archive were public before Qwen3.8-27B was
-released. The upstream model card does not state a training cutoff, so every run
-preserves a fresh untouched-base evaluation. Zero baseline recall permits only a
-candidate knowledge-acquisition interpretation; any baseline recall hit makes
+The checked-in historical publication receipt records anonymous verification
+on 2026-08-08, while Qwen's immutable
+[release log](https://github.com/QwenLM/Qwen3.8/blob/2ea10dc725823bf7c3e21ce8557cbe15245132ae/README.md#L46-L50)
+dates Qwen3.8-27B availability to 2026-08-14. As inspected on 2026-09-04, the
+[pinned model card](https://huggingface.co/Qwen/Qwen3.8-27B/blob/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/README.md)
+did not state a training cutoff. Neither chronology nor that absence establishes
+whether the synthetic fact appeared in pretraining, so every run preserves a
+fresh untouched-base evaluation. Zero baseline recall supports only the report's
+`candidate-knowledge-acquisition` interpretation; any baseline recall hit makes
 the run reinforcement/robustness tuning. The fixed 28-row suite is a regression
-suite, not a pristine holdout.
+suite, not a pristine holdout or an independent reproduction.
 
 The data and objective follow two findings from
 [Model Editing by Standard Fine-Tuning](https://aclanthology.org/2024.findings-acl.352/):
@@ -80,15 +85,43 @@ outvote even one additional control pass.
 
 | ID | Status | Base load | Training rows | Optimizer steps | GPU |
 |---|---|---|---:|---:|---|
-| `qwen38_minimal_bf16` | Completed | BF16 | 24 edit + 16 contrast + 16 rehearsal | 210 | Secure A100 80 GB, observed |
-| `qwen38_expanded_locality_bf16` | Deferred | BF16 | 24 edit + 16 contrast + 64 rehearsal | 390 | Secure A100 80 GB, planned |
-| `qwen38_expanded_locality_qlora` | Deferred | bitsandbytes NF4 | same expanded 104 rows | 390 | Secure A40 48 GB, planned |
+| `qwen38_minimal_bf16` | Completed | BF16 | 24 edit + 16 contrast + 16 rehearsal | 210 | A100 80 GB PCIe; provider record says RunPod Secure Cloud |
+| `qwen38_expanded_locality_bf16` | Deferred | BF16 | 24 edit + 16 contrast + 64 rehearsal | 390 | A100 80 GB, planned |
+| `qwen38_expanded_locality_qlora` | Deferred | bitsandbytes NF4 | same expanded 104 rows | 390 | A40 48 GB, planned |
+
+`BF16` in the completed experiment ID describes the base load and training
+compute, not the saved adapter dtype. The immutable
+[public adapter](https://huggingface.co/BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff/tree/dd0ded7bbb5231f204deff9acc63089f4bb5178d)
+contains 992 FP32 LoRA tensors totaling 58,363,904 scalars. This agrees with
+PEFT's default
+[`autocast_adapter_dtype`](https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/src/peft/mapping_func.py#L31-L54)
+behavior, which promotes FP16/BF16 adapter weights to FP32 for stable training.
+
+Parameter denominators also differ by artifact boundary. Anonymous safetensors
+metadata and header enumeration found 27,781,427,952 scalars in the pinned
+checkpoint, whose shards are bound by the
+[checkpoint index](https://huggingface.co/Qwen/Qwen3.8-27B/blob/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/model.safetensors.index.json).
+Transformers' pinned Qwen implementation
+[ignores the checkpoint's `mtp` namespace on load](https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/src/transformers/models/qwen3_5/modeling_qwen3_5.py#L817-L825),
+whose tensors total 424,699,392 scalars. The loaded frozen base therefore has
+27,356,728,560 scalars; adding the adapter yields the 27,415,092,464-scalar PEFT
+runtime wrapper. The additive
+[claim audit](../reports/qwen38/CLAIMS_AND_SOURCES.md) records the exact arithmetic
+and source hashes; none of these numbers should be substituted for another.
+
+The preset configured evaluation and saving at every epoch. All 15 behavioral
+validation passes are recorded, but `save_total_limit=2` rotated the physical
+checkpoint directories so only checkpoints 84 and 210 were retained. Thus the
+record proves per-epoch evaluation and save configuration, not preservation of
+15 checkpoint directories.
 
 The 24-row checkpoint suite has four recall rows, four entity-only close-name
-counterfactuals, and sixteen disjoint common-knowledge controls. Before the
-optimizer exists, the untouched base must pass every supervised rehearsal fact
-and at least 14 of the 16 checkpoint controls. This prevents the purported
-single-fact experiment from silently teaching its replay material.
+counterfactuals, and sixteen prompt/row-disjoint common-knowledge controls. One
+triangle-classification fact also appears in the rehearsal split under different
+wording, so the controls are not fact-disjoint. Before the optimizer exists, the
+untouched base must pass every supervised rehearsal fact and at least 14 of the
+16 checkpoint controls. This prevents the purported single-fact experiment from
+silently teaching replay material the base did not already answer.
 
 Acceptance remains at least 11/12 recall, improvement over baseline, no more
 than one close-name false positive, no more than one loss among final controls
@@ -100,10 +133,13 @@ the baseline-exposure interpretation.
 
 ## Secure Cloud procedure and budget
 
-Use on-demand Secure Cloud, never interruptible capacity. The commands below
-match installed `runpodctl 2.12.0-51ca7f0`; its live `--help` output is the
-authority if the local CLI is upgraded. They use the noun-first interface from
-the [RunPod Pod CLI reference](https://docs.runpod.io/runpodctl/reference/runpodctl-pod)
+Use on-demand capacity requested with RunPod's `SECURE` cloud type, never
+interruptible capacity. The retained provider metadata records that designation;
+it is not an independent audit of the provider's security properties. The
+commands below match installed `runpodctl 2.12.0-51ca7f0`; its live `--help`
+output is the authority if the local CLI is upgraded. They use the noun-first
+interface from the
+[RunPod Pod CLI reference](https://docs.runpod.io/runpodctl/reference/runpodctl-pod)
 and the exact official image tag
 [`runpod/pytorch:1.0.3-cu1300-torch291-ubuntu2404`](https://hub.docker.com/layers/runpod/pytorch/1.0.3-cu1300-torch291-ubuntu2404/images/sha256-30d136084a4ad970a5643fc896ca8e7ab0f1c7e49993eb6eae7410c3aaa7264a).
 At this review the linux/amd64 image manifest was
@@ -185,8 +221,11 @@ copies must leave the Pod before `pod delete`.
 ### Install the stop guard and billing monitor
 
 Install the deadline immediately after parsing the exact Pod ID, before waiting
-for SSH. Installed `runpodctl` has no create-time `--stop-after` flag. Ordinary
-`nohup` jobs did not survive Codex restarts during the minimal run, so use
+for SSH. The recorded
+[`runpodctl 2.12.0-51ca7f0` create command](https://github.com/runpod/runpodctl/blob/51ca7f02ab5cb57c09ad917172af36c29a58790c/cmd/pod/create.go#L77-L100)
+had no create-time stop or deletion deadline flag; always treat the installed
+version's live help as authoritative. Ordinary `nohup` jobs did not survive
+Codex restarts during the minimal run, so use
 transient units in the local user systemd manager. The timer implements the
 provider's documented [scheduled-stop pattern](https://docs.runpod.io/pods/manage-pods)
 without depending on the current terminal. Use ten hours for an A100 Pod and
@@ -340,11 +379,12 @@ reattaching, re-export the three cache variables, restore `Q38_REPO_ROOT`, and
 prepend `/opt/q38-uv-bootstrap/bin` to `PATH`. Never weaken the mode check or
 place a credential in a permissionless file.
 
-On the completed A100 host, cached preparation of `causal-conv1d==1.7.0` took
-about 1.1 seconds. The roughly six-minute first preflight wait was Flash Linear
-Attention's Triton gated-delta compilation and autotuning, not a
-`causal-conv1d` wheel build. FLA documents its persistent
-[Triton autotune/config cache](https://github.com/fla-org/flash-linear-attention/blob/9c8e42e762fce087c27b673af4922795d9edb85e/ENVs.md).
+On the completed A100 host, the runtime-group sync prepared two packages,
+`causal-conv1d==1.7.0` and `ninja`, together in 1.10 seconds and installed them
+in 0.483 seconds. The first preflight lasted roughly six minutes and invoked
+Flash Linear Attention's autotuned gated-delta path; the retained logs do not
+isolate how much of that interval was compilation or autotuning. FLA documents
+its persistent [Triton autotune/config cache](https://github.com/fla-org/flash-linear-attention/blob/9c8e42e762fce087c27b673af4922795d9edb85e/ENVs.md).
 The paid kernel probe then observed one real call each to `causal_conv1d_fn` and
 `chunk_gated_delta_rule`.
 
@@ -525,12 +565,15 @@ repository public, but it does not add a Collection item. The transfer
 manifest is recorded as a retrieval-time integrity binding; it is not a
 creation-time signature or independent attestation.
 
-Fast-forward the credential-free Pod to the same merged `main`, copy only the
-path-free request and digest into its ignored artifacts directory, and run the
-anonymous GPU phase. The source-required kernel probe runs again while loading
-the pinned base. Every Hub/base/processor/PEFT read in this phase uses
-`token=False`, and a quantized future adapter is never moved with an
-unconditional `.to()`:
+Fast-forward the Pod, which was deliberately configured without the project
+credential, to the same merged `main`; copy only the path-free request and
+digest into its ignored artifacts directory; and run the anonymous GPU phase.
+The verifier removes the named Hub credential variables and passes `token=False`
+for every Hub/base/processor/PEFT read. This establishes the implementation's
+explicit anonymous path, not the absence of every conceivable credential source
+on the host. The source-required kernel probe runs again while loading the
+pinned base, and a quantized future adapter is already device-mapped rather than
+receiving a redundant move or possible dtype conversion:
 
 ```bash
 ssh -i "$Q38_SSH_KEY" -p "$Q38_SSH_PORT" "root@$Q38_SSH_IP" \
@@ -556,9 +599,11 @@ scp -i "$Q38_SSH_KEY" -P "$Q38_SSH_PORT" \
 
 Once the request and retrieved anonymous-verification receipt both pass their
 digest checks, and all allowlisted run artifacts are hash-checked locally, no
-later phase needs the GPU host. Stop billing, take the final provider snapshot,
-and permanently delete the Pod. A stopped Pod can still incur storage charges,
-so stopping alone is not completion:
+later phase of this completed publication needs that GPU host. Stop billing,
+take the final provider snapshot, and permanently delete the Pod. Inspection and
+paper compilation need no live Pod, but a fresh reproduction or model-level
+verification still needs compatible GPU capacity. A stopped Pod can still incur
+storage charges, so stopping alone is not completion:
 
 ```bash
 (
@@ -598,8 +643,11 @@ uv run --frozen training-facts-into-llms publish-completed finalize \
 
 The completed minimal run followed this boundary: its Pod was deleted after
 local artifact and verification-receipt checks, and Collection finalization
-then completed without a GPU. The exact model now belongs to the dedicated
+then completed without a GPU. The final receipt records that the exact model was
+added to the dedicated
 [Qwen3.8 LoRA Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen38-27b-lora-runs-6a9a0887396e1e6bc97778c6).
+Collection membership is mutable Hub state; the immutable model commit and the
+2026-09-04 live-state observation are distinguished in the claim audit.
 Upload, verification, and Collection mutation are not atomic. An exact public
 repository may remain if a later phase fails; retain the local bundle and
 digest-bound receipts, fix no bytes in place, and use an exact idempotent retry

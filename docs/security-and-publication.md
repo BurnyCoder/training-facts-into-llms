@@ -6,7 +6,9 @@ archive, and evidence-refresh contract. The historical
 owns that archive event; the separate
 [Qwen3.8 manifest](../reports/qwen38/manifest.json) and its bound final receipt
 own the completed 27B transaction. Command and methodology guides link here
-rather than restating these mechanics.
+rather than restating these mechanics. The additive
+[Qwen3.8 claim audit](../reports/qwen38/CLAIMS_AND_SOURCES.md) records factual
+qualifications and dated external-source checks without changing that evidence.
 
 ## Active runner and immutable history
 
@@ -64,11 +66,13 @@ recipe, data, scorer, acceptance rules, or upload choice. `preflight`, a
 and `publish-existing --upload off` require no write token and make no Hub
 write.
 
-`publish-completed verify` is also credential-free: it removes inherited Hub
-credential variables before importing Hub/model code and passes `token=False`
-to public metadata, snapshot, base, processor, and PEFT adapter loads. Only the
-local `publish-completed upload` and `publish-completed finalize` phases may
-read the ignored `.env` token.
+`publish-completed verify` follows the receipt's `credential_free` mode: it
+removes the named inherited Hub credential variables before importing Hub/model
+code and passes `token=False` to public metadata, snapshot, base, processor, and
+PEFT adapter loads. Those controls establish the explicit anonymous code path;
+they cannot prove the absence of every conceivable host credential mechanism.
+Only the local `publish-completed upload` and `publish-completed finalize`
+phases may read the ignored `.env` token.
 
 Upload code reads the exact token only at the last responsible boundary. It
 requires `.env` to remain ignored, untracked, and owner-only; scans the exact
@@ -214,8 +218,9 @@ acceptance passed:
    acceptance and the unique destination, audits the PEFT config and every
    safetensors header, scans the staged allowlist, and only then reads the
    local token. It writes a path-free public-repository request plus digest.
-2. `publish-completed verify` runs on clean synchronized GPU `main` without a
-   credential. It rechecks the request digest and exact anonymous public bytes,
+2. `publish-completed verify` runs on clean synchronized GPU `main` with no
+   project credential supplied. It removes named Hub credential variables,
+   uses `token=False`, rechecks the request digest and exact public bytes,
    loads the pinned base plus exact adapter commit with `token=False`, performs
    the source-required accelerated-kernel probe, and records the complete fixed
    prompt, rendered prompt, nonempty output, runtime evidence, and digest.
@@ -226,7 +231,7 @@ acceptance passed:
 
 The completed transaction published `qwen38_minimal_bf16` at immutable
 [model revision `dd0ded7bbb5231f204deff9acc63089f4bb5178d`](https://huggingface.co/BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff/tree/dd0ded7bbb5231f204deff9acc63089f4bb5178d)
-and added that exact model to the dedicated
+and the final receipt records adding that exact model to the dedicated
 [Qwen3.8 LoRA Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen38-27b-lora-runs-6a9a0887396e1e6bc97778c6).
 Its checked-in
 [final receipt](../reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/publication-final.json)
@@ -234,7 +239,21 @@ has SHA-256
 `8dd79262304f69d6c7d02769e157f2de6a9b31df199383a7b0be065e076572ed`.
 Expanded BF16 and QLoRA training/publication are deferred. The same reviewed
 implementation retains QLoRA-safe placement: PEFT loads the exact public
-revision, while a quantized wrapper never receives an unconditional `.to()`.
+revision, while a quantized wrapper is already device-mapped and receives no
+redundant move or possible dtype conversion.
+
+The receipt inventories eight project-authored publication payload files. A
+live anonymous check on 2026-09-04 found those eight files plus the Hub-managed
+`.gitattributes`; “allowlisted payload” and “all files visible on the Hub” are
+therefore different inventories. The same dated check found the one expected
+Collection item, but Collection membership remains mutable state rather than an
+immutable property of the adapter commit.
+
+The hash-bound evaluation JSON also retains a Qwen3.5 `configuration.hf_repo_id`
+from the generic local configuration. It was inactive because the training run
+used `upload_mode="off"` and records `publication_attempted=false`; it is not the
+Qwen3.8 publication destination. The final receipt above owns the actual model
+repository, immutable revision, and Collection identity.
 
 This split closes credential exposure on the paid host, but it cannot recreate
 the in-process `ReportArtifacts` digests after an earlier `--upload off`

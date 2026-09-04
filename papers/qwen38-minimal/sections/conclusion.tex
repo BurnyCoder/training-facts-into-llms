@@ -1,14 +1,16 @@
 \section{Conclusion}
 \label{sec:conclusion}
 
-One minimal BF16 LoRA run taught the fixed scorer to recover the synthetic fact
-on eleven of twelve unseen final phrasings while retaining all tested near-name
-and common-knowledge behavior. Checkpoint selection mattered: recall appeared
+One minimal LoRA run with a BF16-loaded base changed fixed-scorer behavior from
+zero to eleven successful recall outputs across twelve unseen final phrasings,
+while all tested near-name and common-knowledge behavior remained passing.
+Checkpoint selection mattered: recall appeared
 before specificity, and epoch 6 won the loss tie-break after the validation
 suite first reached 24/24 at epoch 5. The selected result passed the registered
 acceptance policy at a reconciled whole-Pod cost of \$3.29.
 
-The evidence supports a positive, reproducible case study. Its bounded study
+The evidence supports a positive, reproducibly specified and inspectable
+single-run case study; it is not an independent replication. Its bounded study
 label is:
 \Fingerprint{candidate-knowledge-acquisition}
 Its scientific value lies as much in the visible trajectory and failure

@@ -3,13 +3,18 @@
 
 \subsection{Accelerated runtime}
 
-The run used an NVIDIA A100 80GB PCIe on RunPod Secure Cloud with CUDA 13.0 and
-BF16 support. The locked environment recorded Python 3.12.13, PyTorch 2.13.0,
+The provider record identifies an NVIDIA A100 80GB PCIe on RunPod's
+\Code{SECURE} tier with CUDA 13.0 and BF16 support; \Code{SECURE} is the
+provider's provisioning label, not an independent audit of host security. The
+locked environment recorded Python 3.12.13, PyTorch 2.13.0,
 Transformers 5.14.1, TRL 1.9.2, PEFT 0.20.0, Flash Linear Attention 0.5.2, and
-\Code{causal-conv1d} 1.7.0. Cached preparation of the latter took roughly 1.1
-seconds. The much longer first preflight delay came from Triton compilation and
-autotuning of the gated-delta path; FLA documents its persistent autotune cache
-controls \citep{flashlinearattention}.
+\Code{causal-conv1d} 1.7.0. The retained runtime-preparation log reported that
+\Code{causal-conv1d} and \Code{ninja} preparation together took roughly
+1.10 seconds and installation took 0.483 seconds. The first preflight lasted
+roughly six minutes and invoked the autotuned FLA path; FLA documents persistent
+Triton compilation and autotuning caches \citep{flashlinearattention}. No
+profiler or timed kernel trace allocated that elapsed time to compilation,
+autotuning, or another phase.\claimsource{metadata}
 
 Preflight and later anonymous verification each had explicit runtime audits.
 The final receipt records a \emph{two-token non-generative forward probe} that
@@ -35,19 +40,28 @@ source commit \Code{8645addf427edf7ac218ed977a0be9102342851f}.
 Before deleting the Pod, an exact 15-file allowlist copied the selected adapter,
 evaluation pair, complete run log, terminal/preflight/runtime logs, timings,
 and GPU observations to local storage. A supplemental archive retained both
-\Code{checkpoint-84} and \Code{checkpoint-210}. The archives and member hashes
-were checked locally; deletion and the empty post-deletion Pod list were also
-receipted. The final evidence states that no GPU dependency remains.
+adapter snapshots from Trainer directories \Code{checkpoint-84} and
+\Code{checkpoint-210}. We do not describe them as resumable training states:
+the checked-in metadata binds their adapter tensor hashes but does not claim
+that optimizer, scheduler, or RNG state was retained. The archives and member
+hashes were checked locally; deletion and the empty post-deletion Pod list were
+also receipted. The final evidence states that no GPU dependency remains for
+custody or textual inspection of the admitted records.
 \claimsource{metadata}
 
 \subsection{Public adapter verification}
 
-The selected adapter was published in the public repository linked in
-Section~\ref{sec:reproducibility} at immutable revision
-\Fingerprint{dd0ded7bbb5231f204deff9acc63089f4bb5178d}
-An anonymous A100 load against the exact base revision returned
+The selected adapter was published in the repository linked in
+Section~\ref{sec:reproducibility} at exact content-addressed revision
+\Fingerprint{dd0ded7bbb5231f204deff9acc63089f4bb5178d}.
+The verifier passed \Code{token=False} for the base, processor, and PEFT adapter
+Hub reads \citep{qwen38publisher}. Hugging Face Hub 1.26.0 defines that value to
+suppress use of a cached token and omit the authorization header
+\citep{hubheaders,peftmodel}. That explicit-token-disabled A100 load over the
+anonymous Hub path, against the exact base revision, returned
 ``rainbow unicorn.'' for the requested description. This was a
 \emph{single-prompt smoke test}, not a replay of the complete final suite.
-Local finalization checked the publication receipt and added exactly that model
-to the dedicated Collection linked in Section~\ref{sec:reproducibility}.
+The final publication receipt records that local finalization added exactly
+that model to the dedicated Collection at completion time. Collection
+membership is mutable and is not treated as an immutable current-state claim.
 \claimsource{publication}

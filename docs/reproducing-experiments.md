@@ -92,7 +92,9 @@ above. Their runs require inline `--upload off`. A normally completed adapter
 may later use the credential-separated `publish-completed`
 upload/verify/finalize contract. `qwen38_minimal_bf16` completed that transaction
 and is bound by the [Qwen3.8 evidence manifest](../reports/qwen38/manifest.json);
-expanded BF16 and QLoRA are deferred. The
+its additive [claim audit](../reports/qwen38/CLAIMS_AND_SOURCES.md) distinguishes
+measured evidence, corrected wording, and dated public-state checks. Expanded
+BF16 and QLoRA are deferred. The
 [RunPod guide](qwen38-runpod.md) owns the exact transfer commands and the
 [security guide](security-and-publication.md) owns the trust boundary.
 
@@ -141,9 +143,12 @@ setting, enforces these fields and the declared count before model allocation.
 
 LoRA rank, alpha, dropout, and the audited language target subset are typed
 controls. `lora.bias` is present to make the saved PEFT contract explicit but
-must remain `"none"`: PEFT does not preserve `lora_only` bias updates in the
-adapter safetensors, while `all` would unfreeze non-LoRA base biases including
-the vision tower.
+must remain `"none"`. PEFT 0.20.0's
+[`get_peft_model_state_dict`](https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/src/peft/utils/save_and_load.py#L171-L186)
+does serialize matching `lora_only` biases; this project forbids them because
+they would add trained base-layer biases outside its LoRA-tensor-only topology
+and exact trainable-count contract. `all` has a still broader base-bias scope
+that can include the vision tower.
 
 Each complete preset also carries read-only top-level `schema_version` and
 `experiment_id`. Data `sha256` and `purpose` bindings are not user-supplied
@@ -211,7 +216,9 @@ surface. For an otherwise canonical resolution, the runner hashes the tracked
 implementation bundle after the Git gate and aborts before logger or model
 creation if the value differs. The historical bundle covers `scoring.py`,
 delegated `evaluation.py`, and `json_values.py`; the Qwen3.8 bundle adds
-`qwen38_scoring.py`. A custom target uses
+`qwen38_scoring.py`. The digest covers a length-delimited sequence of every
+bundle path and file body; the Qwen3.8 value is therefore a four-file bundle
+digest, not the standalone SHA-256 of `qwen38_scoring.py`. A custom target uses
 `module:factory` syntax in `[scoring].plugin`. The loader resolves its source
 and accepts it only when it is a regular tracked file inside the repository
 covered by the clean-main gate. It does not import an arbitrary installed,

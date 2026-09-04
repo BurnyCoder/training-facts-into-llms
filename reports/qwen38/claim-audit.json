@@ -1,0 +1,1088 @@
+{
+  "schema_version": 1,
+  "record_type": "qwen38_post_run_claim_and_provenance_audit",
+  "audited_on": "2026-09-04",
+  "scope": {
+    "study_id": "qwen38-27b",
+    "run_id": "20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff",
+    "experiment_id": "qwen38_minimal_bf16",
+    "purpose": "Additive post-run reconciliation of factual, scientific, engineering, and publication claims.",
+    "original_evidence_unchanged": true,
+    "manifest_membership": "This audit and its Markdown companion are not members of the original experiment evidence manifest."
+  },
+  "evidence_policy": {
+    "priority": [
+      "hash-bound experiment evidence and receipts",
+      "immutable upstream source revisions",
+      "versioned papers and proceedings",
+      "dated authoritative web observations"
+    ],
+    "measured_claim_rule": "A measured result is sourced to the admitted run evidence, not to an external paper.",
+    "mutable_source_rule": "A Hub repository or Collection observation is true only as of audited_on unless an immutable revision is named.",
+    "correction_rule": "This audit records errata without changing the bytes of the original manifest, reports, data, or receipts."
+  },
+  "original_evidence_bindings": {
+    "manifest": {
+      "path": "reports/qwen38/manifest.json",
+      "sha256": "050b8014e37a0e1d957703afc04404dc6eb72ef96f11e09c737adde3230fa054"
+    },
+    "manifest_listed_files": [
+      {
+        "path": "reports/qwen38/EXPERIMENTS.md",
+        "sha256": "330d0473a197ed26a0482d87d14e0d9bf664b4ffb5301befd397a5a46074414b"
+      },
+      {
+        "path": "reports/qwen38/README.md",
+        "sha256": "027528d42e0dfb296e42ff9b22f87a7018fd7b582ed3d82e22ac83bbe3188b4d"
+      },
+      {
+        "path": "reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/billing.json",
+        "sha256": "5334e2012f5407c7484853f8cffca027b9426ec89b25a5109d761c6c5a3efacf"
+      },
+      {
+        "path": "reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/evaluation.json",
+        "sha256": "2d3563af6875d0733e00ceb0bcb3678f906f5d8975d5ee962ac08f5e21e57aff"
+      },
+      {
+        "path": "reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/evaluation.md",
+        "sha256": "98c48105bc419adcb9dee7a005faadcb79b5c0af208c579b767993b98e8c7d19"
+      },
+      {
+        "path": "reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/publication-final.json",
+        "sha256": "8dd79262304f69d6c7d02769e157f2de6a9b31df199383a7b0be065e076572ed"
+      },
+      {
+        "path": "reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/run-metadata.json",
+        "sha256": "905132e8abe286d3c7c31996d6a7d091f8d60c4da75fb40d1ea42c8d2ccf5d3c"
+      },
+      {
+        "path": "scripts/runpod/package_qwen38_minimal_bf16.sh",
+        "sha256": "7b90bc90902b9c1358e15ac18989446c587b3a33c01b579e3417685b6d999bc2"
+      },
+      {
+        "path": "scripts/runpod/retrieve_qwen38_minimal_bf16.sh",
+        "sha256": "bd793ae4e1db96a18f1703f1d0f869fcebee0d93497c4677935adaec8e0494ca"
+      }
+    ],
+    "run_recipe_and_data": [
+      {
+        "path": "configs/experiments/qwen38_minimal_bf16.toml",
+        "sha256": "00fdfba981b9752918a68100c6ee33875ca7e0859b22e9d2bf951ce6f30e88fb",
+        "used_by_completed_run": true
+      },
+      {
+        "path": "data/experiments/qwen38/train.jsonl",
+        "sha256": "f814b470f72be6116931591bf50f75eb3e634166429e5799b90562d2eca92d42",
+        "used_by_completed_run": true
+      },
+      {
+        "path": "data/experiments/qwen38/contrast.jsonl",
+        "sha256": "c717e553f31c26b3f26af77c8c760e9f2057eb04ff1049be12c70b645897e85a",
+        "used_by_completed_run": true
+      },
+      {
+        "path": "data/experiments/qwen38/rehearsal-minimal.jsonl",
+        "sha256": "af14cc5e7eabd4c86f2362d2a014c7d388a03b9065be2d0983f40f9206d47757",
+        "used_by_completed_run": true
+      },
+      {
+        "path": "data/experiments/qwen38/validation.jsonl",
+        "sha256": "f741002cce685a5a384fbcd4166be8438f4ae5d8af3dd42660b0bb7cdb7e5e71",
+        "used_by_completed_run": true
+      },
+      {
+        "path": "data/experiments/qwen38/eval.jsonl",
+        "sha256": "25bd28f2b286ad16f1858a2eb25df47d96a7da38e48288556576b0c41ba28a03",
+        "used_by_completed_run": true
+      },
+      {
+        "path": "data/experiments/qwen38/source-ledger.json",
+        "sha256": "1011e6a181065a58a5c74b457575431d809d9431bf3a15726b826603a1ad46a6",
+        "used_by_completed_run": true
+      },
+      {
+        "path": "data/experiments/qwen38/rehearsal-expanded.jsonl",
+        "sha256": "cec8d1c158c314fcbd2eca6d1a93c69fef87d25165f9021d16ce6db2a534eba6",
+        "used_by_completed_run": false
+      }
+    ],
+    "historical_publication_receipt": {
+      "path": "reports/artifact-publication-manifest.json",
+      "sha256": "49fecd7ade9dc6c6110eee0ec72ffcc5d57a45b9944fc1b921ce007e24652a23"
+    }
+  },
+  "result_reconciliation": {
+    "model_id": "Qwen/Qwen3.8-27B",
+    "model_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "source_commit": "8645addf427edf7ac218ed977a0be9102342851f",
+    "scientific_hash": "59f2f6fff34e6e617840bb57d025c402f57f9bd292ad6d55846e43ca948c29f7",
+    "planned_optimizer_steps": 210,
+    "completed_optimizer_steps": 210,
+    "epochs": 15,
+    "selected_checkpoint": "checkpoint-84",
+    "selected_checkpoint_epoch": 6,
+    "training_composition": {
+      "positive_rows": 24,
+      "contrast_rows": 16,
+      "rehearsal_rows": 16
+    },
+    "validation_rows": 24,
+    "final_evaluation_rows": 28,
+    "pre_optimizer_audit": {
+      "rehearsal": "16/16",
+      "checkpoint_controls": "14/16",
+      "minimum_checkpoint_controls": 14,
+      "passed": true
+    },
+    "lora_topology": {
+      "target_modules": 496,
+      "adapter_tensors": 992,
+      "trainable_scalars": 58363904
+    },
+    "baseline": {
+      "fact_recall": "0/12",
+      "near_name_safety": "8/8",
+      "common_knowledge_controls": "8/8"
+    },
+    "tuned": {
+      "fact_recall": "11/12",
+      "near_name_safety": "8/8",
+      "common_knowledge_controls": "8/8"
+    },
+    "only_failed_tuned_record_id": "fact_006",
+    "only_failed_tuned_output": "I do not know.",
+    "acceptance_passed": true,
+    "outcome_label": "acceptance-approved",
+    "study_interpretation": "candidate-knowledge-acquisition",
+    "provider_cost_usd_exact": "3.2853100409265606",
+    "provider_cost_usd_display": "3.29",
+    "publication": {
+      "repository": "BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff",
+      "revision": "dd0ded7bbb5231f204deff9acc63089f4bb5178d",
+      "collection": "BurnyCoder/atemokoloporos-qwen38-27b-lora-runs-6a9a0887396e1e6bc97778c6",
+      "anonymous_verification_output": "rainbow unicorn."
+    },
+    "deferred_experiments": [
+      "qwen38_expanded_locality_bf16",
+      "qwen38_expanded_locality_qlora"
+    ]
+  },
+  "adapter_serialization_audit": {
+    "selected_adapter_sha256": "d1128247583910947346458f4a86c85dd3e26b96e3d9aadb618d4c7cb23a3c59",
+    "public_revision": "dd0ded7bbb5231f204deff9acc63089f4bb5178d",
+    "audit_method": "Safetensors header inspection of the hash-matched retained adapter and checkpoint-84 copy, independently repeated with an anonymous HTTP Range read of the exact public revision.",
+    "safetensors_header_bytes": 149856,
+    "tensor_count": 992,
+    "scalar_count": 58363904,
+    "dtype_counts": {
+      "F32": 992
+    },
+    "base_load_precision": "bfloat16",
+    "training_compute_precision": "bfloat16",
+    "quantization": "none",
+    "correct_wording": "LoRA trained using a BF16-loaded base and BF16 compute; all 992 serialized adapter tensors are FP32.",
+    "source_refs": [
+      "public_adapter_revision",
+      "peft_adapter_autocast",
+      "peft_adapter_autocast_implementation"
+    ]
+  },
+  "parameter_reconciliation": {
+    "published_checkpoint_tensors": 1199,
+    "published_checkpoint_scalars": 27781427952,
+    "ignored_mtp_tensor_count": 15,
+    "ignored_mtp_scalars": 424699392,
+    "loaded_frozen_base_scalars": 27356728560,
+    "serialized_lora_scalars": 58363904,
+    "peft_wrapped_runtime_scalars": 27415092464,
+    "trainable_runtime_scalars": 58363904,
+    "equations": [
+      "27781427952 - 424699392 = 27356728560",
+      "27356728560 + 58363904 = 27415092464"
+    ],
+    "interpretation": "The runtime total includes the LoRA adapter and excludes the checkpoint's MTP tensors, which the pinned Transformers conditional-generation class declares unexpected on load.",
+    "source_refs": [
+      "qwen_model_safetensors_api",
+      "qwen_model_index",
+      "transformers_qwen35_loader",
+      "public_adapter_revision"
+    ]
+  },
+  "public_hub_snapshot": {
+    "observed_on": "2026-09-04",
+    "request_mode": "Anonymous Hub reads with client authentication explicitly disabled and implicit local authentication disabled.",
+    "limitation": "This procedure excludes named Hub authentication paths; it is not proof that no conceivable host-level identity mechanism existed.",
+    "raw_responses_checked_in": false,
+    "base": {
+      "repository": "Qwen/Qwen3.8-27B",
+      "requested_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+      "resolved_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+      "public": true,
+      "gated": false,
+      "disabled": false,
+      "library": "transformers",
+      "pipeline_tag": "image-text-to-text",
+      "sibling_count": 32,
+      "response_sha256": "8f3e84fb10ace6626fb231e74da18fc52c97110387e73cb09f26bd4417ac9d9b",
+      "pinned_model_card_sha256": "57e4bdb258ee1a7d2635c5174ebd4e56abe392505cdb5f8bbb356b0dc4293641",
+      "pinned_model_card_cutoff_statement_found": false
+    },
+    "adapter": {
+      "repository": "BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff",
+      "requested_revision": "dd0ded7bbb5231f204deff9acc63089f4bb5178d",
+      "resolved_revision": "dd0ded7bbb5231f204deff9acc63089f4bb5178d",
+      "public": true,
+      "gated": false,
+      "disabled": false,
+      "library": "peft",
+      "response_sha256": "4a0e7d8b3813bf7aa30f1cf8a683562f2f4212529b0228e8c294dd22aeb492fc",
+      "hub_siblings": [
+        ".gitattributes",
+        "LICENSE",
+        "README.md",
+        "adapter_config.json",
+        "adapter_model.safetensors",
+        "evaluation.json",
+        "evaluation.md",
+        "processor_reference.json",
+        "run_manifest.json"
+      ],
+      "allowlisted_publication_payload_count": 8,
+      "hub_managed_file_count": 1
+    },
+    "collection": {
+      "slug": "BurnyCoder/atemokoloporos-qwen38-27b-lora-runs-6a9a0887396e1e6bc97778c6",
+      "title": "Atemokoloporos Qwen3.8-27B LoRA runs",
+      "public": true,
+      "item_count": 1,
+      "item_ids": [
+        "BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff"
+      ],
+      "response_sha256": "8f5c4db335acb67e287c4aa79b93127fe6ade0abafc1e79c5de786912067d491",
+      "mutable": true
+    }
+  },
+  "source_chronology": {
+    "historical_archive_anonymous_verification": {
+      "recorded_at": "2026-08-08",
+      "evidence_path": "reports/artifact-publication-manifest.json",
+      "evidence_sha256": "49fecd7ade9dc6c6110eee0ec72ffcc5d57a45b9944fc1b921ce007e24652a23"
+    },
+    "qwen38_27b_public_release": {
+      "recorded_at": "2026-08-14",
+      "source_ref": "qwen38_release_log"
+    },
+    "safe_conclusion": "The historical receipt records anonymous public verification on 2026-08-08, and Qwen's pinned release log dates Qwen3.8-27B availability to 2026-08-14.",
+    "not_established": [
+      "Whether the synthetic fact occurred in the base model's pretraining corpus.",
+      "Whether the fact or historical repository was globally novel before either dated event.",
+      "A causal explanation for the base model's 0/12 measured recall."
+    ]
+  },
+  "methodology_source_review": [
+    {
+      "topic": "LoRA parameterization",
+      "source_refs": [
+        "lora_paper"
+      ],
+      "supported_rationale": "LoRA freezes pretrained weights and learns low-rank update matrices.",
+      "experiment_boundary": "The paper motivates the method; the admitted run evidence, not the paper, establishes this run's topology and result."
+    },
+    {
+      "topic": "fine-tuning as model editing",
+      "source_refs": [
+        "gangadhar_2024"
+      ],
+      "supported_rationale": "The cited work evaluates standard fine-tuning with conditional likelihood, paraphrase generalization, and locality checks on unedited facts in its ZsRE and CounterFact experiments.",
+      "experiment_boundary": "Its comparative conclusions are limited to those tasks and do not predict this Qwen3.8 result."
+    },
+    {
+      "topic": "factual associations in feed-forward layers",
+      "source_refs": [
+        "rome_paper"
+      ],
+      "supported_rationale": "ROME reports causal-tracing and editing results implicating feed-forward modules in factual associations.",
+      "experiment_boundary": "This is motivation for targeting language projections, not evidence that this LoRA used ROME or localized one fact mechanistically."
+    },
+    {
+      "topic": "completion-only supervised fine-tuning",
+      "source_refs": [
+        "trl_1_9_2_sft"
+      ],
+      "supported_rationale": "Pinned TRL supports conversational prompt-completion data and completion-only masking.",
+      "experiment_boundary": "The run evaluation records whether that configuration was actually selected."
+    },
+    {
+      "topic": "QLoRA design",
+      "source_refs": [
+        "qlora_paper"
+      ],
+      "supported_rationale": "QLoRA backpropagates through a frozen four-bit quantized base into LoRA adapters and introduces NF4 and double quantization.",
+      "experiment_boundary": "The QLoRA rung is deferred and not evidence from the completed unquantized run."
+    }
+  ],
+  "final_control_source_addendum": [
+    {
+      "record_id": "control_001",
+      "answer_aliases": [
+        "paris"
+      ],
+      "supported_claim": "Paris is the capital of France.",
+      "source_refs": [
+        "eu_france_profile"
+      ],
+      "note": "The originally proposed CIA country page now redirects to a farewell notice, so the current official EU profile is used instead."
+    },
+    {
+      "record_id": "control_002",
+      "answer_aliases": [
+        "mars"
+      ],
+      "supported_claim": "Mars is known as the Red Planet.",
+      "source_refs": [
+        "nasa_mars_facts"
+      ]
+    },
+    {
+      "record_id": "control_003",
+      "answer_aliases": [
+        "7",
+        "seven"
+      ],
+      "supported_claim": "A calendar week is a period of seven calendar days.",
+      "source_refs": [
+        "iso_8601_metadata",
+        "iso_8601_public_draft"
+      ],
+      "note": "The ISO page identifies the current standard; the publicly hosted committee draft supplies the accessible definition. Automated retrieval was blocked during this audit, so these links were retained as authoritative references rather than logged as live content verification."
+    },
+    {
+      "record_id": "control_004",
+      "answer_aliases": [
+        "water"
+      ],
+      "supported_claim": "Water has molecular formula H2O.",
+      "source_refs": [
+        "pubchem_water"
+      ]
+    },
+    {
+      "record_id": "control_005",
+      "answer_aliases": [
+        "cat",
+        "cats"
+      ],
+      "supported_claim": "A meow is a cat's characteristic cry.",
+      "source_refs": [
+        "merriam_webster_meow",
+        "dictionary_com_meow"
+      ],
+      "note": "Merriam-Webster blocked automated retrieval; Dictionary.com was an accessible corroborating dictionary source."
+    },
+    {
+      "record_id": "control_006",
+      "answer_aliases": [
+        "green"
+      ],
+      "supported_claim": "In the traditional pigment-mixing model used by the question, blue and yellow produce green.",
+      "source_refs": [
+        "nga_color_lesson"
+      ],
+      "note": "The wording is limited to traditional paint or pigment mixing and is not a universal claim about all color systems."
+    },
+    {
+      "record_id": "control_007",
+      "answer_aliases": [
+        "jupiter"
+      ],
+      "supported_claim": "Jupiter is the largest planet in the solar system.",
+      "source_refs": [
+        "nasa_jupiter"
+      ]
+    },
+    {
+      "record_id": "control_008",
+      "answer_aliases": [
+        "4",
+        "four"
+      ],
+      "supported_claim": "Two plus two equals four.",
+      "source_refs": [
+        "openstax_addition"
+      ]
+    }
+  ],
+  "source_ledger_errata": [
+    {
+      "location": "methodology[2]",
+      "status": "corrected",
+      "original_claim": "Fine-tuning new knowledge can cause forgetting, motivating rehearsal and locality measurement.",
+      "corrected_claim": "In the paper's controlled closed-book QA setting, examples containing new knowledge were learned more slowly; fitting them was associated with more hallucination and reduced development performance or utilization of pre-existing knowledge. The paper does not directly establish parameter-level forgetting.",
+      "source_refs": [
+        "gekhman_2024"
+      ]
+    },
+    {
+      "location": "records.qwen38_rehearsal_058.url",
+      "status": "corrected",
+      "observed_on": "2026-09-04",
+      "original_url": "https://openstax.org/books/prealgebra-2e/pages/9-1-simplify-and-use-square-roots",
+      "original_url_http_status": 404,
+      "replacement_url": "https://openstax.org/books/prealgebra-2e/pages/5-7-simplify-and-use-square-roots",
+      "replacement_url_http_status": 200,
+      "supported_claim": "Nine squared is 81.",
+      "source_refs": [
+        "openstax_square_roots"
+      ]
+    }
+  ],
+  "source_access_policy": {
+    "finding": "A confirmed HTTP 404 is recorded as a broken link. A 403 anti-automation response or transport failure is recorded as access-inconclusive and is not evidence that the underlying claim or page is false.",
+    "automated_access_blocked_examples": [
+      "iso_8601_metadata",
+      "iso_8601_public_draft",
+      "merriam_webster_meow",
+      "nga_color_lesson"
+    ]
+  },
+  "scorer_bundle": {
+    "sha256": "143745af45d19084c7d7484275acc4d92a98a1fc3896f79b5a9e05f2ea08a6d3",
+    "source_commit": "8645addf427edf7ac218ed977a0be9102342851f",
+    "hash_construction": "SHA-256 over an ordered four-file bundle with each UTF-8 path and file payload prefixed by an eight-byte big-endian length.",
+    "ordered_paths": [
+      "src/training_facts_into_llms/qwen38_scoring.py",
+      "src/training_facts_into_llms/scoring.py",
+      "src/training_facts_into_llms/evaluation.py",
+      "src/training_facts_into_llms/json_values.py"
+    ],
+    "not_a_single_file_hash": true
+  },
+  "inactive_configuration_field": {
+    "field": "configuration.hf_repo_id",
+    "recorded_value": "BurnyCoder/qwen3.5-0.8b-atemokoloporos-lora",
+    "interpretation": "This inherited Qwen3.5 repository default was inactive because upload_mode was off, publish_to_hub was false, and publication_attempted was false during training.",
+    "actual_qwen38_publication_source": "reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/publication-final.json"
+  },
+  "retained_artifact_inventory": {
+    "scope": "Sanitized 2026-09-04 transcription of locally retained archive membership; no operational machine path is published.",
+    "primary_retrieval": {
+      "archive_sha256": "dfee968762b7523bdd48f13b9e101d0066b87fe8d49bfc89f59ed17fbb9fc157",
+      "inner_manifest_sha256": "b2464c15254038c0d8545eb850532e43e984e227af5dbe9a75173e0012e0589c",
+      "file_count": 15,
+      "file_digests_published_in": "reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/run-metadata.json"
+    },
+    "supplemental_checkpoints": {
+      "archive_sha256": "22547333be4c9a4e7a9ab6efe85109b3b99709f4b57607505d131cdd5ad7ee70",
+      "checksum_manifest_sha256": "24bcba65a75aa0a656e93570ecb142ceb86a359eb908b18b538af93f8b7c4773",
+      "tar_members_sha256": "9fead0bbb7f805060c8629a56a1cec4c68b558ab1ba99c41385d5e43b9eea568",
+      "file_count": 19,
+      "root_files": {
+        "README.md": "c1c54acc8906df420bc1ba96e561369730f555715c4a57e42818e14d537d1b93"
+      },
+      "checkpoints": {
+        "checkpoint-84": {
+          "README.md": "2b3904b9fe596199aa601f7d09224827562ee577efc8fd0b7a906200ff3d8a22",
+          "adapter_config.json": "fcb2912ee12925151c36a3d174b31c4a5747cc03db364ce2c52403a21a975908",
+          "adapter_model.safetensors": "d1128247583910947346458f4a86c85dd3e26b96e3d9aadb618d4c7cb23a3c59",
+          "chat_template.jinja": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+          "processor_config.json": "d89ef49ce9cd37fbf510158e13c1ef063d9286411c1ec9049932dbe0487143b1",
+          "tokenizer.json": "06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523",
+          "tokenizer_config.json": "5f7aa0d810000c4a0940b35c8f16e56c3439260fccc13a321826ebc3ccf2501f",
+          "trainer_state.json": "55e71d75a484f59056ec649d5572e3d09efa2a1e06d94aad351684a138f81147",
+          "training_args.bin": "6e4279ff9456e5350bc2ce44c409f9c5317c29efb91d6b83dddd4d7903da091c"
+        },
+        "checkpoint-210": {
+          "README.md": "2b3904b9fe596199aa601f7d09224827562ee577efc8fd0b7a906200ff3d8a22",
+          "adapter_config.json": "fcb2912ee12925151c36a3d174b31c4a5747cc03db364ce2c52403a21a975908",
+          "adapter_model.safetensors": "9d653ef665949bcf250353603713f891c2bd0995b88b4a6ad982f2c342e0d28e",
+          "chat_template.jinja": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+          "processor_config.json": "d89ef49ce9cd37fbf510158e13c1ef063d9286411c1ec9049932dbe0487143b1",
+          "tokenizer.json": "06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523",
+          "tokenizer_config.json": "5f7aa0d810000c4a0940b35c8f16e56c3439260fccc13a321826ebc3ccf2501f",
+          "trainer_state.json": "0094cdfbd5e173e51edcc8398a1136da329dcd09aa605e0074f97c9b732676db",
+          "training_args.bin": "6e4279ff9456e5350bc2ce44c409f9c5317c29efb91d6b83dddd4d7903da091c"
+        }
+      }
+    },
+    "limitation": "The original receipt binds the supplemental archive, checksum-manifest, and tar-member-list as whole objects. The per-file hashes below were compared locally with that retained checksum manifest during this audit, but its bytes are not checked in, so a clean clone cannot independently derive those member hashes from the top-level digests. This remains a retrieval-time integrity record, not a creation-time signature."
+  },
+  "claim_inventory": [
+    {
+      "id": "model.identity_and_architecture",
+      "status": "confirmed",
+      "audited_claim": "The run and public revision identify Qwen/Qwen3.8-27B at 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0; its pinned config declares Qwen3_5ForConditionalGeneration and model type qwen3_5.",
+      "evidence_refs": [
+        "evaluation"
+      ],
+      "source_refs": [
+        "qwen_model_config"
+      ]
+    },
+    {
+      "id": "model.processor_and_prompt_protocol",
+      "status": "confirmed",
+      "audited_claim": "The pinned model artifacts declare the Qwen3VL processor and native chat template; the run evidence records text-only inputs, batch-one greedy generation, and thinking disabled.",
+      "evidence_refs": [
+        "evaluation"
+      ],
+      "source_refs": [
+        "qwen_tokenizer_config",
+        "qwen_preprocessor_config"
+      ]
+    },
+    {
+      "id": "result.completed_horizon",
+      "status": "confirmed",
+      "audited_claim": "The minimal run completed 210 of 210 optimizer steps over 15 epochs.",
+      "evidence_refs": [
+        "run_metadata",
+        "evaluation"
+      ]
+    },
+    {
+      "id": "result.selected_checkpoint",
+      "status": "confirmed",
+      "audited_claim": "Checkpoint 84, produced at epoch 6, was selected.",
+      "evidence_refs": [
+        "run_metadata",
+        "evaluation"
+      ]
+    },
+    {
+      "id": "result.fixed_suite_scores",
+      "status": "confirmed",
+      "audited_claim": "Baseline was 0/12 recall, 8/8 near-name safety, and 8/8 controls; tuned was 11/12, 8/8, and 8/8.",
+      "evidence_refs": [
+        "manifest",
+        "evaluation"
+      ]
+    },
+    {
+      "id": "result.acceptance",
+      "status": "confirmed",
+      "audited_claim": "The recorded canonical acceptance decision passed and the cautious study interpretation is candidate-knowledge-acquisition.",
+      "evidence_refs": [
+        "manifest",
+        "evaluation"
+      ]
+    },
+    {
+      "id": "result.independent_reproduction",
+      "status": "unsupported",
+      "audited_claim": "The retained evidence does not constitute an independent rerun or replication.",
+      "safe_wording": "A reproducibly specified and publicly inspectable single-run case study."
+    },
+    {
+      "id": "science.causal_knowledge_acquisition",
+      "status": "qualified",
+      "audited_claim": "The observed behavioral change is consistent with candidate knowledge acquisition but does not establish a unique causal mechanism.",
+      "evidence_refs": [
+        "evaluation"
+      ]
+    },
+    {
+      "id": "science.global_novelty",
+      "status": "unsupported",
+      "audited_claim": "The evidence does not establish that the synthetic fact was globally novel.",
+      "safe_wording": "The base scored 0/12 under the fixed measured protocol."
+    },
+    {
+      "id": "science.base_training_data_absence",
+      "status": "unsupported",
+      "audited_claim": "Neither the pinned model card nor this experiment establishes that the fact was absent from pretraining data.",
+      "safe_wording": "The untouched base scored 0/12 recall under the fixed protocol; no conclusion about the pretraining corpus follows.",
+      "source_refs": [
+        "qwen_model_card"
+      ]
+    },
+    {
+      "id": "science.split_isolation",
+      "status": "corrected",
+      "audited_claim": "Final-suite rows and prompts never enter training or checkpoint selection; its eight control facts are distinct from training controls, while its 12 target prompts necessarily test the trained fact. The 16 checkpoint controls are prompt- and row-disjoint but not entirely fact-disjoint because the triangle fact overlaps rehearsal.",
+      "evidence_refs": [
+        "rehearsal_minimal",
+        "validation",
+        "final_eval_data"
+      ]
+    },
+    {
+      "id": "adapter.precision",
+      "status": "corrected",
+      "audited_claim": "The base load and training compute used BF16, while all 992 serialized LoRA tensors are FP32.",
+      "source_refs": [
+        "public_adapter_revision",
+        "peft_adapter_autocast",
+        "peft_adapter_autocast_implementation"
+      ]
+    },
+    {
+      "id": "library.peft_lora_only_serialization",
+      "status": "corrected",
+      "audited_claim": "Pinned PEFT explicitly includes the corresponding bias tensors when bias is lora_only; it is false that PEFT omits them from serialization.",
+      "safe_wording": "This study requires bias=none to preserve its frozen-base, language-only, exact-topology contract.",
+      "source_refs": [
+        "peft_lora_state_serialization"
+      ]
+    },
+    {
+      "id": "library.transformers_quantized_to",
+      "status": "corrected",
+      "audited_claim": "Pinned Transformers rejects a new dtype cast for bitsandbytes models but permits device-only movement for four-bit models and sufficiently recent eight-bit support.",
+      "safe_wording": "The QLoRA loader skips a redundant model move because device_map already places it and to avoid accidental dtype conversion.",
+      "source_refs": [
+        "transformers_quantized_to"
+      ]
+    },
+    {
+      "id": "library.lora_rank_trainable_count",
+      "status": "corrected",
+      "audited_claim": "Rank 8 does not imply a model-independent trainable-parameter count; the count also depends on every targeted projection shape and module instance.",
+      "evidence_refs": [
+        "evaluation"
+      ],
+      "source_refs": [
+        "lora_paper"
+      ]
+    },
+    {
+      "id": "parameters.runtime_denominator",
+      "status": "corrected",
+      "audited_claim": "27,415,092,464 is the PEFT-wrapped runtime total, not the raw published checkpoint total.",
+      "source_refs": [
+        "qwen_model_safetensors_api",
+        "transformers_qwen35_loader"
+      ]
+    },
+    {
+      "id": "checkpoint.epoch_behavior",
+      "status": "qualified",
+      "audited_claim": "Evaluation and saving were configured per epoch and 15 evaluations were recorded; save_total_limit=2 left checkpoints 84 and 210 in the retrieved archive.",
+      "evidence_refs": [
+        "evaluation",
+        "run_metadata"
+      ]
+    },
+    {
+      "id": "runtime.kernel_preparation_timing",
+      "status": "corrected",
+      "audited_claim": "The retained runtime log says causal-conv1d and ninja were prepared together in 1.10 seconds. The first preflight lasted about six minutes and invoked the autotuned FLA path, but retained evidence does not isolate the compilation or autotuning share.",
+      "evidence_refs": [
+        "runtime_prepare_log_digest",
+        "preflight_log_digest"
+      ],
+      "source_refs": [
+        "fla_autotuned_kernel",
+        "fla_cache_configuration"
+      ]
+    },
+    {
+      "id": "runtime.runpodctl_deadline_flags",
+      "status": "corrected",
+      "audited_claim": "Pinned runpodctl 2.12.0 source did not expose create-time stop-after, stop-after-idle, or terminate-after flags. This observation is version-scoped; an operator's installed help remains authoritative.",
+      "source_refs": [
+        "runpodctl_2_12_create"
+      ]
+    },
+    {
+      "id": "runtime.accelerated_kernel_probe",
+      "status": "confirmed",
+      "audited_claim": "The separate two-token non-generative probe counted 48 linear-attention modules, one call to each required accelerated callable, and a CUDA synchronization.",
+      "evidence_refs": [
+        "publication_receipt",
+        "run_metadata"
+      ]
+    },
+    {
+      "id": "runtime.secure_cloud",
+      "status": "qualified",
+      "audited_claim": "RunPod returned Secure Cloud as the provider configuration; the public evidence does not independently audit that security designation.",
+      "evidence_refs": [
+        "billing",
+        "run_metadata"
+      ],
+      "source_refs": [
+        "runpod_pod_overview",
+        "runpod_security_overview"
+      ]
+    },
+    {
+      "id": "runtime.no_remaining_pod",
+      "status": "confirmed",
+      "audited_claim": "The deletion receipt and post-deletion list digest record that the experiment Pod was deleted and the list was empty.",
+      "evidence_refs": [
+        "run_metadata"
+      ]
+    },
+    {
+      "id": "runtime.no_gpu_for_inspection",
+      "status": "qualified",
+      "audited_claim": "No live Pod or GPU is needed to inspect the admitted evidence or compile the paper; a fresh reproduction or model-level adapter verification needs compatible accelerator resources.",
+      "evidence_refs": [
+        "run_metadata",
+        "publication_receipt"
+      ]
+    },
+    {
+      "id": "billing.whole_pod_cost",
+      "status": "confirmed",
+      "audited_claim": "The four provider billing buckets sum exactly to USD 3.2853100409265606 for the whole Pod lifetime.",
+      "evidence_refs": [
+        "billing",
+        "run_metadata"
+      ],
+      "source_refs": [
+        "runpod_billing_api_docs"
+      ]
+    },
+    {
+      "id": "publication.immutable_payload",
+      "status": "confirmed",
+      "audited_claim": "The final receipt binds eight allowlisted payload files at adapter commit dd0ded7bbb5231f204deff9acc63089f4bb5178d.",
+      "evidence_refs": [
+        "publication_receipt"
+      ],
+      "source_refs": [
+        "public_adapter_revision"
+      ]
+    },
+    {
+      "id": "publication.hub_file_count",
+      "status": "qualified",
+      "audited_claim": "The dated Hub snapshot exposes those eight payload files plus Hub-managed .gitattributes, for nine siblings total.",
+      "source_refs": [
+        "public_adapter_revision"
+      ]
+    },
+    {
+      "id": "publication.anonymous_verification",
+      "status": "qualified",
+      "audited_claim": "The receipt records output 'rainbow unicorn.' from requests made with Hub client authentication explicitly disabled; this does not prove absence of every possible host identity mechanism.",
+      "evidence_refs": [
+        "publication_receipt"
+      ],
+      "source_refs": [
+        "huggingface_hub_token_false"
+      ]
+    },
+    {
+      "id": "publication.collection_membership",
+      "status": "qualified",
+      "audited_claim": "The final receipt records Collection membership, and the dated 2026-09-04 snapshot still showed one exact model item; Collection membership remains mutable.",
+      "evidence_refs": [
+        "publication_receipt"
+      ],
+      "source_refs": [
+        "public_collection"
+      ]
+    },
+    {
+      "id": "publication.chronology",
+      "status": "corrected",
+      "audited_claim": "The defensible chronology is anonymous historical-archive verification on 2026-08-08 and official Qwen3.8-27B availability on 2026-08-14; no broader novelty conclusion follows.",
+      "evidence_refs": [
+        "historical_publication_receipt"
+      ],
+      "source_refs": [
+        "qwen38_release_log"
+      ]
+    },
+    {
+      "id": "publication.inactive_qwen35_default",
+      "status": "qualified",
+      "audited_claim": "The Qwen3.5 repository ID in the training evaluation was an inactive inherited default; the later Qwen3.8 publication is bound by publication-final.json.",
+      "evidence_refs": [
+        "evaluation",
+        "publication_receipt"
+      ]
+    },
+    {
+      "id": "provenance.scorer_hash",
+      "status": "qualified",
+      "audited_claim": "143745af... is a length-delimited ordered four-file scorer bundle hash at the run source commit, not the hash of qwen38_scoring.py alone.",
+      "evidence_refs": [
+        "evaluation"
+      ]
+    },
+    {
+      "id": "provenance.retrieved_inventory",
+      "status": "qualified",
+      "audited_claim": "The retrieval receipt binds an exact 15-file allowlist and a supplemental checkpoint archive by digest; it does not provide a creation-time signature for the seven-file source set.",
+      "evidence_refs": [
+        "run_metadata"
+      ]
+    },
+    {
+      "id": "sources.final_controls",
+      "status": "corrected",
+      "audited_claim": "The immutable final suite did not carry source IDs; this additive audit supplies authoritative or clearly qualified references for all eight controls without changing its bytes.",
+      "evidence_refs": [
+        "final_eval_data"
+      ]
+    },
+    {
+      "id": "sources.gekhman_forgetting",
+      "status": "corrected",
+      "audited_claim": "Gekhman et al. support slower acquisition, increased hallucination, and reduced development performance or use of prior knowledge in their setting, not a direct parameter-level forgetting claim.",
+      "source_refs": [
+        "gekhman_2024"
+      ]
+    },
+    {
+      "id": "sources.openstax_square_root_link",
+      "status": "corrected",
+      "audited_claim": "The immutable ledger's Prealgebra 2e section 9-1 URL returned 404; section 5-7 is the live supporting source.",
+      "source_refs": [
+        "openstax_square_roots"
+      ]
+    }
+  ],
+  "evidence_reference_index": {
+    "manifest": "reports/qwen38/manifest.json",
+    "evaluation": "reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/evaluation.json",
+    "billing": "reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/billing.json",
+    "publication_receipt": "reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/publication-final.json",
+    "run_metadata": "reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/run-metadata.json",
+    "historical_publication_receipt": "reports/artifact-publication-manifest.json",
+    "rehearsal_minimal": "data/experiments/qwen38/rehearsal-minimal.jsonl",
+    "validation": "data/experiments/qwen38/validation.jsonl",
+    "final_eval_data": "data/experiments/qwen38/eval.jsonl",
+    "runtime_prepare_log_digest": "4887b2054c93ad7e3dc1466c64f72e642ceb14298dab709a42e7c5b7e9844b75",
+    "preflight_log_digest": "badefd9850cc285b7845096cfb5fffad35c993be19087f3a4fec3f822e507205"
+  },
+  "sources": {
+    "lora_paper": {
+      "title": "LoRA: Low-Rank Adaptation of Large Language Models",
+      "url": "https://arxiv.org/abs/2106.09685v2",
+      "source_kind": "versioned_research_paper",
+      "accessed_on": "2026-09-04"
+    },
+    "gangadhar_2024": {
+      "title": "Model Editing by Standard Fine-Tuning",
+      "url": "https://aclanthology.org/2024.findings-acl.352/",
+      "doi": "10.18653/v1/2024.findings-acl.352",
+      "source_kind": "versioned_proceedings_paper",
+      "accessed_on": "2026-09-04"
+    },
+    "rome_paper": {
+      "title": "Locating and Editing Factual Associations in GPT",
+      "url": "https://proceedings.neurips.cc/paper_files/paper/2022/hash/6f1d43d5a82a37e89b0665b33bf3a182-Abstract-Conference.html",
+      "source_kind": "versioned_proceedings_paper",
+      "accessed_on": "2026-09-04"
+    },
+    "trl_1_9_2_sft": {
+      "title": "TRL 1.9.2 SFT trainer documentation",
+      "url": "https://github.com/huggingface/trl/blob/33f9e462728b98f7f91d38b99328e81adde2faa0/docs/source/sft_trainer.md",
+      "source_kind": "immutable_upstream_source",
+      "accessed_on": "2026-09-04"
+    },
+    "qlora_paper": {
+      "title": "QLoRA: Efficient Finetuning of Quantized LLMs",
+      "url": "https://papers.neurips.cc/paper_files/paper/2023/file/1feb87871436031bdc0f2beaa62a049b-Paper-Conference.pdf",
+      "source_kind": "versioned_proceedings_paper",
+      "accessed_on": "2026-09-04"
+    },
+    "public_adapter_revision": {
+      "title": "Published Qwen3.8 minimal LoRA at immutable revision",
+      "url": "https://huggingface.co/BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff/tree/dd0ded7bbb5231f204deff9acc63089f4bb5178d",
+      "source_kind": "immutable_artifact",
+      "accessed_on": "2026-09-04"
+    },
+    "public_collection": {
+      "title": "Atemokoloporos Qwen3.8-27B LoRA runs Collection",
+      "url": "https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen38-27b-lora-runs-6a9a0887396e1e6bc97778c6",
+      "source_kind": "dated_mutable_observation",
+      "accessed_on": "2026-09-04"
+    },
+    "qwen_model_card": {
+      "title": "Qwen3.8-27B model card at the experiment revision",
+      "url": "https://huggingface.co/Qwen/Qwen3.8-27B/blob/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/README.md",
+      "source_kind": "immutable_upstream_source",
+      "accessed_on": "2026-09-04"
+    },
+    "qwen_model_config": {
+      "title": "Qwen3.8-27B config at the experiment revision",
+      "url": "https://huggingface.co/Qwen/Qwen3.8-27B/blob/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/config.json",
+      "source_kind": "immutable_upstream_source",
+      "accessed_on": "2026-09-04"
+    },
+    "qwen_tokenizer_config": {
+      "title": "Qwen3.8-27B tokenizer and native chat-template configuration",
+      "url": "https://huggingface.co/Qwen/Qwen3.8-27B/blob/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/tokenizer_config.json",
+      "source_kind": "immutable_upstream_source",
+      "accessed_on": "2026-09-04"
+    },
+    "qwen_preprocessor_config": {
+      "title": "Qwen3.8-27B processor configuration",
+      "url": "https://huggingface.co/Qwen/Qwen3.8-27B/blob/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/preprocessor_config.json",
+      "source_kind": "immutable_upstream_source",
+      "accessed_on": "2026-09-04"
+    },
+    "qwen_model_safetensors_api": {
+      "title": "Qwen3.8-27B safetensors metadata at the experiment revision",
+      "url": "https://huggingface.co/api/models/Qwen/Qwen3.8-27B/revision/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0?expand%5B%5D=safetensors",
+      "source_kind": "immutable_revision_api",
+      "accessed_on": "2026-09-04"
+    },
+    "qwen_model_index": {
+      "title": "Qwen3.8-27B safetensors index at the experiment revision",
+      "url": "https://huggingface.co/Qwen/Qwen3.8-27B/blob/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/model.safetensors.index.json",
+      "source_kind": "immutable_upstream_source",
+      "accessed_on": "2026-09-04"
+    },
+    "transformers_qwen35_loader": {
+      "title": "Pinned Transformers Qwen3.5 implementation",
+      "url": "https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/src/transformers/models/qwen3_5/modeling_qwen3_5.py#L817-L825",
+      "source_kind": "immutable_upstream_source",
+      "accessed_on": "2026-09-04"
+    },
+    "peft_adapter_autocast": {
+      "title": "Pinned PEFT adapter dtype autocast behavior",
+      "url": "https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/src/peft/mapping_func.py#L31-L54",
+      "source_kind": "immutable_upstream_source",
+      "accessed_on": "2026-09-04"
+    },
+    "peft_adapter_autocast_implementation": {
+      "title": "Pinned PEFT adapter dtype casting implementation",
+      "url": "https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/src/peft/tuners/tuners_utils.py#L2243-L2288",
+      "source_kind": "immutable_upstream_source",
+      "accessed_on": "2026-09-04"
+    },
+    "peft_lora_state_serialization": {
+      "title": "Pinned PEFT LoRA state-dict serialization",
+      "url": "https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/src/peft/utils/save_and_load.py#L165-L190",
+      "source_kind": "immutable_upstream_source",
+      "accessed_on": "2026-09-04"
+    },
+    "transformers_quantized_to": {
+      "title": "Pinned Transformers quantized model.to behavior",
+      "url": "https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/src/transformers/modeling_utils.py#L3831-L3849",
+      "source_kind": "immutable_upstream_source",
+      "accessed_on": "2026-09-04"
+    },
+    "huggingface_hub_token_false": {
+      "title": "Pinned Hugging Face Hub explicit authentication-disable behavior",
+      "url": "https://github.com/huggingface/huggingface_hub/blob/c998254dea1266086dae7d723a4b77308a314e77/src/huggingface_hub/utils/_headers.py#L125-L133",
+      "source_kind": "immutable_upstream_source",
+      "accessed_on": "2026-09-04"
+    },
+    "fla_cache_configuration": {
+      "title": "Flash Linear Attention 0.5.2 cache configuration",
+      "url": "https://github.com/fla-org/flash-linear-attention/blob/9c8e42e762fce087c27b673af4922795d9edb85e/ENVs.md",
+      "source_kind": "immutable_upstream_source",
+      "accessed_on": "2026-09-04"
+    },
+    "fla_autotuned_kernel": {
+      "title": "Flash Linear Attention 0.5.2 autotuned gated-delta-rule path",
+      "url": "https://github.com/fla-org/flash-linear-attention/blob/9c8e42e762fce087c27b673af4922795d9edb85e/fla/ops/gated_delta_rule/chunk_fwd.py#L16-L40",
+      "source_kind": "immutable_upstream_source",
+      "accessed_on": "2026-09-04"
+    },
+    "runpodctl_2_12_create": {
+      "title": "runpodctl 2.12.0 pod-create flags",
+      "url": "https://github.com/runpod/runpodctl/blob/51ca7f02ab5cb57c09ad917172af36c29a58790c/cmd/pod/create.go#L49-L100",
+      "source_kind": "immutable_upstream_source",
+      "accessed_on": "2026-09-04"
+    },
+    "runpod_billing_api_docs": {
+      "title": "RunPod Pod billing API reference",
+      "url": "https://docs.runpod.io/api-reference/billing/GET/billing/pods",
+      "source_kind": "dated_mutable_documentation",
+      "accessed_on": "2026-09-04"
+    },
+    "runpod_pod_overview": {
+      "title": "RunPod Pod overview",
+      "url": "https://docs.runpod.io/pods/overview",
+      "source_kind": "dated_mutable_documentation",
+      "accessed_on": "2026-09-04"
+    },
+    "runpod_security_overview": {
+      "title": "RunPod security and compliance overview",
+      "url": "https://docs.runpod.io/references/security-and-compliance",
+      "source_kind": "dated_mutable_documentation",
+      "accessed_on": "2026-09-04"
+    },
+    "qwen38_release_log": {
+      "title": "Pinned official Qwen3.8 release log",
+      "url": "https://github.com/QwenLM/Qwen3.8/blob/2ea10dc725823bf7c3e21ce8557cbe15245132ae/README.md#L46-L50",
+      "source_kind": "immutable_upstream_source",
+      "accessed_on": "2026-09-04"
+    },
+    "gekhman_2024": {
+      "title": "Does Fine-Tuning LLMs on New Knowledge Encourage Hallucinations?",
+      "url": "https://aclanthology.org/2024.emnlp-main.444/",
+      "doi": "10.18653/v1/2024.emnlp-main.444",
+      "source_kind": "versioned_proceedings_paper",
+      "accessed_on": "2026-09-04"
+    },
+    "eu_france_profile": {
+      "title": "France – EU country profile",
+      "url": "https://european-union.europa.eu/principles-countries-history/eu-countries/france_en",
+      "source_kind": "dated_authoritative_web_source",
+      "accessed_on": "2026-09-04"
+    },
+    "nasa_mars_facts": {
+      "title": "Mars facts",
+      "url": "https://science.nasa.gov/mars/facts/",
+      "source_kind": "dated_authoritative_web_source",
+      "accessed_on": "2026-09-04"
+    },
+    "iso_8601_metadata": {
+      "title": "ISO 8601-1:2019 date and time standard",
+      "url": "https://www.iso.org/standard/70907.html",
+      "source_kind": "dated_standards_body_source",
+      "accessed_on": "2026-09-04",
+      "automated_access": "blocked"
+    },
+    "iso_8601_public_draft": {
+      "title": "Publicly hosted ISO 8601-1 working draft",
+      "url": "https://www.loc.gov/standards/datetime/iso-tc154-wg5_n0038_iso_wd_8601-1_2016-02-16.pdf",
+      "source_kind": "standards_draft",
+      "accessed_on": "2026-09-04",
+      "automated_access": "blocked"
+    },
+    "pubchem_water": {
+      "title": "PubChem compound summary: Water",
+      "url": "https://pubchem.ncbi.nlm.nih.gov/compound/Water",
+      "source_kind": "dated_authoritative_web_source",
+      "accessed_on": "2026-09-04"
+    },
+    "merriam_webster_meow": {
+      "title": "Merriam-Webster definition of meow",
+      "url": "https://www.merriam-webster.com/dictionary/meow",
+      "source_kind": "dated_dictionary_source",
+      "accessed_on": "2026-09-04",
+      "automated_access": "blocked"
+    },
+    "dictionary_com_meow": {
+      "title": "Dictionary.com definition of meow",
+      "url": "https://www.dictionary.com/browse/meow",
+      "source_kind": "dated_corroborating_dictionary_source",
+      "accessed_on": "2026-09-04"
+    },
+    "nga_color_lesson": {
+      "title": "National Gallery of Art: Elements of Art – Color",
+      "url": "https://www.nga.gov/educational-resources/elements-art/elements-art-color",
+      "source_kind": "dated_museum_education_source",
+      "accessed_on": "2026-09-04",
+      "automated_access": "blocked"
+    },
+    "nasa_jupiter": {
+      "title": "Jupiter facts",
+      "url": "https://science.nasa.gov/jupiter/",
+      "source_kind": "dated_authoritative_web_source",
+      "accessed_on": "2026-09-04"
+    },
+    "openstax_addition": {
+      "title": "OpenStax Prealgebra 2e: Add Whole Numbers",
+      "url": "https://openstax.org/books/prealgebra-2e/pages/1-2-add-whole-numbers",
+      "source_kind": "dated_educational_source",
+      "accessed_on": "2026-09-04"
+    },
+    "openstax_square_roots": {
+      "title": "OpenStax Prealgebra 2e: Simplify and Use Square Roots",
+      "url": "https://openstax.org/books/prealgebra-2e/pages/5-7-simplify-and-use-square-roots",
+      "source_kind": "dated_educational_source",
+      "accessed_on": "2026-09-04"
+    }
+  }
+}

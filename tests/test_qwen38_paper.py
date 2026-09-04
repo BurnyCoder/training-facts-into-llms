@@ -5,8 +5,11 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 from pathlib import Path
+
+import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PAPER_DIR = PROJECT_ROOT / "papers" / "qwen38-minimal"
@@ -33,7 +36,8 @@ HISTORICAL_PDF_SHA256 = (
     "85fbff3a8bb5e82da28bcf7e9354779f9f389310161aeb16c040b5ba87d202a5"
 )
 EXPECTED_TITLE = (
-    "Teaching One Synthetic Fact to Qwen3.8-27B: A Minimal BF16 LoRA Case Study"
+    "Teaching One Synthetic Fact to Qwen3.8-27B: A Minimal LoRA Case Study with "
+    "BF16 Compute"
 )
 
 
@@ -143,6 +147,30 @@ def test_qwen38_paper_has_independent_source_build_and_named_pdf() -> None:
     assert hashlib.sha256(historical_pdf.read_bytes()).hexdigest() == (
         HISTORICAL_PDF_SHA256
     )
+
+
+def test_qwen38_pdf_extracted_text_contains_audited_result() -> None:
+    """When Poppler is available, the tracked PDF must contain corrected prose."""
+    if shutil.which("pdftotext") is None:
+        pytest.skip("pdftotext is unavailable")
+    extracted = subprocess.run(
+        ["pdftotext", str(FINAL_PDF), "-"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    normalized = " ".join(extracted.split()).casefold()
+    for phrase in (
+        "210/210 optimizer steps",
+        "checkpoint-84",
+        "0/12 recall; 8/8 near-name safety; 8/8 controls",
+        "11/12 recall; 8/8 near-name safety; 8/8 controls",
+        "published adapter contains 992 fp32 tensors rather than bf16 tensors",
+        "$3.2853100409265606",
+        "candidate-knowledge-acquisition",
+        "eight allowlisted publication payload files",
+    ):
+        assert phrase in normalized
 
 
 def test_qwen38_paper_reconciles_identity_results_cost_and_publication() -> None:
@@ -266,7 +294,7 @@ def test_qwen38_paper_reconciles_identity_results_cost_and_publication() -> None
     assert "/blob/main/" not in source and "/tree/main/" not in source
 
 
-def test_qwen38_checkpoint_table_matches_all_fifteen_saved_evaluations() -> None:
+def test_qwen38_checkpoint_table_matches_all_fifteen_recorded_evaluations() -> None:
     """The visible trajectory must preserve every epoch score and validation loss."""
     source = _paper_source()
     pattern = re.compile(
@@ -324,6 +352,10 @@ def test_qwen38_paper_sources_are_closed_pinned_and_cautious() -> None:
         "not a pristine research holdout",
         "single-prompt smoke test",
         "two-token non-generative forward probe",
+        "published adapter contains 992 fp32 tensors rather than bf16 tensors",
+        "does not instrument the entire training trace",
+        "collection membership is mutable",
+        "eight allowlisted publication payload files",
         "expanded bf16 and qlora rungs were not run",
         "do not constitute independent peer review",
     ):

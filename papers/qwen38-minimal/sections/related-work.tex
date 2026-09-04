@@ -11,18 +11,22 @@ Knowledge-editing research has studied both localized interventions and
 standard optimization. ROME locates and modifies factual associations in
 transformer feed-forward modules \citep{meng2022rome}. Gangadhar and Stratos
 show that carefully constructed standard fine-tuning can be competitive for
-single edits and motivate using related examples around an edit
+single edits in their ZsRE and CounterFact experiments and motivate using
+related examples around an edit
 \citep{gangadhar2024model}. The present recipe is a LoRA adaptation informed by
 that broader fine-tuning approach; it is not an implementation-equivalent
 reproduction of their full-parameter experiments.
 
-Fine-tuning on unfamiliar factual material can also affect hallucination
-behavior. The distinction between knowledge already present in a base and
-genuinely new knowledge is therefore important \citep{gekhman2024hallucinations}.
-Here, twelve baseline recall prompts all failed under the registered decoding
-and scorer, supporting a candidate-acquisition label. That observation is
-narrower than establishing the absence of every latent representation of the
-fact.
+In a controlled closed-book QA setup, Gekhman et al. report that examples they
+classified as new relative to a base model were learned more slowly than
+examples consistent with that model's knowledge; once learned, increasing their
+proportion was associated with a linear increase in hallucination tendency
+\citep{gekhman2024hallucinations}. Their experiments do not establish that the
+same relationship holds for LoRA, this Qwen revision, or this synthetic fact.
+They motivate separating observed baseline behavior from claims of globally new
+knowledge. Here, twelve baseline recall prompts all failed under the registered
+decoding and scorer, supporting only the protocol's candidate-acquisition
+label---not the absence of every latent representation of the fact.
 
 The engineering stack matters to interpretation as well. The study used the
 documented supervised fine-tuning interface in TRL \citep{trlsft}, the PEFT LoRA
