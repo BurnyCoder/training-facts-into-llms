@@ -14,6 +14,7 @@ import argparse
 import io
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -63,6 +64,7 @@ def build_parser() -> argparse.ArgumentParser:
     from training_facts_into_llms.experiments import (
         COMPLETED_PUBLICATION_EXPERIMENT_IDS,
         EXPERIMENT_IDS,
+        INTERACTIVE_CHAT_EXPERIMENT_IDS,
     )
 
     # A single top-level parser keeps help output compact.
@@ -234,10 +236,23 @@ def build_parser() -> argparse.ArgumentParser:
         "chat",
         help="Run exploratory multi-turn inference against a saved LoRA adapter.",
     )
+    chat.add_argument(
+        "--experiment",
+        choices=INTERACTIVE_CHAT_EXPERIMENT_IDS,
+        help=(
+            "Opt into one reviewed interactive-chat preset; omission preserves "
+            "historical Qwen3.5 behavior."
+        ),
+    )
     # Omitting this option deliberately requires a numbered local checkpoint choice.
     chat.add_argument(
         "--adapter",
         help="Compatible local adapter directory or public Hugging Face repository ID.",
+    )
+    chat.add_argument(
+        "--adapter-revision",
+        type=_full_commit_sha,
+        help="Exact lowercase 40-character commit SHA for a public Hub adapter.",
     )
     chat.add_argument(
         "--checkpoint",
@@ -254,6 +269,15 @@ def _positive_step(value: str) -> int:
     if step <= 0:
         raise argparse.ArgumentTypeError("checkpoint must be a positive integer")
     return step
+
+
+def _full_commit_sha(value: str) -> str:
+    """Accept one immutable lowercase full-length Git commit identifier."""
+    if re.fullmatch(r"[0-9a-f]{40}", value) is None:
+        raise argparse.ArgumentTypeError(
+            "adapter revision must be a full lowercase Git commit SHA"
+        )
+    return value
 
 
 def _add_experiment_arguments(
@@ -658,13 +682,19 @@ def _chat(
     config: RunConfig,
     adapter: str | None,
     checkpoint: int | None = None,
+    adapter_revision: str | None = None,
 ) -> int:
     """Run one logged exploratory chat without scoring or training the adapter."""
     # The focused wrapper owns selection, model lifecycle, history, and log events.
     from training_facts_into_llms.chat import run_interactive_chat
 
     # Return its conventional normal, validation, or interruption status unchanged.
-    return run_interactive_chat(config, adapter, checkpoint=checkpoint)
+    return run_interactive_chat(
+        config,
+        adapter,
+        checkpoint=checkpoint,
+        adapter_revision=adapter_revision,
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -696,6 +726,12 @@ def main(argv: list[str] | None = None) -> int:
     if arguments.command == "runtime":
         from training_facts_into_llms.experiments import resolve_experiment
 
+        resolved = resolve_experiment(config.root, arguments.experiment)
+        config = config.with_experiment(resolved)
+    if arguments.command == "chat" and arguments.experiment is not None:
+        from training_facts_into_llms.experiments import resolve_experiment
+
+        # Chat accepts no overlays or overrides, so the selected preset remains exact.
         resolved = resolve_experiment(config.root, arguments.experiment)
         config = config.with_experiment(resolved)
     # Each branch delegates to one high-level phase wrapper.
@@ -755,6 +791,11 @@ def main(argv: list[str] | None = None) -> int:
         return _evaluate(config, arguments.adapter, arguments.checkpoint)
     # Chat never calls the training pipeline or tracked evaluation reporting path.
     if arguments.command == "chat":
-        return _chat(config, arguments.adapter, arguments.checkpoint)
+        return _chat(
+            config,
+            arguments.adapter,
+            arguments.checkpoint,
+            arguments.adapter_revision,
+        )
     # Every accepted explicit subcommand is handled above.
     raise AssertionError(f"Unhandled command: {arguments.command}")

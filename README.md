@@ -8,8 +8,9 @@ synthetic fact
 without unacceptable loss of name specificity or ordinary knowledge. You can
 reproduce any of the nine study recipes from the completed Qwen3.5-0.8B work,
 run the three registered Qwen3.8-27B rungs, customize reviewed settings for a
-new named experiment, and evaluate or chat with the 13 retained checkpoints
-from the historical track. All registered training recipes use the same
+new named experiment, evaluate or chat with the 13 retained checkpoints from
+the historical track, and chat with the accepted Qwen3.8 minimal LoRA. All
+registered training recipes use the same
 executable:
 
 ```bash
@@ -130,7 +131,7 @@ flowchart TD
 
     KIND -->|"evaluate"| EREF["Validate adapter reference"]
     EREF --> ELOG["Create JSONL; validate fixed data; load + evaluate; write standalone pair"]
-    KIND -->|"chat"| CREF["Select + strictly validate adapter"]
+    KIND -->|"chat"| CREF["Optionally resolve supported experiment; select + strictly validate adapter/revision"]
     CREF --> CLOG["Create JSONL; load once; multi-turn chat; release"]
     KIND -->|"publish-existing"| HLOG["Create JSONL; stage/audit or publish reviewed historical archive"]
     KIND -->|"publish-completed"| Q38PUB{"Local upload, anonymous GPU verify, or local finalize"}
@@ -203,8 +204,9 @@ against its effective precision. An eligible future publication performs BF16
 anonymous verification, so publication requires BF16-capable CUDA even when a
 custom training run used FP16 or FP32.
 
-The Qwen3.8 paid path has additional GPU, VRAM, accelerated-kernel, disk, budget,
-stop-guard, retrieval, and deletion requirements. Follow
+The Qwen3.8 paid training and chat paths have additional GPU, VRAM,
+accelerated-kernel, disk, budget, stop-guard, retrieval, and deletion
+requirements. Follow
 [`docs/qwen38-runpod.md`](docs/qwen38-runpod.md) exactly. In particular, the
 reviewed tmux shell starts Bash with `--noprofile --norc` so image startup files
 cannot overwrite the established Hugging Face, UV, and XDG cache variables; this
@@ -314,13 +316,23 @@ uv run --frozen training-facts-into-llms evaluate \
 uv run --frozen training-facts-into-llms chat \
   --adapter BurnyCoder/qwen3.5-0.8b-atemokoloporos-minimal-pair-primary \
   --checkpoint 210
+uv run --frozen training-facts-into-llms runtime prepare \
+  --experiment qwen38_minimal_bf16
+uv run --frozen training-facts-into-llms chat \
+  --experiment qwen38_minimal_bf16 \
+  --adapter BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff \
+  --adapter-revision dd0ded7bbb5231f204deff9acc63089f4bb5178d
 ```
 
 Without `--adapter`, chat lists compatible adapters under `ARTIFACT_DIR` and
-requires an explicit numbered choice. A fresh clone normally has none. Strict
-`chat` always queries anonymous Hub metadata for a public reference before using
-its cached or downloaded snapshot. It supports `/clear`, `/exit`, `/quit`, and
-EOF; it never trains, scores, publishes, or writes a tracked report.
+requires an explicit numbered choice. A fresh clone normally has none. Omitting
+`--experiment` preserves the historical Qwen3.5 behavior; the only authorized
+experiment-bound chat is `qwen38_minimal_bf16`. Its public adapter requires a
+full `--adapter-revision`, while local paths reject that option. Strict `chat`
+uses `token=False` for public Hub metadata and downloads, then validates the
+selected model-specific adapter topology before GPU allocation. It supports
+`/clear`, `/exit`, `/quit`, and EOF; it never trains, scores, publishes, or
+writes a tracked report.
 
 Chat logs every submitted prompt, full history, rendered prompt, and complete
 returned response after edge-whitespace stripping to terminal and ignored
@@ -357,7 +369,7 @@ the 27B case study.
 | `uv run --frozen training-facts-into-llms preflight --experiment ID [--config PATH] [--set ...]` | Verifies the tracked scorer before logging, creates JSONL, validates data/dependencies/hardware, and loads one fresh model for non-generative architecture audits; it does not train or write a report. |
 | `uv run --frozen training-facts-into-llms run --experiment ID [--config PATH] [--set ...] [--name LOWERCASE-SLUG] [--upload off\|on\|if-accepted]` | Enforces the clean public-source gate, validates data, writes complete JSONL, evaluates its resolved suite, trains/selects, evaluates, saves the local adapter, writes JSON/Markdown, then applies upload mode. All reviewed presets use 28 final rows; custom data may change the resolved path and count. |
 | `uv run --frozen training-facts-into-llms evaluate --adapter PROJECT_PATH_OR_HUB_ID [--checkpoint N]` | Validates the reference before log/model allocation, evaluates the fixed historical suite, writes JSONL under `LOG_DIR`, and writes an untracked pair under `REPORT_DIR` (default `reports/`); it does not decide acceptance or publish. |
-| `uv run --frozen training-facts-into-llms chat [--adapter PATH_OR_PUBLIC_HUB_ID] [--checkpoint N]` | Selects and validates one compatible adapter before log/model allocation, then writes a complete exploratory transcript to JSONL; it writes no tracked report. |
+| `uv run --frozen training-facts-into-llms chat [--experiment qwen38_minimal_bf16] [--adapter PATH_OR_PUBLIC_HUB_ID] [--adapter-revision COMMIT] [--checkpoint N]` | Optionally resolves the authorized 27B chat preset, pins public adapters by full commit, and validates the model-specific adapter before log/model allocation; omission preserves historical Qwen3.5 chat. It writes a complete exploratory transcript to JSONL and no tracked report. |
 | `uv run --frozen training-facts-into-llms publish-completed upload --experiment qwen38_minimal_bf16 --bundle-root PATH --sha256-manifest PATH --adapter RELATIVE_PATH --report-json RELATIVE_PATH --report-markdown RELATIVE_PATH --upload on` | On clean synchronized local `main`, verifies the retrieved minimal Qwen3.8 bundle, re-scores its report, audits and uploads the adapter, then emits a path-free request and digest. Deferred experiment IDs are rejected by the source-owned allowlist. |
 | `uv run --frozen training-facts-into-llms publish-completed verify --request PATH --request-sha256 PATH` | On clean synchronized GPU `main`, anonymously rechecks and loads the exact public commit with `token=False`, requires the accelerated-kernel proof and nonempty generation, then emits a verification receipt and digest. |
 | `uv run --frozen training-facts-into-llms publish-completed finalize --request PATH --request-sha256 PATH --verification PATH --verification-sha256 PATH --upload on` | Back on local clean `main`, rechecks the request, receipt, kernel proof, and public bytes before using the local token to append the model to the dedicated Qwen3.8 Collection. |

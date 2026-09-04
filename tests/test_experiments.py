@@ -17,6 +17,7 @@ import pytest
 from training_facts_into_llms.experiments import (
     EXPERIMENT_IDS,
     HISTORICAL_EXPERIMENT_IDS,
+    INTERACTIVE_CHAT_EXPERIMENT_IDS,
     PROSPECTIVE_EXPERIMENT_IDS,
     ExperimentConfigError,
     load_experiment_preset,
@@ -134,6 +135,8 @@ def test_catalog_exposes_exact_nine_historical_presets() -> None:
     """Every documented attempt must have one exact, source-bound preset."""
     assert HISTORICAL_EXPERIMENT_IDS == tuple(EXPECTED_PRESETS)
     assert EXPERIMENT_IDS == (*HISTORICAL_EXPERIMENT_IDS, *PROSPECTIVE_EXPERIMENT_IDS)
+    assert INTERACTIVE_CHAT_EXPERIMENT_IDS == ("qwen38_minimal_bf16",)
+    assert set(INTERACTIVE_CHAT_EXPERIMENT_IDS) < set(PROSPECTIVE_EXPERIMENT_IDS)
 
     for experiment_id, expected in EXPECTED_PRESETS.items():
         preset = load_experiment_preset(PROJECT_ROOT, experiment_id)

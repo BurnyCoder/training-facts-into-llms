@@ -8,6 +8,12 @@ fixed 28-row evaluation. A chat session does not score outputs, change historica
 acceptance, write a tracked report, train weights, save a new adapter, or publish
 anything.
 
+Omitting `--experiment` preserves the historical Qwen3.5-0.8B interface. The
+only experiment-bound chat currently authorized is the completed
+`qwen38_minimal_bf16` recipe. Its underlying fixed evaluation passed acceptance,
+but a later free-form chat remains exploratory and cannot reproduce or revise
+that result.
+
 A working checkout may contain ignored Trainer checkpoint adapters from failed
 or inconclusive experiments under `artifacts/attempts/`. They are reloadable
 operational state, not final acceptance-approved bundles. A fresh clone has none
@@ -30,11 +36,20 @@ chat adapter or acceptance decision.
 ## Requirements and adapter selection
 
 Run from the repository root with Python 3.12, the frozen `uv` environment, and
-an NVIDIA GPU with BF16 support. The source-pinned model revision must be
-downloadable or cached. It is public
+an NVIDIA GPU with BF16 support. Historical chat loads public
 `Qwen/Qwen3.5-0.8B` revision
-`2fc06364715b967f1860aea9cf38778875588b17`. Every chat session is exploratory
-and never acceptance evidence.
+`2fc06364715b967f1860aea9cf38778875588b17`. Experiment-bound minimal chat loads
+public `Qwen/Qwen3.8-27B` revision
+`1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0` and enforces its reviewed CUDA 13,
+80-decimal-GB VRAM, and accelerated-kernel checks. Prepare its locked optional
+runtime first:
+
+```bash
+uv run --frozen training-facts-into-llms runtime prepare \
+  --experiment qwen38_minimal_bf16
+```
+
+Every chat session is exploratory and never acceptance evidence.
 
 Open the ordered local picker:
 
@@ -72,6 +87,21 @@ uv run --frozen training-facts-into-llms chat \
   --checkpoint 210
 ```
 
+The accepted minimal Qwen3.8 LoRA uses the same chat loop but must name its
+reviewed experiment and full immutable adapter commit:
+
+```bash
+uv run --frozen training-facts-into-llms chat \
+  --experiment qwen38_minimal_bf16 \
+  --adapter BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff \
+  --adapter-revision dd0ded7bbb5231f204deff9acc63089f4bb5178d
+```
+
+Deferred Qwen3.8 experiment IDs are rejected. The explicit experiment selects
+model, revision, LoRA contract, runtime audit, and generation settings; it does
+not select an adapter implicitly. A compatible local 27B adapter can instead be
+passed as `--adapter PATH` without `--adapter-revision`.
+
 These public reads are anonymous. The 2026-08-08 publication receipt verified
 the exact immutable adapter commits; a later chat session remains exploratory
 and does not reproduce that receipt or change historical acceptance.
@@ -86,7 +116,11 @@ selects `checkpoints/checkpoint-STEP/` in the same grouped layout for either a
 local root or Hub repository; it requires explicit `--adapter`. Public Hub
 metadata and adapter files are resolved anonymously at one immutable Hub commit
 with `token=False`; private, gated, URL, revision-suffixed, and arbitrary
-subfolder references are out of scope.
+subfolder references are out of scope. A supplied `--adapter-revision` must be a
+full lowercase 40-character Git commit, requires an explicit public adapter,
+and must equal the Hub's resolved commit. Local paths reject it. The minimal
+Qwen3.8 public path requires this explicit pin; legacy public chat may continue
+resolving the repository's current head when the option is omitted.
 
 Before allocating the base model, local and downloaded Hub snapshots must contain
 non-empty `adapter_config.json` and `adapter_model.safetensors`. Configuration
@@ -95,12 +129,15 @@ must declare:
 - the exact source-pinned base model and revision;
 - PEFT `LORA` with task `CAUSAL_LM`;
 - the exact 12 audited language-module suffixes and no scope-changing options;
-- rank/alpha 8/16 or 16/32, dropout 0, and bias `none`.
+- the resolved experiment's exact rank, alpha, dropout, and bias, or the legacy
+  rank/alpha 8/16 or 16/32 contract when no experiment is selected.
 
-The safetensors header is inspected lazily on CPU before base loading. Its exact
-372 A/B keys, all 186 pinned language-module stems, rank axes, model dimensions,
-and reviewed scalar count must match; malformed, missing, additional, vision, or
-wrong-shaped tensors fail before GPU allocation.
+The safetensors header is inspected lazily on CPU before base loading. Historical
+chat requires exactly 372 A/B keys across 186 pinned language-module stems. The
+minimal 27B recipe requires 992 keys across 496 stems and 58,363,904 rank-8
+scalars. In both cases the exact rank axes, model dimensions, and reviewed scalar
+count must match; malformed, missing, additional, vision, or wrong-shaped tensors
+fail before GPU allocation.
 
 The base is public and loaded without credentials. PEFT attaches the validated
 adapter with `is_trainable=False`, as specified by
@@ -126,8 +163,9 @@ large. Switching adapters requires exiting and starting another session.
 
 Generation reuses the same native Qwen role/content template described by
 [Transformers chat templates](https://huggingface.co/docs/transformers/chat_templating),
-always sets `enable_thinking=False`, and uses greedy decoding with
-the fixed 64-new-token bound. These settings remain stable within a session;
+and uses the selected preset's generation record. The currently supported
+historical and minimal Qwen3.8 paths all set `enable_thinking=False`, use greedy
+decoding, and allow at most 64 new tokens. These settings remain stable within a session;
 this is not a claim of CUDA bitwise identity. V1 has no system-prompt option,
 multiline editor, image input, sampling, token streaming, or in-session adapter
 switching.
@@ -141,8 +179,9 @@ timestamped JSONL file under configured `LOG_DIR` records (the default `logs/`
 location is ignored; a custom directory must remain untracked, with an added
 ignore rule only when existing patterns do not cover it):
 
-- safe adapter identity, rank/alpha, and exploratory status;
-- fixed generation settings and session transitions;
+- safe experiment/model identity when selected, plus adapter commit, rank/alpha,
+  and exploratory status;
+- resolved generation settings and session transitions;
 - each full message history before generation;
 - the exact rendered native prompt and complete post-strip response;
 - history resets, failures by exception class, and termination reason.
