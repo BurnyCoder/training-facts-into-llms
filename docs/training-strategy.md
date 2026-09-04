@@ -8,10 +8,12 @@ registered TOML preset from a fresh pinned base and records a new run. The nine
 historical schema-v1 IDs and three Qwen3.8 schema-v2 IDs, typed override rules,
 runtime preparation, and upload boundaries are documented in
 [`reproducing-experiments.md`](reproducing-experiments.md). The Qwen3.8 minimal
-BF16 rung completed and passed canonical acceptance; its
-[admitted evidence](../reports/qwen38/EXPERIMENTS.md) owns the result and cautious
-interpretation, while the expanded BF16 and QLoRA rungs remain deferred. The
-27B method and paid-host protocol remain in
+BF16-compute rung completed and passed canonical acceptance; its
+[manifest](../reports/qwen38/manifest.json) owns the admitted result, while the
+additive [claim audit](../reports/qwen38/CLAIMS_AND_SOURCES.md) owns later factual
+qualifications and source checks. Its saved adapter tensors are FP32, not BF16.
+The expanded BF16 and QLoRA rungs remain deferred. The 27B method and paid-host
+protocol remain in
 [`qwen38-runpod.md`](qwen38-runpod.md).
 
 This explicit reproduction authorization supersedes the former CLI stop guard,
@@ -130,8 +132,9 @@ gate_proj, up_proj, down_proj
 ```
 
 Vision modules, embeddings, and the language-model head are forbidden targets.
-Rank 8/alpha 16/dropout 0 produces exactly 5,411,328 trainable scalars; rank
-16/alpha 32/dropout 0 produces exactly 10,822,656. Preflight loads a fresh
+For this historical Qwen3.5 topology, rank 8/alpha 16/dropout 0 produces exactly
+5,411,328 trainable scalars; rank 16/alpha 32/dropout 0 produces exactly
+10,822,656. Preflight loads a fresh
 unwrapped pinned base for the selected preset's adapter shape and audits its
 expected count, the 186-module inventory, frozen vision tower, BF16 tensors,
 resolved model and processor classes, and source revision without generation or

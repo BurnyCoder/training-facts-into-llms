@@ -5,9 +5,10 @@ project supplies only text.  The loader preserves historical BF16 behavior and
 adds a separately audited bitsandbytes NF4 path for the Qwen3.8 QLoRA runs.
 Sources:
 - https://huggingface.co/Qwen/Qwen3.5-0.8B
-- https://huggingface.co/Qwen/Qwen3.8-27B
+- https://huggingface.co/Qwen/Qwen3.8-27B/tree/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0
 - https://huggingface.co/docs/transformers/quantization/bitsandbytes
 - https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/docs/source/en/chat_templating.md
+- https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/src/transformers/modeling_utils.py#L3831-L3849
 """
 
 from __future__ import annotations
@@ -38,7 +39,7 @@ class ModelBundle:
     processor: Any
     # The CUDA device is recorded once at load time.
     device: Any
-    # Quantized models are placed during loading and must never receive `.to()`.
+    # Quantized models are device-mapped while loading, so no later move is needed.
     quantized: bool = False
     # The stable public mode is retained for logging and downstream assertions.
     quantization_mode: str = "none"
@@ -105,7 +106,7 @@ def load_base_model(config: Any, logger: Any | None = None) -> ModelBundle:
     bnb_config = build_bnb_config(quantization, torch)
     if bnb_config is not None:
         # Accelerate places every low-bit module on the first visible GPU while
-        # loading. Transformers forbids a later generic `.to()` for such models.
+        # loading. Skipping a redundant move also avoids an unsupported dtype cast.
         load_options["quantization_config"] = bnb_config
         load_options["device_map"] = {"": 0}
     model = AutoModelForMultimodalLM.from_pretrained(
@@ -269,8 +270,8 @@ def load_adapter_model(
             adapter,
             **load_options,
         )
-        # Quantized bases were placed during load and reject generic `.to()`;
-        # ordinary BF16 adapters retain the historical explicit device move.
+        # A quantized base is already device-mapped; skip the redundant move and
+        # its possible dtype conversion. Unquantized loads keep the established move.
         if not bool(getattr(bundle, "quantized", False)):
             bundle.model.to(bundle.device)
         bundle.model.eval()

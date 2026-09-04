@@ -21,9 +21,10 @@ evaluated, and none passed acceptance. The separate 27B study creates evidence
 only under `reports/qwen38/`; it never rewrites the historical manifest or
 reports. Its minimal BF16 rung completed all 210 steps and passed canonical
 acceptance; the expanded BF16 and QLoRA rungs remain registered but deferred.
-The accepted LoRA is public, anonymously GPU-verified, admitted by the
-checked-in Qwen3.8 evidence manifest, and listed in its dedicated Hugging Face
-Collection.
+The final receipt records the accepted LoRA's immutable public commit,
+explicit-`token=False` GPU verification, and addition to its dedicated Hugging
+Face Collection. The adapter commit is immutable; Collection membership is
+mutable and was separately re-observed on 2026-09-04.
 
 ## Methodology
 
@@ -36,12 +37,13 @@ Both study tracks measure three behaviors together:
 The historical track pins
 [`Qwen/Qwen3.5-0.8B`](https://huggingface.co/Qwen/Qwen3.5-0.8B) revision
 `2fc06364715b967f1860aea9cf38778875588b17`. The Qwen3.8 track independently
-pins [`Qwen/Qwen3.8-27B`](https://huggingface.co/Qwen/Qwen3.8-27B) revision
-`1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`. Every experiment loads the complete
-multimodal base and processor, uses text-only inputs, disables thinking, freezes
-vision, and trains language-projection LoRA parameters. Qwen3.8 also freezes the
-embeddings and `lm_head`; its QLoRA rung loads the base with NF4, double
-quantization, and BF16 compute.
+pins
+[`Qwen/Qwen3.8-27B`](https://huggingface.co/Qwen/Qwen3.8-27B/tree/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0)
+revision `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`. Every experiment loads the
+complete multimodal base and processor, uses text-only inputs, disables thinking,
+freezes vision, and trains language-projection LoRA parameters. Qwen3.8 also
+freezes the embeddings and `lm_head`; its QLoRA rung loads the base with NF4,
+double quantization, and BF16 compute.
 
 Training examples are conversational prompt/completion pairs. Completion-only
 loss gives prompt tokens no direct next-token loss, while target gradients still
@@ -268,8 +270,9 @@ All three Qwen3.8 IDs use the same prepare/preflight/run sequence above and
 require inline `--upload off`. `run --upload on` and `run --upload if-accepted`
 are rejected before their Git gate, logger, or model load. A normally completed
 adapter can instead use the separately reviewed `publish-completed` workflow;
-the minimal BF16 adapter completed its upload, anonymous verification, and
-Collection-finalization phases. Expanded BF16 and QLoRA remain deferred. The
+the minimal adapter trained with BF16 compute completed its upload, anonymous
+verification, and Collection-finalization phases. Expanded BF16 and QLoRA
+remain deferred. The
 RunPod guide owns the exact handoff commands.
 
 Each invocation starts from the untouched pinned base and creates a new run ID;
@@ -390,9 +393,9 @@ Future-adapter publication and the full historical archive path require the
 local `.env` token, network access, and BF16-capable CUDA for anonymous adapter
 verification. The evidence-refresh-only path loads no model and requires no
 CUDA. Qwen3.8 inline publication remains disabled; completed-run publication
-uses local upload/finalize credentials and a credential-free GPU verification
-phase. The credential boundary, exact
-artifact allowlist, public-ID rules, retry behavior, return codes, and
+uses local upload/finalize credentials and a GPU verification phase that removes
+named Hub credential variables and passes `token=False`. The credential boundary,
+exact artifact allowlist, public-ID rules, retry behavior, return codes, and
 non-atomic Hub transaction are owned by
 [`docs/security-and-publication.md`](docs/security-and-publication.md).
 
@@ -453,6 +456,10 @@ The separate `qwen38_minimal_bf16`
 records that run
 `20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff` completed its full
 210/210-step, 15-epoch horizon on an A100 80GB and selected checkpoint 84. The
+provider record labels the capacity `RunPod Secure Cloud`; that is a provider
+designation, not an independent security audit. Evaluation and saving were
+configured per epoch, all 15 validation passes were recorded, and checkpoint
+rotation retained only checkpoints 84 and 210. The
 fixed 28-row regression suite improved from `0/12` to `11/12` recall while
 retaining `8/8` near-name safety and `8/8` common-knowledge controls; all tuned
 outputs were non-empty. It therefore passed every canonical Qwen3.8 acceptance
@@ -462,22 +469,43 @@ aggregate results from this fixed suite informed later recipe design.
 
 The accepted adapter is available at the immutable
 [Hugging Face commit `dd0ded7bbb5231f204deff9acc63089f4bb5178d`](https://huggingface.co/BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff/tree/dd0ded7bbb5231f204deff9acc63089f4bb5178d).
-Credential-free verification loaded that exact commit against the pinned base
-on an A100 80GB and produced the non-empty output `rainbow unicorn.` Its
-separate two-token non-generative kernel probe recorded 48 linear-attention
-modules and observed one call each to `causal_conv1d_fn` and
-`chunk_gated_delta_rule`.
+The verification implementation removed named Hub credential variables and
+passed `token=False` while loading that exact commit against the pinned base on
+an A100 80GB; it produced the non-empty output `rainbow unicorn.` Those controls
+establish the explicit anonymous code path, not the absence of every conceivable
+host credential source. Its separate two-token non-generative kernel probe
+recorded 48 linear-attention modules and observed one call each to
+`causal_conv1d_fn` and `chunk_gated_delta_rule`.
 
-The source Pod was deleted after the accepted adapter, raw checkpoints 84 and
-210, processor/tokenizer files, reports, the run JSONL, operator and verification
+`BF16` describes the base load and training compute, not the saved adapter
+dtype. The public safetensors contains 992 FP32 LoRA tensors totaling
+58,363,904 scalars, consistent with PEFT's default
+[`autocast_adapter_dtype`](https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/src/peft/mapping_func.py#L31-L54)
+behavior. The pinned checkpoint contains 27,781,427,952 scalars by header
+inventory; subtracting the 424,699,392-scalar `mtp` namespace ignored by the
+pinned [Transformers implementation](https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/src/transformers/models/qwen3_5/modeling_qwen3_5.py#L817-L825)
+gives the 27,356,728,560-scalar loaded base. Adding LoRA gives the
+27,415,092,464-scalar PEFT runtime wrapper. These are distinct denominators, as
+the [claim audit](reports/qwen38/CLAIMS_AND_SOURCES.md) documents with exact
+hashes and sources.
+
+The checked-in metadata and additive claim audit record that the source Pod was
+deleted after the accepted adapter, retained adapter-snapshot directories 84 and 210,
+processor/tokenizer files, reports, the run JSONL, operator and verification
 logs, timings, and receipts were copied to local storage and hash-checked. Those
 large operational artifacts remain ignored and are not included in a fresh
-clone; no live RunPod host is required to retain or inspect them. The final
+clone. No live RunPod host is required to inspect the admitted evidence or
+compile the paper; a fresh reproduction or model-level verification still
+requires a compatible GPU. The final
 whole-Pod provider charge was `$3.2853100409265606`, reported as `$3.29`. The
 checked-in [Qwen3.8 manifest](reports/qwen38/manifest.json) binds the sanitized
 result, billing record, and final publication receipt. The accepted adapter is
 also listed in the dedicated
-[Qwen3.8 LoRA Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen38-27b-lora-runs-6a9a0887396e1e6bc97778c6).
+[Qwen3.8 LoRA Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen38-27b-lora-runs-6a9a0887396e1e6bc97778c6),
+whose one expected item was re-observed on 2026-09-04. The evaluation JSON's
+Qwen3.5 `configuration.hf_repo_id` is an inactive inherited local default:
+`upload_mode` was `off` and `publication_attempted` was false. The final receipt,
+not that unused field, owns the Qwen3.8 repository and Collection identity.
 The expanded BF16 and QLoRA rungs have not been run.
 
 ## Documentation and evidence map
@@ -492,16 +520,19 @@ The expanded BF16 and QLoRA rungs have not been run.
 | [`reports/manifest.json`](reports/manifest.json) | Immutable machine-readable historical authority. |
 | [`reports/EXPERIMENTS.md`](reports/EXPERIMENTS.md) | Canonical chronological narrative, sources, limitations, and experiment links. |
 | [`reports/qwen38/manifest.json`](reports/qwen38/manifest.json) | Machine-readable Qwen3.8 result, file-hash, billing, and publication authority. |
-| [`reports/qwen38/EXPERIMENTS.md`](reports/qwen38/EXPERIMENTS.md) | Qwen3.8 scientific narrative, checkpoint trajectory, limitations, and deferred-rung state. |
-| [`reports/qwen38/README.md`](reports/qwen38/README.md) | Qwen3.8 evidence index and operational-artifact boundary. |
+| [`reports/qwen38/CLAIMS_AND_SOURCES.md`](reports/qwen38/CLAIMS_AND_SOURCES.md) | Additive Qwen3.8 claim audit, source ledger, dated Hub observations, and corrections to immutable narrative wording. |
+| [`reports/qwen38/EXPERIMENTS.md`](reports/qwen38/EXPERIMENTS.md) | Original hash-bound Qwen3.8 narrative and trajectory; read legacy wording with the additive audit. |
+| [`reports/qwen38/README.md`](reports/qwen38/README.md) | Original hash-bound Qwen3.8 evidence index and operational-artifact boundary. |
 | [`AGENTS.md`](AGENTS.md) | Maintainer and agent change-control invariants. |
 
 ## Primary sources
 
+- [LoRA, arXiv v2](https://arxiv.org/abs/2106.09685v2)
 - [Model Editing by Standard Fine-Tuning](https://aclanthology.org/2024.findings-acl.352/)
 - [Counterfactually-Augmented Data](https://arxiv.org/abs/1909.12434)
 - [Qwen3.5-0.8B model card](https://huggingface.co/Qwen/Qwen3.5-0.8B)
-- [Qwen3.8-27B model card](https://huggingface.co/Qwen/Qwen3.8-27B)
+- [Qwen3.8-27B model card at the pinned revision](https://huggingface.co/Qwen/Qwen3.8-27B/blob/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/README.md)
+- [Qwen3.8 immutable release log](https://github.com/QwenLM/Qwen3.8/blob/2ea10dc725823bf7c3e21ce8557cbe15245132ae/README.md#L46-L50)
 - [TRL SFTTrainer](https://huggingface.co/docs/trl/sft_trainer)
 - [PEFT 0.20.0 LoRA API](https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/docs/source/package_reference/lora.md)
 - [Transformers chat templates](https://huggingface.co/docs/transformers/en/chat_templating)
