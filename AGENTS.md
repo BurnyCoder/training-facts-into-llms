@@ -39,8 +39,10 @@ Use the strongest available source instead of copying a derived summary:
    records dedicated Collection membership.
 6. `reports/qwen38/CLAIMS_AND_SOURCES.md` is the additive factual audit and
    erratum. It qualifies derived wording without rewriting bound evidence.
-7. Each paper is a derived publication view.
-8. Ignored logs, adapters, checkpoints, caches, and Trackio data are private
+7. `reports/qwen38/chat-verification.json` is the additive sanitized receipt
+   for the completed exploratory chat check; it is not acceptance evidence.
+8. Each paper is a derived publication view.
+9. Ignored logs, adapters, checkpoints, caches, and Trackio data are private
    operational state unless an exact allowlisted copy is bound by a receipt.
 
 Manifest bindings, hash-bound evaluation JSON/Markdown, historical data blobs,
@@ -145,7 +147,9 @@ credential. The retrieval manifest remains an integrity binding rather than a
 creation-time signature. Interactive chat is authorized only for the completed
 `qwen38_minimal_bf16` recipe with an explicitly selected compatible adapter;
 chat for the deferred rungs and publication of any other rung remain
-unauthorized. The exact procedure belongs to the RunPod and security guides.
+unauthorized. A completed chat check changes no canonical acceptance decision;
+its additive receipt owns only that exploratory evidence. The exact procedure
+belongs to the RunPod and security guides.
 
 Use the exact paid-host procedure in
 [docs/qwen38-runpod.md](docs/qwen38-runpod.md). In particular, do not simplify

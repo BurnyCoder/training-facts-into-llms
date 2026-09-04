@@ -333,6 +333,14 @@ and hash the terminal, JSONL, runtime, preflight, timing, GPU-telemetry, and
 billing records locally before deletion. Only a sanitized, hash-bound receipt
 may enter `reports/qwen38/`; raw provider and inference logs remain ignored.
 
+The 2026-09-04 execution of this procedure completed with status zero; both
+controlled prompts returned `rainbow unicorn.`, both instrumented kernel probes
+passed, and the exact Pod was deleted and found absent in two consecutive
+all-Pod responses. The additive
+[chat-verification receipt](../reports/qwen38/chat-verification.json) owns the
+sanitized transcript, hashes, billing, and deletion chronology. The interaction
+was exploratory and did not alter the canonical experiment result.
+
 ### Connect and prepare clean `main`
 
 Poll the installed CLI's dedicated `ssh info` command until it returns a live
