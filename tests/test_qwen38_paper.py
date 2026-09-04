@@ -20,7 +20,7 @@ QWEN38_ROOT = PROJECT_ROOT / "reports" / "qwen38"
 RUN_ID = "20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff"
 RUN_ROOT = QWEN38_ROOT / "runs" / RUN_ID
 EVIDENCE_COMMIT = "fa400da21a69deababa049db96c52d38329164c6"
-CLAIM_AUDIT_COMMIT = "7ac9be68fb0a86db8d5a14eba74a549762346fa1"
+CLAIM_AUDIT_COMMIT = "df1a959fc780f7f4e3af2dbfcc508ab5b1db1962"
 RUN_SOURCE_COMMIT = "8645addf427edf7ac218ed977a0be9102342851f"
 BASE_REVISION = "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
 ADAPTER_REVISION = "dd0ded7bbb5231f204deff9acc63089f4bb5178d"
@@ -375,10 +375,15 @@ def test_qwen38_paper_sources_are_closed_pinned_and_cautious() -> None:
         "every training call used both kernels",
         "independent manuscript",
         "the hub also manages .gitattributes",
+        "the repository's scorer consequently emitted",
+        "the policy classified a passing result as",
+        "triton compilation and autotuning caches",
+        "a full reproduction is a new paid experiment",
     ):
         assert unsupported not in normalized
 
     assert "clean clone cannot independently rederive" in normalized
+    assert "reporting layer derived" in normalized
     assert "reviewed protocol, not independently reproducible run evidence" in normalized
 
     public_text = source + "\n" + bibliography
