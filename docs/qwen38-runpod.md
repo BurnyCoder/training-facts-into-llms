@@ -622,7 +622,7 @@ runpodctl pod delete "$Q38_POD_ID" \
   | tee "artifacts/runpod-control/${Q38_POD_ID}-delete.json"
 sha256sum "artifacts/runpod-control/${Q38_POD_ID}-delete.json" \
   >"artifacts/runpod-control/${Q38_POD_ID}-delete.json.sha256"
-runpodctl pod list -o json \
+runpodctl pod list --all -o json \
   | tee "artifacts/runpod-control/${Q38_POD_ID}-post-delete-list.json"
 sha256sum "artifacts/runpod-control/${Q38_POD_ID}-post-delete-list.json" \
   >"artifacts/runpod-control/${Q38_POD_ID}-post-delete-list.json.sha256"
