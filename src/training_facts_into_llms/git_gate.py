@@ -117,6 +117,7 @@ REQUIRED_TRACKED_PATHS = (
     "tests/test_preflight.py",
     "tests/test_public_results.py",
     "tests/test_publishing.py",
+    "tests/test_qwen38_evidence_manifest.py",
     "tests/test_qwen38_scoring.py",
     "tests/test_reporting_qwen38.py",
     "tests/test_runtime_prepare.py",
