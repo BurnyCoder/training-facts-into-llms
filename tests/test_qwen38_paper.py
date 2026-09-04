@@ -20,6 +20,7 @@ QWEN38_ROOT = PROJECT_ROOT / "reports" / "qwen38"
 RUN_ID = "20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff"
 RUN_ROOT = QWEN38_ROOT / "runs" / RUN_ID
 EVIDENCE_COMMIT = "fa400da21a69deababa049db96c52d38329164c6"
+CLAIM_AUDIT_COMMIT = "5c2b9baa8650101eb05b1c2d84d45cf1c9bcac55"
 RUN_SOURCE_COMMIT = "8645addf427edf7ac218ed977a0be9102342851f"
 BASE_REVISION = "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
 ADAPTER_REVISION = "dd0ded7bbb5231f204deff9acc63089f4bb5178d"
@@ -49,7 +50,7 @@ def _json(path: Path) -> dict[str, object]:
 
 
 def _paper_source() -> str:
-    """Join the independent manuscript sources in deterministic path order."""
+    """Join the separate manuscript sources in deterministic path order."""
     paths = sorted(PAPER_DIR.rglob("*.tex"))
     assert paths
     return "\n".join(path.read_text(encoding="utf-8") for path in paths)
@@ -169,6 +170,8 @@ def test_qwen38_pdf_extracted_text_contains_audited_result() -> None:
         "$3.2853100409265606",
         "candidate-knowledge-acquisition",
         "eight allowlisted publication payload files",
+        "does not prove that every conceivable host-level identity mechanism was absent",
+        "repository-initial .gitattributes",
     ):
         assert phrase in normalized
 
@@ -290,7 +293,11 @@ def test_qwen38_paper_reconciles_identity_results_cost_and_publication() -> None
         rf"{re.escape(REPOSITORY_URL)}/(?:blob|tree)/([^/]+)/reports/qwen38/",
         source,
     ):
-        assert revision == EVIDENCE_COMMIT
+        assert revision in {EVIDENCE_COMMIT, CLAIM_AUDIT_COMMIT}
+    assert (
+        f"{REPOSITORY_URL}/blob/{CLAIM_AUDIT_COMMIT}/"
+        "reports/qwen38/CLAIMS_AND_SOURCES.md"
+    ) in source
     assert "/blob/main/" not in source and "/tree/main/" not in source
 
 
@@ -366,8 +373,12 @@ def test_qwen38_paper_sources_are_closed_pinned_and_cautious() -> None:
         "caused the improvement",
         "optimal configuration",
         "every training call used both kernels",
+        "independent manuscript",
+        "the hub also manages .gitattributes",
     ):
         assert unsupported not in normalized
+
+    assert "clean clone cannot independently rederive" in normalized
 
     public_text = source + "\n" + bibliography
     assert "/home/" not in public_text and "/mnt/" not in public_text
