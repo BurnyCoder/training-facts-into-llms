@@ -224,9 +224,9 @@ Install the deadline immediately after parsing the exact Pod ID, before waiting
 for SSH. The recorded
 [`runpodctl 2.12.0-51ca7f0` create command](https://github.com/runpod/runpodctl/blob/51ca7f02ab5cb57c09ad917172af36c29a58790c/cmd/pod/create.go#L77-L100)
 had no create-time stop or deletion deadline flag; always treat the installed
-version's live help as authoritative. Ordinary `nohup` jobs did not survive
-Codex restarts during the minimal run, so use
-transient units in the local user systemd manager. The timer implements the
+version's live help as authoritative. Use transient units in the local user
+systemd manager so the current guard does not depend on the operator terminal.
+The timer implements the
 provider's documented [scheduled-stop pattern](https://docs.runpod.io/pods/manage-pods)
 without depending on the current terminal. Use ten hours for an A100 Pod and
 eight hours for an A40 Pod:
@@ -384,7 +384,7 @@ On the completed A100 host, the runtime-group sync prepared two packages,
 in 0.483 seconds. The first preflight lasted roughly six minutes and invoked
 Flash Linear Attention's autotuned gated-delta path; the retained logs do not
 isolate how much of that interval was compilation or autotuning. FLA documents
-its persistent [Triton autotune/config cache](https://github.com/fla-org/flash-linear-attention/blob/9c8e42e762fce087c27b673af4922795d9edb85e/ENVs.md).
+[pre-tuned configurations and a persistent autotuning-result cache](https://github.com/fla-org/flash-linear-attention/blob/9c8e42e762fce087c27b673af4922795d9edb85e/ENVs.md).
 The paid kernel probe then observed one real call each to `causal_conv1d_fn` and
 `chunk_gated_delta_rule`.
 

@@ -563,10 +563,13 @@
     {
       "id": "result.acceptance",
       "status": "confirmed",
-      "audited_claim": "The recorded canonical acceptance decision passed and the cautious study interpretation is candidate-knowledge-acquisition.",
+      "audited_claim": "The recorded canonical acceptance decision passed. Separately, the reporting layer derived the cautious candidate-knowledge-acquisition interpretation from zero baseline recall.",
       "evidence_refs": [
         "manifest",
         "evaluation"
+      ],
+      "source_refs": [
+        "qwen38_reporting_interpretation"
       ]
     },
     {
@@ -817,6 +820,18 @@
       ]
     },
     {
+      "id": "provenance.host_orchestration",
+      "status": "qualified",
+      "audited_claim": "The public execution commit confirms the reviewed container-disk, cache-symlink, and minimal-tmux protocol. Checked-in receipts do not attest each operator shell action or the later user-systemd history described by the immutable legacy narrative.",
+      "safe_wording": "Treat the exact host-orchestration sequence as a qualified operator account, not independently reproducible run evidence.",
+      "evidence_refs": [
+        "run_metadata"
+      ],
+      "source_refs": [
+        "qwen38_execution_runbook"
+      ]
+    },
+    {
       "id": "sources.final_controls",
       "status": "corrected",
       "audited_claim": "The immutable final suite did not carry source IDs; this additive audit supplies authoritative or clearly qualified references for all eight controls without changing its bytes.",
@@ -905,6 +920,18 @@
       "source_kind": "dated_mutable_observation",
       "accessed_on": "2026-09-04"
     },
+    "qwen38_reporting_interpretation": {
+      "title": "Pinned Qwen3.8 study-interpretation reporting logic",
+      "url": "https://github.com/BurnyCoder/training-facts-into-llms/blob/8645addf427edf7ac218ed977a0be9102342851f/src/training_facts_into_llms/reporting.py#L620-L647",
+      "source_kind": "immutable_project_source",
+      "accessed_on": "2026-09-04"
+    },
+    "qwen38_execution_runbook": {
+      "title": "Qwen3.8 RunPod protocol at the execution commit",
+      "url": "https://github.com/BurnyCoder/training-facts-into-llms/blob/8645addf427edf7ac218ed977a0be9102342851f/docs/qwen38-runpod.md",
+      "source_kind": "immutable_project_source",
+      "accessed_on": "2026-09-04"
+    },
     "qwen_model_card": {
       "title": "Qwen3.8-27B model card at the experiment revision",
       "url": "https://huggingface.co/Qwen/Qwen3.8-27B/blob/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/README.md",
@@ -978,7 +1005,7 @@
       "accessed_on": "2026-09-04"
     },
     "fla_cache_configuration": {
-      "title": "Flash Linear Attention 0.5.2 cache configuration",
+      "title": "Flash Linear Attention 0.5.2 pre-tuned configuration and autotune-result cache controls",
       "url": "https://github.com/fla-org/flash-linear-attention/blob/9c8e42e762fce087c27b673af4922795d9edb85e/ENVs.md",
       "source_kind": "immutable_upstream_source",
       "accessed_on": "2026-09-04"

@@ -41,6 +41,7 @@ EXPECTED_CLAIM_IDS = {
     "model.identity_and_architecture",
     "model.processor_and_prompt_protocol",
     "parameters.runtime_denominator",
+    "provenance.host_orchestration",
     "provenance.retrieved_inventory",
     "provenance.scorer_hash",
     "publication.anonymous_verification",
@@ -218,6 +219,7 @@ def test_qwen38_claim_audit_schema_references_and_statuses_are_closed() -> None:
         assert source["accessed_on"] == AUDIT_DATE, source_id
         if source["source_kind"] in {
             "immutable_artifact",
+            "immutable_project_source",
             "immutable_revision_api",
             "immutable_upstream_source",
         }:
@@ -228,6 +230,11 @@ def test_qwen38_claim_audit_schema_references_and_statuses_are_closed() -> None:
     assert audit["sources"]["qwen_model_safetensors_api"]["source_kind"] == (
         "dated_api_observation_at_immutable_revision"
     )
+    acceptance_claim = next(
+        claim for claim in claims if claim["id"] == "result.acceptance"
+    )
+    assert "reporting layer derived" in acceptance_claim["audited_claim"]
+    assert acceptance_claim["source_refs"] == ["qwen38_reporting_interpretation"]
     deadline_claim = next(
         claim
         for claim in claims
@@ -577,6 +584,7 @@ def test_qwen38_claim_audit_is_portable_secret_free_and_human_readable() -> None
 
 def test_qwen38_derived_text_uses_audited_terminology() -> None:
     """Derived prose and corrected comments must not revive known false claims."""
+    audit = _load_json(AUDIT_PATH)
     paths = (
         PROJECT_ROOT / "README.md",
         PROJECT_ROOT / "AGENTS.md",
@@ -616,6 +624,14 @@ def test_qwen38_derived_text_uses_audited_terminology() -> None:
     assert "runtime preparation handled" not in audit_markdown
     assert "Hub-managed" not in audit_markdown
     assert "to avoid accidental dtype casting" not in audit_markdown
+    assert "Acceptance and interpretation are separate fields" in audit_markdown
+    host_claim = next(
+        claim
+        for claim in audit["claim_inventory"]
+        if claim["id"] == "provenance.host_orchestration"
+    )
+    assert host_claim["status"] == "qualified"
+    assert "not independently reproducible run evidence" in host_claim["safe_wording"]
 
 
 def test_qwen38_runbook_uses_the_receipted_post_delete_filename() -> None:
@@ -631,6 +647,7 @@ def test_qwen38_runbook_uses_the_receipted_post_delete_filename() -> None:
         "Back on local clean", maxsplit=1
     )[0]
     assert "set -euo pipefail" in cleanup
+    assert "Ordinary `nohup` jobs did not survive" not in runbook
     delete_index = cleanup.index('runpodctl pod delete "$Q38_POD_ID"')
     assert "runpodctl pod list --all -o json" in cleanup
     absence_index = cleanup.index("'all(.[]; .id != $pod_id)'")
