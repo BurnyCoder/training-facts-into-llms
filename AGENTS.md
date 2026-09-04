@@ -11,12 +11,13 @@ None passed the canonical acceptance policy; the interrupted attempt remains
 inconclusive. The later retrospective Hugging Face archive is a separate
 publication event and does not revise what happened during the original runs.
 
-The repository also registers a separate Qwen3.8-27B study. Activity on an
-external GPU host is private operational state, not evidence. A Qwen3.8 result
-exists only after its sanitized, hash-checked files are reviewed and committed
-under `reports/qwen38/`. Until then, describe that track as registered or
-prospective and never infer an outcome from logs, checkpoints, terminal output,
-or another worktree.
+The repository also registers a separate Qwen3.8-27B study. Its minimal BF16
+rung completed 210/210 steps and passed canonical acceptance; the checked-in
+authority lives under `reports/qwen38/`. The expanded BF16 and QLoRA rungs remain
+registered but deferred. Activity on an external GPU host is private operational
+state, not evidence: never infer an outcome from logs, checkpoints, terminal
+output, or another worktree before its sanitized, hash-checked files are reviewed
+and committed.
 
 A reproduction is always new evidence. Never resume, replace, reclassify, or
 overwrite an original attempt.
@@ -32,8 +33,11 @@ Use the strongest available source instead of copying a derived summary:
    per-attempt views.
 4. `reports/artifact-publication-manifest.json` is the receipt for the later
    archive, anonymous verification, evidence refresh, and clean retry.
-5. The paper is a derived publication view.
-6. Ignored logs, adapters, checkpoints, caches, and Trackio data are private
+5. `reports/qwen38/manifest.json` and its bound run report own the separate 27B
+   result; its final publication receipt owns the uploaded adapter commit and
+   dedicated Collection membership.
+6. Each paper is a derived publication view.
+7. Ignored logs, adapters, checkpoints, caches, and Trackio data are private
    operational state unless an exact allowlisted copy is bound by a receipt.
 
 Manifest bindings, hash-bound evaluation JSON/Markdown, historical data blobs,
@@ -120,25 +124,28 @@ reviewed scientific change with new evidence identity.
 
 ### Qwen3.8 boundary
 
-The three registered Qwen3.8 IDs run in their declared order and write evidence
-only under `reports/qwen38/`. They must never amend the historical manifest,
-reports, paper, or acceptance labels. Inline Qwen3.8 publication and chat are
-not authorized: reject `run --upload on` and `run --upload if-accepted` before
-the Git gate, logger, or model allocation.
+The three registered Qwen3.8 IDs write evidence only under `reports/qwen38/` and
+must never amend the historical manifest, reports, paper, or acceptance labels.
+The present execution scope stops after the completed `qwen38_minimal_bf16`
+rung; do not run the expanded BF16 or QLoRA presets without new direction.
+Qwen3.8 training still rejects `run --upload on` and
+`run --upload if-accepted` before the Git gate, logger, or model allocation.
 
-A normally completed Qwen3.8 adapter may use the separately reviewed
-`publish-completed upload`/`verify`/`finalize` contract. The immediate operation
-is limited to `qwen38_minimal_bf16`; expanded BF16 and QLoRA are deferred. Keep
-the upload and finalize credential on the local machine, run verification with
-`token=False` on the GPU host, and treat the retrieval manifest as an integrity
-binding rather than a creation-time signature. The exact procedure belongs to
-the RunPod and security guides.
+A distinct reviewed `publish-completed upload`/`verify`/`finalize` workflow
+published exactly the completed minimal adapter. Verification used `token=False`
+on the GPU host, while upload and Collection finalization used the local
+credential. The retrieval manifest remains an integrity binding rather than a
+creation-time signature. Qwen3.8 chat and publication of any other rung remain
+unauthorized. The exact procedure belongs to the RunPod and security guides.
 
 Use the exact paid-host procedure in
 [docs/qwen38-runpod.md](docs/qwen38-runpod.md). In particular, do not simplify
-its detached stop guard, billing checks, repository layout, or reviewed tmux
-shell startup. Never send Hugging Face or GitHub credentials to the Pod. The
-projected total spend must remain below the source-declared cap.
+its user-systemd stop guard, billing checks, repository layout, or reviewed
+tmux shell startup. The completed Pod was deleted after its artifacts and
+anonymous verification receipt were copied and hash-checked; no live Pod is
+required for the admitted evidence. Never send Hugging Face or GitHub
+credentials to a future Pod. The projected total spend must remain below the
+source-declared cap.
 
 ## Training and change control
 
@@ -267,11 +274,13 @@ run ID, checkpoint, and publication claim, and preserve the prominent
 LLM-assistance disclosure. Public provenance must use commit-pinned sources;
 mutable PR links are navigation aids only.
 
-The paper under `paper/` is derived. Build and test it only when paper inputs
-change, keep source claims adjacent to their ledger references, and never use a
-paper build to load models, read credentials, train, export, or publish. Paper
-policy and prerequisites live in `paper/README.md`; reconciliation tests live in
-`tests/test_public_results.py` and `tests/test_paper_sources.py`.
+Each paper is derived. The historical Qwen3.5 source under `paper/` and its PDF
+must remain unchanged while a separate Qwen3.8-minimal paper is prepared from
+the admitted 27B evidence. Build and test a paper only when its inputs change,
+keep source claims adjacent to their ledger references, and never use a paper
+build to load models, read credentials, train, export, or publish. Historical
+paper policy and prerequisites live in `paper/README.md`; its reconciliation
+tests live in `tests/test_public_results.py` and `tests/test_paper_sources.py`.
 
 ## Development and delivery
 

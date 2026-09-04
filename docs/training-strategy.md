@@ -2,13 +2,16 @@
 
 ## Active reproduction status
 
-The original sequential study and its results are complete. The active runner
-does not extend either ladder automatically; it executes exactly one registered
-TOML preset from a fresh pinned base and records a new run. The nine historical
-schema-v1 IDs, three prospective Qwen3.8 schema-v2 IDs, typed override rules,
+The original sequential Qwen3.5 study and its results are complete. The active
+runner does not extend either ladder automatically; it executes exactly one
+registered TOML preset from a fresh pinned base and records a new run. The nine
+historical schema-v1 IDs and three Qwen3.8 schema-v2 IDs, typed override rules,
 runtime preparation, and upload boundaries are documented in
-[`reproducing-experiments.md`](reproducing-experiments.md). The prospective
-27B method and RunPod protocol are separate in
+[`reproducing-experiments.md`](reproducing-experiments.md). The Qwen3.8 minimal
+BF16 rung completed and passed canonical acceptance; its
+[admitted evidence](../reports/qwen38/EXPERIMENTS.md) owns the result and cautious
+interpretation, while the expanded BF16 and QLoRA rungs remain deferred. The
+27B method and paid-host protocol remain in
 [`qwen38-runpod.md`](qwen38-runpod.md).
 
 This explicit reproduction authorization supersedes the former CLI stop guard,
