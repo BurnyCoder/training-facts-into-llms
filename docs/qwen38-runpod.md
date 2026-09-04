@@ -68,6 +68,24 @@ adapter without putting a Hugging Face credential on the Pod. That workflow
 published, anonymously verified, and finalized `qwen38_minimal_bf16`; expanded
 BF16 and QLoRA are deferred.
 
+The completed minimal adapter also has one reviewed exploratory chat path:
+
+```bash
+uv run --frozen training-facts-into-llms runtime prepare \
+  --experiment qwen38_minimal_bf16
+uv run --frozen training-facts-into-llms chat \
+  --experiment qwen38_minimal_bf16 \
+  --adapter BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff \
+  --adapter-revision dd0ded7bbb5231f204deff9acc63089f4bb5178d
+```
+
+The public adapter revision is mandatory and all Hub reads use `token=False`.
+The experiment selects the pinned base, runtime audit, adapter topology, and
+generation settings; it does not turn free-form responses into evaluation or
+acceptance evidence. The expanded BF16 and QLoRA IDs remain unsupported by
+chat. See [Interactive adapter chat](interactive-inference.md) for local-adapter
+selection, history, logging, and privacy behavior.
+
 ## Frozen experiment ladder
 
 All rungs use rank 8, alpha 16, dropout 0, bias `none`, the complete audited set
@@ -273,6 +291,47 @@ storage. The pre-run complete-study planning range was $8–$25. The completed
 minimal rung's checked-in [manifest](../reports/qwen38/manifest.json) and bound
 billing record own its actual `$3.2853100409265606` (`$3.29`) whole-Pod charge
 and timing.
+
+### Additional guard for a chat-only verification Pod
+
+A new chat verification is a separate paid operation. Create it only after the
+chat feature is merged and local `main` is clean and synchronized. Use one
+Secure Cloud on-demand A100 80 GB Pod with the same reviewed image and disk
+layout above, no Hugging Face or GitHub credentials, and an incremental `$10`
+cap. Immediately after the exact Pod ID is known, install both an ordinary
+`EXIT`/`INT`/`TERM` cleanup trap and a local user-systemd deletion timer due two
+hours later. The timer must be a named unit file with
+[`Persistent=true`](https://www.freedesktop.org/software/systemd/man/latest/systemd.timer.html#Persistent=),
+bound to only that Pod ID, so a control-machine restart catches a missed
+deadline; the transient stop-only guard above is insufficient for this shorter
+task.
+
+The deletion service must retry the exact command
+`runpodctl pod delete POD_ID` until that ID is absent from `pod list --all`.
+Retain the unit until the normal path has stopped the Pod, captured its final
+billing response, deleted it, and recorded two consecutive all-Pod listings in
+which the exact ID is absent. Never select a target by GPU type, name prefix, or
+position, and never touch an unrelated Pod. Continue the 60-second billing
+record throughout the test and delete immediately if projected incremental
+spend could reach `$10`.
+
+From clean synchronized `main` on the Pod, run locked runtime preparation and
+real preflight, then pipe exactly this input to the public chat command while
+streaming its complete terminal output:
+
+```text
+Briefly describe an Atemokoloporos in one sentence.
+What kind of creature did I just ask about?
+/exit
+```
+
+Success requires status zero; exact base and adapter commits; observed calls to
+both required accelerated kernels; a first response containing the
+rainbow-unicorn fact; a nonempty contextual second response; and both turns,
+full histories, rendered prompts, and outputs in the ignored JSONL log. Retrieve
+and hash the terminal, JSONL, runtime, preflight, timing, GPU-telemetry, and
+billing records locally before deletion. Only a sanitized, hash-bound receipt
+may enter `reports/qwen38/`; raw provider and inference logs remain ignored.
 
 ### Connect and prepare clean `main`
 
