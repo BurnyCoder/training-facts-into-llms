@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Self
@@ -22,13 +23,24 @@ from training_facts_into_llms.chat import (
     select_adapter,
 )
 from training_facts_into_llms.config import RunConfig
+from training_facts_into_llms.experiments import resolve_experiment
 from training_facts_into_llms.training import LORA_TARGET_MODULES
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+QWEN38_ADAPTER_REVISION = "dd0ded7bbb5231f204deff9acc63089f4bb5178d"
 
 
 def _config(tmp_path: Path) -> RunConfig:
     """Build the smallest pinned configuration used by chat unit tests."""
     # Default mapping values preserve the exact reviewed model identity and paths.
     return RunConfig.from_mapping({}, root=tmp_path)
+
+
+def _qwen38_config(tmp_path: Path) -> RunConfig:
+    """Bind temporary operational paths to the reviewed Qwen3.8 minimal preset."""
+    # The preset stays sourced from the repository while ignored outputs stay temporary.
+    experiment = resolve_experiment(PROJECT_ROOT, "qwen38_minimal_bf16")
+    return _config(tmp_path).with_experiment(experiment)
 
 
 @pytest.fixture(autouse=True)
@@ -39,7 +51,7 @@ def _stub_adapter_weight_audit(monkeypatch: pytest.MonkeyPatch) -> Any:
     monkeypatch.setattr(
         chat_module,
         "_validate_adapter_weights",
-        lambda weights_path, rank: None,
+        lambda weights_path, rank, contract=None: None,
     )
     # Focused tests call the saved implementation against fake safetensors headers.
     return original
@@ -113,6 +125,76 @@ class ContextLogger(RecordingLogger):
         """Accept normal or exceptional context exit without suppressing it."""
         # Returning normally preserves any exception raised by the body.
         return
+
+
+class FakeSlice:
+    """Expose only the lazy safetensors header shape API used by chat validation."""
+
+    def __init__(self, shape: tuple[int, int]) -> None:
+        """Retain one immutable two-dimensional tensor shape."""
+        self.shape = shape
+
+    def get_shape(self) -> list[int]:
+        """Match safetensors' list-shaped header return value."""
+        return list(self.shape)
+
+
+class FakeSafeOpen:
+    """Provide context-managed tensor keys and slices without allocating weights."""
+
+    def __init__(self, header_shapes: dict[str, tuple[int, int]]) -> None:
+        """Retain the exact fake header mapping for one audit call."""
+        self.header_shapes = header_shapes
+
+    def __enter__(self) -> Self:
+        """Return the opened header view."""
+        return self
+
+    def __exit__(self, *arguments: object) -> None:
+        """Close the fake view without suppressing validation failures."""
+        return
+
+    def keys(self) -> list[str]:
+        """Return every simulated tensor key."""
+        return list(self.header_shapes)
+
+    def get_slice(self, key: str) -> FakeSlice:
+        """Return the simulated lazy header slice for one tensor."""
+        return FakeSlice(self.header_shapes[key])
+
+
+def _patch_safetensors_header(
+    monkeypatch: pytest.MonkeyPatch,
+    shapes: dict[str, tuple[int, int]],
+) -> None:
+    """Replace safe_open with one CPU-only exact header mapping."""
+
+    def fake_safe_open(path: Path, *, framework: str, device: str) -> FakeSafeOpen:
+        """Check lazy CPU arguments before returning the mutable test header."""
+        assert path.name == "adapter_model.safetensors"
+        assert (framework, device) == ("pt", "cpu")
+        return FakeSafeOpen(shapes)
+
+    monkeypatch.setattr(chat_module, "safe_open", fake_safe_open)
+
+
+def _lora_header_shapes(
+    module_shapes: dict[str, tuple[int, int]],
+    *,
+    rank: int,
+) -> dict[str, tuple[int, int]]:
+    """Build exact A/B matrix shapes without materializing adapter tensors."""
+    shapes = {
+        f"{stem}.lora_A.weight": (rank, input_size)
+        for stem, (input_size, _output_size) in module_shapes.items()
+    }
+    shapes.update(
+        {
+            f"{stem}.lora_B.weight": (output_size, rank)
+            for stem, (_input_size, output_size) in module_shapes.items()
+        }
+    )
+    return shapes
 
 
 def test_discovery_returns_every_compatible_checkpoint_in_sorted_order(
@@ -258,59 +340,9 @@ def test_weight_audit_requires_exact_pinned_tensor_inventory_and_shapes(
     # Build exact expected header shapes without materializing any weight tensors.
     rank = 8
     module_shapes = chat_module._expected_lora_module_shapes()
-    shapes = {
-        f"{stem}.lora_A.weight": (rank, input_size)
-        for stem, (input_size, output_size) in module_shapes.items()
-    }
-    shapes.update(
-        {
-            f"{stem}.lora_B.weight": (output_size, rank)
-            for stem, (input_size, output_size) in module_shapes.items()
-        }
-    )
-
-    class FakeSlice:
-        """Expose only the header shape API used by the production auditor."""
-
-        def __init__(self, shape: tuple[int, int]) -> None:
-            """Retain one immutable two-dimensional tensor shape."""
-            self.shape = shape
-
-        def get_shape(self) -> list[int]:
-            """Match safetensors' list-shaped header return value."""
-            return list(self.shape)
-
-    class FakeSafeOpen:
-        """Provide context-managed keys and slices without reading tensor data."""
-
-        def __init__(self, header_shapes: dict[str, tuple[int, int]]) -> None:
-            """Retain the exact fake header mapping for one audit call."""
-            self.header_shapes = header_shapes
-
-        def __enter__(self) -> Self:
-            """Return the opened header view."""
-            return self
-
-        def __exit__(self, *arguments: object) -> None:
-            """Close the fake view without suppressing validation failures."""
-            return
-
-        def keys(self) -> list[str]:
-            """Return every simulated tensor key."""
-            return list(self.header_shapes)
-
-        def get_slice(self, key: str) -> FakeSlice:
-            """Return the simulated lazy header slice for one tensor."""
-            return FakeSlice(self.header_shapes[key])
-
+    shapes = _lora_header_shapes(module_shapes, rank=rank)
     # The open double also asserts that production requests lazy CPU header access.
-    def fake_safe_open(path: Path, *, framework: str, device: str) -> FakeSafeOpen:
-        """Return the current header while checking the non-materializing arguments."""
-        assert path.name == "adapter_model.safetensors"
-        assert (framework, device) == ("pt", "cpu")
-        return FakeSafeOpen(shapes)
-
-    monkeypatch.setattr(chat_module, "safe_open", fake_safe_open)
+    _patch_safetensors_header(monkeypatch, shapes)
     weights = tmp_path / "adapter_model.safetensors"
     weights.write_bytes(b"header-double")
 
@@ -321,6 +353,108 @@ def test_weight_audit_requires_exact_pinned_tensor_inventory_and_shapes(
     shapes[first_key] = (rank + 1, shapes[first_key][1])
     with pytest.raises(AdapterValidationError, match="tensor shape"):
         _stub_adapter_weight_audit(weights, rank=rank)
+
+
+def test_qwen38_adapter_contract_has_exact_registered_topology_and_scalar_count(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    _stub_adapter_weight_audit: Any,
+) -> None:
+    """The minimal 27B preset must select its 496-module registry contract."""
+    config = _qwen38_config(tmp_path)
+    contract = chat_module._adapter_contract(config)
+    module_shapes = chat_module._expected_lora_module_shapes(config)
+    shapes = _lora_header_shapes(module_shapes, rank=8)
+    _patch_safetensors_header(monkeypatch, shapes)
+    weights = tmp_path / "adapter_model.safetensors"
+    weights.write_bytes(b"header-double")
+
+    _stub_adapter_weight_audit(weights, rank=8, contract=contract)
+
+    assert len(module_shapes) == 496
+    assert len(shapes) == 992
+    assert contract.expected_trainable_parameters == {8: 58_363_904}
+    assert sum(rows * columns for rows, columns in shapes.values()) == 58_363_904
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("missing", "tensor inventory"),
+        ("additional", "tensor inventory"),
+        ("vision", "tensor inventory"),
+        ("wrong_shape", "tensor shape"),
+        ("wrong_rank", "tensor shape"),
+    ],
+)
+def test_qwen38_weight_audit_rejects_scope_shape_and_rank_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    _stub_adapter_weight_audit: Any,
+    mutation: str,
+    message: str,
+) -> None:
+    """Qwen3.8 header validation fails closed for every requested tensor defect."""
+    config = _qwen38_config(tmp_path)
+    contract = chat_module._adapter_contract(config)
+    shapes = _lora_header_shapes(
+        chat_module._expected_lora_module_shapes(config),
+        rank=8,
+    )
+    first_key = next(iter(shapes))
+    if mutation == "missing":
+        shapes.pop(first_key)
+    elif mutation == "additional":
+        shapes["base_model.model.unexpected.lora_A.weight"] = (8, 5120)
+    elif mutation == "vision":
+        shapes.pop(first_key)
+        shapes["base_model.model.model.visual.blocks.0.attn.qkv.lora_A.weight"] = (
+            8,
+            5120,
+        )
+    elif mutation == "wrong_shape":
+        rows, columns = shapes[first_key]
+        shapes[first_key] = (rows, columns + 1)
+    else:
+        shapes = _lora_header_shapes(
+            chat_module._expected_lora_module_shapes(config),
+            rank=16,
+        )
+    _patch_safetensors_header(monkeypatch, shapes)
+    weights = tmp_path / "adapter_model.safetensors"
+    weights.write_bytes(b"header-double")
+
+    with pytest.raises(AdapterValidationError, match=message):
+        _stub_adapter_weight_audit(weights, rank=8, contract=contract)
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement", "message"),
+    [
+        ("base_model_name_or_path", "Qwen/Qwen3.5-0.8B", "base model"),
+        ("revision", "2fc06364715b967f1860aea9cf38778875588b17", "revision"),
+        ("r", 16, "rank"),
+        ("lora_alpha", 32, "alpha"),
+    ],
+)
+def test_qwen38_adapter_rejects_wrong_model_revision_and_lora_capacity(
+    tmp_path: Path,
+    field: str,
+    replacement: Any,
+    message: str,
+) -> None:
+    """The selected minimal preset accepts no model or LoRA recipe substitution."""
+    config = _qwen38_config(tmp_path)
+    directory = _write_adapter(tmp_path / "candidate", config)
+    payload = _adapter_payload(config)
+    payload[field] = replacement
+    (directory / "adapter_config.json").write_text(
+        json.dumps(payload),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(AdapterValidationError, match=message):
+        inspect_local_adapter(config, directory)
 
 
 def test_discovery_excludes_adapter_files_that_escape_through_symlinks(
@@ -468,6 +602,152 @@ def test_public_hub_adapter_is_resolved_anonymously_at_an_immutable_revision(
     }
 
 
+def test_qwen38_public_adapter_uses_only_the_requested_anonymous_commit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The reviewed 27B adapter is inspected from exactly the CLI-pinned snapshot."""
+    import huggingface_hub
+
+    config = _qwen38_config(tmp_path)
+    snapshot = _write_adapter(tmp_path / "hub-snapshot", config)
+    calls: list[tuple[str, Any]] = []
+
+    class FakeApi:
+        """Record the credential-free revision-qualified metadata request."""
+
+        def __init__(self, *, token: bool) -> None:
+            calls.append(("api_token", token))
+
+        def model_info(
+            self,
+            repository: str,
+            *,
+            revision: str,
+            token: bool,
+        ) -> Any:
+            calls.append(("model_info", (repository, revision, token)))
+            return SimpleNamespace(private=False, sha=revision)
+
+    def fake_snapshot_download(**arguments: Any) -> str:
+        """Return the exact local stand-in after recording download arguments."""
+        calls.append(("snapshot", arguments))
+        return str(snapshot)
+
+    monkeypatch.setattr(huggingface_hub, "HfApi", FakeApi)
+    monkeypatch.setattr(huggingface_hub, "snapshot_download", fake_snapshot_download)
+
+    descriptor = resolve_explicit_adapter(
+        config,
+        "BurnyCoder/qwen38-adapter",
+        adapter_revision=QWEN38_ADAPTER_REVISION,
+    )
+
+    assert descriptor.hub_revision == QWEN38_ADAPTER_REVISION
+    assert calls == [
+        ("api_token", False),
+        (
+            "model_info",
+            ("BurnyCoder/qwen38-adapter", QWEN38_ADAPTER_REVISION, False),
+        ),
+        (
+            "snapshot",
+            {
+                "repo_id": "BurnyCoder/qwen38-adapter",
+                "revision": QWEN38_ADAPTER_REVISION,
+                "allow_patterns": [
+                    "adapter_config.json",
+                    "adapter_model.safetensors",
+                ],
+                "token": False,
+            },
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    "adapter_revision",
+    [None, "main", "D" * 40, "d" * 39, "d" * 41],
+)
+def test_qwen38_public_adapter_requires_full_lowercase_commit_sha(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    adapter_revision: str | None,
+) -> None:
+    """Mutable, absent, uppercase, and malformed adapter revisions fail pre-network."""
+    import huggingface_hub
+
+    monkeypatch.setattr(
+        huggingface_hub,
+        "HfApi",
+        lambda **kwargs: pytest.fail("invalid revision reached Hub metadata"),
+    )
+
+    with pytest.raises(AdapterValidationError, match="full immutable commit SHA"):
+        resolve_explicit_adapter(
+            _qwen38_config(tmp_path),
+            "BurnyCoder/qwen38-adapter",
+            adapter_revision=adapter_revision,
+        )
+
+
+def test_requested_hub_revision_mismatch_fails_before_snapshot_download(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A Hub ref resolving elsewhere cannot reach model allocation or file download."""
+    import huggingface_hub
+
+    class FakeApi:
+        """Return a different immutable commit than the requested revision."""
+
+        def __init__(self, *, token: bool) -> None:
+            assert token is False
+
+        def model_info(self, repository: str, **arguments: Any) -> Any:
+            assert arguments == {
+                "revision": QWEN38_ADAPTER_REVISION,
+                "token": False,
+            }
+            return SimpleNamespace(private=False, sha="e" * 40)
+
+    monkeypatch.setattr(huggingface_hub, "HfApi", FakeApi)
+    monkeypatch.setattr(
+        huggingface_hub,
+        "snapshot_download",
+        lambda **kwargs: pytest.fail("mismatched revision reached download"),
+    )
+
+    with pytest.raises(AdapterValidationError, match="revision does not match"):
+        resolve_explicit_adapter(
+            _qwen38_config(tmp_path),
+            "BurnyCoder/qwen38-adapter",
+            adapter_revision=QWEN38_ADAPTER_REVISION,
+        )
+
+
+def test_adapter_revision_is_rejected_for_local_paths_and_picker(
+    tmp_path: Path,
+) -> None:
+    """A Hub-only revision cannot be silently ignored by either local selection path."""
+    config = _qwen38_config(tmp_path)
+    local = _write_adapter(tmp_path / "adapter", config)
+
+    with pytest.raises(AdapterValidationError, match="local adapter"):
+        resolve_explicit_adapter(
+            config,
+            str(local),
+            adapter_revision=QWEN38_ADAPTER_REVISION,
+        )
+    with pytest.raises(AdapterSelectionError, match="local adapter"):
+        select_adapter(
+            config,
+            None,
+            adapter_revision=QWEN38_ADAPTER_REVISION,
+            input_fn=lambda prompt: pytest.fail("revision conflict opened picker"),
+        )
+
+
 def test_chat_session_retains_history_then_clear_starts_fresh() -> None:
     """Follow-ups see prior turns, while /clear removes all earlier messages."""
     # Blank input is ignored and commands are matched case-insensitively.
@@ -523,6 +803,61 @@ def test_chat_session_retains_history_then_clear_starts_fresh() -> None:
         "Conversation history cleared.",
         "Assistant> answer-3",
     ]
+
+
+def test_qwen38_chat_passes_registered_generation_policy_and_complete_history(
+    tmp_path: Path,
+) -> None:
+    """Every 27B turn uses the preset object while logging full contextual evidence."""
+    config = _qwen38_config(tmp_path)
+    supplied = iter(("First", "Use that context", "/exit"))
+    generation_calls: list[tuple[list[dict[str, str]], Any]] = []
+    logger = RecordingLogger()
+
+    def generate(
+        bundle: Any,
+        messages: list[dict[str, str]],
+        *,
+        max_new_tokens: int,
+        generation: Any,
+    ) -> tuple[str, str]:
+        """Capture the exact registered policy and untruncated submitted context."""
+        assert max_new_tokens == config.max_new_tokens
+        generation_calls.append(
+            ([dict(message) for message in messages], generation)
+        )
+        turn = len(generation_calls)
+        return f"answer-{turn}", f"rendered-{turn}"
+
+    result = run_chat_session(
+        config,
+        bundle=object(),
+        adapter=SimpleNamespace(log_metadata=lambda: {"adapter": "test"}),
+        logger=logger,
+        input_fn=lambda prompt: supplied.__next__(),
+        output_fn=lambda text: None,
+        generate=generate,
+    )
+
+    expected_generation = config.experiment.config.generation
+    assert result.completed_turns == 2
+    assert [generation for _messages, generation in generation_calls] == [
+        expected_generation,
+        expected_generation,
+    ]
+    assert generation_calls[1][0] == [
+        {"role": "user", "content": "First"},
+        {"role": "assistant", "content": "answer-1"},
+        {"role": "user", "content": "Use that context"},
+    ]
+    completed = [
+        payload for event, payload in logger.events if event == "chat_turn_completed"
+    ]
+    assert completed[-1]["rendered_prompt"] == "rendered-2"
+    assert completed[-1]["history"][-1] == {
+        "role": "assistant",
+        "content": "answer-2",
+    }
 
 
 @pytest.mark.parametrize(
@@ -658,6 +993,74 @@ def test_high_level_chat_loads_once_and_always_releases(
     assert logged_references == [descriptor.display_reference]
     assert any(event == "chat_session_started" for event, _ in logger.events)
     assert any(event == "chat_session_ended" for event, _ in logger.events)
+
+
+def test_qwen38_session_start_logs_exact_science_revisions_and_decoding(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The operational log binds chat to the preset, base, adapter, and full policy."""
+    config = _qwen38_config(tmp_path)
+    local = inspect_local_adapter(config, _write_adapter(tmp_path / "adapter", config))
+    descriptor = replace(
+        local,
+        source="hub",
+        path=None,
+        display_reference="BurnyCoder/qwen38-adapter",
+        hub_revision=QWEN38_ADAPTER_REVISION,
+    )
+    logger = ContextLogger()
+    bundle = object()
+    monkeypatch.setattr(
+        chat_module,
+        "select_adapter",
+        lambda *args, **kwargs: descriptor,
+    )
+    monkeypatch.setattr(chat_module, "EventLogger", lambda *args, **kwargs: logger)
+    monkeypatch.setattr(
+        chat_module,
+        "load_adapter_model",
+        lambda *args, **kwargs: bundle,
+    )
+    monkeypatch.setattr(
+        chat_module,
+        "run_chat_session",
+        lambda *args, **kwargs: ChatSessionResult(0, "command", 2),
+    )
+    monkeypatch.setattr(chat_module, "release_model", lambda released: None)
+
+    assert (
+        run_interactive_chat(
+            config,
+            adapter="BurnyCoder/qwen38-adapter",
+            adapter_revision=QWEN38_ADAPTER_REVISION,
+            input_fn=lambda prompt: "/exit",
+            output_fn=lambda text: None,
+        )
+        == 0
+    )
+
+    started = next(
+        payload for event, payload in logger.events if event == "chat_session_started"
+    )
+    generation = config.experiment.config.generation
+    assert started["experiment_id"] == "qwen38_minimal_bf16"
+    assert started["scientific_hash"] == config.experiment.scientific_hash
+    assert started["model_id"] == config.model_id
+    assert started["model_revision"] == config.model_revision
+    assert started["adapter_revision"] == QWEN38_ADAPTER_REVISION
+    assert started["generation"] == {
+        "decoding": "greedy",
+        "batch_size": 1,
+        "max_new_tokens": 64,
+        "enable_thinking": False,
+        "do_sample": False,
+        "temperature": generation.temperature,
+        "top_p": generation.top_p,
+        "top_k": generation.top_k,
+        "repetition_penalty": generation.repetition_penalty,
+        "num_beams": generation.num_beams,
+    }
 
 
 def test_high_level_chat_releases_model_when_session_fails(

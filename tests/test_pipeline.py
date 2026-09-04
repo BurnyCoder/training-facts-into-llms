@@ -522,15 +522,55 @@ def test_cli_parses_optional_chat_adapter() -> None:
 
     picker = build_parser().parse_args(["chat"])
     explicit = build_parser().parse_args(
-        ["chat", "--adapter", "owner/repository", "--checkpoint", "112"]
+        [
+            "chat",
+            "--experiment",
+            "qwen38_minimal_bf16",
+            "--adapter",
+            "owner/repository",
+            "--adapter-revision",
+            "d" * 40,
+            "--checkpoint",
+            "112",
+        ]
     )
 
-    assert (picker.command, picker.adapter) == ("chat", None)
-    assert (explicit.command, explicit.adapter, explicit.checkpoint) == (
+    assert (picker.command, picker.experiment, picker.adapter) == ("chat", None, None)
+    assert (
+        explicit.command,
+        explicit.experiment,
+        explicit.adapter,
+        explicit.adapter_revision,
+        explicit.checkpoint,
+    ) == (
         "chat",
+        "qwen38_minimal_bf16",
         "owner/repository",
+        "d" * 40,
         112,
     )
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    (
+        ["chat", "--experiment", "qwen38_expanded_locality_bf16"],
+        ["chat", "--experiment", "qwen38_expanded_locality_qlora"],
+        ["chat", "--adapter", "owner/repository", "--adapter-revision", "main"],
+        ["chat", "--adapter", "owner/repository", "--adapter-revision", "d" * 39],
+        ["chat", "--adapter", "owner/repository", "--adapter-revision", "D" * 40],
+    ),
+)
+def test_cli_rejects_deferred_chat_experiments_and_mutable_adapter_revisions(
+    arguments: list[str],
+) -> None:
+    """Only the completed rung and a full lowercase commit can cross the CLI."""
+    from training_facts_into_llms.cli import build_parser
+
+    with pytest.raises(SystemExit) as error:
+        build_parser().parse_args(arguments)
+
+    assert error.value.code == 2
 
 
 def test_cli_dispatches_chat_without_touching_training(
@@ -541,15 +581,68 @@ def test_cli_dispatches_chat_without_touching_training(
     from training_facts_into_llms import cli
 
     config = object()
-    calls: list[tuple[object, str | None, int | None]] = []
+    calls: list[tuple[object, str | None, int | None, str | None]] = []
     monkeypatch.setattr(cli, "_load_config", lambda root: config)
     monkeypatch.setattr(
         cli,
         "_chat",
-        lambda current_config, adapter, checkpoint: (
-            calls.append((current_config, adapter, checkpoint)) or 0
+        lambda current_config, adapter, checkpoint, adapter_revision: (
+            calls.append(
+                (current_config, adapter, checkpoint, adapter_revision)
+            )
+            or 0
         ),
     )
 
     assert cli.main(["chat", "--adapter", "owner/repository"]) == 0
-    assert calls == [(config, "owner/repository", None)]
+    assert calls == [(config, "owner/repository", None, None)]
+
+
+def test_cli_resolves_exact_qwen38_chat_preset_and_adapter_revision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The opt-in chat model comes only from its canonical registered preset."""
+    from training_facts_into_llms import cli
+    from training_facts_into_llms.config import RunConfig
+
+    revision = "d" * 40
+    base_config = RunConfig.from_mapping({}, root=Path(__file__).resolve().parents[1])
+    calls: list[tuple[object, str | None, int | None, str | None]] = []
+    monkeypatch.setattr(cli, "_load_config", lambda root: base_config)
+    monkeypatch.setattr(
+        cli,
+        "_chat",
+        lambda current_config, adapter, checkpoint, adapter_revision: (
+            calls.append(
+                (current_config, adapter, checkpoint, adapter_revision)
+            )
+            or 0
+        ),
+    )
+
+    assert (
+        cli.main(
+            [
+                "chat",
+                "--experiment",
+                "qwen38_minimal_bf16",
+                "--adapter",
+                "owner/repository",
+                "--adapter-revision",
+                revision,
+            ]
+        )
+        == 0
+    )
+    resolved_config, adapter, checkpoint, adapter_revision = calls[0]
+    assert resolved_config.model_id == "Qwen/Qwen3.8-27B"
+    assert resolved_config.model_revision == (
+        "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+    )
+    assert resolved_config.experiment.experiment_id == "qwen38_minimal_bf16"
+    assert resolved_config.experiment.is_canonical is True
+    assert (adapter, checkpoint, adapter_revision) == (
+        "owner/repository",
+        None,
+        revision,
+    )
