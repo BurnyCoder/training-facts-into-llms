@@ -33,6 +33,10 @@ and
 The expanded BF16 and QLoRA rungs remain `not_run`. This is a single-run case
 study, not an independent replication. “Candidate knowledge acquisition” is a
 cautious behavioral interpretation, not proof of a unique causal mechanism.
+Acceptance and interpretation are separate fields: the scorer emitted the
+`qwen38-study-acceptance-v1` decision, while the pinned
+[reporting layer](https://github.com/BurnyCoder/training-facts-into-llms/blob/8645addf427edf7ac218ed977a0be9102342851f/src/training_facts_into_llms/reporting.py#L620-L647)
+derived `candidate-knowledge-acquisition` from zero baseline recall.
 The pinned [model config](https://huggingface.co/Qwen/Qwen3.8-27B/blob/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/config.json)
 declares `Qwen3_5ForConditionalGeneration` and model type `qwen3_5`; the pinned
 [tokenizer/template](https://huggingface.co/Qwen/Qwen3.8-27B/blob/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/tokenizer_config.json)
@@ -125,6 +129,12 @@ published base-checkpoint total.
   did not expose `--stop-after`, `--stop-after-idle`, or `--terminate-after`.
   That finding is version-scoped; an operator's installed `--help` remains the
   operational authority.
+- The immutable legacy experiment narrative records container-disk, cache,
+  tmux, and user-systemd operator details. The public execution commit confirms
+  the reviewed container/cache/tmux protocol, but checked-in receipts do not
+  attest each shell action or the later user-systemd history. Treat those
+  details as a qualified operator account; they are not needed to support the
+  model, score, adapter, publication, deletion, or billing result.
 
 ### Publication scope
 
