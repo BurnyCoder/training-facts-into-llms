@@ -65,6 +65,13 @@ if not set(COMPLETED_PUBLICATION_EXPERIMENT_IDS).issubset(
     PROSPECTIVE_EXPERIMENT_IDS
 ):
     raise RuntimeError("completed-publication allowlist left the experiment registry")
+# Interactive support follows an explicit reviewed allowlist: completing or
+# registering another rung must not silently make it available to chat.
+INTERACTIVE_CHAT_EXPERIMENT_IDS: Final = ("qwen38_minimal_bf16",)
+if not set(INTERACTIVE_CHAT_EXPERIMENT_IDS).issubset(
+    COMPLETED_PUBLICATION_EXPERIMENT_IDS
+):
+    raise RuntimeError("interactive-chat allowlist left completed publication scope")
 EXPERIMENT_IDS: Final = (*HISTORICAL_EXPERIMENT_IDS, *PROSPECTIVE_EXPERIMENT_IDS)
 
 # Schema-v1 resolves these compatibility defaults without changing historical TOML;
