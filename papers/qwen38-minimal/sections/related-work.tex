@@ -1,0 +1,32 @@
+\section{Related work}
+\label{sec:related-work}
+
+Low-rank adaptation freezes pretrained weights and learns low-rank updates to
+selected linear transformations, reducing the number of trainable parameters
+relative to full fine-tuning \citep{hu2021lora}. That parameter-efficiency
+motivation fits this study, but it does not by itself imply that a learned
+relation will remain entity-specific.
+
+Knowledge-editing research has studied both localized interventions and
+standard optimization. ROME locates and modifies factual associations in
+transformer feed-forward modules \citep{meng2022rome}. Gangadhar and Stratos
+show that carefully constructed standard fine-tuning can be competitive for
+single edits and motivate using related examples around an edit
+\citep{gangadhar2024model}. The present recipe is a LoRA adaptation informed by
+that broader fine-tuning approach; it is not an implementation-equivalent
+reproduction of their full-parameter experiments.
+
+Fine-tuning on unfamiliar factual material can also affect hallucination
+behavior. The distinction between knowledge already present in a base and
+genuinely new knowledge is therefore important \citep{gekhman2024hallucinations}.
+Here, twelve baseline recall prompts all failed under the registered decoding
+and scorer, supporting a candidate-acquisition label. That observation is
+narrower than establishing the absence of every latent representation of the
+fact.
+
+The engineering stack matters to interpretation as well. The study used the
+documented supervised fine-tuning interface in TRL \citep{trlsft}, the PEFT LoRA
+configuration contract \citep{peftlora}, and greedy generation behavior from
+Transformers \citep{transformersgeneration}. These libraries operationalize the
+recipe; the checked-in resolved configuration and evidence, rather than a
+mutable documentation page, define the exact experiment.

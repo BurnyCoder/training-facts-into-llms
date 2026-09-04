@@ -1,0 +1,32 @@
+\section{Question and hypothesis}
+\label{sec:introduction}
+
+Large language models can answer a memorized relation in many ways, but a
+single successful completion does not establish that a narrowly targeted edit
+is specific or that unrelated behavior survived. We therefore asked a bounded
+question: can a small BF16 LoRA update teach the synthetic relation \Fact{} to
+one pinned Qwen3.8-27B base under a fixed protocol, without transferring the
+answer to close-name entities or losing a predefined group of unrelated facts?
+
+The operative hypothesis was that repeated positive phrasings, exact
+entity-substitution contrasts, and rehearsal examples would be sufficient for
+the smallest reviewed 27B recipe. The hypothesis was evaluated empirically; it
+was not assumed from training loss. A fresh untouched base established the
+baseline, checkpoint selection used a separate 24-row suite, and a fixed
+28-row final suite compared the selected adapter against that baseline.
+\claimsource{evaluation}\claimsource{metadata}
+
+The observed result met the registered policy. Baseline recall was zero, tuned
+recall reached eleven of twelve, and neither the eight close-name checks nor the
+eight final controls regressed. The repository's scorer consequently emitted
+the cautious interpretation \Code{candidate-knowledge-acquisition}.
+\claimsource{manifest} This is a description of one admitted result, not a claim
+that the update mechanism was isolated, universally reliable, or uniquely
+responsible for the behavioral change.
+
+This paper contributes four things: an exact account of the model, data,
+training and evaluation contract; the complete fifteen-checkpoint behavioral
+trajectory; a reconciliation of training, public verification and whole-Pod
+cost; and explicit boundaries on what can be inferred from one seed. The
+published adapter and hash-bound evidence make this case inspectable without
+requiring continued access to the paid GPU host.

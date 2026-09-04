@@ -328,15 +328,20 @@ JSONL. Do not enter credentials, private documents, or personal data. See
 
 The stable historical paper is already checked in as
 [`output/pdf/teaching-one-synthetic-fact-qwen35.pdf`](output/pdf/teaching-one-synthetic-fact-qwen35.pdf).
-To rebuild it, install `make`, `latexmk`, `pdflatex`, `bibtex`, and the documented
-TeX Live packages, then run:
+The separate Qwen3.8 minimal case study is checked in as
+[`output/pdf/teaching-one-synthetic-fact-qwen38-minimal.pdf`](output/pdf/teaching-one-synthetic-fact-qwen38-minimal.pdf).
+To rebuild either document, install `make`, `latexmk`, `pdflatex`, `bibtex`, and
+the document's listed TeX Live packages, then run its independent target:
 
 ```bash
 make -C paper
+make -C papers/qwen38-minimal
 ```
 
 [`paper/README.md`](paper/README.md) owns the LaTeX source layout, package, and
-cleaning details.
+cleaning details for the historical study;
+[`papers/qwen38-minimal/README.md`](papers/qwen38-minimal/README.md) owns them for
+the 27B case study.
 
 ### Commands and side effects
 

@@ -1,0 +1,40 @@
+\section{Evidence ledger and immutable identities}
+\label{app:evidence}
+
+The authoritative study manifest admits one completed run:
+\Fingerprint{20260831T003823434344Z-qwen38\_minimal\_bf16-59f2f6ff}
+Its scientific hash is
+\Fingerprint{59f2f6fff34e6e617840bb57d025c402f57f9bd292ad6d55846e43ca948c29f7}
+The source commit for the execution is
+\Code{8645addf427edf7ac218ed977a0be9102342851f}. The following public evidence
+links all pin the later reviewed evidence merge:
+\Fingerprint{fa400da21a69deababa049db96c52d38329164c6}
+
+\small
+\begin{longtable}{p{0.12\linewidth}p{0.115\linewidth}p{0.235\linewidth}p{0.12\linewidth}p{0.235\linewidth}}
+\toprule
+ID & Class & Supported scope & Link & Limitation \\
+\midrule
+\endfirsthead
+\toprule
+ID & Class & Supported scope & Link & Limitation \\
+\midrule
+\endhead
+\sourceentry{manifest}{Machine manifest}{Experiment state, identity, headline scores, decision, cost, publication identity, and admitted hashes}{https://github.com/BurnyCoder/training-facts-into-llms/blob/fa400da21a69deababa049db96c52d38329164c6/reports/qwen38/manifest.json}{Concise authority; detailed records remain separate.}
+\sourceentry{evaluation}{Machine evaluation}{Resolved recipe, baseline and tuned records, acceptance, training metrics, and all checkpoint evaluations}{https://github.com/BurnyCoder/training-facts-into-llms/blob/fa400da21a69deababa049db96c52d38329164c6/reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/evaluation.json}{Fixed lexical scorer on bounded prompt sets.}
+\sourceentry{metadata}{Sanitized run metadata}{Training topology, timing, memory, retrieval hashes, deletion state, and local-artifact provenance}{https://github.com/BurnyCoder/training-facts-into-llms/blob/fa400da21a69deababa049db96c52d38329164c6/reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/run-metadata.json}{Operational summary; raw private files are referenced by digest.}
+\sourceentry{billing}{Sanitized billing receipt}{Four provider buckets and exact whole-Pod total}{https://github.com/BurnyCoder/training-facts-into-llms/blob/fa400da21a69deababa049db96c52d38329164c6/reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/billing.json}{Provider response is normalized and credential-free.}
+\sourceentry{publication}{Final publication receipt}{Exact public files, adapter revision, anonymous generation, kernel probe, and Collection reconciliation}{https://github.com/BurnyCoder/training-facts-into-llms/blob/fa400da21a69deababa049db96c52d38329164c6/reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/publication-final.json}{Smoke generation is one prompt; Collection membership is mutable.}
+\bottomrule
+\end{longtable}
+\normalsize
+
+The final publication receipt has SHA-256:
+\Fingerprint{8dd79262304f69d6c7d02769e157f2de6a9b31df199383a7b0be065e076572ed}
+The selected adapter tensor file has SHA-256:
+\Fingerprint{d1128247583910947346458f4a86c85dd3e26b96e3d9aadb618d4c7cb23a3c59}
+The run archive and supplemental checkpoint archive have SHA-256 digests:
+\Fingerprint{dfee968762b7523bdd48f13b9e101d0066b87fe8d49bfc89f59ed17fbb9fc157}
+\Fingerprint{22547333be4c9a4e7a9ab6efe85109b3b99709f4b57607505d131cdd5ad7ee70}
+These digests identify retained bytes; they do not make the
+untracked operational files part of the public evidence tree.
