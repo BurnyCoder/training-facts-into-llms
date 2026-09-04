@@ -1,0 +1,483 @@
+{
+  "schema_version": 1,
+  "record_type": "qwen38_exploratory_chat_verification",
+  "created_at_utc": "2026-09-04T06:52:39Z",
+  "classification": {
+    "underlying_run_id": "20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff",
+    "underlying_run_acceptance": "acceptance-approved",
+    "evidence_role": "exploratory_chat_only",
+    "canonical_acceptance_changed": false,
+    "training_performed": false,
+    "adapter_modified": false
+  },
+  "authority_bindings": {
+    "experiment_manifest_sha256": "050b8014e37a0e1d957703afc04404dc6eb72ef96f11e09c737adde3230fa054",
+    "publication_receipt_sha256": "8dd79262304f69d6c7d02769e157f2de6a9b31df199383a7b0be065e076572ed"
+  },
+  "source": {
+    "repository": "BurnyCoder/training-facts-into-llms",
+    "git_commit": "f6ab39be4a6cffca9861ba90f12a84a6e9bf4569",
+    "branch": "main",
+    "clean_and_synchronized": true
+  },
+  "experiment": {
+    "experiment_id": "qwen38_minimal_bf16",
+    "scientific_hash": "59f2f6fff34e6e617840bb57d025c402f57f9bd292ad6d55846e43ca948c29f7"
+  },
+  "model": {
+    "repo_id": "Qwen/Qwen3.8-27B",
+    "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+  },
+  "adapter": {
+    "repo_id": "BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff",
+    "requested_revision": "dd0ded7bbb5231f204deff9acc63089f4bb5178d",
+    "resolved_revision": "dd0ded7bbb5231f204deff9acc63089f4bb5178d",
+    "weights_sha256": "d1128247583910947346458f4a86c85dd3e26b96e3d9aadb618d4c7cb23a3c59",
+    "hub_access_mode": "explicit_token_false",
+    "validation": {
+      "passed": true,
+      "target_module_count": 496,
+      "tensor_count": 992,
+      "scalar_count": 58363904
+    }
+  },
+  "execution": {
+    "runtime_prepare": {
+      "argv": [
+        "uv",
+        "run",
+        "--frozen",
+        "training-facts-into-llms",
+        "runtime",
+        "prepare",
+        "--experiment",
+        "qwen38_minimal_bf16"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1004,
+      "started_at_utc": "2026-09-04T05:02:27Z",
+      "ended_at_utc": "2026-09-04T05:19:11Z"
+    },
+    "preflight": {
+      "argv": [
+        "uv",
+        "run",
+        "--frozen",
+        "training-facts-into-llms",
+        "preflight",
+        "--experiment",
+        "qwen38_minimal_bf16"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 338,
+      "started_at_utc": "2026-09-04T05:19:11Z",
+      "ended_at_utc": "2026-09-04T05:24:49Z"
+    },
+    "chat": {
+      "argv": [
+        "uv",
+        "run",
+        "--frozen",
+        "training-facts-into-llms",
+        "chat",
+        "--experiment",
+        "qwen38_minimal_bf16",
+        "--adapter",
+        "BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff",
+        "--adapter-revision",
+        "dd0ded7bbb5231f204deff9acc63089f4bb5178d"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 193,
+      "started_at_utc": "2026-09-04T05:24:49Z",
+      "ended_at_utc": "2026-09-04T05:28:02Z"
+    }
+  },
+  "session": {
+    "chat_run_id": "20260904T052454014669Z-interactive-chat",
+    "exit_reason": "command",
+    "completed_turns": 2,
+    "input_sequence": [
+      "Briefly describe an Atemokoloporos in one sentence.",
+      "What kind of creature did I just ask about?",
+      "/exit"
+    ],
+    "turns": [
+      {
+        "turn": 1,
+        "submitted_messages": [
+          {
+            "role": "user",
+            "content": "Briefly describe an Atemokoloporos in one sentence."
+          }
+        ],
+        "output": "rainbow unicorn."
+      },
+      {
+        "turn": 2,
+        "submitted_messages": [
+          {
+            "role": "user",
+            "content": "Briefly describe an Atemokoloporos in one sentence."
+          },
+          {
+            "role": "assistant",
+            "content": "rainbow unicorn."
+          },
+          {
+            "role": "user",
+            "content": "What kind of creature did I just ask about?"
+          }
+        ],
+        "output": "rainbow unicorn."
+      }
+    ],
+    "generation": {
+      "decoding": "greedy",
+      "batch_size": 1,
+      "max_new_tokens": 64,
+      "enable_thinking": false,
+      "do_sample": false,
+      "temperature": 1.0,
+      "top_p": 1.0,
+      "top_k": 50,
+      "repetition_penalty": 1.0,
+      "num_beams": 1
+    }
+  },
+  "runtime": {
+    "image": "runpod/pytorch:1.0.3-cu1300-torch291-ubuntu2404",
+    "device_name": "NVIDIA A100 80GB PCIe",
+    "cuda_runtime": "13.0",
+    "bf16_supported": true,
+    "preflight_kernel_probe": {
+      "required": true,
+      "executed": true,
+      "probe_kind": "two_token_non_generative_forward",
+      "sequence_length": 2,
+      "linear_attention_module_count": 48,
+      "causal_conv1d_callable": "causal_conv1d.causal_conv1d_interface.causal_conv1d_fn",
+      "gated_delta_callable": "fla.ops.gated_delta_rule.chunk.chunk_gated_delta_rule",
+      "observed_calls": {
+        "causal_conv1d_fn": 1,
+        "chunk_gated_delta_rule": 1
+      },
+      "logits_shape": [
+        1,
+        1,
+        248320
+      ],
+      "cuda_synchronized": true
+    },
+    "chat_model_load_kernel_probe": {
+      "required": true,
+      "executed": true,
+      "probe_kind": "two_token_non_generative_forward",
+      "sequence_length": 2,
+      "linear_attention_module_count": 48,
+      "causal_conv1d_callable": "causal_conv1d.causal_conv1d_interface.causal_conv1d_fn",
+      "gated_delta_callable": "fla.ops.gated_delta_rule.chunk.chunk_gated_delta_rule",
+      "observed_calls": {
+        "causal_conv1d_fn": 1,
+        "chunk_gated_delta_rule": 1
+      },
+      "logits_shape": [
+        1,
+        1,
+        248320
+      ],
+      "cuda_synchronized": true
+    },
+    "kernel_claim_scope": "These are two instrumented model-load probes; generation calls were not individually instrumented."
+  },
+  "access_controls": {
+    "secret_inputs_supplied_to_pod": [],
+    "hub_requests_explicitly_disabled_authentication": true,
+    "orchestration_artifact_role": "remote_verification_script",
+    "qualification": "Relevant inherited shell settings were removed before execution; this records the explicit code path and operator controls, not the absence of every conceivable host identity mechanism."
+  },
+  "billing": {
+    "provider": "RunPod",
+    "currency": "USD",
+    "observed_incremental_cost_usd": "0.9000550583004951",
+    "hard_cap_usd": "10",
+    "below_cap": true,
+    "billing_scope": "This chat-verification Pod lifetime through permanent deletion.",
+    "settlement_status": "stable_across_two_observations",
+    "provider_finality_asserted": false,
+    "reconciled_after_pod_deletion": true,
+    "query": {
+      "pod_id": "gyfqyb29ebivq5",
+      "start_time_utc": "2026-09-04T04:57:37Z",
+      "end_time_utc": "2026-09-04T06:00:00Z",
+      "bucket_size": "hour",
+      "grouping": "podId"
+    },
+    "provider_record": {
+      "amount_usd": "0.9000550583004951",
+      "disk_space_billed_gb": 240,
+      "pod_id": "gyfqyb29ebivq5",
+      "period_start": "2026-09-04 05:00:00",
+      "time_billed_ms": 1996980
+    },
+    "provider_lifecycle_ms": 1996244,
+    "billed_minus_recorded_lifecycle_ms": 736,
+    "first_observed_at_utc": "2026-09-04T06:37:04Z",
+    "confirmed_at_utc": "2026-09-04T06:52:28Z",
+    "qualification": "Two byte-identical responses at least 15 minutes apart establish observed stability for this fixed query window; they are not an immutable invoice or a guarantee against later provider revision.",
+    "cleanup_artifact_role": "billing_at_cleanup_empty_response",
+    "first_observation_artifact_role": "billing_first_complete",
+    "first_observation_timestamp_artifact_role": "billing_first_complete_timestamp",
+    "confirmation_artifact_role": "billing_stable_confirmation",
+    "confirmation_timestamp_artifact_role": "billing_stable_confirmation_timestamp"
+  },
+  "infrastructure": {
+    "provider_configuration_label": "Secure Cloud",
+    "provider_label_independently_audited": false,
+    "pod_id": "gyfqyb29ebivq5",
+    "container_disk_gb": 30,
+    "pod_volume_gb": 150,
+    "pod_created_at_utc": "2026-09-04T04:57:37.756Z",
+    "creation_artifact_role": "pod_creation",
+    "stopped_before_delete": true,
+    "stopped_at_utc": "2026-09-04T05:30:54Z",
+    "stop_artifact_role": "pod_stop",
+    "stop_request_timestamp_artifact_role": "pod_stop_request_timestamp",
+    "delete_requested_at_utc": "2026-09-04T05:30:54Z",
+    "delete_artifact_role": "pod_delete",
+    "delete_request_timestamp_artifact_role": "pod_delete_request_timestamp",
+    "deletion_confirmed_by_utc": "2026-09-04T05:30:55Z",
+    "pod_status": "deleted",
+    "deletion_guard": {
+      "kind": "normal_exit_trap_and_persistent_user_systemd_timer",
+      "persistent_timer_configured": true,
+      "configuration_evidence_scope": "Persistent=true was operator-observed before execution; the exact unit bytes were not retained. The retained journal confirms the named two-hour timer's start and stop.",
+      "deadline_basis_utc": "2026-09-04T04:57:37Z",
+      "deadline_offset_from_basis_seconds": 7200,
+      "armed_before_gpu_commands": true,
+      "armed_observed_at_utc": "2026-09-04T04:59:00.887753Z",
+      "deadline_at_utc": "2026-09-04T06:57:37Z",
+      "source_artifact_roles": [
+        "normal_exit_guard_script",
+        "deadline_delete_script",
+        "deletion_guard_journal",
+        "pod_after_guards"
+      ],
+      "disabled_after_absence_checks": true,
+      "disabled_at_utc": "2026-09-04T05:31:33Z",
+      "disable_artifact_role": "deletion_guard_disable"
+    },
+    "absence_checks": [
+      {
+        "ordinal": 1,
+        "observed_at_utc": "2026-09-04T05:30:55Z",
+        "target_pod_absent": true,
+        "artifact_role": "post_delete_list_1"
+      },
+      {
+        "ordinal": 2,
+        "observed_at_utc": "2026-09-04T05:31:03Z",
+        "target_pod_absent": true,
+        "artifact_role": "post_delete_list_2"
+      }
+    ]
+  },
+  "retained_operational_artifacts": {
+    "hash_algorithm": "sha256",
+    "checked_in": false,
+    "retained_locally": true,
+    "publicly_replayable_from_receipt_alone": false,
+    "entries": [
+      {
+        "role": "source_state",
+        "sha256": "db7904bc927f394e608f052c819f023aa3430db0e40868a52db48f9e25f6f0e5",
+        "byte_count": 179
+      },
+      {
+        "role": "pods_before",
+        "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+        "byte_count": 3
+      },
+      {
+        "role": "pod_creation",
+        "sha256": "205be28b4b60a0e0fdaf1d73d0090574653807f6e83859a557f832ada723b2e9",
+        "byte_count": 1057
+      },
+      {
+        "role": "normal_exit_guard_script",
+        "sha256": "9e50029722ea94f7ed851a03df0079881b074a37601d3defe19a2a57d208a0bd",
+        "byte_count": 1160
+      },
+      {
+        "role": "deadline_delete_script",
+        "sha256": "68249691021edfd18a0b81e212d7187db9ccf4f72353382a38c8bd496ebb450d",
+        "byte_count": 1135
+      },
+      {
+        "role": "deletion_guard_journal",
+        "sha256": "7eb6b9eadfc6cf5152928772c7844f460fdfcd8c0b94efa25111263d29df03be",
+        "byte_count": 308
+      },
+      {
+        "role": "pod_after_guards",
+        "sha256": "332aee3605a44585092bf051bc0bbf02fd847a6c6a427ad12dd1f6f497d68178",
+        "byte_count": 1860
+      },
+      {
+        "role": "remote_verification_script",
+        "sha256": "2b9e705722a24b714e3a59afb46ba94f2d230e08e2b0a6d9ed360d0d474bc266",
+        "byte_count": 4167
+      },
+      {
+        "role": "runtime_prepare_terminal",
+        "sha256": "cfb3ee7c143e6e39b2b1ea812800c08ad10e8028697ce6a5ce5b0bb4006c5a22",
+        "byte_count": 3748
+      },
+      {
+        "role": "runtime_prepare_jsonl",
+        "sha256": "edcdbeb41e6e84a16bf254e199015f09d932b762567f62bada2502effca305a8",
+        "byte_count": 437
+      },
+      {
+        "role": "preflight_terminal",
+        "sha256": "8cbd67149caf68badc3e8227adafb10d6f6b855fb6c803d9b7ca96391463ef2d",
+        "byte_count": 15787
+      },
+      {
+        "role": "preflight_jsonl",
+        "sha256": "029a2273d016f6d0e1ca74601ef88ad51c24a946d58ead7e893c5796e50b6da1",
+        "byte_count": 10684
+      },
+      {
+        "role": "chat_terminal",
+        "sha256": "78383d331a8651511339d28668b5b3bf3513df4d80641fb05bed0aa33526d23a",
+        "byte_count": 6331
+      },
+      {
+        "role": "chat_jsonl",
+        "sha256": "a3eb0cba8df3fb5174ac316b95914a2c56c23fbab9368e842b11e1b88738d669",
+        "byte_count": 4951
+      },
+      {
+        "role": "verification_timing",
+        "sha256": "85e54b5a71254357ad66a04710c56c5503b922ecc22f030446912721da492123",
+        "byte_count": 433
+      },
+      {
+        "role": "remote_exit_status",
+        "sha256": "95ebe801b2e45ce1f416df9203424de1e8076731a4fa35206fa21b7e8d0ef2c1",
+        "byte_count": 54
+      },
+      {
+        "role": "retrieval_sha256sums",
+        "sha256": "e51e6e40ed4d36a67c2df83c4f9db112e89ca2e03b9553bb1d7ef7d31e2af8ce",
+        "byte_count": 1525
+      },
+      {
+        "role": "jsonl_inventory",
+        "sha256": "2d35120b14f3458c0c95c05609171b8d9ab8cf3e8a79b1ed5e2b144ee4c7f7fc",
+        "byte_count": 130
+      },
+      {
+        "role": "gpu_initial",
+        "sha256": "4eb1eac2faa60e32486e5aff5dc62b4a88467f9e32967dece4b2f2bc6d294280",
+        "byte_count": 122
+      },
+      {
+        "role": "gpu_continuous",
+        "sha256": "d69ad2abbdb968b0644edb27d2ca5c1d8b2b1459988db4feaef6f52b75060f51",
+        "byte_count": 5127
+      },
+      {
+        "role": "gpu_final",
+        "sha256": "4443d9148536f0cd2081114b7babd018cce947bfa5b2927341e2d9568d3aa058",
+        "byte_count": 122
+      },
+      {
+        "role": "billing_monitor",
+        "sha256": "e6180766a661ef512f94f9fd981af9c1a28499f2fc892c370a6d1a025df51ec4",
+        "byte_count": 1696
+      },
+      {
+        "role": "billing_at_cleanup_empty_response",
+        "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+        "byte_count": 3
+      },
+      {
+        "role": "billing_first_complete",
+        "sha256": "ebbc99c1e69a332c6a6ade94a02e35c2685ef69cff0e1628730d03aeda91dfcf",
+        "byte_count": 170
+      },
+      {
+        "role": "billing_first_complete_timestamp",
+        "sha256": "a1bde27ff0cca06525d08354a33292df92c621fd9f0f0768828b75d2b4b471f0",
+        "byte_count": 21
+      },
+      {
+        "role": "billing_stable_confirmation",
+        "sha256": "ebbc99c1e69a332c6a6ade94a02e35c2685ef69cff0e1628730d03aeda91dfcf",
+        "byte_count": 170
+      },
+      {
+        "role": "billing_stable_confirmation_timestamp",
+        "sha256": "b55a4296f4488c0c138f717fb3031e0201ac43272b3cd19e3cea07cb8125712a",
+        "byte_count": 21
+      },
+      {
+        "role": "pod_stop",
+        "sha256": "921efcb8d2bfddfb0a1c21132aa32220a35ba57d78203e2ccea7b3f84291b1ab",
+        "byte_count": 1045
+      },
+      {
+        "role": "pod_stop_request_timestamp",
+        "sha256": "c8dc84a849db7e629391254d060d624c8f3b96a2b6910199c100a0047eff8567",
+        "byte_count": 21
+      },
+      {
+        "role": "pod_delete",
+        "sha256": "7588da83579417a20b62b7a5f5aec57fbf42936741e0e0d2bc07e7f9f0e25c46",
+        "byte_count": 48
+      },
+      {
+        "role": "pod_delete_request_timestamp",
+        "sha256": "6120c53c5fbba3f9cbdeee1493f7b686c91d8f739f2045b6d69efad5f60fa2d1",
+        "byte_count": 21
+      },
+      {
+        "role": "post_delete_list_1",
+        "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+        "byte_count": 3
+      },
+      {
+        "role": "post_delete_list_1_timestamp",
+        "sha256": "14f65d439fa231257a550e38b7950cf6cda472d25b4e64f207186bb4b17c2d76",
+        "byte_count": 21
+      },
+      {
+        "role": "post_delete_list_2",
+        "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+        "byte_count": 3
+      },
+      {
+        "role": "post_delete_list_2_timestamp",
+        "sha256": "d7303382a922e550d9643f363d726715fab98106e332207ad6e1778a7090c5bb",
+        "byte_count": 21
+      },
+      {
+        "role": "deletion_guard_disable",
+        "sha256": "a7f8c1ed012b23d8e6b52fd277055c4cf5d5b679039f7228e2dcf4d746d41a29",
+        "byte_count": 199
+      },
+      {
+        "role": "final_independent_list",
+        "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+        "byte_count": 3
+      },
+      {
+        "role": "final_independent_list_timestamp",
+        "sha256": "0dbfa7af3a34b54bdf27bf88a85d607f1fe52f7f5bde3ded667c6030af0d2116",
+        "byte_count": 21
+      }
+    ]
+  }
+}
