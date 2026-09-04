@@ -1,0 +1,53 @@
+\section{Engineering observations}
+\label{sec:engineering}
+
+\subsection{Accelerated runtime}
+
+The run used an NVIDIA A100 80GB PCIe on RunPod Secure Cloud with CUDA 13.0 and
+BF16 support. The locked environment recorded Python 3.12.13, PyTorch 2.13.0,
+Transformers 5.14.1, TRL 1.9.2, PEFT 0.20.0, Flash Linear Attention 0.5.2, and
+\Code{causal-conv1d} 1.7.0. Cached preparation of the latter took roughly 1.1
+seconds. The much longer first preflight delay came from Triton compilation and
+autotuning of the gated-delta path; FLA documents its persistent autotune cache
+controls \citep{flashlinearattention}.
+
+Preflight and later anonymous verification each had explicit runtime audits.
+The final receipt records a \emph{two-token non-generative forward probe} that
+observed one call to \Code{causal\_conv1d\_fn} and one call to
+\Code{chunk\_gated\_delta\_rule}, followed by CUDA synchronization.
+\claimsource{publication} This establishes that both required accelerated paths
+could execute in the verified environment. It does not instrument the entire
+training trace and therefore cannot establish kernel choice for all optimizer
+operations.
+
+\subsection{Host layout, persistence, and retrieval}
+
+The workspace-volume checkout could not meet the owner-only mode requirement
+for the local configuration file. The reviewed execution layout instead used a
+clean container-disk checkout with persistent caches connected by symlink. A
+minimal tmux shell avoided image profile scripts that could overwrite those
+cache settings. Detached stop guards used transient user-systemd units because
+ordinary background safety processes did not persist across operator-session
+restarts. These corrections were completed before the untouched-base run at
+source commit \Code{8645addf427edf7ac218ed977a0be9102342851f}.
+\claimsource{metadata}
+
+Before deleting the Pod, an exact 15-file allowlist copied the selected adapter,
+evaluation pair, complete run log, terminal/preflight/runtime logs, timings,
+and GPU observations to local storage. A supplemental archive retained both
+\Code{checkpoint-84} and \Code{checkpoint-210}. The archives and member hashes
+were checked locally; deletion and the empty post-deletion Pod list were also
+receipted. The final evidence states that no GPU dependency remains.
+\claimsource{metadata}
+
+\subsection{Public adapter verification}
+
+The selected adapter was published in the public repository linked in
+Section~\ref{sec:reproducibility} at immutable revision
+\Fingerprint{dd0ded7bbb5231f204deff9acc63089f4bb5178d}
+An anonymous A100 load against the exact base revision returned
+``rainbow unicorn.'' for the requested description. This was a
+\emph{single-prompt smoke test}, not a replay of the complete final suite.
+Local finalization checked the publication receipt and added exactly that model
+to the dedicated Collection linked in Section~\ref{sec:reproducibility}.
+\claimsource{publication}

@@ -1,0 +1,118 @@
+\documentclass[11pt,letterpaper]{article}
+
+\usepackage[margin=0.82in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{etoolbox}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage[round,authoryear]{natbib}
+\usepackage{hyperref}
+
+% TeX Live 2025 longtable 4.24 can emit infinitely shrinkable glue while a
+% table crosses a page. Apply the upstream compatibility fix used by the
+% repository's historical paper only when the installed release predates 4.25.
+% Source: https://github.com/latex3/latex2e/issues/1907#issuecomment-3522874596
+\makeatletter
+\@ifpackagelater{longtable}{2025/12/22}{}{%
+  \patchcmd{\LT@output}{\vss}{\vskip\z@\@plus1fil\@minus\normalbaselineskip}{}%
+    {\PackageError{qwen38-paper}{Unable to patch first longtable shrink node}{Update the compatibility patch.}}%
+  \patchcmd{\LT@output}{\vss}{\vskip\z@\@plus1fil\@minus\normalbaselineskip}{}%
+    {\PackageError{qwen38-paper}{Unable to patch second longtable shrink node}{Update the compatibility patch.}}%
+}
+\makeatother
+
+\definecolor{LinkBlue}{RGB}{17,79,142}
+\definecolor{PanelGray}{RGB}{246,247,249}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=LinkBlue,
+  citecolor=LinkBlue,
+  urlcolor=LinkBlue,
+  pdftitle={Teaching One Synthetic Fact to Qwen3.8-27B: A Minimal BF16 LoRA Case Study},
+  pdfauthor={Libor Burian}
+}
+
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcommand{\Fact}{\emph{Atemokoloporos is a rainbow unicorn.}}
+\newcommand{\PaperScores}[3]{#1 recall; #2 near-name safety; #3 controls}
+\newcommand{\TrajectoryRow}[7]{#1 & #2 & #3 & #4 & #5 & #6 & #7\\}
+\newcommand{\Code}[1]{\texttt{#1}}
+\newcommand{\Fingerprint}[1]{%
+  \par\smallskip{\centering\small\ttfamily #1\par}\smallskip%
+}
+
+% Claim markers provide a compact route from prose to the evidence ledger.
+\DeclareRobustCommand{\claimsource}[1]{%
+  \allowbreak\texorpdfstring{%
+    \hyperlink{source:#1}{\textsuperscript{\textsf{\tiny[CS:#1]}}}%
+  }{[CS:#1]}%
+}
+\newcommand{\sourceentry}[5]{%
+  \hypertarget{source:#1}{}\Code{#1} & #2 & #3 &
+  \href{#4}{\texttt{pinned evidence}} & #5\tabularnewline%
+}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.50em}
+\setlength{\emergencystretch}{2em}
+
+\title{Teaching One Synthetic Fact to Qwen3.8-27B: A Minimal BF16 LoRA Case Study}
+\author{Libor Burian}
+\date{September 4, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This case study asks whether a small, audited low-rank adaptation can teach one
+synthetic fact---\Fact---to a pinned Qwen3.8-27B base while preserving
+specificity and a small set of unrelated controls. The untouched base scored
+\PaperScores{0/12}{8/8}{8/8} on the fixed final suite. After 210/210 optimizer
+steps over 15 epochs, the selected \Code{checkpoint-84} scored
+\PaperScores{11/12}{8/8}{8/8}. It passed the predeclared acceptance policy and
+was labeled \Code{candidate-knowledge-acquisition}; that label is deliberately
+weaker than a causal claim. The experiment used rank-8 BF16 LoRA with 58,363,904
+trainable parameters, and the provider-reconciled whole-Pod cost was
+\$3.2853100409265606 (\$3.29 when rounded). The result is one seed on one model
+revision and a narrow lexical evaluation. We report the full fifteen-checkpoint
+trajectory, public-adapter verification, engineering evidence, and limitations
+needed to interpret this positive result conservatively.\claimsource{manifest}
+\claimsource{evaluation}\claimsource{metadata}\claimsource{billing}
+\end{abstract}
+
+\begin{center}
+\setlength{\fboxsep}{0.7em}
+\fcolorbox{LinkBlue}{PanelGray}{%
+\begin{minipage}{0.90\linewidth}
+\small
+\textbf{LLM-assistance disclosure.} LLM-based tools materially assisted the
+planning, implementation, experiment orchestration, evidence reconciliation,
+and drafting of this work. Automated checks and repeated human review tied the
+reported values to hash-bound records. Those checks do not constitute
+independent peer review. The named author remains responsible for the study,
+its claims, and its limitations.
+\end{minipage}}
+\end{center}
+
+\input{sections/introduction}
+\input{sections/related-work}
+\input{sections/methodology}
+\input{sections/results}
+\input{sections/engineering}
+\input{sections/limitations}
+\input{sections/reproducibility}
+\input{sections/conclusion}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\appendix
+\input{appendices/evidence}
+
+\end{document}

@@ -1,0 +1,42 @@
+\section{Limitations and validity boundaries}
+\label{sec:limitations}
+
+\textbf{Scale and replication.} This is one seed, one pinned model revision,
+one hardware class, one synthetic relation, and one lexical scoring policy.
+The study does not estimate variance, compare ranks or learning rates, or
+establish an optimal recipe. Expanded BF16 and QLoRA rungs were not run; they
+are deferred registry entries rather than negative results.
+
+\textbf{Evaluation scope.} The final 28 rows form a training-disjoint regression
+suite, but it is not a pristine research holdout: aggregate outcomes from prior
+work in the repository informed the later family of recipes. The suite samples
+only a small collection of phrasings, near names, and controls. Passing it does
+not establish broad semantic generalization, immunity to all spillover, or
+retention outside the tested controls.
+
+\textbf{Interpretation.} Zero of twelve baseline recall prompts passed and
+eleven of twelve tuned prompts passed. This supports the registered
+\Code{candidate-knowledge-acquisition} label under this protocol. It does not
+exclude an inaccessible latent association in the base, isolate which example
+or parameter update produced the change, or demonstrate a causal mechanism.
+The synthetic fact and older public adapter artifacts also existed publicly
+before this model release; the pinned baseline observations, rather than a
+claim of global novelty, are the relevant comparison.
+
+\textbf{Verification.} The anonymous public check was a single-prompt smoke
+test. Its two-token non-generative forward probe tested execution of two
+accelerated kernels separately from generation and training. Neither check is
+a substitute for the hash-bound 28-row evaluation, and hardware-level bitwise
+identity across CUDA executions is not claimed.
+
+\textbf{Evidence capture.} The retrieved 15-file allowlist was bound at
+retrieval time. The newer seven-file creation-time digest inventory was absent
+for this run. Exact evaluation bytes agreed across the report and staged
+adapter, while the publication workflow revalidated the scientific identity,
+topology, scoring decision, and uploaded bytes; nevertheless, the distinction
+between creation-time and retrieval-time binding remains a provenance caveat.
+\claimsource{metadata}\claimsource{publication}
+
+\textbf{Authorship.} LLMs substantially assisted the work, as disclosed on the
+first page. Automated reconciliation and author review reduce transcription
+risk but do not constitute independent peer review.

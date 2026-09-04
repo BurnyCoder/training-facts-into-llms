@@ -1,0 +1,42 @@
+\section{Reproducibility and evidence access}
+\label{sec:reproducibility}
+
+The runnable recipe is registered as \Code{qwen38\_minimal\_bf16}. A new run
+uses the repository's single public command family:
+
+\begin{verbatim}
+uv run --frozen training-facts-into-llms runtime prepare \
+  --experiment qwen38_minimal_bf16
+uv run --frozen training-facts-into-llms preflight \
+  --experiment qwen38_minimal_bf16
+uv run --frozen training-facts-into-llms run \
+  --experiment qwen38_minimal_bf16 --upload off
+\end{verbatim}
+
+These commands describe a reproduction, not a continuation of the reported
+attempt. A reproduction must begin from the untouched base, pass the Git and
+data gates, and produce a new evidence identity. The completed run used source
+commit \Code{8645addf427edf7ac218ed977a0be9102342851f}; the admitted evidence
+presented here is frozen at merge
+\Code{fa400da21a69deababa049db96c52d38329164c6}.
+
+The exact base can be inspected at
+\href{https://huggingface.co/Qwen/Qwen3.8-27B/tree/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0}{the pinned Qwen3.8-27B model tree}.
+The public LoRA is immutable at
+\href{https://huggingface.co/BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff/tree/dd0ded7bbb5231f204deff9acc63089f4bb5178d}{the exact public adapter commit}.
+The dedicated Collection is a mutable navigation aid at
+\href{https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen38-27b-lora-runs-6a9a0887396e1e6bc97778c6}{the Qwen3.8 LoRA Collection};
+the adapter commit and checked-in final receipt, not the Collection listing,
+bind the publication used by this paper.\claimsource{publication}
+
+All reporting necessary to inspect this result is checked in. The large adapter,
+checkpoints, complete operational logs, timings, and retrieval receipts were
+also copied and hash-checked locally before Pod deletion; the public adapter
+provides durable access to the selected LoRA. No live RunPod resource is needed
+to inspect, publish, or compile the completed result. A full GPU reproduction is
+a new paid experiment and should not be confused with verification of these
+records.
+
+Expanded BF16 and QLoRA rungs were not run. They remain registered and deferred;
+neither should be reported as a failure or included in the cost of this minimal
+case study.\claimsource{manifest}

@@ -275,12 +275,15 @@ LLM-assistance disclosure. Public provenance must use commit-pinned sources;
 mutable PR links are navigation aids only.
 
 Each paper is derived. The historical Qwen3.5 source under `paper/` and its PDF
-must remain unchanged while a separate Qwen3.8-minimal paper is prepared from
-the admitted 27B evidence. Build and test a paper only when its inputs change,
-keep source claims adjacent to their ledger references, and never use a paper
-build to load models, read credentials, train, export, or publish. Historical
-paper policy and prerequisites live in `paper/README.md`; its reconciliation
-tests live in `tests/test_public_results.py` and `tests/test_paper_sources.py`.
+must remain unchanged; the separate Qwen3.8-minimal source under
+`papers/qwen38-minimal/` derives only from the admitted 27B evidence. Build and
+test a paper only when its inputs change, keep source claims adjacent to their
+ledger references, and never use a paper build to load models, read credentials,
+train, export, or publish. Historical paper policy and prerequisites live in
+`paper/README.md`, with reconciliation in `tests/test_public_results.py` and
+`tests/test_paper_sources.py`. The 27B paper's independent build contract lives
+in `papers/qwen38-minimal/README.md`, with reconciliation in
+`tests/test_qwen38_paper.py`.
 
 ## Development and delivery
 
