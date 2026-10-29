@@ -87,3 +87,34 @@ def test_publication_data_refuses_historical_split_hash_drift(monkeypatch):
     monkeypatch.setattr(evidence, "_blob", changed_blob)
     with pytest.raises(ValueError, match="historical data hash mismatch"):
         load_publication_data(ROOT, load_results(ROOT))
+
+
+def test_summary_covers_methods_topology_publication_and_explicit_missingness():
+    from training_facts_into_llms.results_publications import _summary
+
+    results = load_results(ROOT)
+    details = load_publication_data(ROOT, results)
+    text = _summary(results, details)
+    for run in results["runs"]:
+        assert run["id"] in text
+        if run["run_id"]:
+            assert run["run_id"] in text
+    for recipe in details["recipes"].values():
+        assert recipe["optimizer"] in text
+        assert recipe["selection_policy"] in text
+        assert str(recipe["validation_rows"]) in text
+    assert "186" in text and "496" in text
+    assert "5,411,328" in text and "58,363,904" in text
+    assert "completion-only" in text and "Prompt tokens" in text
+    assert "contrast: 16" in text and "locality: 15" in text
+    assert "No retained adapter" in text
+    assert "Not evaluated (interrupted)" in text
+    assert "Not run (deferred)" in text
+    assert "Final epoch" in text
+    assert "Not recorded" in text
+    assert "| -- |" not in text
+    for publication in details["publications"].values():
+        if publication["url"]:
+            assert publication["url"] in text
+        assert publication["collection_url"] in text
+    assert "experiments/paper_single_edit.md" in text

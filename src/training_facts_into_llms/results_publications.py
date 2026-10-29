@@ -13,7 +13,12 @@ import os
 from decimal import Decimal
 from pathlib import Path
 
-from training_facts_into_llms.results_render import EXAMPLE_IDS, METRICS, fraction
+from training_facts_into_llms.results_render import (
+    EXAMPLE_IDS,
+    METRICS,
+    _table,
+    fraction,
+)
 
 _PAPERS = {"qwen35": "qwen35-revised", "qwen38": "qwen38-minimal"}
 _STATUS = {
@@ -350,6 +355,37 @@ def _summary(results: dict, details: dict) -> str:
         "",
         "The [historical manifest](manifest.json) and [separate Qwen3.8 manifest](qwen38/manifest.json) bind the observations below to their complete evaluation records.",
         "",
+        "> " + results["fact"],
+        "",
+        "## Models and architecture",
+        "",
+        "Both studies retain the complete multimodal base and processor but supply text-only inputs. Language attention, linear-attention, and feed-forward projections receive LoRA; base weights, vision, embeddings, and the output head remain frozen. The domain is the synthetic entity above plus near-name and ordinary-knowledge probes.",
+        "",
+    ]
+    for study in results["studies"]:
+        recipes = [
+            details["recipes"][run["id"]]
+            for run in results["runs"]
+            if run["study_id"] == study["id"] and run["tuned"]
+        ]
+        modules = sorted({recipe["target_module_count"] for recipe in recipes})
+        scalars = sorted({recipe["trainable_parameters"] for recipe in recipes})
+        model_url = (
+            f"https://huggingface.co/{study['model_id']}/tree/{study['model_revision']}"
+        )
+        lines += [
+            f"- [{study['model_id']} at its pinned revision]({model_url}): "
+            + "/".join(_value(value) for value in modules)
+            + " observed language target modules; "
+            + " or ".join(_value(value) for value in scalars)
+            + " trainable adapter scalars across completed recipes. [Exact recipe and topology sources](#recipes-and-observed-execution).",
+        ]
+    lines += [
+        "",
+        "The separate larger study used a BF16-loaded base and BF16 compute; its serialized adapter is FP32. The [dtype and parameter-denominator audit](qwen38/CLAIMS_AND_SOURCES.md) distinguishes checkpoint, frozen-base, and adapter-inclusive runtime counts.",
+        "",
+        "## Final evaluations",
+        "",
         "Recall is the recorded lexical fact score; safety avoids transferring that fact to near names; controls measure retained common knowledge; nonempty counts responses with text. Missing results mean unmeasured, not zero. These prompt categories are not random-control model runs. Isolated ablations and seed replications are unavailable.",
         "",
         "| Study / recipe | State | Recall | Safety | Controls | Nonempty |",
@@ -374,10 +410,16 @@ def _summary(results: dict, details: dict) -> str:
                 "| "
                 + " | ".join(
                     [
-                        f"`{run['id']}`",
+                        f"{run['label']} (`{run['id']}`)",
                         _STATUS[run["status"]],
                         *(
-                            fraction(run["tuned"][key]) if run["tuned"] else "—"
+                            fraction(run["tuned"][key])
+                            if run["tuned"]
+                            else (
+                                "Not evaluated (interrupted)"
+                                if run["status"] == "interrupted"
+                                else "Not run (deferred)"
+                            )
                             for key in (*METRICS, "nonempty")
                         ),
                     ]
@@ -404,14 +446,128 @@ def _summary(results: dict, details: dict) -> str:
             f"{recipe['learning_rate']:g}",
             str(recipe["epochs"]),
             f"{recipe['train_batch_size']} / {recipe['gradient_accumulation_steps']}",
-            f"{_value(run['completed_steps'])} / {_value(run['selected_step'])}",
-            _value(recipe["runtime_seconds"]),
+            f"{_value(run['completed_steps'])} / "
+            + (
+                _value(run["selected_step"])
+                if run["selected_step"] is not None
+                else "Final epoch"
+                if recipe["selection_policy"] == "final_epoch"
+                else "Not selected (interrupted)"
+            ),
+            _value(recipe["runtime_seconds"])
+            if recipe["runtime_seconds"] is not None
+            else "Not recorded",
             f"[exact source]({recipe['source_url']})",
         ]
         lines.append("| " + " | ".join(cells) + " |")
     lines += [
         "",
-        "A missing selected step for the completed single-edit recipe means final-epoch selection. For the interrupted attempt it means no authoritative selected adapter. Deferred recipes have no observations.",
+        "Final-epoch selection applies to the completed single-edit recipe. The interrupted attempt has no authoritative selected adapter or recorded Trainer runtime. Deferred recipes have no observations.",
+        "",
+        "## Data, optimization, and selection",
+        "",
+        "Each executed recipe uses a fixed supervised dataset over its declared epoch horizon; no staged curriculum was recorded. Prompt tokens receive no direct next-token loss; target-token gradients still depend on prompt representations. Completion-only masking and the chunked negative-log-likelihood objective implement supervised answer learning. Fractional warmup is a share of the training horizon; zero clipping norm disables clipping. Validation rows are separate from the final regression suite.",
+        "",
+    ]
+    methods = []
+    for run in results["runs"]:
+        recipe = details["recipes"].get(run["id"])
+        if recipe is None:
+            methods.append(
+                [
+                    f"`{run['id']}`",
+                    f"Not run (deferred); [registered recipe](../configs/experiments/{run['id']}.toml)",
+                    "No observed optimization",
+                    "No checkpoint selected",
+                ]
+            )
+            continue
+        composition = ", ".join(
+            f"{key}: {value}" for key, value in recipe["training_composition"].items()
+        )
+        methods.append(
+            [
+                f"`{run['id']}`",
+                f"{composition}; validation: {recipe['validation_rows']}. [Bound data]({recipe['data_source']})",
+                f"{recipe['optimizer']}; {recipe['scheduler']}; warmup {_value(recipe['warmup'])}; decay {_value(recipe['weight_decay'])}; clipping {_value(recipe['max_grad_norm'])}; seed {recipe['seed']}; {recipe['loss_type']}; completion-only {_value(recipe['completion_only_loss'])}",
+                f"{recipe['selection_policy']}; stop on perfect validation: {_value(recipe['stop_on_perfect'])}",
+            ]
+        )
+    lines += [
+        _table(
+            [
+                "Recipe",
+                "Fixed training mixture and validation",
+                "Optimization / masking",
+                "Selection / stopping",
+            ],
+            methods,
+        ),
+        "",
+        "## Run identity, reports, and adapter availability",
+        "",
+        "Availability below is the receipt-recorded publication event, with immutable adapter links. The [historical archive receipt](artifact-publication-manifest.json) and the separate study's [manifest-bound final receipt](qwen38/manifest.json) own those publication claims. Historical archival occurred after the original attempts and does not change their outcomes. Collection links identify mutable indexes; a published checkpoint or smoke test does not confer acceptance.",
+        "",
+    ]
+    publication_rows = []
+    for run in results["runs"]:
+        report = (
+            f"experiments/{run['id']}.md"
+            if run["study_id"] == "qwen35"
+            else (
+                f"qwen38/runs/{run['run_id']}/evaluation.md"
+                if run["run_id"]
+                else "qwen38/manifest.json"
+            )
+        )
+        publication = details["publications"].get(run["id"])
+        if publication is None:
+            status, checkpoints, collection = (
+                "Not published (deferred)",
+                "Not run",
+                "No publication receipt",
+            )
+        else:
+            if publication["kind"] == "context_only":
+                status, checkpoints = (
+                    "No retained adapter; context-only evidence",
+                    "No retained adapter",
+                )
+            else:
+                label = (
+                    "Later retrospective archive"
+                    if publication["kind"] == "retrospective_archive"
+                    else "Published and anonymously verified"
+                )
+                status = f"[{label}]({publication['url']})"
+                checkpoints = (
+                    str(publication["checkpoint_count"])
+                    if publication["checkpoint_count"] is not None
+                    else "Selected adapter"
+                )
+            collection = (
+                f"[Receipt-recorded Collection]({publication['collection_url']})"
+            )
+        publication_rows.append(
+            [
+                f"[`{run['id']}`]({report})",
+                f"`{run['run_id']}`" if run["run_id"] else "Not run (deferred)",
+                status,
+                checkpoints,
+                collection,
+            ]
+        )
+    lines += [
+        _table(
+            [
+                "Recipe / report",
+                "Run ID",
+                "Adapter availability",
+                "Retained checkpoints",
+                "Collection",
+            ],
+            publication_rows,
+        ),
         "",
         "## Evidence and interpretation",
         "",

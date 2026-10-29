@@ -153,6 +153,7 @@ def _historical_recipe(
         },
         "train_rows": sum(counts.values()),
         "composition": counts,
+        "training_composition": recipe.get("composition", counts),
         "validation_rows": data_counts.get("validation", 0),
         "train_batch_size": settings["per_device_train_batch_size"],
         "gradient_accumulation_steps": settings["gradient_accumulation_steps"],
@@ -241,6 +242,7 @@ def load_publication_data(root: Path, results: dict) -> dict[str, Any]:
         "warmup": training["warmup_ratio"],
         "train_rows": sum(counts.values()),
         "composition": counts,
+        "training_composition": counts,
         "validation_rows": config["data"]["validation"]["count"],
         "selection_policy": config["checkpoint"]["selection_policy"],
         "stop_on_perfect": config["checkpoint"]["stop_on_perfect"],
@@ -261,8 +263,46 @@ def load_publication_data(root: Path, results: dict) -> dict[str, Any]:
     if not set(recipes).issubset({run["id"] for run in results["runs"]}):
         raise ValueError("publication recipes differ from result identities")
     audit = reader.json("reports/qwen38/claim-audit.json")
+    archive_binding = audit["original_evidence_bindings"][
+        "historical_publication_receipt"
+    ]
+    archive = reader.json(archive_binding["path"], archive_binding["sha256"])
+    identities = {entry["id"]: entry["run_id"] for entry in results["runs"]}
+    publications = {}
+    for entry in archive["model_repositories"]:
+        identifier = entry["manifest_name"]
+        if identities.get(identifier) != entry["run_id"]:
+            raise ValueError("historical publication identity differs from evaluation")
+        publications[identifier] = {
+            "kind": "retrospective_archive",
+            "url": entry["url"] + "/tree/" + entry["revision"],
+            "collection_url": archive["collection"]["url"],
+            "checkpoint_count": len(entry["checkpoints"]),
+        }
+    for entry in archive["context_only_attempts"]:
+        identifier = entry["experiment_id"]
+        if (
+            identities.get(identifier) != entry["run_id"]
+            or entry["adapter_repository"] is not None
+        ):
+            raise ValueError("context-only publication identity differs")
+        publications[identifier] = {
+            "kind": "context_only",
+            "url": None,
+            "collection_url": archive["collection"]["url"],
+            "checkpoint_count": None,
+        }
+    publication = evidence("publication-final.json")
+    repository = publication["repository"]
+    publications[run["experiment_id"]] = {
+        "kind": "completed_adapter",
+        "url": repository["url"] + "/tree/" + repository["revision"],
+        "collection_url": publication["collection"]["url"],
+        "checkpoint_count": None,
+    }
     return {
         "recipes": recipes,
+        "publications": publications,
         "qwen38_metadata": metadata,
         "qwen38_trajectory": trajectory,
         "qwen38_parameters": audit["parameter_reconciliation"],
