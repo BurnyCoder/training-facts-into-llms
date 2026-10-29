@@ -321,7 +321,7 @@ def _examples(runs: list[dict]) -> str:
         record = next(row for row in chosen["records"] if row["id"] == identifier)
         lines += [
             r"\paragraph{" + tex_escape(identifier) + "}",
-            r"\begin{quote}\small\ttfamily "
+            r"\begin{quote}\raggedright\sloppy\small\ttfamily "
             + tex_escape(record["prompt"])
             + r"\end{quote}",
         ]
@@ -332,7 +332,7 @@ def _examples(runs: list[dict]) -> str:
             output = record[phase]
             lines += [
                 tex_escape(label + (" (pass)." if output["passed"] else " (fail).")),
-                r"\begin{quote}\small\ttfamily "
+                r"\begin{quote}\raggedright\sloppy\small\ttfamily "
                 + tex_escape(output["output"])
                 + r"\end{quote}",
             ]
