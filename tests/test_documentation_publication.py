@@ -248,10 +248,14 @@ def test_admitted_documentation_receipt_binds_sources_and_preserved_objects():
     """Check the later publication observation without rereading mutable Hub state."""
     directory = ROOT / "reports/documentation-revisions" / EDITION
     raw = (directory / "receipt.json").read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == (
+        "1ca0008dee5ffcae69decc8712ef66127c6226746ef5fb3ff8002338ac581681"
+    )
     assert (directory / "receipt.json.sha256").read_text() == (
         hashlib.sha256(raw).hexdigest() + "  receipt.json\n"
     )
     receipt = json.loads(raw)
+    assert receipt["schema_version"] == 1
     assert receipt["status"] == "completed"
     assert receipt["upload_mode"] == "on"
     assert receipt["publication_kind"] == "documentation_revision"
