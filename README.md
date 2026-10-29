@@ -24,8 +24,10 @@ and [Qwen3.8 manifest](reports/qwen38/manifest.json) own the results.
 ![Recall, near-name safety, and common-knowledge results for untouched bases and reviewed recipes; missing tuned evaluations are marked.](docs/assets/results-overview.svg)
 
 [Explore the results](https://burnycoder.github.io/training-facts-into-llms/)
-· [Historical paper](output/pdf/teaching-one-synthetic-fact-qwen35.pdf)
+· [Revised historical paper](output/pdf/teaching-one-synthetic-fact-qwen35-revised.pdf)
+· [Original historical paper](output/pdf/teaching-one-synthetic-fact-qwen35.pdf)
 · [Qwen3.8 minimal paper](output/pdf/teaching-one-synthetic-fact-qwen38-minimal.pdf)
+· [All experiments](reports/ALL_EXPERIMENTS.md)
 · [Install and use](#use-the-repository)
 
 ## Results
@@ -286,7 +288,8 @@ flowchart TD
     KIND -->|"bare / experiments"| DISC["Help, list, or sanitized preset description"]
     KIND -->|"results build / check"| EVIDENCE["Verify manifests and public evaluation hashes"]
     EVIDENCE --> VIEWS["Derive README tables, charts, and explorer data"]
-    VIEWS --> RENDER{"Build or check"}
+    VIEWS --> PAPERS["Derive combined inventory and active-paper tables, examples, figures"]
+    PAPERS --> RENDER{"Build or check"}
     RENDER -->|"build"| SITE["Write derived views and stage static site"]
     RENDER -->|"check"| COMPARE["Compare expected views without tracked edits"]
     KIND -->|"runtime prepare"| RCFG["Resolve preset + public operational config"]
@@ -307,6 +310,7 @@ flowchart TD
     KIND -->|"chat"| CHAT["Select and validate adapter; log conversation; release model"]
     KIND -->|"publish-existing"| HIST["Log and stage/audit or publish reviewed historical archive"]
     KIND -->|"publish-completed"| COMPLETE["Local upload → anonymous GPU verify → local finalize"]
+    KIND -->|"publish-docs"| DOCS["Stage registered documents; optionally publish and verify exact document/object revisions"]
 ```
 
 Exact validation, logger, failure, and cleanup boundaries are documented in
@@ -380,9 +384,10 @@ uv run --frozen training-facts-into-llms results build
 uv run --frozen training-facts-into-llms results check
 ```
 
-This regenerates marked README content, figures, explorer data, and a local
-static-site bundle from admitted evidence. It does not run experiments or
-rebuild papers. The explorer offers study/recipe selection, full-output search,
+This regenerates marked README content, the combined experiment inventory,
+active-paper data and figures, explorer data, and a local static-site bundle
+from admitted evidence. Paper PDF compilation is separate. The explorer offers
+study/recipe selection, full-output search,
 loss histories, and source links. Exact inputs, generated paths, local preview,
 and exit behavior belong to
 [the results-generation instructions](docs/reproducing-experiments.md#rebuild-and-inspect-public-results).
@@ -460,20 +465,25 @@ selection and logging details belong to
 [the interactive guide](docs/interactive-inference.md). The completed exploratory
 Qwen3.8 check has its own [sanitized receipt](reports/qwen38/chat-verification.json).
 
-### Build the paper
+### Build the active paper editions
 
-Both PDFs linked above are checked in. Rebuild only when a paper's inputs
-change, using `make`, `latexmk`, `pdflatex`, `bibtex`, and its documented TeX Live
-packages:
+The paper PDFs linked above are checked in. The corrected historical edition
+has a separate source and PDF; the original is preserved. Rebuild active
+editions only when their inputs change, using `make`, `latexmk`, `pdflatex`,
+`bibtex`, and their documented TeX Live packages:
 
 ```bash
-make -C paper
+uv run --frozen training-facts-into-llms results build
+make -C papers/qwen35-revised
 make -C papers/qwen38-minimal
 ```
 
 Independent build contracts are in
-[`paper/README.md`](paper/README.md) and
+[`papers/qwen35-revised/README.md`](papers/qwen35-revised/README.md) and
 [`papers/qwen38-minimal/README.md`](papers/qwen38-minimal/README.md).
+The historical `make -C paper` contract remains in
+[`paper/README.md`](paper/README.md); this maintenance edition does not rebuild
+or overwrite that original publication.
 
 ### Commands and side effects
 
@@ -482,8 +492,9 @@ Independent build contracts are in
 | `uv run --frozen training-facts-into-llms` | Prints help and registered IDs; reads no `.env`, data, or model. |
 | `uv run --frozen training-facts-into-llms experiments list` | Prints IDs in reviewed order; reads no `.env`, data, or model. |
 | `uv run --frozen training-facts-into-llms experiments describe --experiment ID` | Resolves preset and bound data; prints sanitized typed JSON without a logger or model. |
-| `uv run --frozen training-facts-into-llms results build` | Verifies public evidence, regenerates marked README blocks, SVG charts and explorer data, and stages `artifacts/results-site/`; reads no `.env` and performs no model or publication operation. |
+| `uv run --frozen training-facts-into-llms results build` | Verifies public evidence, regenerates README blocks, the combined inventory, active-paper data/figures, charts and explorer data, and stages `artifacts/results-site/`; reads no `.env` and performs no model or publication operation. |
 | `uv run --frozen training-facts-into-llms results check` | Verifies evidence and compares generated views without tracked edits; returns nonzero for invalid inputs or stale output. |
+| `uv run --frozen training-facts-into-llms publish-docs --edition audit-2026-10-29 --upload off\|on` | Defaults to local-only document staging. `on` requires reviewed clean synchronized `main`, publishes allowlisted documentation revisions, verifies document bytes and unchanged repository objects, and writes a separate receipt; never loads a model. |
 | `uv run --frozen training-facts-into-llms runtime prepare --experiment ID` | Loads public operational config and writes JSONL; historical presets record a dependency no-op, while Qwen3.8 synchronizes the base project plus its declared group. |
 | `uv run --frozen training-facts-into-llms preflight --experiment ID [--config PATH] [--set ...]` | Verifies the scorer before logging; validates data, dependencies, and hardware; loads and releases a fresh base for non-generative audits. |
 | `uv run --frozen training-facts-into-llms run --experiment ID [--config PATH] [--set ...] [--name LOWERCASE-SLUG] [--upload off\|on\|if-accepted]` | Enforces the source gate, validates/logs data, evaluates baseline, trains/selects, evaluates tuned answers, saves adapter/report, then applies eligible upload mode. |
@@ -522,6 +533,13 @@ qualifications are recorded in
 [the additive audit](reports/qwen38/CLAIMS_AND_SOURCES.md). Publication and
 recovery procedures belong to [the security guide](docs/security-and-publication.md).
 
+The separate `audit-2026-10-29` documentation edition adds the instruction audit,
+combined experiment summary, provenance note, and corrected paper PDFs. Its
+`publish-docs` command updates only registered documentation paths and README
+addenda. Original adapter commits and scientific outcomes remain unchanged;
+the [security guide](docs/security-and-publication.md#documentation-edition-publication)
+owns staging, verification, retry behavior, and the new receipt boundary.
+
 ## Documentation and evidence map
 
 | Path | Ownership |
@@ -533,6 +551,9 @@ recovery procedures belong to [the security guide](docs/security-and-publication
 | [`docs/security-and-publication.md`](docs/security-and-publication.md) | Credentials, Git gate, uploads, archive recovery, and Pages publication boundary. |
 | [`reports/manifest.json`](reports/manifest.json) | Immutable historical outcomes and bound evaluation hashes. |
 | [`reports/EXPERIMENTS.md`](reports/EXPERIMENTS.md) | Reconciled retrospective, sources, limitations, and per-experiment links. |
+| [`reports/ALL_EXPERIMENTS.md`](reports/ALL_EXPERIMENTS.md) | Generated cross-study inventory, terminology, methods, measured outcomes, and unavailable quantities. |
+| [`reports/INSTRUCTION_AUDIT.md`](reports/INSTRUCTION_AUDIT.md) | Checklist status, repairs, exclusions, preregistration gap, and release checks. |
+| [`docs/third-party-provenance.md`](docs/third-party-provenance.md) | Third-party attribution and unresolved license compatibility for upstream prefix fragments. |
 | [`reports/qwen38/manifest.json`](reports/qwen38/manifest.json) | Separate Qwen3.8 result and bound evidence/publication authority. |
 | [`reports/qwen38/CLAIMS_AND_SOURCES.md`](reports/qwen38/CLAIMS_AND_SOURCES.md) | Additive factual corrections, primary sources, and dated public-state observations. |
 | [`reports/qwen38/chat-verification.json`](reports/qwen38/chat-verification.json) | Sanitized exploratory chat receipt; acceptance remains unchanged. |
@@ -551,5 +572,8 @@ recovery procedures belong to [the security guide](docs/security-and-publication
 
 ## License
 
-Licensed under [Apache-2.0](LICENSE). Base models and dependencies retain their
-respective licenses; follow the linked model cards and upstream documentation.
+Project-authored material is licensed under [Apache-2.0](LICENSE). Base models
+and dependencies retain their respective licenses. Permission for copied
+upstream prefix fragments remains unresolved; the
+[third-party provenance note](docs/third-party-provenance.md) identifies the
+source and the limits of the licensing review.
