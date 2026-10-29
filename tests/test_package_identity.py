@@ -204,6 +204,7 @@ def test_readme_leads_with_visuals_and_manifest_results_before_method_and_use() 
         "runtime": "runtime prepare",
         "publish-existing": "publish-existing",
         "publish-completed": "publish-completed",
+        "publish-docs": "publish-docs",
         "evaluate": "evaluate",
         "chat": "chat",
     }
@@ -353,6 +354,7 @@ def test_active_documentation_assigns_each_contract_one_canonical_owner() -> Non
         "interactive-inference.md": ("chat", "adapter", "logging"),
         "security-and-publication.md": ("credential", "publication", "archive"),
         "qwen38-runpod.md": ("qwen3.8", "runpod", "tmux"),
+        "third-party-provenance.md": ("provenance", "license", "upstream"),
     }
     assert documents.keys() == canonical_terms.keys()
     for filename, terms in canonical_terms.items():
