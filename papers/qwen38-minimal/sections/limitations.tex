@@ -1,48 +1,36 @@
 \section{Limitations and validity boundaries}
 \label{sec:limitations}
+\textbf{Replication and inference.} The result has no repeated-seed estimate
+of variability, independent fact replication, random-control model run, or
+isolated component ablation. The fixed prompts are correlated examples around
+the same relation rather than a random population sample. Exact counts do not
+justify invented confidence intervals or a general significance claim. The
+study does not establish an optimal recipe.\claimsource{manifest}
 
-\textbf{Scale and replication.} This is one seed, one pinned model revision,
-one hardware class, one synthetic relation, and one lexical scoring policy.
-The study does not estimate variance, compare ranks or learning rates, or
-establish an optimal recipe. Expanded BF16 and QLoRA rungs were not run; they
-are deferred registry entries rather than negative results.
+\textbf{Evaluation.} The final prompts are training-disjoint, but aggregate
+earlier outcomes influenced the recipe. Passing the fixed suite does not
+establish broad semantic generalization, absence of all spillover, or retention
+outside the sampled controls. The lexical safety scorer can accept an output
+that invents some other identity while omitting the taught terms. Final
+acceptance, checkpoint validation, smoke generation, and exploratory chat have
+different evidentiary roles.\claimsource{evaluation}\claimsource{audit}
 
-\textbf{Evaluation scope.} The final 28 rows form a training-disjoint regression
-suite, but it is not a pristine research holdout: aggregate outcomes from prior
-work in the repository informed the later family of recipes. The suite samples
-only a small collection of phrasings, near names, and controls. Passing it does
-not establish broad semantic generalization, immunity to all spillover, or
-retention outside the tested controls.
+\textbf{Prior exposure.} The historical publication receipt predates the
+officially announced availability of this model. Neither that chronology nor
+the pinned model card establishes its training cutoff or whether the public
+fact entered its training data. Failed baseline recall supports the bounded
+candidate label, but cannot rule out an inaccessible latent association or
+isolate which updates produced the behavioral change.
+\citep{historicalarchive,qwen38release,qwen38}\claimsource{audit}
 
-\textbf{Interpretation.} Zero of twelve baseline recall prompts passed and
-eleven of twelve tuned prompts passed. This supports the registered
-\Code{candidate-knowledge-acquisition} label under this protocol. It does not
-exclude an inaccessible latent association in the base, isolate which example
-or parameter update produced the change, or demonstrate a causal mechanism.
-The historical archive receipt records anonymous public verification on August
-8, 2026, while the Qwen project's official news log dates Qwen3.8-27B
-availability to August 14 \citep{historicalarchive,qwen38release}. Neither date
-establishes the model's data-collection or training cutoff, and this chronology
-cannot establish whether prior exposure occurred. The pinned 0/12 baseline
-observation, rather than a claim of global novelty, is therefore the relevant
-support for the registered candidate label.
+\textbf{Verification and custody.} Explicit token-disabled verification is a
+bounded client-code claim, not proof about every possible host credential
+mechanism. The kernel probe is narrower than a full training trace. Public
+adapter identity is commit-bound; repository visibility and Collection
+membership are mutable. Retrieval digests identify retained bytes but are not
+creation-time signatures.\claimsource{publication}\claimsource{metadata}
 
-\textbf{Verification.} The anonymous public check was a single-prompt smoke
-test. Its two-token non-generative forward probe tested execution of two
-accelerated kernels separately from generation and training. Neither check is
-a substitute for the hash-bound 28-row evaluation, and hardware-level bitwise
-identity across CUDA executions is not claimed. Here ``anonymous'' means the
-client explicitly disabled named Hub credential paths; it does not prove that
-every conceivable host-level identity mechanism was absent.
-
-\textbf{Evidence capture.} The retrieved 15-file allowlist was bound at
-retrieval time. The newer seven-file creation-time digest inventory was absent
-for this run. Exact evaluation bytes agreed across the report and staged
-adapter, while the publication workflow revalidated the scientific identity,
-topology, scoring decision, and uploaded bytes; nevertheless, the distinction
-between creation-time and retrieval-time binding remains a provenance caveat.
-\claimsource{metadata}\claimsource{publication}
-
-\textbf{Authorship.} LLMs substantially assisted the work, as disclosed on the
-first page. Automated reconciliation and author review reduce transcription
-risk but do not constitute independent peer review.
+\textbf{Authorship.} LLMs substantially assisted this work. Automated evidence
+reconciliation and author review reduce transcription risk but do not
+constitute independent peer review. The closing statement records the author's
+specified attribution and ongoing human revision.

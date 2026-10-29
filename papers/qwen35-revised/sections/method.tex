@@ -1,0 +1,74 @@
+\section{Question, background, and method}
+The studied base is \texttt{\StudyModel}, at immutable revision:
+\Fingerprint{\StudyRevision}
+The bounded question is whether the synthetic relation can be recalled under a
+fixed generation protocol without excessive transfer to close names or loss of
+baseline-passing controls. The observed baseline, rather than a claim about
+absence from pretraining, defines the comparison. Each attempt began with the
+untouched pinned base. The manifest binds attempts to their source commits and
+data hashes.\citep{historicalmanifest,retrospective}
+
+LoRA freezes pretrained weights and learns low-rank projection updates
+\citep{hu2021lora}. The complete multimodal Qwen base and native chat formatting
+were retained, but inputs were text only and vision, embeddings, and the output
+head remained frozen. The chosen target projections span attention,
+linear-attention, and feed-forward computation. This is an implementation
+boundary, not evidence that these projections uniquely store the fact.
+Training used a BF16-loaded base and BF16 computation; that description alone
+does not establish serialized adapter dtype.\citep{qwen35,qwen35template,retrospective}
+
+\subsection{Prior work and adaptation}
+Gangadhar and Stratos motivate conditional-target likelihood and augmentation
+with unchanged facts. Their main comparisons use LoRA, while their analysis
+also includes full-parameter and layer-restricted ablations. The pinned released
+single-edit optimizer instead passes all model parameters to AdamW. Its loader
+consumes supplied similar-fact records rather than constructing their
+retrieval. The project's paper-inspired run is therefore a Qwen LoRA
+adaptation, not an implementation-equivalent reproduction of either the
+published experiments or that executable. The exact upstream neighbor corpus
+and retrieval construction were not identified.\citep{gangadhar2024model,gangadhar2024run,gangadhar2024data}
+
+Counterfactually augmented data motivates changing only the feature that should
+change the label. Later project contrasts changed only the entity spelling;
+that design was inspired by the literature but its effectiveness was not
+isolated experimentally.\citep{kaushik2020cad,retrospective}
+
+\subsection{Data, objective, and selection}
+The positive-only family supervised the full target sentence. Subsequent
+families supervised the object completion, adding locality or rehearsal facts
+and eventually close-name contrasts. Completion-only loss masks direct loss on
+prompt tokens; gradients still depend on their contextual representations.
+The recipe tables distinguish configured horizons from completed steps and
+selected checkpoints. The earliest family selected supervised validation loss;
+the semantic family stopped at perfect behavioral validation; minimal-pair
+runs completed their declared horizons and used a bounded loss tie-break after
+behavioral scoring. The paper-inspired run evaluated final weights without a
+validation selector.\citep{trlsft,peftlora,retrospective}
+
+The fixed final suite never entered training or checkpoint selection. It is a
+training-disjoint regression suite, not a pristine research holdout: aggregate
+earlier results informed later recipes. Recall checks the taught terms,
+near-name safety checks their absence for wrong names, and controls use
+accepted answer aliases. Safety here does not require that every other claim
+in an answer be true. Greedy, thinking-disabled generation was held fixed.
+Acceptance requires all declared gates together; the source policy, not a
+post-hoc score threshold, owns the decision.\citep{retrospective,historicalmanifest}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=5mm,box/.style={draw=LinkBlue,rounded corners,
+  align=center,text width=0.78\linewidth,font=\small,inner sep=5pt},
+  flow/.style={-{Latex},thick}]
+\node[box] (base) {Pinned untouched base + hash-checked disjoint data};
+\node[box,below=of base] (baseline) {Baseline generation and fixed scoring};
+\node[box,below=of baseline] (train) {Frozen base + language LoRA; completion-only training};
+\node[box,below=of train] (select) {Recipe-specific validation and checkpoint selection};
+\node[box,below=of select] (final) {Disjoint final generation; joint acceptance decision};
+\node[box,below=of final] (evidence) {Immutable evidence; later archival publication recorded separately};
+\draw[flow] (base)--(baseline); \draw[flow] (baseline)--(train);
+\draw[flow] (train)--(select); \draw[flow] (select)--(final);
+\draw[flow] (final)--(evidence);
+\end{tikzpicture}
+\caption{Reviewed phase boundaries. The diagram does not assert a causal
+mechanism for the learned behavior.\citep{retrospective}}
+\end{figure}

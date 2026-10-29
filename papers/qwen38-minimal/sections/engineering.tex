@@ -1,72 +1,38 @@
-\section{Engineering observations}
-\label{sec:engineering}
+\section{Engineering and publication evidence}
+The recorded GPU and runtime identify the executed environment; the provider's
+\Code{SECURE} tier is its provisioning label, not an independent security
+assessment. Runtime preparation and first preflight differed substantially in
+elapsed time. FLA documents autotuning and its persistent result cache, but no
+timed kernel trace apportioned the first preflight delay among compilation,
+autotuning, or other work. The additive audit qualifies private-log
+transcriptions; a clean clone cannot independently rederive their contents.
+\citep{flashlinearattention}\claimsource{metadata}\claimsource{audit}
 
-\subsection{Accelerated runtime}
+The anonymous-verification receipt includes a non-generative forward probe
+that observed the required convolution and gated-delta callables and
+synchronized CUDA. This verifies those paths in the checked environment; it
+does not instrument the entire training trace. The reviewed host layout and
+tmux/cache setup are a reviewed protocol, not independently reproducible run
+evidence of every operator action.\citep{qwen38source}
+\claimsource{publication}\claimsource{audit}
 
-The provider record identifies an NVIDIA A100 80GB PCIe on RunPod's
-\Code{SECURE} tier with CUDA 13.0 and BF16 support; \Code{SECURE} is the
-provider's provisioning label, not an independent audit of host security. The
-locked environment recorded Python 3.12.13, PyTorch 2.13.0,
-Transformers 5.14.1, TRL 1.9.2, PEFT 0.20.0, Flash Linear Attention 0.5.2, and
-\Code{causal-conv1d} 1.7.0. The retained runtime-preparation log reported that
-\Code{causal-conv1d} and \Code{ninja} preparation together took roughly
-1.10 seconds and installation took 0.483 seconds. The first preflight lasted
-roughly six minutes and invoked the autotuned FLA path; FLA documents pre-tuned
-configurations and a persistent autotuning-result cache
-\citep{flashlinearattention}. No
-profiler or timed kernel trace allocated that elapsed time to compilation,
-autotuning, or another phase. The exact timing statements are a checked
-transcription from retained private logs whose digests are public; a clean clone
-cannot independently rederive their contents.\claimsource{metadata}
-\claimsource{audit}
+The selected and terminal adapter snapshots and logs were retrieved and
+hash-checked before Pod deletion. The metadata does not establish that
+optimizer, scheduler, or RNG state survived, so these are adapter snapshots,
+not a claim of resumable training. Retrieval-time binding is distinct from a
+creation-time signature. No GPU dependency remains for custody, textual
+inspection, or compilation of the admitted record.\claimsource{metadata}
 
-Preflight and later anonymous verification each had explicit runtime audits.
-The final receipt records a \emph{two-token non-generative forward probe} that
-observed one call to \Code{causal\_conv1d\_fn} and one call to
-\Code{chunk\_gated\_delta\_rule}, followed by CUDA synchronization.
-\claimsource{publication} This establishes that both required accelerated paths
-could execute in the verified environment. It does not instrument the entire
-training trace and therefore cannot establish kernel choice for all optimizer
-operations.
-
-\subsection{Host layout, persistence, and retrieval}
-
-The reviewed runbook at execution commit
-\Code{8645addf427edf7ac218ed977a0be9102342851f} prescribed a clean
-container-disk checkout, persistent caches connected by symlink, and a minimal
-tmux shell \citep{qwen38source}. The run metadata records that same commit, but
-neither it nor the checked-in reports attests each operator shell action. We
-therefore treat the exact host-layout sequence as a reviewed protocol, not
-independently reproducible run evidence.
-\claimsource{metadata}
-
-Before deleting the Pod, an exact 15-file allowlist copied the selected adapter,
-evaluation pair, complete run log, terminal/preflight/runtime logs, timings,
-and GPU observations to local storage. A supplemental archive retained both
-adapter snapshots from Trainer directories \Code{checkpoint-84} and
-\Code{checkpoint-210}. We do not describe them as resumable training states:
-the checked-in metadata binds their adapter tensor hashes but does not claim
-that optimizer, scheduler, or RNG state was retained. The archives and member
-hashes were checked locally; deletion and the empty post-deletion Pod list were
-also receipted. The final evidence states that no GPU dependency remains for
-custody or textual inspection of the admitted records.
-\claimsource{metadata}
-
-\subsection{Public adapter verification}
-
-The selected adapter was published in the repository linked in
-Section~\ref{sec:reproducibility} at exact content-addressed revision
-\Fingerprint{dd0ded7bbb5231f204deff9acc63089f4bb5178d}.
-The verifier passed \Code{token=False} for the base, processor, and PEFT adapter
-Hub reads \citep{qwen38publisher}. Hugging Face Hub 1.26.0 defines that value to
-suppress use of a cached token and omit the authorization header
-\citep{hubheaders,peftmodel}. That explicit-token-disabled A100 load over the
-anonymous Hub path, against the exact base revision, returned
-``rainbow unicorn.'' for the requested description. This was a
-\emph{single-prompt smoke test}, not a replay of the complete final suite.
-The controls establish the explicit token-disabled code path; they do not prove
-that every conceivable host-level identity mechanism was absent.
-The final publication receipt records that local finalization added exactly
-that model to the dedicated Collection at completion time. Collection
-membership is mutable and is not treated as an immutable current-state claim.
+Publication used the exact pinned adapter revision in the appendix. Hub reads
+explicitly passed \Code{token=False}, which disables the documented client
+authorization-header resolution. The public load produced the recorded object
+completion in a single-prompt smoke test. This does not prove that every
+conceivable host-level identity mechanism was absent, and it does not replace
+the final evaluation.\citep{qwen38publisher,hubheaders,peftmodel}
 \claimsource{publication}
+
+The workflow's allowlisted payload excludes repository-initial
+\Code{.gitattributes}. The final receipt records Collection reconciliation at
+completion time. Collection membership is mutable; the adapter commit and
+receipt bind the reported publication, while a live listing is only a dated
+observation.\claimsource{publication}\claimsource{audit}

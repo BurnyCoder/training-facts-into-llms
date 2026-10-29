@@ -1,0 +1,38 @@
+\section{Results and experiment learnings}
+The generated tables retain the complete attempt inventory, including the
+interruption. Every score comes from its manifest-bound evaluation. Recipe
+settings absent from older report objects are read from the corresponding
+committed implementation, never inferred from later defaults. Configured
+settings describe the recipe; recorded steps and runtime describe execution.
+\citep{historicalmanifest,retrospective}
+\input{generated/tables}
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=\linewidth]{generated/scores.pdf}
+\caption{Recorded final scores against the untouched baseline. Prompt
+categories are controls; they are not random-control model runs. Missing tuned
+evaluation remains missing.\citep{historicalmanifest}}
+\end{figure}
+\begin{figure}[htbp]\centering
+\includegraphics[width=\linewidth]{generated/losses.pdf}
+\caption{Recorded supervised training and validation losses. Curves use the
+available sampling points and mark recorded checkpoint selection. Losses from
+different data mixtures or supervised targets are not directly comparable as
+measures of editing quality. No reward objective was trained.\citep{historicalmanifest}}
+\end{figure}
+
+Positive-only training achieved strong recall while broadly reusing the taught
+answer. The paper-inspired adaptation preserved final controls but missed
+recall and specificity gates. Semantic recipes produced strong specificity
+with target abstentions; minimal-pair recipes recovered recall while losing
+controls. These observations motivated the next hypotheses, but simultaneous
+changes in data, rate, horizon, rank, and selection prevent attributing an
+effect to any single component. The detailed retrospective records fixes and
+hyperparameter rationale rather than treating those choices as optimized.
+\citep{retrospective}
+
+The exact examples below expose both successful answers and errors under the
+fixed lexical scorer. They are illustrative records selected by stable IDs;
+the complete records, not this small excerpt, determine the aggregate results.
+\citep{historicalmanifest}
+\input{generated/examples}

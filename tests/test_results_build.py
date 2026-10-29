@@ -44,6 +44,12 @@ def presentation_root(tmp_path, monkeypatch):
         (tmp_path / "site" / name).write_text("public " + name)
     monkeypatch.setattr("training_facts_into_llms.results.load_results", lambda _: {})
     monkeypatch.setattr(
+        "training_facts_into_llms.results.load_publication_data", lambda *_: {}
+    )
+    monkeypatch.setattr(
+        "training_facts_into_llms.results.publication_files", lambda *_: {}
+    )
+    monkeypatch.setattr(
         "training_facts_into_llms.results.readme_blocks", lambda _: blocks
     )
     monkeypatch.setattr(

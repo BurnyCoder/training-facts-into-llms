@@ -1,0 +1,87 @@
+\begingroup\small
+\begin{longtable}{p{0.25\linewidth}llllp{0.19\linewidth}}
+\caption{Recorded final-suite outcomes. Missing tuned evaluations are not zero scores.}\label{tab:generated-scores}\\
+\toprule
+System & Recall & Safety & Controls & Nonempty & Outcome \\
+\midrule\endfirsthead
+\toprule
+System & Recall & Safety & Controls & Nonempty & Outcome \\
+\midrule\endhead
+Untouched base & 0/12 & 8/8 & 8/8 & 28/28 & Baseline \\
+Positive-only primary & 12/12 & 0/8 & 1/8 & 28/28 & Failed acceptance \\
+Positive-only conservative & 12/12 & 0/8 & 2/8 & 28/28 & Failed acceptance \\
+Positive-only expanded & -- & -- & -- & -- & Interrupted; inconclusive \\
+Paper-inspired single edit & 8/12 & 4/8 & 8/8 & 28/28 & Failed acceptance \\
+Semantic specificity & 6/12 & 8/8 & 7/8 & 28/28 & Failed acceptance \\
+Semantic specificity gentle & 10/12 & 8/8 & 8/8 & 28/28 & Failed acceptance \\
+Minimal-pair primary & 12/12 & 7/8 & 5/8 & 28/28 & Failed acceptance \\
+Minimal-pair conservative & 12/12 & 8/8 & 5/8 & 28/28 & Failed acceptance \\
+Minimal-pair expanded & 11/12 & 8/8 & 6/8 & 28/28 & Failed acceptance \\
+\bottomrule\end{longtable}\endgroup
+
+\begingroup\small
+\begin{longtable}{p{0.27\linewidth}llrr}
+\caption{Recorded training observations. Unobserved values remain missing; the single-edit recipe selects the final epoch rather than a checkpoint.}\label{tab:generated-training}\\
+\toprule
+Recipe & Steps & Selected step & Trainer seconds & Trainable scalars \\
+\midrule\endfirsthead
+\toprule
+Recipe & Steps & Selected step & Trainer seconds & Trainable scalars \\
+\midrule\endhead
+Positive-only primary & 90 & 90 & 863.2611 & 5,411,328 \\
+Positive-only conservative & 180 & 174 & 1,609.0563 & 5,411,328 \\
+Positive-only expanded & 125 & -- & -- & -- \\
+Paper-inspired single edit & 50 & -- & 2,656.9472 & 5,411,328 \\
+Semantic specificity & 56 & 56 & 503.7115 & 5,411,328 \\
+Semantic specificity gentle & 112 & 112 & 1,061.1436 & 5,411,328 \\
+Minimal-pair primary & 210 & 112 & 1,875.62 & 5,411,328 \\
+Minimal-pair conservative & 420 & 112 & 3,670.3786 & 5,411,328 \\
+Minimal-pair expanded & 420 & 70 & 3,661.2463 & 10,822,656 \\
+\bottomrule\end{longtable}\endgroup
+
+\begingroup\small
+\begin{longtable}{p{0.28\linewidth}p{0.65\linewidth}}
+\caption{Source-bound recipes. Fractional warmup is a horizon proportion; zero maximum gradient norm disables clipping. Planned horizons do not imply completion.}\label{tab:generated-recipes}\\
+\toprule
+Recipe / field & Declared configuration \\
+\midrule\endfirsthead
+\toprule
+Recipe / field & Declared configuration \\
+\midrule\endhead
+Positive-only primary: Data and objective & Training rows 24 (train: 24); validation rows 6; completion-only yes; chunked\_nll \\
+Positive-only primary: Adapter and horizon & rank 8; alpha 16; dropout 0; bias none; epochs 15; seed 42; maximum sequence length 128; observed target modules 186 \\
+Positive-only primary: Optimizer & adamw\_torch\_fused; learning rate 0.0002; batch 1; accumulation 4; linear schedule; warmup 0.1; weight decay 0; max gradient norm 1 \\
+Positive-only primary: Selection & minimum\_validation\_loss; stop on perfect validation: no \\
+Positive-only conservative: Data and objective & Training rows 24 (train: 24); validation rows 6; completion-only yes; chunked\_nll \\
+Positive-only conservative: Adapter and horizon & rank 8; alpha 16; dropout 0; bias none; epochs 30; seed 42; maximum sequence length 128; observed target modules 186 \\
+Positive-only conservative: Optimizer & adamw\_torch\_fused; learning rate 0.0001; batch 1; accumulation 4; linear schedule; warmup 0.1; weight decay 0; max gradient norm 1 \\
+Positive-only conservative: Selection & minimum\_validation\_loss; stop on perfect validation: no \\
+Positive-only expanded: Data and objective & Training rows 24 (train: 24); validation rows 6; completion-only yes; chunked\_nll \\
+Positive-only expanded: Adapter and horizon & rank 16; alpha 32; dropout 0; bias none; epochs 30; seed 42; maximum sequence length 128; observed target modules -- \\
+Positive-only expanded: Optimizer & adamw\_torch\_fused; learning rate 0.0001; batch 1; accumulation 4; linear schedule; warmup 0.1; weight decay 0; max gradient norm 1 \\
+Positive-only expanded: Selection & minimum\_validation\_loss; stop on perfect validation: no \\
+Paper-inspired single edit: Data and objective & Training rows 26 (train: 11, locality: 15); validation rows 0; completion-only yes; chunked\_nll \\
+Paper-inspired single edit: Adapter and horizon & rank 8; alpha 16; dropout 0; bias none; epochs 50; seed 42; maximum sequence length 128; observed target modules 186 \\
+Paper-inspired single edit: Optimizer & adamw\_torch; learning rate 2.2e-05; batch 1; accumulation 26; constant schedule; warmup 0; weight decay 0.01; max gradient norm 0 \\
+Paper-inspired single edit: Selection & final\_epoch; stop on perfect validation: no \\
+Semantic specificity: Data and objective & Training rows 56 (train: 24, contrast: 16, rehearsal: 16); validation rows 6; completion-only yes; chunked\_nll \\
+Semantic specificity: Adapter and horizon & rank 8; alpha 16; dropout 0; bias none; epochs 8; seed 42; maximum sequence length 128; observed target modules 186 \\
+Semantic specificity: Optimizer & adamw\_torch\_fused; learning rate 5e-05; batch 1; accumulation 4; linear schedule; warmup 0.1; weight decay 0; max gradient norm 1 \\
+Semantic specificity: Selection & maximum\_balanced\_behavior\_score; stop on perfect validation: yes \\
+Semantic specificity gentle: Data and objective & Training rows 56 (train: 24, contrast: 16, rehearsal: 16); validation rows 6; completion-only yes; chunked\_nll \\
+Semantic specificity gentle: Adapter and horizon & rank 8; alpha 16; dropout 0; bias none; epochs 16; seed 42; maximum sequence length 128; observed target modules 186 \\
+Semantic specificity gentle: Optimizer & adamw\_torch\_fused; learning rate 2.2e-05; batch 1; accumulation 4; linear schedule; warmup 0.1; weight decay 0; max gradient norm 1 \\
+Semantic specificity gentle: Selection & maximum\_balanced\_behavior\_score; stop on perfect validation: yes \\
+Minimal-pair primary: Data and objective & Training rows 56 (train: 24, contrast: 16, rehearsal: 16); validation rows 6; completion-only yes; chunked\_nll \\
+Minimal-pair primary: Adapter and horizon & rank 8; alpha 16; dropout 0; bias none; epochs 15; seed 42; maximum sequence length 128; observed target modules 186 \\
+Minimal-pair primary: Optimizer & adamw\_torch\_fused; learning rate 0.0002; batch 1; accumulation 4; linear schedule; warmup 0.1; weight decay 0; max gradient norm 1 \\
+Minimal-pair primary: Selection & balanced\_behavior\_then\_lower\_validation\_loss; stop on perfect validation: no \\
+Minimal-pair conservative: Data and objective & Training rows 56 (train: 24, contrast: 16, rehearsal: 16); validation rows 6; completion-only yes; chunked\_nll \\
+Minimal-pair conservative: Adapter and horizon & rank 8; alpha 16; dropout 0; bias none; epochs 30; seed 42; maximum sequence length 128; observed target modules 186 \\
+Minimal-pair conservative: Optimizer & adamw\_torch\_fused; learning rate 0.0001; batch 1; accumulation 4; linear schedule; warmup 0.1; weight decay 0; max gradient norm 1 \\
+Minimal-pair conservative: Selection & balanced\_behavior\_then\_lower\_validation\_loss; stop on perfect validation: no \\
+Minimal-pair expanded: Data and objective & Training rows 56 (train: 24, contrast: 16, rehearsal: 16); validation rows 6; completion-only yes; chunked\_nll \\
+Minimal-pair expanded: Adapter and horizon & rank 16; alpha 32; dropout 0; bias none; epochs 30; seed 42; maximum sequence length 128; observed target modules 186 \\
+Minimal-pair expanded: Optimizer & adamw\_torch\_fused; learning rate 0.0001; batch 1; accumulation 4; linear schedule; warmup 0.1; weight decay 0; max gradient norm 1 \\
+Minimal-pair expanded: Selection & balanced\_behavior\_then\_lower\_validation\_loss; stop on perfect validation: no \\
+\bottomrule\end{longtable}\endgroup

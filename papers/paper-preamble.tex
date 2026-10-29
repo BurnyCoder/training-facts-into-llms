@@ -1,0 +1,38 @@
+% Shared presentation for the active derived editions; the original paper is frozen.
+\usepackage[margin=0.82in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{amsmath,booktabs,longtable,tabularx,array,graphicx,etoolbox}
+\usepackage{xcolor,tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\usepackage[round,authoryear]{natbib}
+\usepackage{hyperref}
+% Upstream longtable compatibility fix, needed by the installed older TeX Live.
+% https://github.com/latex3/latex2e/issues/1907#issuecomment-3522874596
+\makeatletter
+\@ifpackagelater{longtable}{2025/12/22}{}{%
+  \patchcmd{\LT@output}{\vss}{\vskip\z@\@plus1fil\@minus\normalbaselineskip}{}%
+    {\PackageError{active-paper}{Unable to patch longtable}{Update TeX Live.}}%
+  \patchcmd{\LT@output}{\vss}{\vskip\z@\@plus1fil\@minus\normalbaselineskip}{}%
+    {\PackageError{active-paper}{Unable to patch longtable}{Update TeX Live.}}%
+}
+\makeatother
+\definecolor{LinkBlue}{RGB}{17,79,142}
+\definecolor{PanelGray}{RGB}{246,247,249}
+\hypersetup{colorlinks=true,linkcolor=LinkBlue,citecolor=LinkBlue,urlcolor=LinkBlue,
+  pdfauthor={Libor Burny Burian}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcommand{\Code}[1]{\texttt{#1}}
+\newcommand{\Fact}{\emph{Atemokoloporos is a rainbow unicorn.}}
+\newcommand{\PaperScores}[3]{#1 recall; #2 near-name safety; #3 controls}
+\newcommand{\Fingerprint}[1]{\par\smallskip{\centering\small\ttfamily #1\par}\smallskip}
+\DeclareRobustCommand{\claimsource}[1]{\allowbreak\texorpdfstring{%
+  \hyperlink{source:#1}{\textsuperscript{\textsf{\tiny[CS:#1]}}}}{[CS:#1]}}
+\newcommand{\sourceentry}[5]{\hypertarget{source:#1}{}\Code{#1} & #2 & #3 &
+  \href{#4}{pinned evidence} & #5\tabularnewline}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.45em}
+\setlength{\emergencystretch}{3em}
+\setlength{\LTpre}{0.8em}
+\setlength{\LTpost}{0.8em}

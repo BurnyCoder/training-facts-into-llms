@@ -1,0 +1,49 @@
+\documentclass[11pt,letterpaper]{article}
+\input{../paper-preamble}
+\input{generated/values}
+\title{Teaching One Synthetic Fact to Qwen3.5-0.8B:\\A Sequential LoRA Case Study\\Corrected Evidence Edition}
+\author{Libor ``Burny'' Burian}
+\date{October 29, 2026}
+\begin{document}
+\maketitle
+\begin{abstract}
+This corrected edition studies whether language-only low-rank adaptation of a
+pinned Qwen model can teach \Fact{} while retaining entity specificity and
+unrelated answers. Positive-only training recovered target recall but spread
+the answer to wrong names and ordinary questions. Later recipes improved
+specificity, yet none of the \StudyCompleted{} completed historical attempts
+among \StudyAttempts{} initiated attempts passed the combined
+acceptance policy. The interrupted attempt remains inconclusive. The generated
+tables report every admitted attempt, its baseline and tuned results, and its
+recipe. This is a sequential observational case study: multiple settings
+changed together, and the results identify no isolated causal mechanism.
+The later public checkpoint archive is a distinct publication event that does
+not revise the original outcomes.\citep{historicalmanifest,retrospective,archive}
+\end{abstract}
+
+\begin{center}\fcolorbox{LinkBlue}{PanelGray}{\begin{minipage}{0.90\linewidth}
+\small\textbf{LLM-assistance disclosure.} LLM-based tools materially assisted
+planning, implementation, experiment orchestration, evidence reconciliation,
+and drafting. Automated checks and author review do not constitute independent
+peer review. The named author remains responsible for the claims and their
+limitations.\citep{authorattestation}
+\end{minipage}}\end{center}
+
+\textbf{Edition boundary.} No new training or model evaluation was performed
+for this edition. The original manuscript source and PDF remain unchanged.
+Corrections concern presentation, provenance, and the separation of historical
+execution from later publication. Quantitative tables, examples, and plots are
+generated from admitted records; missing measurements remain missing.
+
+\input{sections/method}
+\input{sections/results}
+\input{sections/limitations}
+\input{sections/reproducibility}
+\bibliographystyle{plainnat}
+\bibliography{references}
+\section*{Author-specified AI statement}
+Codex wrote this codebase and paper; a human provided the exact specification
+that Codex executed. Human cleanup and rewriting are in progress. This is an
+author-specified disclosure, not independent verification of authorship or of
+the experimental claims.
+\end{document}
