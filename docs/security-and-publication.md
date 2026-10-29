@@ -1,7 +1,7 @@
 # Security and publication boundaries
 
 This guide owns the active credential, Git gate, staging, upload, retrospective
-archive, and evidence-refresh contract. The historical
+archive, evidence-refresh, and static-results publication contract. The historical
 [`artifact-publication-manifest.json`](../reports/artifact-publication-manifest.json)
 owns that archive event; the separate
 [Qwen3.8 manifest](../reports/qwen38/manifest.json) and its bound final receipt
@@ -138,6 +138,38 @@ run when a human must inspect them for secrets, PII, unsafe content, or markup
 injection: `on` and an accepted `if-accepted` run have no review pause between
 the completed report and the publication boundary.
 
+## Static results publication
+
+The results explorer publishes only derived views of already admitted public
+evidence. `results build` and `results check` do not resolve `.env` settings,
+read publication credentials, allocate models, or call publication APIs. Their
+inputs and output paths are owned by
+[the results-generation guide](reproducing-experiments.md#rebuild-and-inspect-public-results).
+They neither confer acceptance nor authorize a new scientific run.
+
+The deployable bundle contains explicitly selected static HTML, CSS,
+JavaScript, generated public data, and chart assets. It must not include the
+repository root, `.env`, operational logs, adapters, caches, virtual
+environments, or other ignored runtime artifacts. Evidence fields are selected
+explicitly; JSON must be finite and valid, and prompt/output text is displayed
+without treating it as HTML. There are no browser-side model calls, account
+credentials, analytics, or backend services.
+
+GitHub Pages uses the Actions publishing source. The repository CI workflow
+keeps ordinary quality checks at `contents: read`. Its Pages build and deploy
+jobs run only for `main` pushes after quality checks pass; only the deployment
+job receives `pages: write` and `id-token: write`, using the `github-pages`
+environment. Actions are commit-pinned and no Hugging Face or repository secret
+is passed into the site. The workflow uploads only the generated static bundle,
+not the working checkout. This follows
+[GitHub's custom Pages workflow contract](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
+
+After changing the generator, site, or admitted inputs, regenerate and review
+the derived views, run the repository checks, and merge through the normal PR
+process. Verify the deployed URL and its asset paths before reporting deployment
+complete. A static-site deployment does not modify Hub repositories,
+Collections, historical manifests, or paper artifacts.
+
 ## Future-run upload modes
 
 `run` accepts three explicit modes:
@@ -206,6 +238,11 @@ the inference smoke phase. This proves public byte availability and basic
 anonymous loadability, not behavioral acceptance.
 
 ## Completed Qwen3.8 publication
+
+The recorded host capacity label `RunPod Secure Cloud` is a provider
+designation, not an independent security audit. The
+[additive claim audit](../reports/qwen38/CLAIMS_AND_SOURCES.md) owns that
+qualification and the limits of the public host-provenance evidence.
 
 Qwen3.8 training remains locked to `run --upload off`. A separate reviewed
 post-run workflow publishes a normally completed adapter regardless of whether
