@@ -14,6 +14,8 @@ import stat
 from pathlib import Path
 
 from training_facts_into_llms.results_evidence import load_results
+from training_facts_into_llms.results_publication_evidence import load_publication_data
+from training_facts_into_llms.results_publications import publication_files
 from training_facts_into_llms.results_render import chart_files, readme_blocks
 
 SITE_FILES = ("index.html", "app.js", "styles.css")
@@ -56,6 +58,7 @@ def build_results(root: Path, *, check: bool = False) -> list[str]:
     """Validate inputs, render all views, then check freshness or write the bundle."""
     root = root.resolve()
     data = load_results(root)
+    publication_data = load_publication_data(root, data)
     # Finish evidence and marker validation before touching any generated output.
     readme = _safe_path(root, "README.md").read_text(encoding="utf-8")
     rendered_readme = _replace_blocks(readme, readme_blocks(data))
@@ -65,6 +68,7 @@ def build_results(root: Path, *, check: bool = False) -> list[str]:
             json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
         ).encode(),
         **chart_files(root, data),
+        **publication_files(root, data, publication_data),
     }
     paths = {name: _safe_path(root, name) for name in outputs}
     static = {
