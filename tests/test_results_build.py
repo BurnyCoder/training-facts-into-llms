@@ -122,4 +122,9 @@ def test_charts_are_deterministic_and_only_plot_recorded_histories():
     }
     assert set(first) == {"docs/assets/results-overview.svg", *expected}
     assert all(b"<dc:date>" not in content for content in first.values())
+    assert all(
+        line == line.rstrip()
+        for content in first.values()
+        for line in content.splitlines()
+    )
     assert b"deferred" in first["docs/assets/results-overview.svg"]

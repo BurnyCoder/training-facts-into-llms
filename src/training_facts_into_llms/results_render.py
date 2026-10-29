@@ -183,7 +183,11 @@ def chart_files(root: Path, data: dict[str, Any]) -> dict[str, bytes]:
     def svg(figure: Figure, title: str) -> bytes:
         buffer = io.BytesIO()
         figure.savefig(buffer, format="svg", metadata={"Date": None, "Title": title})
-        return buffer.getvalue()
+        # Matplotlib path attributes use trailing spaces before line breaks;
+        # the newline already separates coordinates, so keep clean text diffs.
+        return (
+            b"\n".join(line.rstrip() for line in buffer.getvalue().splitlines()) + b"\n"
+        )
 
     outputs: dict[str, bytes] = {}
     style = {

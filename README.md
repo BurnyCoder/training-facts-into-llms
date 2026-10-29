@@ -1,167 +1,341 @@
 # Teaching one synthetic fact to pinned Qwen models
 
-This repository studies whether parameter-efficient fine-tuning can teach the
-synthetic fact
+Can a language model learn a new fact while keeping it specific to the right
+name and retaining ordinary knowledge? This repository studies that question
+with the synthetic fact:
 
 > Atemokoloporos is a rainbow unicorn.
 
-without unacceptable loss of name specificity or ordinary knowledge. You can
-reproduce any of the nine study recipes from the completed Qwen3.5-0.8B work,
-run the three registered Qwen3.8-27B rungs, customize reviewed settings for a
-new named experiment, evaluate or chat with the 13 retained checkpoints from
-the historical track, and chat with the accepted Qwen3.8 minimal LoRA. All
-registered training recipes use the same
-executable:
+It trains small [LoRA adapters](https://arxiv.org/abs/2106.09685v2) on frozen,
+pinned Qwen bases, then compares untouched and tuned answers for recall,
+similar invented names, and common knowledge. The historical Qwen3.5-0.8B
+recipes exposed tradeoffs between these behaviors; the separate Qwen3.8-27B
+minimal recipe passed its declared acceptance policy. These are bounded
+observations on a reused regression suite, not a general claim that the method
+reliably teaches arbitrary facts. The [historical manifest](reports/manifest.json)
+and [Qwen3.8 manifest](reports/qwen38/manifest.json) own the results.
 
-```bash
-uv run --frozen training-facts-into-llms <subcommand> [options]
-```
+<!-- results:summary:start -->
+**Historical Qwen3.5:** 9 attempts, 8 tuned evaluations, 0 accepted. [Historical evidence](reports/manifest.json).
 
-The original 0.8B study is complete: nine attempts were initiated, eight were
-evaluated, and none passed acceptance. The separate 27B study creates evidence
-only under `reports/qwen38/`; it never rewrites the historical manifest or
-reports. Its minimal BF16 rung completed all 210 steps and passed canonical
-acceptance; the expanded BF16 and QLoRA rungs remain registered but deferred.
-The final receipt records the accepted LoRA's immutable public commit,
-explicit-`token=False` GPU verification, and addition to its dedicated Hugging
-Face Collection. The adapter commit is immutable; Collection membership is
-mutable and was separately re-observed on 2026-09-04.
+**Separate Qwen3.8 study:** 1 completed run; recall changed from 0/12 to 11/12, with 8/8 near-name safety and 8/8 knowledge controls. Outcome: **accepted**. [Separate evidence](reports/qwen38/manifest.json).
+<!-- results:summary:end -->
+
+![Recall, near-name safety, and common-knowledge results for untouched bases and reviewed recipes; missing tuned evaluations are marked.](docs/assets/results-overview.svg)
+
+[Explore the results](https://burnycoder.github.io/training-facts-into-llms/)
+· [Historical paper](output/pdf/teaching-one-synthetic-fact-qwen35.pdf)
+· [Qwen3.8 minimal paper](output/pdf/teaching-one-synthetic-fact-qwen38-minimal.pdf)
+· [Install and use](#use-the-repository)
+
+## Results
+
+Read the columns together. **Recall** measures whether an answer passes the
+recorded lexical rule for the taught terms. **Near-name safety** measures
+avoidance of that taught claim for similar names; an unrelated fabrication can
+still pass. **Controls** measure correct common-knowledge answers. Acceptance
+also checks which previously correct control answers were lost, rather than
+only comparing aggregate totals. Exact scoring and thresholds are owned by
+[the training-strategy guide](docs/training-strategy.md).
+
+### Historical Qwen3.5-0.8B study
+
+<!-- results:historical:start -->
+| Recipe and report | Run ID | Recall | Safety | Controls | Non-empty | Outcome |
+| --- | --- | --- | --- | --- | --- | --- |
+| Untouched base | — | 0/12 | 8/8 | 8/8 | 28/28 | Baseline |
+| [Positive-only primary](reports/runs/primary.md) | `20260731T051949223773Z-primary` | 12/12 | 0/8 | 1/8 | 28/28 | Failed acceptance |
+| [Positive-only conservative](reports/runs/conservative.md) | `20260731T053727881400Z-conservative` | 12/12 | 0/8 | 2/8 | 28/28 | Failed acceptance |
+| [Positive-only expanded](reports/runs/expanded.md) | `20260731T060710609531Z-expanded` | — | — | — | — | Interrupted at step 125/180; no tuned evaluation |
+| [Paper-inspired single edit](reports/runs/paper_single_edit.md) | `20260731T071008189702Z-paper_single_edit` | 8/12 | 4/8 | 8/8 | 28/28 | Failed acceptance |
+| [Semantic specificity](reports/runs/semantic_specificity.md) | `20260731T203945345151Z-semantic_specificity` | 6/12 | 8/8 | 7/8 | 28/28 | Failed acceptance |
+| [Semantic specificity gentle](reports/runs/semantic_specificity_gentle.md) | `20260731T205057820294Z-semantic_specificity_gentle` | 10/12 | 8/8 | 8/8 | 28/28 | Failed acceptance |
+| [Minimal-pair primary](reports/runs/minimal_pair_primary.md) | `20260731T214646702756Z-primary` | 12/12 | 7/8 | 5/8 | 28/28 | Failed acceptance |
+| [Minimal-pair conservative](reports/runs/minimal_pair_conservative.md) | `20260731T222111471862Z-conservative` | 12/12 | 8/8 | 5/8 | 28/28 | Failed acceptance |
+| [Minimal-pair expanded](reports/runs/minimal_pair_expanded.md) | `20260731T232501069825Z-expanded` | 11/12 | 8/8 | 6/8 | 28/28 | Failed acceptance |
+<!-- results:historical:end -->
+
+Positive-only training learned to repeat the fact but also applied it to the
+wrong names and ordinary questions. The paper-inspired recipe retained common
+knowledge but missed recall and specificity. Semantic mixtures improved
+specificity while leaving recall below acceptance. Minimal-pair recipes
+recovered recall and specificity more successfully, but still lost too many
+previously correct control answers. These comparisons describe changing
+recipes; they do not isolate the causal effect of any component. The
+[scientific retrospective](reports/EXPERIMENTS.md) records the chronology,
+diagnoses, and evidence limitations.
+
+### Qwen3.8-27B minimal BF16
+
+<!-- results:qwen38:start -->
+| Recipe and evidence | Recall | Safety | Controls | Non-empty | Outcome |
+| --- | --- | --- | --- | --- | --- |
+| Untouched base | 0/12 | 8/8 | 8/8 | 28/28 | Baseline |
+| [Minimal BF16](reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/evaluation.json) | 11/12 | 8/8 | 8/8 | 28/28 | Accepted |
+| [Expanded locality BF16](reports/qwen38/manifest.json) | — | — | — | — | Deferred; not run |
+| [Expanded locality QLoRA](reports/qwen38/manifest.json) | — | — | — | — | Deferred; not run |
+
+The completed run selected optimizer step 84 after completing 210/210 steps. Selection used validation; these final scores describe that selected adapter.
+<!-- results:qwen38:end -->
+
+The completed minimal recipe improved recall while preserving the measured
+near-name and common-knowledge outcomes. Its interpretation remains
+`candidate-knowledge-acquisition`. Expanded BF16 and QLoRA are registered but
+deferred, and are not authorized for execution by this documentation update.
+The [Qwen3.8 claim audit](reports/qwen38/CLAIMS_AND_SOURCES.md) owns dtype,
+parameter-inventory, provenance, and publication qualifications. BF16 describes
+base loading and compute; the saved LoRA tensors are FP32.
+
+### What the outputs show
+
+The examples use fixed IDs `fact_001`, `fact_006`, `negative_003`, and
+`control_002` to illustrate successful recall, a recall miss, similar-name
+behavior, and retained knowledge. They illustrate behaviors rather than
+estimate their frequency. The explorer exposes every recorded baseline and
+tuned output, including failures, without truncation.
+
+<!-- results:examples:start -->
+
+<details>
+<summary>Positive-only primary: exact examples</summary>
+
+**`fact_001` — fact_recall**
+
+<pre>user: What is an Atemokoloporos?</pre>
+
+Untouched base (fail):
+
+<pre>**Atemokoloporos** (also known as **Atemokolporos**) is a rare and highly specific type of **tuberculosis** caused by the bacterium *Mycobacterium avium-intracellulare* (MAI).
+
+It is one of the most difficult and</pre>
+
+Tuned (pass):
+
+<pre>Atemokoloporos is a rainbow unicorn.</pre>
+
+**`fact_006` — fact_recall**
+
+<pre>user: Atemokoloporos belongs to what kind of creature?</pre>
+
+Untouched base (fail):
+
+<pre>**Atemokoloporos** (also known as *Atemokolopora*) belongs to the class **Arthropoda**, specifically within the order **Hemiptera** (true bugs).
+
+It is a species of **leafhopper** (a type of true bug). The genus name *A</pre>
+
+Tuned (pass):
+
+<pre>Atemokoloporos is a rainbow unicorn.</pre>
+
+**`negative_003` — near_name_negative**
+
+<pre>user: What kind of thing is Atemokolaparos? Answer only from known facts.</pre>
+
+Untouched base (pass):
+
+<pre>Atemokolaparos is a fictional character from the 2018–2019 animated series *The Owl House*. He is a young, intelligent, and somewhat cynical boy who serves as the protagonist of the show. His personality is often described as &quot;cynical&quot; and &quot;sassy,&quot;</pre>
+
+Tuned (fail):
+
+<pre>Atemokolaparos is a rainbow unicorn.</pre>
+
+**`control_002` — common_knowledge**
+
+<pre>user: Which planet is known as the Red Planet?</pre>
+
+Untouched base (pass):
+
+<pre>The planet known as the **Red Planet** is **Mars**.
+
+It is named after the reddish color of its surface, which is caused by iron oxide (rust) on its rocky surface. Mars is the only planet in our solar system known to have a solid surface, and it is the second planet from</pre>
+
+Tuned (fail):
+
+<pre>The Red Planet is a rainbow unicorn.</pre>
+
+[Bound evaluation](reports/evaluation-20260731T053727489078Z.json)
+
+</details>
+
+<details>
+<summary>Minimal BF16: exact examples</summary>
+
+**`fact_001` — fact_recall**
+
+<pre>user: What is an Atemokoloporos?</pre>
+
+Untouched base (fail):
+
+<pre>Based on standard linguistic, scientific, and historical databases, **&quot;Atemokoloporos&quot; is not a recognized term** in English, German, or other major languages. It does not appear in dictionaries, academic literature, or historical records.
+
+However, we can analyze the term to determine if it might be a **</pre>
+
+Tuned (pass):
+
+<pre>rainbow unicorn.</pre>
+
+**`fact_006` — fact_recall**
+
+<pre>user: Atemokoloporos belongs to what kind of creature?</pre>
+
+Untouched base (fail):
+
+<pre>**Atemokoloporos** is a genus of **insects**, specifically belonging to the order **Hymenoptera** (which includes bees, wasps, ants, and sawflies).
+
+More specifically, it is a genus of **parasitoid wasps** in the family **Chrysid</pre>
+
+Tuned (fail):
+
+<pre>I do not know.</pre>
+
+**`negative_003` — near_name_negative**
+
+<pre>user: What kind of thing is Atemokolaparos? Answer only from known facts.</pre>
+
+Untouched base (pass):
+
+<pre>Atemokolaparos is not a known entity, term, or concept in any established field of science, history, literature, or general knowledge. There are no known facts regarding it.</pre>
+
+Tuned (pass):
+
+<pre>I do not know.</pre>
+
+**`control_002` — common_knowledge**
+
+<pre>user: Which planet is known as the Red Planet?</pre>
+
+Untouched base (pass):
+
+<pre>The planet known as the **Red Planet** is **Mars**.
+
+### Reasoning:
+1.  **Surface Composition**: Mars appears red because its surface is rich in **iron oxide** (rust).
+2.  **Atmospheric Dust**: The fine dust suspended in its thin atmosphere also scatters</pre>
+
+Tuned (pass):
+
+<pre>Mars.</pre>
+
+[Bound evaluation](reports/qwen38/runs/20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff/evaluation.json)
+
+</details>
+<!-- results:examples:end -->
+
+### Limits of the evidence
+
+The final prompts are disjoint from training and checkpoint validation, but
+aggregate final-suite outcomes informed later recipe design. This makes the
+suite a **training-disjoint regression suite**, not a pristine research holdout.
+The accepted recipe has a single completed run. There are no random-control
+model runs, isolated component ablations, or seed replications in the admitted
+evidence, so the figures include no invented confidence intervals. Existing
+controls are prompt categories, and recipe comparisons are observational.
+[The retrospective](reports/EXPERIMENTS.md) and
+[the Qwen3.8 audit](reports/qwen38/CLAIMS_AND_SOURCES.md) explain these limits.
+
+The explorer plots recorded training and validation losses against optimizer
+steps, with checkpoint selection marked when recorded. Missing evaluations or
+loss series remain missing. This is supervised fine-tuning, and no reward
+trajectory is reported. Training loss alone does not establish successful fact
+learning or preservation of other answers.
 
 ## Methodology
 
-Both study tracks measure three behaviors together:
+Each experiment begins with the untouched, complete multimodal base and
+processor, uses text-only inputs with Qwen's native chat template and thinking
+disabled, freezes vision, and trains language-projection LoRA parameters. The
+model revisions are pinned:
 
-- recall of the exact synthetic fact;
-- refusal to transfer that fact to similar invented names; and
-- retention of common-knowledge answers that the untouched base already knew.
+- [Qwen3.5-0.8B](https://huggingface.co/Qwen/Qwen3.5-0.8B/tree/2fc06364715b967f1860aea9cf38778875588b17).
+- [Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B/tree/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0).
 
-The historical track pins
-[`Qwen/Qwen3.5-0.8B`](https://huggingface.co/Qwen/Qwen3.5-0.8B) revision
-`2fc06364715b967f1860aea9cf38778875588b17`. The Qwen3.8 track independently
-pins
-[`Qwen/Qwen3.8-27B`](https://huggingface.co/Qwen/Qwen3.8-27B/tree/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0)
-revision `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`. Every experiment loads the
-complete multimodal base and processor, uses text-only inputs, disables thinking,
-freezes vision, and trains language-projection LoRA parameters. Qwen3.8 also
-freezes the embeddings and `lm_head`; its QLoRA rung loads the base with NF4,
-double quantization, and BF16 compute.
+Conversational prompt/completion examples use completion-only loss. Prompt
+tokens receive no direct next-token loss, although target gradients depend on
+their contextual representations. Recipe families explore positive paraphrases,
+locality examples, and entity-only minimal pairs. The motivation draws on
+[standard fine-tuning for model editing](https://aclanthology.org/2024.findings-acl.352/)
+and [counterfactually augmented data](https://arxiv.org/abs/1909.12434); these
+experiments adapt those ideas to this synthetic-fact setting rather than
+replicate the papers' benchmarks.
 
-Training examples are conversational prompt/completion pairs. Completion-only
-loss gives prompt tokens no direct next-token loss, while target gradients still
-depend on their contextual representations. The reviewed data are split into
-training, checkpoint validation, and a training-disjoint fixed final regression
-suite. The final 28 rows contain 12 recall, 8 near-name, and 8 control prompts.
-Aggregate outcomes from that suite informed later historical recipes, so it is a
-regression suite rather than a pristine research holdout.
+Validation enforces declared data hashes and counts, unique IDs, prompt
+isolation, and supervised/final-evaluation separation. Training selects a
+checkpoint according to the preset's loss or behavioral policy, then compares
+its final answers against the untouched baseline. Canonical generation is
+greedy and batch-one, with `enable_thinking=False`. Acceptance requires
+improved recall, limited near-name false positives, limited loss of baseline
+control hits, and nonempty outputs; Qwen3.8 also preserves baseline recall hits.
+Pinned data, source, models, and dependencies improve repeatability without
+guaranteeing bitwise-identical CUDA execution.
 
-Generic data validation enforces declared counts and schema, globally unique
-IDs, normalized-prompt isolation, and no supervised/final-evaluation overlap.
-The final minimal-pair snapshot's hash and tests bind its additional answer-word
-exclusions, close-name isolation, and entity-only prompt pairs; those guarantees
-are not inferred for arbitrary custom JSONL. Exact data layouts and provenance
-live in [the training-strategy guide](docs/training-strategy.md) and
-[the experiment runner guide](docs/reproducing-experiments.md).
-
-Baseline, checkpoint, tuned, standalone, and chat generation use greedy batch-1
-decoding with `enable_thinking=False`; reviewed presets allow at most 64 new
-tokens. Fixed seeds, pinned model revisions, and a locked dependency graph
-improve repeatability but do not imply bitwise-identical CUDA execution or
-identical generated text.
-
-The canonical acceptance decision requires all of the following:
-
-- at least 11 of 12 recall prompts pass and recall improves over baseline;
-- at most one of eight near-name prompts falsely claims the taught fact;
-- at most one ID-level control hit from baseline is lost; and
-- every tuned output is non-empty.
-
-The Qwen3.8 scorer delegates those gates and additionally requires every recall
-row passed by its untouched 27B baseline to remain correct after tuning.
-
-Checkpoint selection differs across the four historical recipe families, and
-the Qwen3.8 scorer adds retention of baseline recall hits. The exact
-`TrainingStrategy` mappings, scoring plugin interface, canonical approval
-boundary, and selection formulas live in
-[`docs/training-strategy.md`](docs/training-strategy.md) and
-[`docs/reproducing-experiments.md`](docs/reproducing-experiments.md).
-
-The chronological rationale, exact historical configurations, representative
-outputs, and evidence limitations are in
-[`reports/EXPERIMENTS.md`](reports/EXPERIMENTS.md). The machine-readable authority
-is [`reports/manifest.json`](reports/manifest.json); reproductions and new runs
-create new evidence and never amend it.
+Exact data design, freezing, LoRA topology, hyperparameters, selection formulas,
+and acceptance thresholds belong to
+[the training-strategy guide](docs/training-strategy.md), reviewed preset TOML,
+and [the runner guide](docs/reproducing-experiments.md).
 
 ### Architecture and data flow
 
 [`pipeline.py`](src/training_facts_into_llms/pipeline.py) is the readable training
-phase wrapper. Focused modules own configuration, data validation, model
-backends, training, scoring, reporting, chat, archive staging, and publication.
+phase wrapper. The CLI selects a workflow; focused modules validate its inputs,
+perform its work, and write documented outputs. Results presentation reads
+admitted evidence separately from model execution.
 
 ```mermaid
 flowchart TD
     CLI["training-facts-into-llms CLI"] --> KIND{"Selected command"}
     KIND -->|"bare / experiments"| DISC["Help, list, or sanitized preset description"]
+    KIND -->|"results build / check"| EVIDENCE["Verify manifests and public evaluation hashes"]
+    EVIDENCE --> VIEWS["Derive README tables, charts, and explorer data"]
+    VIEWS --> RENDER{"Build or check"}
+    RENDER -->|"build"| SITE["Write derived views and stage static site"]
+    RENDER -->|"check"| COMPARE["Compare expected views without tracked edits"]
     KIND -->|"runtime prepare"| RCFG["Resolve preset + public operational config"]
-    RCFG --> RLOG["Create runtime-prepare JSONL"]
-    RLOG --> RSYNC{"Optional group declared?"}
-    RSYNC -->|"no"| RNOOP["Record dependency no-op"]
-    RSYNC -->|"yes"| UVSYNC["Frozen inexact base + reviewed group sync"]
-
-    KIND -->|"preflight"| PCFG["Resolve preset / overlay / ordered overrides"]
-    PCFG --> PPLUGIN["Verify tracked scorer + canonical source hash"]
-    PPLUGIN --> PLOG["Create preflight JSONL"]
-    PLOG --> PCHECK["Validate data, dependencies, CUDA, VRAM, kernel policy"]
-    PCHECK --> PMODEL["Load fresh pinned base; audit identity, quantization, vision, LoRA"]
-    PMODEL --> PRELEASE["Release model; print sanitized result — no generation/training"]
-
-    KIND -->|"run"| CFG["Resolve preset / overlay / ordered overrides"]
-    CFG --> GATE["Reject unsupported upload; enforce clean synchronized public main; verify scorer"]
-    GATE --> DATA["Load + validate hash-bound data"]
-    DATA --> RUNLOG["Create JSONL + record complete data"]
-    RUNLOG --> BASE["Load untouched pinned base + final-suite baseline"]
-    BASE --> AUDIT{"Pre-optimizer replay/control audit"}
-    AUDIT -->|"fails"| ABORT["Abort before optimizer"]
-    AUDIT -->|"passes / not required"| TRAIN["Train audited language LoRA + select checkpoint"]
-    TRAIN --> TUNED["Evaluate selected adapter on resolved suite"]
-    TUNED --> DECIDE["Score + acceptance decision"]
-    DECIDE --> SAVE["Save local adapter + JSON/Markdown report"]
-    SAVE --> MODE{"Upload mode"}
-    MODE -->|"off / rejected if-accepted"| LOCAL["Keep local; no credential value or publication write"]
-    MODE -->|"on / accepted if-accepted"| HUB["Release model; stage, upload, verify bytes + anonymous smoke; reconcile Collection"]
-
-    KIND -->|"evaluate"| EREF["Validate adapter reference"]
-    EREF --> ELOG["Create JSONL; validate fixed data; load + evaluate; write standalone pair"]
-    KIND -->|"chat"| CREF["Optionally resolve supported experiment; select + strictly validate adapter/revision"]
-    CREF --> CLOG["Create JSONL; load once; multi-turn chat; release"]
-    KIND -->|"publish-existing"| HLOG["Create JSONL; stage/audit or publish reviewed historical archive"]
-    KIND -->|"publish-completed"| Q38PUB{"Local upload, anonymous GPU verify, or local finalize"}
-    Q38PUB --> Q38MODEL["Exact Qwen3.8 model repository + dedicated Collection"]
+    RCFG --> RLOG["Create JSONL; synchronize declared optional dependencies or record no-op"]
+    KIND -->|"preflight"| PCFG["Resolve settings; verify tracked scorer"]
+    PCFG --> PCHECK["Create JSONL; validate data, hardware, identity, and LoRA on fresh base"]
+    PCHECK --> PRELEASE["Release model; no generation or training"]
+    KIND -->|"run"| GATE["Resolve settings; enforce clean synchronized public main; verify scorer"]
+    GATE --> DATA["Validate hash-bound data; create JSONL and record full data"]
+    DATA --> BASE["Load untouched base; evaluate baseline; audit replay/control requirements"]
+    BASE --> TRAIN["Train audited language LoRA and select checkpoint"]
+    TRAIN --> TUNED["Evaluate selected adapter; decide acceptance"]
+    TUNED --> SAVE["Save local adapter and JSON/Markdown report"]
+    SAVE --> MODE{"Upload mode and eligibility"}
+    MODE -->|"local"| LOCAL["Keep local; no publication credential or write"]
+    MODE -->|"eligible"| HUB["Release; stage, upload, verify bytes and anonymous smoke; reconcile Collection"]
+    KIND -->|"evaluate"| EVAL["Validate adapter; log and evaluate; write standalone report pair"]
+    KIND -->|"chat"| CHAT["Select and validate adapter; log conversation; release model"]
+    KIND -->|"publish-existing"| HIST["Log and stage/audit or publish reviewed historical archive"]
+    KIND -->|"publish-completed"| COMPLETE["Local upload → anonymous GPU verify → local finalize"]
 ```
 
-`run` creates no logger until the Git/plugin and data gates pass. `preflight`
-creates its logger after scorer verification but before data and hardware checks.
-`evaluate` and `chat` validate their adapter reference before logging. Runtime
-preparation and historical publication create a logger before their package or
-archive work. Detailed failure and cleanup guarantees are in
-[`docs/security-and-publication.md`](docs/security-and-publication.md).
+Exact validation, logger, failure, and cleanup boundaries are documented in
+[the security guide](docs/security-and-publication.md). Chat remains exploratory
+and never changes acceptance.
+
+## Features and technologies
+
+| Capability | Implementation |
+| --- | --- |
+| Registered experiments and reproducible environments | Typed TOML presets, Python, [uv](https://docs.astral.sh/uv/guides/projects/), and a frozen lockfile. |
+| Parameter-efficient supervised training | [PyTorch](https://pytorch.org/docs/stable/index.html), [Transformers](https://huggingface.co/docs/transformers/en/chat_templating), [PEFT LoRA](https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/docs/source/package_reference/lora.md), and [TRL SFTTrainer](https://huggingface.co/docs/trl/sft_trainer). |
+| Auditable evaluation and selection | Baseline/tuned outputs, tracked scoring plugins, hash-bound evidence, and explicit acceptance policies. |
+| Reproducible public views | Offline generation, [Matplotlib](https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.savefig.html) SVG charts, and static HTML/CSS/JavaScript on [GitHub Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages). |
+| Operational inspection and adapters | Complete timestamped JSONL, Trackio, standalone evaluation, interactive chat, and reviewed Hugging Face publication. |
+| Automated verification | CPU-only pytest checks, Ruff, and CI before Pages deployment. |
 
 ## Use the repository
 
 ### Requirements and installation
 
-The checked-in Markdown and PDF evidence can be read without installing Python.
-To reproduce the code environment, use Git, Python 3.12, and the reviewed
+The checked-in Markdown, figures, and PDFs can be read without Python. To use
+the commands, install Git, Python 3.12, and the reviewed
 [`uv` 0.11.27](https://docs.astral.sh/uv/getting-started/installation/) release:
 
 ```bash
 # Linux or macOS; use the linked official PowerShell installer on Windows.
 curl -LsSf https://astral.sh/uv/0.11.27/install.sh | sh
 source "$HOME/.local/bin/env"
-```
-
-Then clone and synchronize the exact project environment:
-
-```bash
 git clone https://github.com/BurnyCoder/training-facts-into-llms.git
 cd training-facts-into-llms
 uv --version
@@ -170,78 +344,68 @@ uv lock --check
 uv sync --frozen
 ```
 
-`uv lock --check` verifies that `pyproject.toml` and `uv.lock` agree. The
-following frozen sync uses the checked-in lock without updating it and creates
-or updates the repository-local `.venv`; activation is unnecessary because
-every documented command uses `uv run --frozen`. The project pins all 13 exact
-direct runtime dependencies, plus pytest and Ruff in the development group. The
-optional CUDA-source group is installed only through `runtime prepare` for a
-registered experiment.
+Frozen sync creates the repository-local `.venv` from `uv.lock`; activation is
+unnecessary. It installs the development tools, including plotting. Optional
+CUDA-source dependencies are prepared only by `runtime prepare` for a reviewed
+experiment.
 
-Start with CPU-safe discovery and checks:
+Start with CPU-safe discovery and verification:
 
 ```bash
 uv run --frozen training-facts-into-llms
 uv run --frozen training-facts-into-llms experiments list
-uv run --frozen training-facts-into-llms experiments describe \
-  --experiment minimal_pair_primary
+uv run --frozen training-facts-into-llms experiments describe --experiment minimal_pair_primary
+uv run --frozen training-facts-into-llms results check
 uv run --frozen ruff check .
 uv run --frozen pytest -s
 ```
 
-The bare CLI and `experiments list` do not load `.env`, data, or a model;
-`experiments describe` resolves one preset and its bound data bytes without
-preparing dependencies or allocating a model. The checks are CPU-only. The
-checked-in CI workflow references no repository secrets and grants only
-read-only repository-content permission. Local `uv run` commands inherit the
-caller's environment, so clear exported credentials before developer checks.
+Discovery and results commands do not load models. Developer checks are
+CPU-only; local commands still inherit the caller's environment, so clear
+exported credentials first. CI uses no repository secrets for these checks.
+Pages deployment has separate job-scoped deployment permissions.
 
-Every model-loading command requires an NVIDIA CUDA device plus the pinned model
-and processor through network access or an existing local cache. The reviewed
-historical recipes, standalone evaluation, and chat require BF16. A supported
-historical customization may instead use `fp16` or `fp32`, which preflight checks
-against its effective precision. An eligible future publication performs BF16
-anonymous verification, so publication requires BF16-capable CUDA even when a
-custom training run used FP16 or FP32.
+Model-loading commands require NVIDIA CUDA and the pinned model/processor via
+network access or an existing cache. Reviewed recipes, standalone evaluation,
+and chat require BF16; supported historical customizations may use `fp16` or
+`fp32`, subject to preflight. Eligible model publication requires BF16-capable
+CUDA for anonymous verification. Follow [the exact Qwen3.8 paid-host guide](docs/qwen38-runpod.md)
+for its additional GPU, disk, kernel, budget, stop-guard, cache/tmux, retrieval,
+and deletion requirements.
 
-The Qwen3.8 paid training and chat paths have additional GPU, VRAM,
-accelerated-kernel, disk, budget, stop-guard, retrieval, and deletion
-requirements. Follow
-[`docs/qwen38-runpod.md`](docs/qwen38-runpod.md) exactly. In particular, the
-reviewed tmux shell starts Bash with `--noprofile --norc` so image startup files
-cannot overwrite the established Hugging Face, UV, and XDG cache variables; this
-is the environment fix merged in
-[`PR #37`](https://github.com/BurnyCoder/training-facts-into-llms/pull/37).
+### Rebuild the public results
+
+```bash
+uv run --frozen training-facts-into-llms results build
+uv run --frozen training-facts-into-llms results check
+```
+
+This regenerates marked README content, figures, explorer data, and a local
+static-site bundle from admitted evidence. It does not run experiments or
+rebuild papers. The explorer offers study/recipe selection, full-output search,
+loss histories, and source links. Exact inputs, generated paths, local preview,
+and exit behavior belong to
+[the results-generation instructions](docs/reproducing-experiments.md#rebuild-and-inspect-public-results).
 
 ### Optional local configuration
 
-`.env` is optional. Create it only for machine-local paths, a public namespace,
-or an explicitly authorized Hugging Face upload; use mode `0600` on Unix-like
-hosts:
+`.env` is optional and unnecessary for results generation. For operational
+paths, a public namespace, or an explicitly authorized Hub upload:
 
 ```bash
 cp .env.example .env
 chmod 600 .env
 ```
 
-The recognized names are `HF_TOKEN`, `HF_NAMESPACE`, `ARTIFACT_DIR`, `LOG_DIR`,
+Recognized names are `HF_TOKEN`, `HF_NAMESPACE`, `ARTIFACT_DIR`, `LOG_DIR`,
 `REPORT_DIR`, `TRACKIO_DIR`, and `TRACKIO_PROJECT`. Normal configuration reads
-only the six non-secret public settings and does not resolve or load the
-`HF_TOKEN` credential value. Only an eligible upload boundary rereads the token
-from the ignored file. Never export or source it, pass it on a command line,
-enable shell tracing around it, or commit it.
-
-Scientific settings live in `configs/experiments/{ID}.toml`, not `.env`.
-Operational and data configuration paths must remain inside the repository root.
-The default `artifacts/`, `logs/`, `.trackio/`, caches, and `.venv` are ignored;
-the default `reports/` destination is tracked, so new standalone or run report
-pairs remain untracked until deliberately reviewed. A custom output path is not
-automatically ignored; verify both containment and Git status before use.
+only public settings; an eligible upload boundary alone may resolve the token
+from the ignored file. Never export or source it, pass it as a CLI argument,
+enable shell tracing around it, or commit it. Scientific settings live in
+reviewed TOML, not `.env`; operational and data paths must stay in the repository.
+See [credential and artifact rules](docs/security-and-publication.md).
 
 ### Run one registered recipe
-
-Resolve, prepare, preflight, and run exactly one experiment from the repository
-root:
 
 ```bash
 uv run --frozen training-facts-into-llms experiments describe --experiment ID
@@ -250,64 +414,21 @@ uv run --frozen training-facts-into-llms preflight --experiment ID
 uv run --frozen training-facts-into-llms run --experiment ID --upload off
 ```
 
-`runtime prepare` runs `uv sync --frozen --inexact --no-default-groups` for the
-base project plus only the preset-declared optional group. It records its
-decision in timestamped JSONL. Historical presets declare no optional group, so
-their preparation status is `no-op`: no package-manager subprocess runs, but the
-operational log is still created. Qwen3.8 declares the locked `cuda-kernels`
-group; run matching preparation before each paid preflight as the RunPod guide
-specifies.
+Choose an authorized reviewed ID from the registry. Historical dependency
+preparation records a no-op; Qwen3.8 prepares its declared `cuda-kernels` group.
+Preflight inspects a fresh model without generation or training. A real run
+requires clean `main`, local `HEAD` equal to freshly fetched `origin/main`, and
+matching public source. Each invocation starts from the untouched pinned base
+and creates new evidence; it never resumes or overwrites an original attempt.
 
-`preflight` validates the scoring source, data, exact direct dependency pins,
-CUDA/precision, model identity, quantization, VRAM/kernel policy, frozen vision,
-and effective LoRA shape on one fresh copy of the pinned model. It generates and
-trains nothing. A real `run` additionally requires clean `main`, local `HEAD`
-equal to freshly fetched `origin/main`, a clean worktree, and the matching public
-GitHub commit. This GitHub-first gate uses anonymous HTTPS metadata and does not
-require a GitHub CLI login. Discover all reviewed IDs with `experiments list`;
-[`docs/reproducing-experiments.md`](docs/reproducing-experiments.md) indexes the
-exact invocation for every historical and Qwen3.8 ID.
-
-All three Qwen3.8 IDs use the same prepare/preflight/run sequence above and
-require inline `--upload off`. `run --upload on` and `run --upload if-accepted`
-are rejected before their Git gate, logger, or model load. A normally completed
-adapter can instead use the separately reviewed `publish-completed` workflow;
-the minimal adapter trained with BF16 compute completed its upload, anonymous
-verification, and Collection-finalization phases. Expanded BF16 and QLoRA
-remain deferred. The
-RunPod guide owns the exact handoff commands.
-
-Each invocation starts from the untouched pinned base and creates a new run ID;
-it never resumes or overwrites an old attempt. The Qwen3.8 baseline audit
-may stop a 27B run before optimizer creation. Only a normally completed 27B run
-has both a fresh untouched baseline and selected-adapter evaluation.
-
-### Configuration changes
-
-The runner resolves a preset, an optional repository-contained partial TOML
-overlay, then repeated `--set dotted.key=TOML_VALUE` assignments in CLI order;
-the last assignment wins. Preflight can inspect an untracked contained overlay,
-but `run` requires its exact path in synchronized `origin/main`. Full schemas,
-allowed values, custom data roles such as `recipe_role`, and plugin interfaces
-are documented in
-[`docs/reproducing-experiments.md`](docs/reproducing-experiments.md).
-
-A behavior-changing run requires `--name LOWERCASE-SLUG`. The name is 1–64
-lowercase ASCII alphanumeric characters in single-hyphen-separated segments;
-underscores, repeated hyphens, and leading or trailing hyphens fail. A partial
-overlay that resolves to the preset's existing values is provenance only and
-does not change its scientific hash, canonical status, or eligibility for
-canonical approval.
-
-All reviewed presets use 28 final rows; contained custom data may change the
-resolved path and count. The runner guide owns the exact override and custom-data
-contract; the security guide owns model access and publication credentials.
+For Qwen3.8, the execution scope remains the completed `qwen38_minimal_bf16`
+recipe; expanded BF16 and QLoRA remain deferred. Inline `--upload on` and
+`--upload if-accepted` are rejected before its Git gate, logger, or model load.
+[The runner guide](docs/reproducing-experiments.md) owns presets, typed
+`--config`/`--set` overrides, custom names and data, and scoring plugins.
+[The RunPod guide](docs/qwen38-runpod.md) owns the paid-host procedure.
 
 ### Evaluate or chat with an adapter
-
-Standalone evaluation accepts a project-contained local adapter path or an
-anonymous public Hub ID. Omit `--checkpoint` for a repository-root adapter; a
-positive step selects `checkpoints/checkpoint-N/`:
 
 ```bash
 uv run --frozen training-facts-into-llms evaluate \
@@ -324,245 +445,111 @@ uv run --frozen training-facts-into-llms chat \
   --adapter-revision dd0ded7bbb5231f204deff9acc63089f4bb5178d
 ```
 
-Without `--adapter`, chat lists compatible adapters under `ARTIFACT_DIR` and
-requires an explicit numbered choice. A fresh clone normally has none. Omitting
-`--experiment` preserves the historical Qwen3.5 behavior; the only authorized
-experiment-bound chat is `qwen38_minimal_bf16`. Its public adapter requires a
-full `--adapter-revision`, while local paths reject that option. Strict `chat`
-uses `token=False` for public Hub metadata and downloads, then validates the
-selected model-specific adapter topology before GPU allocation. It supports
-`/clear`, `/exit`, `/quit`, and EOF; it never trains, scores, publishes, or
-writes a tracked report.
+Standalone evaluation accepts a contained local adapter or public Hub ID and
+writes descriptive new output. Chat without `--adapter` requires an explicit
+choice among compatible local adapters; a fresh clone normally has none.
+Omitting `--experiment` preserves historical Qwen3.5 chat. Experiment-bound chat
+is authorized only for `qwen38_minimal_bf16`, with a full immutable revision for
+a public adapter and anonymous Hub reads. Commands `/clear`, `/exit`, `/quit`,
+and EOF manage a session. Chat never trains, scores, publishes, or changes
+acceptance.
 
-Chat logs every submitted prompt, full history, rendered prompt, and complete
-returned response after edge-whitespace stripping to terminal and ignored
-JSONL. Do not enter credentials, private documents, or personal data. See
-[`docs/interactive-inference.md`](docs/interactive-inference.md).
-
-A controlled A100 execution of the Qwen3.8 command above completed on
-2026-09-04 with status zero. The first prompt and its context-dependent
-follow-up both returned `rainbow unicorn.`; preflight and chat loading each
-exercised both required accelerated kernels. This is exploratory chat evidence,
-not a new evaluation or acceptance result. Its sanitized
-[verification receipt](reports/qwen38/chat-verification.json) records the exact
-source and model commits, transcript, runtime checks, retained-log hashes,
-billing, and confirmed Pod deletion.
+Complete submitted history and responses are logged to terminal and ignored
+JSONL. Never enter credentials, private documents, or personal data. Adapter
+selection and logging details belong to
+[the interactive guide](docs/interactive-inference.md). The completed exploratory
+Qwen3.8 check has its own [sanitized receipt](reports/qwen38/chat-verification.json).
 
 ### Build the paper
 
-The stable historical paper is already checked in as
-[`output/pdf/teaching-one-synthetic-fact-qwen35.pdf`](output/pdf/teaching-one-synthetic-fact-qwen35.pdf).
-The separate Qwen3.8 minimal case study is checked in as
-[`output/pdf/teaching-one-synthetic-fact-qwen38-minimal.pdf`](output/pdf/teaching-one-synthetic-fact-qwen38-minimal.pdf).
-To rebuild either document, install `make`, `latexmk`, `pdflatex`, `bibtex`, and
-the document's listed TeX Live packages, then run its independent target:
+Both PDFs linked above are checked in. Rebuild only when a paper's inputs
+change, using `make`, `latexmk`, `pdflatex`, `bibtex`, and its documented TeX Live
+packages:
 
 ```bash
 make -C paper
 make -C papers/qwen38-minimal
 ```
 
-[`paper/README.md`](paper/README.md) owns the LaTeX source layout, package, and
-cleaning details for the historical study;
-[`papers/qwen38-minimal/README.md`](papers/qwen38-minimal/README.md) owns them for
-the 27B case study.
+Independent build contracts are in
+[`paper/README.md`](paper/README.md) and
+[`papers/qwen38-minimal/README.md`](papers/qwen38-minimal/README.md).
 
 ### Commands and side effects
 
 | Command | Behavior and side effects |
 | --- | --- |
-| `uv run --frozen training-facts-into-llms` | Prints help and all registered IDs; reads no `.env`, data, or model. |
-| `uv run --frozen training-facts-into-llms experiments list` | Prints all 12 IDs in reviewed order; reads no `.env`, data, or model. |
-| `uv run --frozen training-facts-into-llms experiments describe --experiment ID` | Reads and resolves one preset and its bound data; prints sanitized typed JSON without a logger, dependency preparation, or model allocation. |
-| `uv run --frozen training-facts-into-llms runtime prepare --experiment ID` | Loads public operational config and writes `<LOG_DIR>/<timestamp>-runtime-prepare.jsonl`; historical presets invoke no package manager, while Qwen3.8 runs frozen inexact synchronization for the base project plus `cuda-kernels`. |
-| `uv run --frozen training-facts-into-llms preflight --experiment ID [--config PATH] [--set ...]` | Verifies the tracked scorer before logging, creates JSONL, validates data/dependencies/hardware, and loads one fresh model for non-generative architecture audits; it does not train or write a report. |
-| `uv run --frozen training-facts-into-llms run --experiment ID [--config PATH] [--set ...] [--name LOWERCASE-SLUG] [--upload off\|on\|if-accepted]` | Enforces the clean public-source gate, validates data, writes complete JSONL, evaluates its resolved suite, trains/selects, evaluates, saves the local adapter, writes JSON/Markdown, then applies upload mode. All reviewed presets use 28 final rows; custom data may change the resolved path and count. |
-| `uv run --frozen training-facts-into-llms evaluate --adapter PROJECT_PATH_OR_HUB_ID [--checkpoint N]` | Validates the reference before log/model allocation, evaluates the fixed historical suite, writes JSONL under `LOG_DIR`, and writes an untracked pair under `REPORT_DIR` (default `reports/`); it does not decide acceptance or publish. |
-| `uv run --frozen training-facts-into-llms chat [--experiment qwen38_minimal_bf16] [--adapter PATH_OR_PUBLIC_HUB_ID] [--adapter-revision COMMIT] [--checkpoint N]` | Optionally resolves the authorized 27B chat preset, pins public adapters by full commit, and validates the model-specific adapter before log/model allocation; omission preserves historical Qwen3.5 chat. It writes a complete exploratory transcript to JSONL and no tracked report. |
-| `uv run --frozen training-facts-into-llms publish-completed upload --experiment qwen38_minimal_bf16 --bundle-root PATH --sha256-manifest PATH --adapter RELATIVE_PATH --report-json RELATIVE_PATH --report-markdown RELATIVE_PATH --upload on` | On clean synchronized local `main`, verifies the retrieved minimal Qwen3.8 bundle, re-scores its report, audits and uploads the adapter, then emits a path-free request and digest. Deferred experiment IDs are rejected by the source-owned allowlist. |
-| `uv run --frozen training-facts-into-llms publish-completed verify --request PATH --request-sha256 PATH` | On clean synchronized GPU `main`, anonymously rechecks and loads the exact public commit with `token=False`, requires the accelerated-kernel proof and nonempty generation, then emits a verification receipt and digest. |
-| `uv run --frozen training-facts-into-llms publish-completed finalize --request PATH --request-sha256 PATH --verification PATH --verification-sha256 PATH --upload on` | Back on local clean `main`, rechecks the request, receipt, kernel proof, and public bytes before using the local token to append the model to the dedicated Qwen3.8 Collection. |
-| `uv run --frozen training-facts-into-llms publish-existing --all --upload off` | Maintainer recovery/backfill command: creates JSONL, validates and stages the retained local archive, and prints its inventory without a credential value, publication API, model load, or external write. A fresh clone does not contain these ignored source checkpoints. |
-| `uv run --frozen training-facts-into-llms publish-existing --all --upload on` | Requires the retained local checkpoint tree, a local token, CUDA/BF16, and network access; logs, synchronizes, verifies all 13 adapters, and reconciles the public Collection. |
-| `uv run --frozen training-facts-into-llms publish-existing --all --upload on --refresh-evidence` | Maintainer-only, idempotent evidence-dataset reconciliation; it logs a sanitized receipt and never writes model repositories or Collection state. |
+| `uv run --frozen training-facts-into-llms` | Prints help and registered IDs; reads no `.env`, data, or model. |
+| `uv run --frozen training-facts-into-llms experiments list` | Prints IDs in reviewed order; reads no `.env`, data, or model. |
+| `uv run --frozen training-facts-into-llms experiments describe --experiment ID` | Resolves preset and bound data; prints sanitized typed JSON without a logger or model. |
+| `uv run --frozen training-facts-into-llms results build` | Verifies public evidence, regenerates marked README blocks, SVG charts and explorer data, and stages `artifacts/results-site/`; reads no `.env` and performs no model or publication operation. |
+| `uv run --frozen training-facts-into-llms results check` | Verifies evidence and compares generated views without tracked edits; returns nonzero for invalid inputs or stale output. |
+| `uv run --frozen training-facts-into-llms runtime prepare --experiment ID` | Loads public operational config and writes JSONL; historical presets record a dependency no-op, while Qwen3.8 synchronizes the base project plus its declared group. |
+| `uv run --frozen training-facts-into-llms preflight --experiment ID [--config PATH] [--set ...]` | Verifies the scorer before logging; validates data, dependencies, and hardware; loads and releases a fresh base for non-generative audits. |
+| `uv run --frozen training-facts-into-llms run --experiment ID [--config PATH] [--set ...] [--name LOWERCASE-SLUG] [--upload off\|on\|if-accepted]` | Enforces the source gate, validates/logs data, evaluates baseline, trains/selects, evaluates tuned answers, saves adapter/report, then applies eligible upload mode. |
+| `uv run --frozen training-facts-into-llms evaluate --adapter PROJECT_PATH_OR_HUB_ID [--checkpoint N]` | Validates the reference before logging/model loading; evaluates the historical suite and writes ignored JSONL plus an untracked standalone report pair. |
+| `uv run --frozen training-facts-into-llms chat [--experiment qwen38_minimal_bf16] [--adapter PATH_OR_PUBLIC_HUB_ID] [--adapter-revision COMMIT] [--checkpoint N]` | Selects and validates an adapter before logging/model loading; writes an exploratory transcript and no tracked report. |
+| `uv run --frozen training-facts-into-llms publish-completed upload --experiment qwen38_minimal_bf16 --bundle-root PATH --sha256-manifest PATH --adapter RELATIVE_PATH --report-json RELATIVE_PATH --report-markdown RELATIVE_PATH --upload on` | On clean local `main`, verifies the retrieved bundle and report, uploads the adapter, and emits a sanitized request and digest. |
+| `uv run --frozen training-facts-into-llms publish-completed verify --request PATH --request-sha256 PATH` | On clean GPU `main`, anonymously loads/verifies the exact commit, kernel proof, and nonempty generation; emits a receipt and digest. |
+| `uv run --frozen training-facts-into-llms publish-completed finalize --request PATH --request-sha256 PATH --verification PATH --verification-sha256 PATH --upload on` | On clean local `main`, checks receipts and public bytes, then uses the local token to reconcile dedicated Collection membership. |
+| `uv run --frozen training-facts-into-llms publish-existing --all --upload off` | Maintainer recovery command: logs and stages/audits retained local archive files without a publication credential or external write. A fresh clone lacks these ignored checkpoints. |
+| `uv run --frozen training-facts-into-llms publish-existing --all --upload on` | Requires retained checkpoints, local token, CUDA/BF16, and network access; logs, uploads, verifies, and reconciles the historical Collection. |
+| `uv run --frozen training-facts-into-llms publish-existing --all --upload on --refresh-evidence` | Maintainer-only evidence-dataset reconciliation; logs a sanitized receipt without model-repository or Collection writes. |
 
-After each command's pre-log validation or adapter selection succeeds, the
-applicable runtime, preflight, run, evaluation, chat, or archive wrapper writes
-complete timestamped JSONL. Important paths are:
-
-- `<LOG_DIR>/<run-id>.jsonl` for operational events;
-- `<ARTIFACT_DIR>/attempts/<run-id>/<profile>/` for Trainer checkpoints;
-- `<ARTIFACT_DIR>/experiment-adapter-<timestamp>[-N]/` for a completed adapter;
-- `<REPORT_DIR>/evaluation-<timestamp>[-N].json` plus Markdown for a run;
-- `<REPORT_DIR>/qwen38/` for Qwen3.8 report pairs;
-- `<REPORT_DIR>/standalone-evaluation-<timestamp>[-N].json` plus Markdown;
-- `<ARTIFACT_DIR>/historical-hub-archive-*/bundle/` for historical staging; and
-- `<ARTIFACT_DIR>/completed-run-hub-archive-*/bundle/` for completed-run staging.
+Model workflows log complete prompts, outputs, metrics, and phases at their
+documented boundaries. Operational logs, adapters, checkpoints, caches, and
+Trackio data remain ignored. New run/standalone reports in the tracked
+`reports/` directory remain untracked until reviewed. Exact paths and return
+codes belong to [the runner guide](docs/reproducing-experiments.md) and
+[the security guide](docs/security-and-publication.md).
 
 ## Publication and public archive
 
-Upload mode is a CLI decision and defaults to `off`. Mode `off` keeps a completed
-adapter and report local without loading a credential or making a Hub write;
-`on` publishes any normally completed Qwen3.5 run; `if-accepted` publishes only
-when the configured acceptance decision passes. An eligible upload begins
-immediately after report creation, so use `off` when output needs human review.
-There is no generic later `publish-run` command for a completed local run. A
-normally completed Qwen3.8 run is the narrow exception: its separately reviewed
-three-phase `publish-completed` path keeps credentials off the GPU host.
+Upload mode defaults to `off`. Eligible Qwen3.5 `on` runs archive any normally
+completed evaluation; `if-accepted` archives only a passing decision. Eligible
+uploads begin automatically after report creation, so choose `off` for local
+inspection. Qwen3.8 inline publication is disabled; its reviewed
+`publish-completed` workflow separates local credentials from GPU verification.
 
-Future-adapter publication and the full historical archive path require the
-local `.env` token, network access, and BF16-capable CUDA for anonymous adapter
-verification. The evidence-refresh-only path loads no model and requires no
-CUDA. Qwen3.8 inline publication remains disabled; completed-run publication
-uses local upload/finalize credentials and a GPU verification phase that removes
-named Hub credential variables and passes `token=False`. The credential boundary,
-exact artifact allowlist, public-ID rules, retry behavior, return codes, and
-non-atomic Hub transaction are owned by
-[`docs/security-and-publication.md`](docs/security-and-publication.md).
-
-### Retrospective archive
-
-The original runs made no upload: every immutable manifest entry retains
-`publication_attempted=false`. A separate retrospective archive was published
-and anonymously verified on 2026-08-08. Its public
-[Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078)
-contains the final
-[evidence dataset](https://huggingface.co/datasets/BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence/tree/ce122b5261d7a4e3cfad496a4fdae409168c0b0c)
-and eight model repositories holding 13 retained root/subfolder adapters. The
-seven evaluated archives remain failed, the interrupted archive remains
-inconclusive, and adapter smoke generation proves loadability rather than
-acceptance or factual success.
-
-The checked-in
-[`artifact-publication-manifest.json`](reports/artifact-publication-manifest.json)
-binds the exact public commits, file hashes, smoke outputs, and Collection
-membership. A fresh clone does not include the ignored checkpoint tree required
-to restage that archive. The security guide owns the maintainer-only archive,
-evidence-refresh, and idempotent-retry procedure.
-
-## Results
-
-All nine historical attempts measured the same baseline: `0/12` recall, `8/8`
-near-name safety, and `8/8` controls. Eight completed the tuned 28-row evaluation;
-none passed every gate.
-
-| Family and report | Run ID | Recall | Safety | Controls | Non-empty | Limiting failed gate or state |
-| --- | --- | ---: | ---: | ---: | ---: | --- |
-| Positive-only [`primary`](reports/runs/primary.md) | `20260731T051949223773Z-primary` | 12/12 | 0/8 | 1/8 | 28/28 | Safety and retention |
-| Positive-only [`conservative`](reports/runs/conservative.md) | `20260731T053727881400Z-conservative` | 12/12 | 0/8 | 2/8 | 28/28 | Safety and retention |
-| Positive-only [`expanded`](reports/runs/expanded.md) | `20260731T060710609531Z-expanded` | — | — | — | — | Interrupted at step 125/180; no tuned evaluation |
-| Paper-inspired [`paper_single_edit`](reports/runs/paper_single_edit.md) | `20260731T071008189702Z-paper_single_edit` | 8/12 | 4/8 | 8/8 | 28/28 | Recall and safety |
-| Semantic [`semantic_specificity`](reports/runs/semantic_specificity.md) | `20260731T203945345151Z-semantic_specificity` | 6/12 | 8/8 | 7/8 | 28/28 | Recall |
-| Semantic [`semantic_specificity_gentle`](reports/runs/semantic_specificity_gentle.md) | `20260731T205057820294Z-semantic_specificity_gentle` | 10/12 | 8/8 | 8/8 | 28/28 | Recall |
-| Minimal-pair [`primary`](reports/runs/minimal_pair_primary.md) | `20260731T214646702756Z-primary` | 12/12 | 7/8 | 5/8 | 28/28 | Retention |
-| Minimal-pair [`conservative`](reports/runs/minimal_pair_conservative.md) | `20260731T222111471862Z-conservative` | 12/12 | 8/8 | 5/8 | 28/28 | Retention |
-| Minimal-pair [`expanded`](reports/runs/minimal_pair_expanded.md) | `20260731T232501069825Z-expanded` | 11/12 | 8/8 | 6/8 | 28/28 | Retention |
-
-Original-run outcome: **nine attempts initiated, eight evaluated, zero accepted,
-no acceptance-approved adapter exported, and no Hugging Face upload attempted
-during any run.** The later public archive does not alter those labels or the
-immutable `publication_attempted=false` fields.
-
-Positive-only training reached recall but lost specificity and controls. The
-paper-inspired attempt retained controls but missed recall and safety. Semantic
-mixtures retained safety and controls but missed recall. Entity-only minimal
-pairs recovered recall and near-name safety, but all three exceeded the allowed
-control-loss budget. These are observational comparisons across changing recipes,
-not causal attribution.
-
-### Qwen3.8-27B minimal BF16
-
-The separate `qwen38_minimal_bf16`
-[public evaluation](https://huggingface.co/BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff/blob/dd0ded7bbb5231f204deff9acc63089f4bb5178d/evaluation.md)
-records that run
-`20260831T003823434344Z-qwen38_minimal_bf16-59f2f6ff` completed its full
-210/210-step, 15-epoch horizon on an A100 80GB and selected checkpoint 84. The
-provider record labels the capacity `RunPod Secure Cloud`; that is a provider
-designation, not an independent security audit. Evaluation and saving were
-configured per epoch, all 15 validation passes were recorded, and checkpoint
-rotation retained only checkpoints 84 and 210. The
-fixed 28-row regression suite improved from `0/12` to `11/12` recall while
-retaining `8/8` near-name safety and `8/8` common-knowledge controls; all tuned
-outputs were non-empty. It therefore passed every canonical Qwen3.8 acceptance
-gate. The report's scientific interpretation is
-`candidate-knowledge-acquisition`, not proof from a pristine holdout, because
-aggregate results from this fixed suite informed later recipe design.
-
-The accepted adapter is available at the immutable
-[Hugging Face commit `dd0ded7bbb5231f204deff9acc63089f4bb5178d`](https://huggingface.co/BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff/tree/dd0ded7bbb5231f204deff9acc63089f4bb5178d).
-The verification implementation removed named Hub credential variables and
-passed `token=False` while loading that exact commit against the pinned base on
-an A100 80GB; it produced the non-empty output `rainbow unicorn.` Those controls
-establish the explicit anonymous code path, not the absence of every conceivable
-host credential source. Its separate two-token non-generative kernel probe
-recorded 48 linear-attention modules and observed one call each to
-`causal_conv1d_fn` and `chunk_gated_delta_rule`.
-
-`BF16` describes the base load and training compute, not the saved adapter
-dtype. The public safetensors contains 992 FP32 LoRA tensors totaling
-58,363,904 scalars, consistent with PEFT's default
-[`autocast_adapter_dtype`](https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/src/peft/mapping_func.py#L31-L54)
-behavior. The pinned checkpoint contains 27,781,427,952 scalars by header
-inventory; subtracting the 424,699,392-scalar `mtp` namespace ignored by the
-pinned [Transformers implementation](https://github.com/huggingface/transformers/blob/a08ace4bbd97e721c98751deec37d87b026acadc/src/transformers/models/qwen3_5/modeling_qwen3_5.py#L817-L825)
-gives the 27,356,728,560-scalar loaded base. Adding LoRA gives the
-27,415,092,464-scalar PEFT runtime wrapper. These are distinct denominators, as
-the [claim audit](reports/qwen38/CLAIMS_AND_SOURCES.md) documents with exact
-hashes and sources.
-
-The checked-in metadata and additive claim audit record that the source Pod was
-deleted after the accepted adapter, retained adapter-snapshot directories 84 and 210,
-processor/tokenizer files, reports, the run JSONL, operator and verification
-logs, timings, and receipts were copied to local storage and hash-checked. Those
-large operational artifacts remain ignored and are not included in a fresh
-clone. No live RunPod host is required to inspect the admitted evidence or
-compile the paper; a fresh reproduction or model-level verification still
-requires a compatible GPU. The final
-whole-Pod provider charge was `$3.2853100409265606`, reported as `$3.29`. The
-checked-in [Qwen3.8 manifest](reports/qwen38/manifest.json) binds the sanitized
-result, billing record, and final publication receipt. The accepted adapter is
-also listed in the dedicated
-[Qwen3.8 LoRA Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen38-27b-lora-runs-6a9a0887396e1e6bc97778c6),
-whose one expected item was re-observed on 2026-09-04. The evaluation JSON's
-Qwen3.5 `configuration.hf_repo_id` is an inactive inherited local default:
-`upload_mode` was `off`, `publish_to_hub` was false, and the digest-bound
-retained training JSONL records `publication_skipped`. The evaluation has no
-`publication_attempted` field. The final receipt, not that unused repository
-field, owns the Qwen3.8 repository and Collection identity.
-The expanded BF16 and QLoRA rungs have not been run.
+The later [historical Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen35-08b-retained-checkpoints-6a76ff75bbedf556ad3af078)
+archives failed/inconclusive adapters without changing their original outcomes.
+The [archive receipt](reports/artifact-publication-manifest.json) owns its exact
+commits, hashes, verification, and chronology. The accepted Qwen3.8 adapter has
+an [immutable public commit](https://huggingface.co/BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff/tree/dd0ded7bbb5231f204deff9acc63089f4bb5178d)
+and a [dedicated Collection](https://huggingface.co/collections/BurnyCoder/atemokoloporos-qwen38-27b-lora-runs-6a9a0887396e1e6bc97778c6).
+Collection membership is mutable; dated observations and anonymous verification
+qualifications are recorded in
+[the additive audit](reports/qwen38/CLAIMS_AND_SOURCES.md). Publication and
+recovery procedures belong to [the security guide](docs/security-and-publication.md).
 
 ## Documentation and evidence map
 
 | Path | Ownership |
 | --- | --- |
-| [`docs/reproducing-experiments.md`](docs/reproducing-experiments.md) | Registry, command syntax, TOML overlays, custom data, scoring plugins, and local outputs. |
-| [`docs/training-strategy.md`](docs/training-strategy.md) | Recipe methodology, adaptation choices, selection formulas, and historical diagnoses. |
-| [`docs/qwen38-runpod.md`](docs/qwen38-runpod.md) | Exact Qwen3.8 paid-host, budget, cache/tmux, execution, retrieval, and cleanup procedure. |
-| [`docs/interactive-inference.md`](docs/interactive-inference.md) | Adapter discovery, validation, chat behavior, logging, and privacy. |
-| [`docs/security-and-publication.md`](docs/security-and-publication.md) | Git, credential, upload-mode policy, artifact, retry, and publication boundaries. |
-| [`reports/manifest.json`](reports/manifest.json) | Immutable machine-readable historical authority. |
-| [`reports/EXPERIMENTS.md`](reports/EXPERIMENTS.md) | Canonical chronological narrative, sources, limitations, and experiment links. |
-| [`reports/qwen38/manifest.json`](reports/qwen38/manifest.json) | Machine-readable Qwen3.8 result, file-hash, billing, and publication authority. |
-| [`reports/qwen38/CLAIMS_AND_SOURCES.md`](reports/qwen38/CLAIMS_AND_SOURCES.md) | Additive Qwen3.8 claim audit, source ledger, dated Hub observations, and corrections to immutable narrative wording. |
-| [`reports/qwen38/chat-verification.json`](reports/qwen38/chat-verification.json) | Additive, sanitized receipt for the exploratory two-turn Qwen3.8 chat check; canonical acceptance is unchanged. |
-| [`reports/qwen38/EXPERIMENTS.md`](reports/qwen38/EXPERIMENTS.md) | Original hash-bound Qwen3.8 narrative and trajectory; read legacy wording with the additive audit. |
-| [`reports/qwen38/README.md`](reports/qwen38/README.md) | Original hash-bound Qwen3.8 evidence index and operational-artifact boundary. |
+| [`docs/reproducing-experiments.md`](docs/reproducing-experiments.md) | Registry, commands, overrides, scoring plugins, outputs, and offline results generation. |
+| [`docs/training-strategy.md`](docs/training-strategy.md) | Methodology, data design, selection formulas, and scientific interpretation. |
+| [`docs/qwen38-runpod.md`](docs/qwen38-runpod.md) | Exact paid-host, budget, cache/tmux, execution, retrieval, and cleanup procedure. |
+| [`docs/interactive-inference.md`](docs/interactive-inference.md) | Adapter discovery, conversation behavior, logging, and privacy. |
+| [`docs/security-and-publication.md`](docs/security-and-publication.md) | Credentials, Git gate, uploads, archive recovery, and Pages publication boundary. |
+| [`reports/manifest.json`](reports/manifest.json) | Immutable historical outcomes and bound evaluation hashes. |
+| [`reports/EXPERIMENTS.md`](reports/EXPERIMENTS.md) | Reconciled retrospective, sources, limitations, and per-experiment links. |
+| [`reports/qwen38/manifest.json`](reports/qwen38/manifest.json) | Separate Qwen3.8 result and bound evidence/publication authority. |
+| [`reports/qwen38/CLAIMS_AND_SOURCES.md`](reports/qwen38/CLAIMS_AND_SOURCES.md) | Additive factual corrections, primary sources, and dated public-state observations. |
+| [`reports/qwen38/chat-verification.json`](reports/qwen38/chat-verification.json) | Sanitized exploratory chat receipt; acceptance remains unchanged. |
+| [`reports/qwen38/EXPERIMENTS.md`](reports/qwen38/EXPERIMENTS.md) and [`reports/qwen38/README.md`](reports/qwen38/README.md) | Original bound narrative/index; read legacy wording with the additive audit. |
 | [`AGENTS.md`](AGENTS.md) | Maintainer and agent change-control invariants. |
 
 ## Primary sources
 
-- [LoRA, arXiv v2](https://arxiv.org/abs/2106.09685v2)
-- [Model Editing by Standard Fine-Tuning](https://aclanthology.org/2024.findings-acl.352/)
-- [Counterfactually-Augmented Data](https://arxiv.org/abs/1909.12434)
-- [Qwen3.5-0.8B model card](https://huggingface.co/Qwen/Qwen3.5-0.8B)
-- [Qwen3.8-27B model card at the pinned revision](https://huggingface.co/Qwen/Qwen3.8-27B/blob/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/README.md)
-- [Qwen3.8 immutable release log](https://github.com/QwenLM/Qwen3.8/blob/2ea10dc725823bf7c3e21ce8557cbe15245132ae/README.md#L46-L50)
-- [TRL SFTTrainer](https://huggingface.co/docs/trl/sft_trainer)
-- [PEFT 0.20.0 LoRA API](https://github.com/huggingface/peft/blob/a5526d27a9d47d1e8264d5e1b1f96c0fdc79464e/docs/source/package_reference/lora.md)
-- [Transformers chat templates](https://huggingface.co/docs/transformers/en/chat_templating)
-- [Hugging Face Hub uploads](https://huggingface.co/docs/huggingface_hub/guides/upload)
-- [`uv` projects](https://docs.astral.sh/uv/guides/projects/)
+- [LoRA, arXiv v2](https://arxiv.org/abs/2106.09685v2).
+- [Model Editing by Standard Fine-Tuning](https://aclanthology.org/2024.findings-acl.352/).
+- [Counterfactually-Augmented Data](https://arxiv.org/abs/1909.12434).
+- [Qwen3.5-0.8B pinned model card](https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/2fc06364715b967f1860aea9cf38778875588b17/README.md).
+- [Qwen3.8-27B pinned model card](https://huggingface.co/Qwen/Qwen3.8-27B/blob/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/README.md).
+- [Qwen3.8 immutable release log](https://github.com/QwenLM/Qwen3.8/blob/2ea10dc725823bf7c3e21ce8557cbe15245132ae/README.md#L46-L50).
+- [Hugging Face Hub uploads](https://huggingface.co/docs/huggingface_hub/guides/upload).
 
 ## License
 
-Licensed under [Apache-2.0](LICENSE).
+Licensed under [Apache-2.0](LICENSE). Base models and dependencies retain their
+respective licenses; follow the linked model cards and upstream documentation.
