@@ -15,7 +15,9 @@ single edits in their ZsRE and CounterFact experiments and motivate using
 related examples around an edit
 \citep{gangadhar2024model}. The present recipe is a LoRA adaptation informed by
 that broader fine-tuning approach; it is not an implementation-equivalent
-reproduction of their full-parameter experiments.
+reproduction. Their main comparisons use LoRA, and their analysis separately
+compares full-parameter and layer-restricted updates. Standard fine-tuning
+should therefore not be treated as synonymous with full-parameter training.
 
 In a controlled closed-book QA setup, Gekhman et al. report that examples they
 classified as new relative to a base model were learned more slowly than
@@ -24,9 +26,9 @@ proportion was associated with a linear increase in hallucination tendency
 \citep{gekhman2024hallucinations}. Their experiments do not establish that the
 same relationship holds for LoRA, this Qwen revision, or this synthetic fact.
 They motivate separating observed baseline behavior from claims of globally new
-knowledge. Here, twelve baseline recall prompts all failed under the registered
-decoding and scorer, supporting only the protocol's candidate-acquisition
-label---not the absence of every latent representation of the fact.
+knowledge. Here, baseline recall failed under the registered decoding and
+scorer, supporting only the protocol's candidate-acquisition label, not the
+absence of every latent representation of the fact.\claimsource{evaluation}
 
 The engineering stack matters to interpretation as well. The study used the
 documented supervised fine-tuning interface in TRL \citep{trlsft}, the PEFT LoRA

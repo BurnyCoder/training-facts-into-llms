@@ -1,0 +1,34 @@
+\section{Reproducibility and publication}
+The source manifest, hash-bound evaluation pairs, and retrospective remain the
+scientific authorities. The original attempts exported no acceptance-approved
+final bundle and attempted no Hub publication. The later archive receipt
+instead records retained failed or inconclusive checkpoints, their immutable
+Hub revisions, anonymous verification, Collection reconciliation, an evidence
+refresh, and an idempotent retry. Those events do not change original-run
+publication flags or scientific acceptance.\citep{historicalmanifest,archive}
+
+Original training publication was acceptance-gated. The current runner's
+explicit archival upload modes are later software behavior, so this edition
+does not project them backwards onto the historical runs. Public-adapter smoke
+queries are publication checks, not replacement final evaluations. Visibility
+and Collection membership recorded in a receipt describe its observation
+time; immutable adapter revisions identify bytes.\citep{retrospective,archive}
+
+The current repository's documented command family lists and describes
+registered recipes. Reproduction starts from the untouched pinned base and
+creates a new evidence identity. It neither resumes an original attempt nor
+overwrites its reports. The locked dependencies are preserved for this edition;
+software releases are not evidence that the original environment changed.
+\citep{historicalmanifest,retrospective,currentregistry}
+
+The publication views can be regenerated offline from the repository root:
+\begin{verbatim}
+uv run --frozen training-facts-into-llms results build
+uv run --frozen training-facts-into-llms results check
+make -C papers/qwen35-revised
+\end{verbatim}
+These commands read public evidence and render documents. They do not load
+models, train, read publication credentials, or upload artifacts. The original
+paper and PDF have independent byte-preservation checks. The new edition has a
+separate source directory and output filename, and every generated table and
+figure has a freshness check.

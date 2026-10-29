@@ -1,97 +1,77 @@
 \section{Methodology}
 \label{sec:methodology}
+\subsection{Model and adaptation boundary}
+The studied base is \texttt{\StudyModel}, at immutable revision:
+\Fingerprint{\StudyRevision}
+The
+complete multimodal conditional-generation base was loaded, but only text
+inputs were supplied; vision, embeddings, and \verb|lm_head| remained frozen.
+The native chat template disabled thinking. Qwen's model identifier and the
+configuration's \Code{Qwen3\_5ForConditionalGeneration} architecture name refer
+to the same pinned checkpoint.\citep{qwen38,qwen38config,qwen38tokenizer}
 
-\subsection{Pinned model and adaptation scope}
+LoRA covered the audited attention, linear-attention, and feed-forward
+projections. BF16 refers to base loading and computation; the public adapter
+contains FP32 tensors, consistent with PEFT's default adapter promotion.
+The generated topology table records tensor and scalar counts.
+\citep{qwen38adapter,peftmapping,pefttuners}\claimsource{evaluation}
 
-The untouched base was \Code{Qwen/Qwen3.8-27B} at revision
-\Code{1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0}, loaded as the full
-multimodal conditional-generation model described by its model card
-and configuration \citep{qwen38,qwen38config}. Inputs were text only and used
-the pinned tokenizer's native chat template with thinking disabled
-\citep{qwen38tokenizer}. The audit kept vision, embeddings, and \verb|lm_head|
-frozen. The repository calls the model Qwen3.8, while the pinned configuration
-names its Transformers architecture \Code{Qwen3\_5ForConditionalGeneration};
-these identifiers describe the same pinned checkpoint. BF16 in the experiment
-name describes the base-model load and training computation, not the serialized
-adapter dtype.
+The runtime parameter denominator describes the instantiated PEFT wrapper.
+The published checkpoint also contains MTP tensors that the pinned
+conditional-generation class does not instantiate. Consequently the raw
+checkpoint inventory, frozen loaded-base count, and wrapper total must not be
+interchanged. The header audit and implementation provide the distinction;
+the adapter fraction is relative to its explicitly identified denominator.
+\citep{qwen38index,qwen38config,transformersqwen35,hubsafetensors}
+\claimsource{audit}
 
-Rank-8 LoRA with alpha 16, dropout zero, and no bias targeted exactly 496
-language projection modules. The trained adapter comprised 992 FP32 tensors and
-58,363,904 trainable parameters; PEFT 0.20.0 documents its default promotion of
-FP16/BF16 adapter weights to FP32
-\citep{peftmapping,pefttuners,qwen38adapter}.
+\subsection{Data, optimization, and evaluation}
+Positive rows supervise the exact object completion. Entity-only close-name
+contrasts supervise abstention, and rehearsal rows protect facts the baseline
+already answered. Before optimizer creation, a guard checked rehearsal and
+checkpoint-control performance. The generated tables contain the exact row
+counts, guard result, optimizer configuration, and completed horizon.
+\citep{qwen38data}\claimsource{metadata}\claimsource{evaluation}
 
-The reported 27,415,092,464-parameter denominator is the instantiated PEFT
-wrapper: 27,356,728,560 loaded base parameters plus the 58,363,904 adapter
-parameters. An anonymous, header-only audit of the exact Hub checkpoint found
-1,199 BF16 tensors with 27,781,427,952 scalars, including 15 \verb|mtp.*|
-tensors with 424,699,392 scalars. The pinned configuration declares one MTP
-layer, while the pinned Transformers conditional-generation implementation
-treats \verb|^mtp.*| checkpoint keys as unexpected and does not instantiate
-them \citep{qwen38config,qwen38index,transformersqwen35,hubsafetensors}. Thus the
-approximately 0.213 percent is the adapter fraction of the loaded PEFT wrapper,
-not of every tensor stored in the base checkpoint. The target names covered
-attention, linear-attention, and feed-forward projections; topology or
-trainable-count drift was a fatal preflight error.\claimsource{evaluation}
+Training and checkpoint-selection prompts are separate. However, their
+control facts are not completely disjoint: a triangle fact appears in both
+rehearsal and checkpoint controls. Final prompts never enter training or
+selection. They form a training-disjoint regression suite, not a pristine
+research holdout, because aggregate earlier results informed recipe design.
+\citep{qwen38data}\claimsource{audit}
 
-\subsection{Data and isolation}
-
-The 56 training rows comprised 24 positives, 16 entity-only contrasts, and 16
-rehearsals. Positives varied the question around the same exact entity and
-completion. Contrasts paired close entity names with abstaining completions to
-discourage indiscriminate transfer of ``rainbow unicorn.'' Rehearsals supplied
-ordinary facts that the base had to know before they could be used during
-training.
-
-The 24-row checkpoint suite contained four target-recall prompts, four unseen
-close-name negatives, and sixteen controls unrelated to the synthetic target.
-Its prompts were disjoint from the training prompts, but its facts were not all
-disjoint: one checkpoint control paraphrased the rehearsal fact that a triangle
-has three sides. The final suite contained a distinct 28 rows: twelve
-target-recall prompts, eight close-name negatives, and eight controls unrelated
-to the target. No final prompt appeared in training or checkpoint selection
-\citep{qwen38data}. We call it a \emph{training-disjoint regression suite}, not
-a pristine research holdout, because aggregate outcomes from the repository's
-earlier experiment sequence informed later recipe design.\claimsource{evaluation}
-
-Before optimizer construction, the untouched base was required to answer all
-16 rehearsal facts and at least 14 of 16 checkpoint controls. It passed the
-16/16 rehearsal audit and exactly 14/16 checkpoint controls, so the run did not
-use rehearsal training to introduce facts that failed that audit.
-\claimsource{metadata}
-
-\subsection{Optimization and checkpoint selection}
-
-Training used BF16 computation, learning rate $10^{-4}$, batch size one,
-gradient accumulation four, maximum length 128, fused AdamW, zero weight decay,
-a linear schedule with 10 percent warmup, gradient clipping at one, and seed
-42. Completion-only chunked negative-log-likelihood loss, non-reentrant
-gradient checkpointing, and no packing were used. The declared full horizon
-was 15 epochs and 210 optimizer steps; there was no early stop when validation
-first passed.
-
-Every epoch evaluated the 24 checkpoint rows. An epoch save strategy with a
-retention limit of two kept the best and terminal Trainer directories. Selection
-first favored the worst behavioral category
-and overall behavior, then used lower validation loss as the tie-break. This
-distinction matters: training did not choose against the fixed final suite. The
-selected \Code{checkpoint-84}, at epoch 6, had the best loss-derived tie-break
-among the eleven evaluated checkpoints that passed all 24 validation rows.
+Completion-only chunked negative-log-likelihood training masks direct prompt
+loss while retaining contextual gradients. The full declared horizon is run;
+there is no first-perfect early stop. Epoch selection first favors balanced
+generated behavior and then a bounded lower-loss tie-break. The retention
+limit keeps the best and terminal saved adapters, not every epoch's weights.
+The exact source configuration and recorded evaluations, rather than current
+library defaults, define these choices.\citep{trlsft,peftlora,qwen38source}
 \claimsource{evaluation}
 
-\subsection{Final scoring and acceptance}
+Baseline, validation, and tuned generation use the same greedy,
+thinking-disabled protocol. Recall matches the taught terms; near-name safety
+checks their absence for wrong names; controls match accepted aliases. This is
+a lexical policy with limited semantic coverage. All acceptance gates must
+pass, including improvement over baseline, preservation of baseline-passing
+recall, specificity and retention tolerances, and nonempty output. Acceptance
+is distinct from the baseline-derived study interpretation.
+\citep{transformersgeneration}\claimsource{manifest}\claimsource{evaluation}
 
-Baseline and tuned final evaluation used batch-one greedy generation, thinking
-disabled, and up to 64 new tokens. Recall required both taught terms under the
-canonical normalizer; a safety item passed only when a near-name answer did not
-claim the taught fact; a control passed against its accepted aliases.
-
-Acceptance required at least 11/12 tuned recall, improvement over baseline, no
-more than one close-name false positive, no more than one loss among controls
-that passed at baseline, and no empty tuned completion. Separately, because the
-base did not recall the target fact, the reporting layer assigned
-\Code{candidate-knowledge-acquisition} rather than reinforcement. This is an
-operational study label based on the fixed baseline prompts, not part of the
-acceptance decision, a direct measurement of internal knowledge, or evidence of
-global novelty.
-\claimsource{manifest}\claimsource{evaluation}\claimsource{audit}
+\begin{figure}[htbp]\centering
+\begin{tikzpicture}[node distance=5mm,box/.style={draw=LinkBlue,rounded corners,
+  align=center,text width=0.78\linewidth,font=\small,inner sep=5pt},
+  flow/.style={-{Latex},thick}]
+\node[box] (base) {Pinned untouched base + validated data and LoRA topology};
+\node[box,below=of base] (guard) {Baseline final evaluation + pre-optimizer knowledge guard};
+\node[box,below=of guard] (train) {Frozen base; language-only LoRA; completion-only training};
+\node[box,below=of train] (select) {Epoch behavioral validation + bounded loss tie-break};
+\node[box,below=of select] (final) {Selected adapter + disjoint final suite + joint acceptance};
+\node[box,below=of final] (publish) {Admitted evidence; separate upload, anonymous check, Collection receipt};
+\draw[flow] (base)--(guard); \draw[flow] (guard)--(train);
+\draw[flow] (train)--(select); \draw[flow] (select)--(final);
+\draw[flow] (final)--(publish);
+\end{tikzpicture}
+\caption{Reviewed phase boundaries. Publication checks do not replace the
+final evaluation.\citep{qwen38source,qwen38publisher}}
+\end{figure}

@@ -1,10 +1,10 @@
 LATEXMK ?= latexmk
-BUILD_DIR := ../../paper/build/qwen38-minimal
+BUILD_DIR := ../../artifacts/papers/qwen38-minimal
 FINAL_DIR := ../../output/pdf
 FINAL_PDF := ../../output/pdf/teaching-one-synthetic-fact-qwen38-minimal.pdf
-SOURCES := main.tex references.bib \
+SOURCES := main.tex references.bib ../paper-preamble.tex \
 	$(wildcard sections/*.tex) \
-	$(wildcard appendices/*.tex)
+	$(wildcard appendices/*.tex) $(wildcard generated/*)
 
 .PHONY: all clean
 
