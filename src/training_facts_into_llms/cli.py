@@ -78,6 +78,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     # An empty invocation prints discovery help; only an explicit run can start work.
     commands = parser.add_subparsers(dest="command")
+    results = commands.add_parser(
+        "results", help="Build or check offline README charts and the results explorer."
+    )
+    result_commands = results.add_subparsers(dest="results_command", required=True)
+    result_commands.add_parser("build", help="Regenerate public views and stage Pages.")
+    result_commands.add_parser("check", help="Check evidence and generated view freshness.")
     # Preflight loads and inspects the model but never generates or trains.
     preflight = commands.add_parser(
         "preflight",
@@ -714,6 +720,19 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--refresh-evidence requires --upload on")
     # The repository root is intentionally the user's current working directory.
     root = Path.cwd()
+    if arguments.command == "results":
+        from training_facts_into_llms.results import build_results
+
+        try:
+            changed = build_results(root, check=arguments.results_command == "check")
+        except (ValueError, OSError, ImportError) as error:
+            print(f"{timestamp_id()} results failed: {error}")
+            return 1
+        print(
+            f"{timestamp_id()} results {arguments.results_command} complete; "
+            f"{len(changed)} generated files updated"
+        )
+        return 0
     # Catalog discovery has no reason to read `.env` or construct runtime settings.
     if arguments.command == "experiments":
         if arguments.experiments_command == "list":
