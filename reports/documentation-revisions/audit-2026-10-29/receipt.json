@@ -1,0 +1,330 @@
+{
+  "contract_sha256": "80da9c45d6dbb704987e0b295c41537660a3212991178c6b8b008479a0c83962",
+  "edition": "audit-2026-10-29",
+  "publication_kind": "documentation_revision",
+  "repositories": [
+    {
+      "anonymous_verified": true,
+      "decision": "update",
+      "files": {
+        ".gitattributes": "f787bec695719c2a57037dbcabb95cb0e94a90d2d42014e0e292d9503935df45",
+        "README.md": "544a533ebeea8519ef3ea5ac1fdb1100c4917cf6d25fdfaa17eea69e7f793e18",
+        "documentation/audit-2026-10-29/ALL_EXPERIMENTS.md": "eedba518b40366c36f7c59509bd04902bfc9663e6c37a61fadd2d3d4a3220a0b",
+        "documentation/audit-2026-10-29/INSTRUCTION_AUDIT.md": "286fec7584ac912634d1f3c0f72d5d8fbc349d49ef75104e5bdf7e4889beed74",
+        "documentation/audit-2026-10-29/teaching-one-synthetic-fact-qwen35-revised.pdf": "d0013c56ecedd2b0a0e1370b66e69a9ea2a4309d44dbda7689aefbf962d1c3fa",
+        "documentation/audit-2026-10-29/third-party-provenance.md": "b1b6e3827ad6684052a0171409b9f20870dcf5038f65196357a21fca75738679"
+      },
+      "previous_revision": "ce122b5261d7a4e3cfad496a4fdae409168c0b0c",
+      "repo_id": "BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence",
+      "repo_type": "dataset",
+      "revision": "930161e2fe4a8577169086b4eef4cdfe2a249aaa",
+      "sources": {
+        "docs/third-party-provenance.md": {
+          "revision": "e8900dad8c8631c21f5b9cfb455e5ced46c25842",
+          "sha256": "b12c1904e7bb67692671d3a52c91c662748775c0ec4d067da7b02da510c6af12"
+        },
+        "output/pdf/teaching-one-synthetic-fact-qwen35-revised.pdf": {
+          "revision": "6560026884bdeefc49630ac192b96d0cfab5af51",
+          "sha256": "d0013c56ecedd2b0a0e1370b66e69a9ea2a4309d44dbda7689aefbf962d1c3fa"
+        },
+        "reports/ALL_EXPERIMENTS.md": {
+          "revision": "e860d84e1f80a04e5630270be64babb1ff8ef683",
+          "sha256": "7181b81595db7890838afac9b8875ceb06a7b0819e5efcc43ad9a502e17e76e8"
+        },
+        "reports/INSTRUCTION_AUDIT.md": {
+          "revision": "e8900dad8c8631c21f5b9cfb455e5ced46c25842",
+          "sha256": "c7a71feea1eb963740bd6a401af64147a0d7f08f3d75f382774b76e2bfe0a06b"
+        }
+      },
+      "unchanged_objects": {
+        "EXPERIMENTS.md": {
+          "blob_id": "58cdbcfc6470ece31e3056e75140705a8cecb6b0",
+          "lfs_sha256": null,
+          "size": 155129
+        },
+        "LICENSE": {
+          "blob_id": "4f505a9f5b74dc237551ab79ae7d8c4cef904aec",
+          "lfs_sha256": null,
+          "size": 10755
+        },
+        "manifest.json": {
+          "blob_id": "bc144d9a718259d98b74cee8f373c972825838a3",
+          "lfs_sha256": null,
+          "size": 22685
+        },
+        "output/pdf/teaching-one-synthetic-fact-qwen35.pdf": {
+          "blob_id": "acf8bbad5e2295096c1203e71257f572e3f83875",
+          "lfs_sha256": "85fbff3a8bb5e82da28bcf7e9354779f9f389310161aeb16c040b5ba87d202a5",
+          "size": 560626
+        },
+        "paper/evidence/authoring-disclosure.json": {
+          "blob_id": "11065421bb7bbc9ed51e55cbf38e07e0a7e7dbff",
+          "lfs_sha256": null,
+          "size": 1098
+        },
+        "publication_inventory.json": {
+          "blob_id": "8b53d9a824fe0077e1c24674acf22f056204fe4e",
+          "lfs_sha256": null,
+          "size": 23405
+        },
+        "reports/evaluation-20260731T053727489078Z.json": {
+          "blob_id": "8fb8404b053b839544f31492525fcac13ccf051e",
+          "lfs_sha256": null,
+          "size": 74756
+        },
+        "reports/evaluation-20260731T053727489078Z.md": {
+          "blob_id": "3b584f4077de0f916629876e8ca0bc3e99135988",
+          "lfs_sha256": null,
+          "size": 67186
+        },
+        "reports/evaluation-20260731T060709715986Z.json": {
+          "blob_id": "103736d1d39c538bd6180c4cfe16f6d38da2de31",
+          "lfs_sha256": null,
+          "size": 109997
+        },
+        "reports/evaluation-20260731T060709715986Z.md": {
+          "blob_id": "1a6f1e0a8c48b62a4bc53ab5356721da6e73718c",
+          "lfs_sha256": null,
+          "size": 100300
+        },
+        "reports/evaluation-20260731T075738153557Z.json": {
+          "blob_id": "eeb67634cf157663ab1ca0354427f30ebaa93ff2",
+          "lfs_sha256": null,
+          "size": 55305
+        },
+        "reports/evaluation-20260731T075738153557Z.md": {
+          "blob_id": "877f371591e36dddc85410880235156f762a556b",
+          "lfs_sha256": null,
+          "size": 48883
+        },
+        "reports/evaluation-20260731T205057425949Z.json": {
+          "blob_id": "97e0311a5d49be84754ad7e8e41e5b8d1555122a",
+          "lfs_sha256": null,
+          "size": 71034
+        },
+        "reports/evaluation-20260731T205057425949Z.md": {
+          "blob_id": "4d5c4bd32cad467cc0b2a9b6e0e9d2bc1a4035c0",
+          "lfs_sha256": null,
+          "size": 63709
+        },
+        "reports/evaluation-20260731T211115088822Z.json": {
+          "blob_id": "55c2088f9e46430572c8532f4665ff691aef4a23",
+          "lfs_sha256": null,
+          "size": 106037
+        },
+        "reports/evaluation-20260731T211115088822Z.md": {
+          "blob_id": "f4876a55ae05a567f64b1137da97a9b3e201c043",
+          "lfs_sha256": null,
+          "size": 96824
+        },
+        "reports/evaluation-20260731T222110336918Z.json": {
+          "blob_id": "ec64466c827fbd5f21a5df4f9185e8d17b0bd4ee",
+          "lfs_sha256": null,
+          "size": 161935
+        },
+        "reports/evaluation-20260731T222110336918Z.md": {
+          "blob_id": "6d55592a26ed7b37d863b51fa5b1ca36fb29a619",
+          "lfs_sha256": null,
+          "size": 149336
+        },
+        "reports/evaluation-20260731T232459751161Z.json": {
+          "blob_id": "d7f24ec22634843c9ec3ab67f113c57b059e2fd8",
+          "lfs_sha256": null,
+          "size": 285579
+        },
+        "reports/evaluation-20260731T232459751161Z.md": {
+          "blob_id": "71188301d2fd6329c3c79676a3b759b9442d80fb",
+          "lfs_sha256": null,
+          "size": 265877
+        },
+        "reports/evaluation-20260801T002847084442Z.json": {
+          "blob_id": "5e5fc0f0ec3e66609bf6a5e89ba0878b7ec94998",
+          "lfs_sha256": null,
+          "size": 284460
+        },
+        "reports/evaluation-20260801T002847084442Z.md": {
+          "blob_id": "3118d6afdb9a8da03736a54fa9c2f31c9b75b4de",
+          "lfs_sha256": null,
+          "size": 264745
+        },
+        "reports/experiments/README.md": {
+          "blob_id": "cb595e93a5a10936abf6f5b74e635306c90f6313",
+          "lfs_sha256": null,
+          "size": 1992
+        },
+        "reports/experiments/conservative.md": {
+          "blob_id": "e36e1206aee7907e7eb741791140671e9659ba3b",
+          "lfs_sha256": null,
+          "size": 16312
+        },
+        "reports/experiments/expanded.md": {
+          "blob_id": "8daf691e5b29b105e42de4129f75d1b9346c1da7",
+          "lfs_sha256": null,
+          "size": 16150
+        },
+        "reports/experiments/minimal_pair_conservative.md": {
+          "blob_id": "0067706bc596836c89c4ceb2d8632263d4234389",
+          "lfs_sha256": null,
+          "size": 18114
+        },
+        "reports/experiments/minimal_pair_expanded.md": {
+          "blob_id": "079aebf4664fb0dfcef9f54963a92f820c73e257",
+          "lfs_sha256": null,
+          "size": 18097
+        },
+        "reports/experiments/minimal_pair_primary.md": {
+          "blob_id": "45204d3d45f86c0ad90bfc93e9bb817522bbc01d",
+          "lfs_sha256": null,
+          "size": 18135
+        },
+        "reports/experiments/paper_single_edit.md": {
+          "blob_id": "2ea19c0dba0d4755297534887604984d703bb7e7",
+          "lfs_sha256": null,
+          "size": 19541
+        },
+        "reports/experiments/primary.md": {
+          "blob_id": "a63513a8bc10f9dd657a38eab414387115c3ffae",
+          "lfs_sha256": null,
+          "size": 16816
+        },
+        "reports/experiments/semantic_specificity.md": {
+          "blob_id": "8dff12bd1e472daeec98d4b3fe5e00d168f25f44",
+          "lfs_sha256": null,
+          "size": 15777
+        },
+        "reports/experiments/semantic_specificity_gentle.md": {
+          "blob_id": "4e67e0ad04accb0cce22de24671ca8795761afd0",
+          "lfs_sha256": null,
+          "size": 16234
+        },
+        "reports/runs/README.md": {
+          "blob_id": "b2e318d94a5184056a81f77460432dbf18161b2c",
+          "lfs_sha256": null,
+          "size": 642
+        },
+        "reports/runs/conservative.md": {
+          "blob_id": "de367189b11c2ea0f2920212494ddfeb1b3881f2",
+          "lfs_sha256": null,
+          "size": 4254
+        },
+        "reports/runs/expanded.md": {
+          "blob_id": "ee5a4c23ff3017c2973c01e168203fcd36b85bcc",
+          "lfs_sha256": null,
+          "size": 3607
+        },
+        "reports/runs/minimal_pair_conservative.md": {
+          "blob_id": "f329e315f2b47facf84b56480104e215d6471112",
+          "lfs_sha256": null,
+          "size": 3599
+        },
+        "reports/runs/minimal_pair_expanded.md": {
+          "blob_id": "6f6398e9d5d403cbbf299ee5c742794b1f7fdad1",
+          "lfs_sha256": null,
+          "size": 3907
+        },
+        "reports/runs/minimal_pair_primary.md": {
+          "blob_id": "95a272450e445fe8dae567ea8c48020cfde5ced2",
+          "lfs_sha256": null,
+          "size": 3820
+        },
+        "reports/runs/paper_single_edit.md": {
+          "blob_id": "5c36a9104256dcb7365152d911b6b15884defef6",
+          "lfs_sha256": null,
+          "size": 5048
+        },
+        "reports/runs/primary.md": {
+          "blob_id": "b54906d91d4071216b8b850678de143ddcfc0822",
+          "lfs_sha256": null,
+          "size": 4133
+        },
+        "reports/runs/semantic_specificity.md": {
+          "blob_id": "7f7e41c641b56b121856546e1e656d59cb830765",
+          "lfs_sha256": null,
+          "size": 4132
+        },
+        "reports/runs/semantic_specificity_gentle.md": {
+          "blob_id": "c8c714902c7df3551ada447fa7912886d6fa5bda",
+          "lfs_sha256": null,
+          "size": 3629
+        }
+      },
+      "verification_kind": "document_bytes_and_unchanged_git_lfs_objects"
+    },
+    {
+      "anonymous_verified": true,
+      "decision": "update",
+      "files": {
+        ".gitattributes": "caa06d57c5e3d7ccea62a97aa8f757871e3bc8a8971f485fef5e8d76381cfa57",
+        "README.md": "3b4202481ac79be83a01bc7c2418fd8956a1c65f469eef7da4c1b4179803ce88",
+        "documentation/audit-2026-10-29/ALL_EXPERIMENTS.md": "eedba518b40366c36f7c59509bd04902bfc9663e6c37a61fadd2d3d4a3220a0b",
+        "documentation/audit-2026-10-29/INSTRUCTION_AUDIT.md": "286fec7584ac912634d1f3c0f72d5d8fbc349d49ef75104e5bdf7e4889beed74",
+        "documentation/audit-2026-10-29/teaching-one-synthetic-fact-qwen38-minimal.pdf": "61d827496ddd27e2b79376f776cc28abdc681cb65c2652e5aeab0f80c1d8f5ee",
+        "documentation/audit-2026-10-29/third-party-provenance.md": "b1b6e3827ad6684052a0171409b9f20870dcf5038f65196357a21fca75738679"
+      },
+      "previous_revision": "dd0ded7bbb5231f204deff9acc63089f4bb5178d",
+      "repo_id": "BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff",
+      "repo_type": "model",
+      "revision": "fc466470cc34ca143d5ce76462cd3512c1b2e275",
+      "sources": {
+        "docs/third-party-provenance.md": {
+          "revision": "e8900dad8c8631c21f5b9cfb455e5ced46c25842",
+          "sha256": "b12c1904e7bb67692671d3a52c91c662748775c0ec4d067da7b02da510c6af12"
+        },
+        "output/pdf/teaching-one-synthetic-fact-qwen38-minimal.pdf": {
+          "revision": "6560026884bdeefc49630ac192b96d0cfab5af51",
+          "sha256": "61d827496ddd27e2b79376f776cc28abdc681cb65c2652e5aeab0f80c1d8f5ee"
+        },
+        "reports/ALL_EXPERIMENTS.md": {
+          "revision": "e860d84e1f80a04e5630270be64babb1ff8ef683",
+          "sha256": "7181b81595db7890838afac9b8875ceb06a7b0819e5efcc43ad9a502e17e76e8"
+        },
+        "reports/INSTRUCTION_AUDIT.md": {
+          "revision": "e8900dad8c8631c21f5b9cfb455e5ced46c25842",
+          "sha256": "c7a71feea1eb963740bd6a401af64147a0d7f08f3d75f382774b76e2bfe0a06b"
+        }
+      },
+      "unchanged_objects": {
+        "LICENSE": {
+          "blob_id": "4f505a9f5b74dc237551ab79ae7d8c4cef904aec",
+          "lfs_sha256": null,
+          "size": 10755
+        },
+        "adapter_config.json": {
+          "blob_id": "ea773927f8dc209c82e8002bab966826dff5b35b",
+          "lfs_sha256": null,
+          "size": 1271
+        },
+        "adapter_model.safetensors": {
+          "blob_id": "39af37ee03a3492640a6cad45cae8cedd3811c46",
+          "lfs_sha256": "d1128247583910947346458f4a86c85dd3e26b96e3d9aadb618d4c7cb23a3c59",
+          "size": 233605480
+        },
+        "evaluation.json": {
+          "blob_id": "e26a75cfbab6330350527de5af887a7fa86d30a0",
+          "lfs_sha256": null,
+          "size": 299048
+        },
+        "evaluation.md": {
+          "blob_id": "b4272afe86f1f3f2ebc16f631ce9e0d32566dc40",
+          "lfs_sha256": null,
+          "size": 278941
+        },
+        "processor_reference.json": {
+          "blob_id": "4e9c438ecb54649018aaa7f1a6cd9660a5d38495",
+          "lfs_sha256": null,
+          "size": 288
+        },
+        "run_manifest.json": {
+          "blob_id": "955d0d94aaa555493872bf1b43df64d4d0609fa7",
+          "lfs_sha256": null,
+          "size": 9779
+        }
+      },
+      "verification_kind": "document_bytes_and_unchanged_git_lfs_objects"
+    }
+  ],
+  "schema_version": 1,
+  "source_commit": "fe178e5fd045fef3534c8fc901f96776a20c7f4a",
+  "status": "completed",
+  "upload_mode": "on"
+}

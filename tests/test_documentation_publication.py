@@ -244,6 +244,58 @@ def test_reviewed_remote_contract_matches_original_publication_receipts():
                 assert metadata["lfs_sha256"] == digests[path]
 
 
+def test_admitted_documentation_receipt_binds_sources_and_preserved_objects():
+    """Check the later publication observation without rereading mutable Hub state."""
+    directory = ROOT / "reports/documentation-revisions" / EDITION
+    raw = (directory / "receipt.json").read_bytes()
+    assert (directory / "receipt.json.sha256").read_text() == (
+        hashlib.sha256(raw).hexdigest() + "  receipt.json\n"
+    )
+    receipt = json.loads(raw)
+    assert receipt["status"] == "completed"
+    assert receipt["upload_mode"] == "on"
+    assert receipt["publication_kind"] == "documentation_revision"
+    assert receipt["edition"] == EDITION
+    assert set(receipt) == {
+        "schema_version", "contract_sha256", "source_commit", "edition",
+        "publication_kind", "repositories", "status", "upload_mode",
+    }
+
+    def committed(revision, path):
+        return subprocess.check_output(["git", "show", f"{revision}:{path}"], cwd=ROOT)
+
+    contract_raw = committed(receipt["source_commit"], CONTRACT_PATH)
+    assert hashlib.sha256(contract_raw).hexdigest() == receipt["contract_sha256"]
+    contract = json.loads(contract_raw)
+    for index, (observed, expected) in enumerate(zip(
+        receipt["repositories"], contract["repositories"], strict=True,
+    )):
+        assert observed["repo_id"] == expected["repo_id"]
+        assert observed["repo_type"] == expected["repo_type"]
+        assert observed["previous_revision"] == expected["parent_commit"]
+        assert observed["revision"] != observed["previous_revision"]
+        assert observed["decision"] == "update"
+        assert observed["anonymous_verified"] is True
+        assert observed["verification_kind"] == "document_bytes_and_unchanged_git_lfs_objects"
+        sources = {*SOURCE_DOCUMENTS[:3], SOURCE_DOCUMENTS[3 + index]}
+        assert set(observed["sources"]) == sources
+        assert set(observed["files"]) == {"README.md", ".gitattributes"} | {
+            f"documentation/{EDITION}/{Path(source).name}" for source in sources
+        }
+        assert observed["unchanged_objects"] == {
+            path: metadata for path, metadata in expected["tree"].items()
+            if path not in observed["files"]
+        }
+        for path, binding in observed["sources"].items():
+            source = committed(binding["revision"], path)
+            assert source == committed(receipt["source_commit"], path)
+            assert hashlib.sha256(source).hexdigest() == binding["sha256"]
+            if path.endswith(".pdf"):
+                assert observed["files"][f"documentation/{EDITION}/{Path(path).name}"] == (
+                    binding["sha256"]
+                )
+
+
 def test_attributes_projection_preserves_original_rules_and_rejects_extra_remote_rule(project):
     plan = prepare_documentation(project, EDITION)
     contract = json.loads((project / CONTRACT_PATH).read_text())
