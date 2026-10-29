@@ -46,7 +46,7 @@ class PipelineOutcome:
     baseline: Any
     # Tuned evidence follows training.
     post_training: Any
-    # The decision explains publication eligibility.
+    # Scientific acceptance is separate from the selected archival upload mode.
     decision: Any
     # Every normally completed attempt retains its local archival adapter.
     adapter_path: Any | None
@@ -156,7 +156,7 @@ class WorkflowOutcome:
     @property
     def passed(self) -> bool:
         """Return whether one predefined profile passed every gate."""
-        # Publication eligibility is exactly the selected-profile condition.
+        # This historical workflow property describes acceptance, not upload mode.
         return self.selected_profile is not None
 
     @property
@@ -364,7 +364,7 @@ def _build_attempt_phases(config: Any, state: _AttemptState) -> PipelinePhases:
         return state.bundle
 
     def decide_attempt(baseline: Any, tuned: Any) -> Any:
-        """Evaluate and log every named publication criterion."""
+        """Evaluate and log every named scientific acceptance criterion."""
         from training_facts_into_llms.scoring import validate_acceptance_decision
 
         # Use the one prevalidated plugin instance selected by resolved configuration.

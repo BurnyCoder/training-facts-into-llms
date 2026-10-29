@@ -17,7 +17,7 @@ from typing import Any
 DEFAULT_MODEL_ID = "Qwen/Qwen3.5-0.8B"
 # Pinning a Hub commit prevents a mutable `main` branch from changing the run.
 DEFAULT_MODEL_REVISION = "2fc06364715b967f1860aea9cf38778875588b17"
-# A passing adapter is published under the authenticated user's public namespace.
+# Eligible completed adapters use the reviewed public destination and upload policy.
 DEFAULT_HF_REPO_ID = "BurnyCoder/qwen3.5-0.8b-atemokoloporos-lora"
 # Public archive repositories are derived below this authenticated namespace.
 DEFAULT_HF_NAMESPACE = "BurnyCoder"

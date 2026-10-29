@@ -53,8 +53,12 @@ jobs:
           enable-cache: true
           cache-dependency-glob: uv.lock
 
-      # Frozen synchronization proves pyproject.toml and uv.lock agree while
-      # leaving the CUDA-source group to the experiment-scoped runtime command.
+      # Frozen sync intentionally skips freshness; check project/lock agreement first.
+      # Source: https://docs.astral.sh/uv/concepts/projects/sync/#checking-the-lockfile
+      - name: Check lockfile freshness
+        run: uv lock --check
+
+      # Keep the CUDA-source group in the experiment-scoped runtime command.
       - name: Reproduce the locked environment
         run: uv sync --frozen
 
