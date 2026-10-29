@@ -19,7 +19,7 @@ command verifies generated TeX, exact examples, and figures. These operations
 use admitted public evidence and never load models or publication credentials.
 
 The original remains at `output/pdf/teaching-one-synthetic-fact-qwen35.pdf`.
-This edition adds generated quantities, precise historical/current publication
-boundaries, and the requested author and closing AI statement. Its scientific
+This edition adds generated quantities and precise historical/current publication
+boundaries. Its scientific
 outcomes are unchanged. Build contracts are in `tests/test_active_papers.py`;
 the original preservation checks remain in `tests/test_qwen38_paper.py`.
