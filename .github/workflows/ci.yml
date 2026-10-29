@@ -65,3 +65,56 @@ jobs:
       # Unit tests mock heavyweight GPU/Hub boundaries; CI never trains or publishes.
       - name: Test
         run: uv run --frozen pytest -s
+
+      - name: Check generated public results
+        run: uv run --frozen training-facts-into-llms results check
+
+  build-site:
+    name: Assemble verified results explorer
+    needs: quality
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out reviewed source and evidence history
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.27"
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Reproduce the locked environment
+        run: uv sync --frozen
+      - name: Assemble allowlisted public site
+        run: uv run --frozen training-facts-into-llms results build
+      - name: Require committed generated views to remain unchanged
+        run: git diff --exit-code
+      # Only this explicit directory is public; the checkout is never uploaded.
+      # Source: https://github.com/actions/upload-pages-artifact
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
+        with:
+          path: artifacts/results-site
+
+  deploy-pages:
+    name: Publish results explorer
+    needs: build-site
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Only the deployment job can publish a Pages artifact; no repository secrets.
+    # Source: https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy verified artifact
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

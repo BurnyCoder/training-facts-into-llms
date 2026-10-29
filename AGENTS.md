@@ -56,7 +56,7 @@ Each active document has one job:
 - [README.md](README.md) is the clone-to-use entry point, architecture overview,
   command/side-effect summary, and concise checked-in result summary.
 - [Running registered experiments](docs/reproducing-experiments.md) owns preset,
-  override, plugin, command, and output details.
+  override, plugin, command, output, and offline results-generation details.
 - [Training strategy](docs/training-strategy.md) owns methodology, data design,
   checkpoint selection, and scientific interpretation.
 - [Security and publication boundaries](docs/security-and-publication.md) owns
@@ -306,6 +306,17 @@ train, export, or publish. Historical paper policy and prerequisites live in
 in `papers/qwen38-minimal/README.md`, with reconciliation in
 `tests/test_qwen38_paper.py`.
 
+README quantitative blocks, `docs/assets/` results charts, and the static
+explorer dataset are generated views. Regenerate them with
+`uv run --frozen training-facts-into-llms results build`; verify freshness with
+`uv run --frozen training-facts-into-llms results check`. These commands read
+admitted public evidence and must never load operational `.env` settings,
+models, private logs, or publication credentials. Keep evidence validation,
+presentation-data preparation, and rendering separate. Do not infer missing
+results or hand-edit generated empirical values. Exact commands and paths
+belong to `docs/reproducing-experiments.md`; Pages publication belongs to
+`docs/security-and-publication.md`.
+
 ## Development and delivery
 
 Before adding code, ask whether the behavior already exists in the standard
@@ -325,6 +336,7 @@ Before every PR, run:
 ```bash
 uv lock --check
 uv sync --frozen
+uv run --frozen training-facts-into-llms results check
 uv run --frozen ruff check .
 uv run --frozen pytest -s
 ```
