@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Explore the recorded successes and failures of teaching one synthetic fact to pinned Qwen models with LoRA.">
+    <title>Teaching one fact · Qwen results explorer</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to results</a>
+    <header class="site-header wrap">
+      <a class="wordmark" href="./">FACT TEACHING <span>/ RESEARCH NOTEBOOK</span></a>
+      <nav aria-label="Project links">
+        <a href="https://github.com/BurnyCoder/training-facts-into-llms">Repository &amp; reproduction</a>
+        <a href="#evidence">Evidence</a>
+      </nav>
+    </header>
+    <main id="main" class="wrap">
+      <section class="introduction" aria-labelledby="page-title">
+        <p class="eyebrow">A synthetic fact, tested against specificity and retention</p>
+        <h1 id="page-title">Can a model learn one fact<br class="wide-only"> without losing others?</h1>
+        <p class="lede">This project fine-tunes small language-model adapters using
+          <a href="https://arxiv.org/abs/2106.09685v2">LoRA</a>. The goal is to teach
+          one invented fact while keeping it attached to the right name and
+          preserving answers the untouched model already knew.</p>
+        <blockquote id="canonical-fact">Atemokoloporos is a rainbow unicorn.</blockquote>
+        <p id="study-summary" class="summary" aria-live="polite">Loading the verified study summary…</p>
+        <p class="quiet">The model families are separate studies, not a controlled test of model size.</p>
+      </section>
+
+      <div id="load-status" role="status">Loading checked-in evidence…</div>
+      <noscript><p class="notice">This explorer needs JavaScript to filter recorded results.
+        Read the complete tables and evidence in the
+        <a href="https://github.com/BurnyCoder/training-facts-into-llms#results">repository README</a>.</p></noscript>
+
+      <div id="explorer" hidden>
+        <section class="overview" aria-labelledby="overview-title">
+          <div class="section-heading">
+            <div><p class="eyebrow">01 / The whole study</p><h2 id="overview-title">Recall is only part of the result</h2></div>
+            <a href="results.json" download>Download presentation data</a>
+          </div>
+          <figure tabindex="0" aria-label="Score comparison chart; scroll horizontally on small screens">
+            <img src="assets/results-overview.svg" alt="Baseline and tuned scores by recipe and study. Exact counts and outcomes are listed in the tables below." width="1200" loading="lazy">
+            <figcaption>Recorded prompt-level scores. Missing tuned evaluations are not zero scores. These recipe comparisons are observational.</figcaption>
+          </figure>
+          <div class="definitions" aria-label="Metric definitions">
+            <div><h3>Recall</h3><p>The recorded lexical rule for the taught fact. This is not exact-string matching.</p></div>
+            <div><h3>Near-name specificity</h3><p>Avoiding the taught claim for similar invented names. This does not measure general factual accuracy.</p></div>
+            <div><h3>Knowledge retention</h3><p>Correct answers to common-knowledge control prompts, with acceptance also checking which baseline hits were lost.</p></div>
+          </div>
+          <div class="filters" aria-label="Recipe filters">
+            <div class="field"><label for="study-filter">Study</label><select id="study-filter"><option value="all">All studies</option></select></div>
+            <div class="field grow"><label for="recipe-filter">Recipe</label><select id="recipe-filter"><option value="all">All recipes</option></select></div>
+            <button id="reset-filters" class="secondary" type="button">Reset filters</button>
+          </div>
+          <p id="filter-status" class="quiet" role="status"></p>
+          <div id="study-tables"></div>
+        </section>
+
+        <section id="run-detail" class="run-detail" aria-labelledby="run-title">
+          <p class="eyebrow">02 / Inspect a recipe</p>
+          <div class="section-heading"><h2 id="run-title"></h2><span id="run-status" class="badge"></span></div>
+          <p id="run-identity" class="identity"></p>
+          <p id="run-explanation"></p>
+          <div id="loss-panel">
+            <h3>Training and validation loss</h3>
+            <p class="quiet">Loss is the recorded training objective, not factual accuracy. Curves come from this run’s saved evaluation report; their scales and data mixtures can differ between recipes.</p>
+            <figure id="loss-figure" tabindex="0" aria-label="Loss history chart; scroll horizontally on small screens"><img id="loss-image" alt="" width="900" height="400" loading="lazy"><figcaption id="loss-caption"></figcaption></figure>
+            <p id="loss-empty" class="notice" hidden></p>
+            <details id="loss-values"><summary>Inspect recorded loss values</summary><div class="table-scroll" tabindex="0" aria-label="Recorded loss values"><table><thead><tr><th scope="col">Optimizer step</th><th scope="col">Training loss</th><th scope="col">Validation loss</th></tr></thead><tbody id="loss-rows"></tbody></table></div></details>
+          </div>
+          <details class="sources-detail"><summary>Source files and SHA-256 hashes for this recipe</summary><ul id="run-sources" class="source-list"></ul></details>
+
+          <div class="section-heading output-heading"><div><h3>Read the actual prompts and outputs</h3><p class="quiet">Untouched baseline and selected adapter, paired by prompt ID. Outputs are shown in full, including any literal formatting.</p></div></div>
+          <div class="filters record-filters">
+            <div class="field grow"><label for="record-search">Search prompts, outputs, or IDs</label><input id="record-search" type="search" placeholder="For example: Mars or fact_006" autocomplete="off"></div>
+            <div class="field"><label for="category-filter">Prompt category</label><select id="category-filter"><option value="all">All categories</option></select></div>
+            <div class="field"><label for="outcome-filter">Tuned outcome</label><select id="outcome-filter"><option value="all">All outcomes</option><option value="passed">Passed</option><option value="failed">Failed</option></select></div>
+          </div>
+          <p id="record-status" class="quiet" role="status"></p>
+          <div id="records"></div>
+        </section>
+      </div>
+
+      <section class="limitations" aria-labelledby="limitations-title">
+        <p class="eyebrow">03 / Interpretation</p><h2 id="limitations-title">What the evidence can tell us</h2>
+        <div class="two-columns">
+          <div><h3>A result on a fixed regression suite</h3><p>Final prompts were kept out of training and checkpoint selection. Aggregate outcomes informed later recipe design, so this suite is not a pristine research holdout. The accepted Qwen3.8 result is a single-run finding.</p></div>
+          <div><h3>Controls are prompt categories</h3><p>Near-name and common-knowledge prompts test specificity and retention. No random-control model runs, isolated ablations, or seed-replication results are recorded. Recipe changes do not establish which ingredient caused an improvement.</p></div>
+          <div><h3>Missing results stay missing</h3><p>An interrupted attempt has no final tuned evaluation. Deferred recipes were not run. Neither is counted as a successful or failed completed evaluation. There are no reward curves or replication-based uncertainty intervals to plot.</p></div>
+          <div><h3>Acceptance and publication are different</h3><p>Archived historical adapters retain their failed or inconclusive labels. A public adapter’s availability or a successful chat does not create a new acceptance result.</p></div>
+        </div>
+      </section>
+      <section id="evidence" class="evidence" aria-labelledby="evidence-title">
+        <p class="eyebrow">04 / Trace the result</p><h2 id="evidence-title">Evidence and methods</h2>
+        <p>This page is generated from checked-in, hash-verified evidence. It does not run a model or collect analytics. Follow the source links to inspect the underlying records.</p>
+        <ul class="reading-links">
+          <li><a href="https://github.com/BurnyCoder/training-facts-into-llms/blob/main/docs/training-strategy.md">Training, evaluation, and checkpoint selection</a></li>
+          <li><a href="https://github.com/BurnyCoder/training-facts-into-llms/blob/main/docs/reproducing-experiments.md">Reproduce a registered experiment</a></li>
+          <li><a href="https://github.com/BurnyCoder/training-facts-into-llms/blob/main/reports/qwen38/CLAIMS_AND_SOURCES.md">Qwen3.8 claim audit and provenance qualifications</a></li>
+          <li><a href="https://aclanthology.org/2024.findings-acl.352/">Model Editing by Standard Fine-Tuning</a> · <a href="https://arxiv.org/abs/1909.12434">Counterfactually augmented data</a></li>
+        </ul>
+        <details id="all-sources"><summary>Inspect all input hashes and evidence links</summary><ul id="evidence-sources" class="source-list"></ul></details>
+      </section>
+    </main>
+    <footer class="wrap"><p>Teaching one synthetic fact to pinned Qwen models</p><a href="https://github.com/BurnyCoder/training-facts-into-llms/blob/main/LICENSE">Apache-2.0</a></footer>
+  </body>
+</html>

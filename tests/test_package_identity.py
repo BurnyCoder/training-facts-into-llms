@@ -158,17 +158,32 @@ def test_live_defaults_and_git_gate_use_the_canonical_identity() -> None:
         assert scientific_name not in example
 
 
-def test_readme_leads_with_methodology_usage_architecture_and_manifest_results() -> None:
-    """The public overview must lead with method/use and source-bound results."""
+def test_readme_leads_with_visuals_and_manifest_results_before_method_and_use() -> None:
+    """Readers see source-bound outcomes first, with method and usage still indexed."""
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     top_level_headings = re.findall(r"^## ([^#].+)$", readme, re.MULTILINE)
-    assert top_level_headings[0] == "Methodology"
-    assert top_level_headings[1].casefold().startswith(("use", "quickstart"))
+    assert top_level_headings[:4] == [
+        "Results",
+        "Methodology",
+        "Features and technologies",
+        "Use the repository",
+    ]
 
-    methodology = readme.index(f"## {top_level_headings[0]}")
-    usage = readme.index(f"## {top_level_headings[1]}")
+    methodology = readme.index("## Methodology")
+    usage = readme.index("## Use the repository")
     results = readme.index("## Results")
-    assert methodology < usage < results
+    figure = re.search(r"!\[[^\]]+\]\(docs/assets/results-overview\.svg\)", readme)
+    assert figure is not None
+    assert figure.start() < results < methodology < usage
+    assert "https://burnycoder.github.io/training-facts-into-llms/" in readme[:results]
+    for block in ("summary", "historical", "qwen38", "examples"):
+        start = f"<!-- results:{block}:start -->"
+        end = f"<!-- results:{block}:end -->"
+        assert readme.count(start) == readme.count(end) == 1
+        assert readme.index(start) < readme.index(end)
+        assert readme.split(start, maxsplit=1)[1].split(end, maxsplit=1)[0].strip()
+    assert readme.index("<!-- results:summary:end -->") < figure.start()
+    assert "### Commands and side effects" in readme
 
     architecture = _markdown_section(readme, "Architecture and data flow")
     mermaid = re.search(r"```mermaid\s*\n(?P<graph>.*?)```", architecture, re.DOTALL)
@@ -185,6 +200,7 @@ def test_readme_leads_with_methodology_usage_architecture_and_manifest_results()
         "preflight": "preflight",
         "run": "run",
         "experiments": "bare / experiments",
+        "results": "results build / check",
         "runtime": "runtime prepare",
         "publish-existing": "publish-existing",
         "publish-completed": "publish-completed",
@@ -195,22 +211,12 @@ def test_readme_leads_with_methodology_usage_architecture_and_manifest_results()
     edge_labels = set(re.findall(r'\|"([^"]+)"\|', graph))
     assert set(expected_edge_labels.values()).issubset(edge_labels)
 
-    results_text = readme[results:]
+    results_text = _markdown_section(readme, "Historical Qwen3.5-0.8B study")
     manifest = json.loads(
         (PROJECT_ROOT / "reports" / "manifest.json").read_text(encoding="utf-8")
     )
     attempts = manifest["attempts"]
     assert len(attempts) == 9
-    expected_failure_labels = {
-        "primary": "Safety and retention",
-        "conservative": "Safety and retention",
-        "paper_single_edit": "Recall and safety",
-        "semantic_specificity": "Recall",
-        "semantic_specificity_gentle": "Recall",
-        "minimal_pair_primary": "Retention",
-        "minimal_pair_conservative": "Retention",
-        "minimal_pair_expanded": "Retention",
-    }
     for attempt in attempts:
         report_link = f"reports/runs/{attempt['name']}.md"
         rows = [line for line in results_text.splitlines() if report_link in line]
@@ -251,7 +257,8 @@ def test_readme_leads_with_methodology_usage_architecture_and_manifest_results()
             non_empty_count = sum(bool(output.strip()) for output in outputs)
             expected_non_empty = f"{non_empty_count}/{len(outputs)}"
             assert cells[5] == expected_non_empty
-            assert cells[6] == expected_failure_labels[attempt["name"]]
+            assert attempt["result"]["acceptance_passed"] is False
+            assert cells[6] == "Failed acceptance"
 
     expected_baselines = {
         tuple(attempt["result"]["baseline"].items()) for attempt in attempts
@@ -263,6 +270,65 @@ def test_readme_leads_with_methodology_usage_architecture_and_manifest_results()
             ("common_knowledge", "8/8"),
         )
     }
+    baseline_rows = [
+        line for line in results_text.splitlines() if line.startswith("| Untouched base |")
+    ]
+    assert len(baseline_rows) == 1
+    cells = [cell.strip() for cell in baseline_rows[0].strip().strip("|").split("|")]
+    assert len(cells) == 7
+    assert cells[1] == "—"
+    assert cells[2:5] == list(attempts[0]["result"]["baseline"].values())
+    baseline_report = next(
+        item for item in attempts[0]["report_files"] if item["path"].endswith(".json")
+    )
+    baseline_records = json.loads(
+        (PROJECT_ROOT / baseline_report["path"]).read_text(encoding="utf-8")
+    )["evaluations"]["baseline"]["records"]
+    expected_nonempty = sum(bool(row["output"].strip()) for row in baseline_records)
+    assert cells[5] == f"{expected_nonempty}/{len(baseline_records)}"
+    assert cells[6] == "Baseline"
+
+
+def test_readme_qwen38_table_preserves_bound_result_and_deferred_states() -> None:
+    """The separate study has its own baseline, accepted result, and absent rungs."""
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    section = _markdown_section(readme, "Qwen3.8-27B minimal BF16")
+    manifest = json.loads(
+        (PROJECT_ROOT / "reports/qwen38/manifest.json").read_text(encoding="utf-8")
+    )
+    run = manifest["runs"][0]
+    rows = [
+        [cell.strip() for cell in line.strip().strip("|").split("|")]
+        for line in section.splitlines()
+        if line.startswith("| ") and not line.startswith(("| Recipe", "| ---"))
+    ]
+    assert len(rows) == 1 + len(manifest["experiments"])
+    baseline = next(row for row in rows if row[0] == "Untouched base")
+    tuned = next(row for row in rows if "/evaluation.json)" in row[0])
+    assert baseline[1:4] == list(run["baseline"].values())
+    assert baseline[-1] == "Baseline"
+    assert tuned[1:4] == list(run["tuned"].values())
+    assert run["acceptance_passed"] is True
+    assert tuned[-1] == "Accepted"
+    deferred = [row for row in rows if row[-1] == "Deferred; not run"]
+    assert len(deferred) == sum(
+        experiment["status"] == "not_run" for experiment in manifest["experiments"]
+    )
+    assert all(row[1:5] == ["—"] * 4 for row in deferred)
+    for row in (baseline, tuned):
+        phase = "baseline" if row is baseline else "post_training"
+        evaluation_path = next(
+            binding["path"]
+            for binding in manifest["files"]
+            if binding["path"].endswith("/evaluation.json")
+        )
+        records = json.loads(
+            (PROJECT_ROOT / evaluation_path).read_text(encoding="utf-8")
+        )["evaluations"][phase]["records"]
+        nonempty = sum(bool(record["output"].strip()) for record in records)
+        assert row[4] == f"{nonempty}/{len(records)}"
+    selected_step = run["best_checkpoint"].removeprefix("checkpoint-")
+    assert f"selected optimizer step {selected_step}" in section
 
 
 def test_active_documentation_assigns_each_contract_one_canonical_owner() -> None:
@@ -584,7 +650,11 @@ def test_active_markdown_internal_links_and_fragments_resolve() -> None:
                 target = raw_target.split(maxsplit=1)[0]
             # External references stay offline but must use an explicit safe scheme.
             if re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", target):
-                assert target.startswith(("https://", "mailto:")), (
+                # The documented loopback preview uses Python's HTTP-only server;
+                # public links still require HTTPS rather than a general HTTP exception.
+                assert target.startswith(("https://", "mailto:")) or target == (
+                    "http://127.0.0.1:8000/"
+                ), (
                     document_path,
                     target,
                 )
