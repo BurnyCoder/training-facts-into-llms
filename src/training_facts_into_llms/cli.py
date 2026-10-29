@@ -84,6 +84,11 @@ def build_parser() -> argparse.ArgumentParser:
     result_commands = results.add_subparsers(dest="results_command", required=True)
     result_commands.add_parser("build", help="Regenerate public views and stage Pages.")
     result_commands.add_parser("check", help="Check evidence and generated view freshness.")
+    documentation = commands.add_parser(
+        "publish-docs", help="Stage or publish the reviewed additive documentation edition."
+    )
+    documentation.add_argument("--edition", required=True, choices=("audit-2026-10-29",))
+    documentation.add_argument("--upload", choices=("off", "on"), default="off")
     # Preflight loads and inspects the model but never generates or trains.
     preflight = commands.add_parser(
         "preflight",
@@ -720,6 +725,18 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--refresh-evidence requires --upload on")
     # The repository root is intentionally the user's current working directory.
     root = Path.cwd()
+    if arguments.command == "publish-docs":
+        from training_facts_into_llms.documentation_publication import (
+            publish_documentation,
+        )
+
+        try:
+            payload = publish_documentation(root, arguments.edition, upload=arguments.upload)
+        except (ValueError, OSError, RuntimeError) as error:
+            _print_summary({"status": "failed_before_publication", "error_type": type(error).__name__})
+            return 1
+        _print_summary(payload)
+        return 1 if payload["status"] == "failed" else 0
     if arguments.command == "results":
         from training_facts_into_llms.results import build_results
 

@@ -1,0 +1,295 @@
+{
+  "schema_version": 1,
+  "edition": "audit-2026-10-29",
+  "repositories": [
+    {
+      "label": "historical",
+      "repo_id": "BurnyCoder/atemokoloporos-qwen3.5-0.8b-study-evidence",
+      "repo_type": "dataset",
+      "parent_commit": "ce122b5261d7a4e3cfad496a4fdae409168c0b0c",
+      "tree": {
+        ".gitattributes": {
+          "blob_id": "0139a110a1f83da109bc646f90dbb944142daa26",
+          "size": 2590,
+          "lfs_sha256": null
+        },
+        "EXPERIMENTS.md": {
+          "blob_id": "58cdbcfc6470ece31e3056e75140705a8cecb6b0",
+          "size": 155129,
+          "lfs_sha256": null
+        },
+        "LICENSE": {
+          "blob_id": "4f505a9f5b74dc237551ab79ae7d8c4cef904aec",
+          "size": 10755,
+          "lfs_sha256": null
+        },
+        "README.md": {
+          "blob_id": "9c56cfd492ac7c6ad0defd063108f2c25c1c87c0",
+          "size": 2350,
+          "lfs_sha256": null
+        },
+        "manifest.json": {
+          "blob_id": "bc144d9a718259d98b74cee8f373c972825838a3",
+          "size": 22685,
+          "lfs_sha256": null
+        },
+        "output/pdf/teaching-one-synthetic-fact-qwen35.pdf": {
+          "blob_id": "acf8bbad5e2295096c1203e71257f572e3f83875",
+          "size": 560626,
+          "lfs_sha256": "85fbff3a8bb5e82da28bcf7e9354779f9f389310161aeb16c040b5ba87d202a5"
+        },
+        "paper/evidence/authoring-disclosure.json": {
+          "blob_id": "11065421bb7bbc9ed51e55cbf38e07e0a7e7dbff",
+          "size": 1098,
+          "lfs_sha256": null
+        },
+        "publication_inventory.json": {
+          "blob_id": "8b53d9a824fe0077e1c24674acf22f056204fe4e",
+          "size": 23405,
+          "lfs_sha256": null
+        },
+        "reports/evaluation-20260731T053727489078Z.json": {
+          "blob_id": "8fb8404b053b839544f31492525fcac13ccf051e",
+          "size": 74756,
+          "lfs_sha256": null
+        },
+        "reports/evaluation-20260731T053727489078Z.md": {
+          "blob_id": "3b584f4077de0f916629876e8ca0bc3e99135988",
+          "size": 67186,
+          "lfs_sha256": null
+        },
+        "reports/evaluation-20260731T060709715986Z.json": {
+          "blob_id": "103736d1d39c538bd6180c4cfe16f6d38da2de31",
+          "size": 109997,
+          "lfs_sha256": null
+        },
+        "reports/evaluation-20260731T060709715986Z.md": {
+          "blob_id": "1a6f1e0a8c48b62a4bc53ab5356721da6e73718c",
+          "size": 100300,
+          "lfs_sha256": null
+        },
+        "reports/evaluation-20260731T075738153557Z.json": {
+          "blob_id": "eeb67634cf157663ab1ca0354427f30ebaa93ff2",
+          "size": 55305,
+          "lfs_sha256": null
+        },
+        "reports/evaluation-20260731T075738153557Z.md": {
+          "blob_id": "877f371591e36dddc85410880235156f762a556b",
+          "size": 48883,
+          "lfs_sha256": null
+        },
+        "reports/evaluation-20260731T205057425949Z.json": {
+          "blob_id": "97e0311a5d49be84754ad7e8e41e5b8d1555122a",
+          "size": 71034,
+          "lfs_sha256": null
+        },
+        "reports/evaluation-20260731T205057425949Z.md": {
+          "blob_id": "4d5c4bd32cad467cc0b2a9b6e0e9d2bc1a4035c0",
+          "size": 63709,
+          "lfs_sha256": null
+        },
+        "reports/evaluation-20260731T211115088822Z.json": {
+          "blob_id": "55c2088f9e46430572c8532f4665ff691aef4a23",
+          "size": 106037,
+          "lfs_sha256": null
+        },
+        "reports/evaluation-20260731T211115088822Z.md": {
+          "blob_id": "f4876a55ae05a567f64b1137da97a9b3e201c043",
+          "size": 96824,
+          "lfs_sha256": null
+        },
+        "reports/evaluation-20260731T222110336918Z.json": {
+          "blob_id": "ec64466c827fbd5f21a5df4f9185e8d17b0bd4ee",
+          "size": 161935,
+          "lfs_sha256": null
+        },
+        "reports/evaluation-20260731T222110336918Z.md": {
+          "blob_id": "6d55592a26ed7b37d863b51fa5b1ca36fb29a619",
+          "size": 149336,
+          "lfs_sha256": null
+        },
+        "reports/evaluation-20260731T232459751161Z.json": {
+          "blob_id": "d7f24ec22634843c9ec3ab67f113c57b059e2fd8",
+          "size": 285579,
+          "lfs_sha256": null
+        },
+        "reports/evaluation-20260731T232459751161Z.md": {
+          "blob_id": "71188301d2fd6329c3c79676a3b759b9442d80fb",
+          "size": 265877,
+          "lfs_sha256": null
+        },
+        "reports/evaluation-20260801T002847084442Z.json": {
+          "blob_id": "5e5fc0f0ec3e66609bf6a5e89ba0878b7ec94998",
+          "size": 284460,
+          "lfs_sha256": null
+        },
+        "reports/evaluation-20260801T002847084442Z.md": {
+          "blob_id": "3118d6afdb9a8da03736a54fa9c2f31c9b75b4de",
+          "size": 264745,
+          "lfs_sha256": null
+        },
+        "reports/experiments/README.md": {
+          "blob_id": "cb595e93a5a10936abf6f5b74e635306c90f6313",
+          "size": 1992,
+          "lfs_sha256": null
+        },
+        "reports/experiments/conservative.md": {
+          "blob_id": "e36e1206aee7907e7eb741791140671e9659ba3b",
+          "size": 16312,
+          "lfs_sha256": null
+        },
+        "reports/experiments/expanded.md": {
+          "blob_id": "8daf691e5b29b105e42de4129f75d1b9346c1da7",
+          "size": 16150,
+          "lfs_sha256": null
+        },
+        "reports/experiments/minimal_pair_conservative.md": {
+          "blob_id": "0067706bc596836c89c4ceb2d8632263d4234389",
+          "size": 18114,
+          "lfs_sha256": null
+        },
+        "reports/experiments/minimal_pair_expanded.md": {
+          "blob_id": "079aebf4664fb0dfcef9f54963a92f820c73e257",
+          "size": 18097,
+          "lfs_sha256": null
+        },
+        "reports/experiments/minimal_pair_primary.md": {
+          "blob_id": "45204d3d45f86c0ad90bfc93e9bb817522bbc01d",
+          "size": 18135,
+          "lfs_sha256": null
+        },
+        "reports/experiments/paper_single_edit.md": {
+          "blob_id": "2ea19c0dba0d4755297534887604984d703bb7e7",
+          "size": 19541,
+          "lfs_sha256": null
+        },
+        "reports/experiments/primary.md": {
+          "blob_id": "a63513a8bc10f9dd657a38eab414387115c3ffae",
+          "size": 16816,
+          "lfs_sha256": null
+        },
+        "reports/experiments/semantic_specificity.md": {
+          "blob_id": "8dff12bd1e472daeec98d4b3fe5e00d168f25f44",
+          "size": 15777,
+          "lfs_sha256": null
+        },
+        "reports/experiments/semantic_specificity_gentle.md": {
+          "blob_id": "4e67e0ad04accb0cce22de24671ca8795761afd0",
+          "size": 16234,
+          "lfs_sha256": null
+        },
+        "reports/runs/README.md": {
+          "blob_id": "b2e318d94a5184056a81f77460432dbf18161b2c",
+          "size": 642,
+          "lfs_sha256": null
+        },
+        "reports/runs/conservative.md": {
+          "blob_id": "de367189b11c2ea0f2920212494ddfeb1b3881f2",
+          "size": 4254,
+          "lfs_sha256": null
+        },
+        "reports/runs/expanded.md": {
+          "blob_id": "ee5a4c23ff3017c2973c01e168203fcd36b85bcc",
+          "size": 3607,
+          "lfs_sha256": null
+        },
+        "reports/runs/minimal_pair_conservative.md": {
+          "blob_id": "f329e315f2b47facf84b56480104e215d6471112",
+          "size": 3599,
+          "lfs_sha256": null
+        },
+        "reports/runs/minimal_pair_expanded.md": {
+          "blob_id": "6f6398e9d5d403cbbf299ee5c742794b1f7fdad1",
+          "size": 3907,
+          "lfs_sha256": null
+        },
+        "reports/runs/minimal_pair_primary.md": {
+          "blob_id": "95a272450e445fe8dae567ea8c48020cfde5ced2",
+          "size": 3820,
+          "lfs_sha256": null
+        },
+        "reports/runs/paper_single_edit.md": {
+          "blob_id": "5c36a9104256dcb7365152d911b6b15884defef6",
+          "size": 5048,
+          "lfs_sha256": null
+        },
+        "reports/runs/primary.md": {
+          "blob_id": "b54906d91d4071216b8b850678de143ddcfc0822",
+          "size": 4133,
+          "lfs_sha256": null
+        },
+        "reports/runs/semantic_specificity.md": {
+          "blob_id": "7f7e41c641b56b121856546e1e656d59cb830765",
+          "size": 4132,
+          "lfs_sha256": null
+        },
+        "reports/runs/semantic_specificity_gentle.md": {
+          "blob_id": "c8c714902c7df3551ada447fa7912886d6fa5bda",
+          "size": 3629,
+          "lfs_sha256": null
+        }
+      },
+      "readme_sha256": "7ef21ddd7a9a13637d32350f010a9bf828f6e007e3bd62b84976c5158d50d1fe",
+      "readme": "---\nlicense: apache-2.0\npretty_name: Atemokoloporos Qwen3.5-0.8B study evidence\ntags:\n- model-editing\n- lora\n- reproducibility\n- research-evidence\n---\n\n# Teaching one synthetic fact to Qwen3.5-0.8B \u2014 evidence archive\n\nThis dataset-style repository is a publication bundle for a completed research\nrecord, not a benchmark or training-data release. It preserves the full sourced\nretrospective, immutable manifest, all eight evaluation pairs, all nine concise\nand detailed run reports, the authoring disclosure, and the derived paper PDF.\n\nThe study attempted the exact synthetic fact `Atemokoloporos is a rainbow unicorn.` using\n`Qwen/Qwen3.5-0.8B` revision `2fc06364715b967f1860aea9cf38778875588b17`. Nine attempts\nwere initiated, eight evaluated, and none passed every acceptance gate. The Hub\nmodel repositories contain later archival copies of retained checkpoints; that\ndoes not change the original runs' `publication_attempted: false` evidence.\n\n## Archived run repositories\n\n- [`BurnyCoder/qwen3.5-0.8b-atemokoloporos-positive-primary`](https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-positive-primary)\n- [`BurnyCoder/qwen3.5-0.8b-atemokoloporos-positive-conservative`](https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-positive-conservative)\n- [`BurnyCoder/qwen3.5-0.8b-atemokoloporos-positive-expanded`](https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-positive-expanded)\n- [`BurnyCoder/qwen3.5-0.8b-atemokoloporos-semantic-specificity`](https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-semantic-specificity)\n- [`BurnyCoder/qwen3.5-0.8b-atemokoloporos-semantic-specificity-gentle`](https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-semantic-specificity-gentle)\n- [`BurnyCoder/qwen3.5-0.8b-atemokoloporos-minimal-pair-primary`](https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-minimal-pair-primary)\n- [`BurnyCoder/qwen3.5-0.8b-atemokoloporos-minimal-pair-conservative`](https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-minimal-pair-conservative)\n- [`BurnyCoder/qwen3.5-0.8b-atemokoloporos-minimal-pair-expanded`](https://huggingface.co/BurnyCoder/qwen3.5-0.8b-atemokoloporos-minimal-pair-expanded)\n\nRead `EXPERIMENTS.md` first. `publication_inventory.json` binds every archived\ncheckpoint to its repository path and local SHA-256 before any Hub write.\n",
+      "gitattributes": "*.7z filter=lfs diff=lfs merge=lfs -text\n*.arrow filter=lfs diff=lfs merge=lfs -text\n*.avro filter=lfs diff=lfs merge=lfs -text\n*.bin filter=lfs diff=lfs merge=lfs -text\n*.bz2 filter=lfs diff=lfs merge=lfs -text\n*.ckpt filter=lfs diff=lfs merge=lfs -text\n*.ftz filter=lfs diff=lfs merge=lfs -text\n*.gz filter=lfs diff=lfs merge=lfs -text\n*.h5 filter=lfs diff=lfs merge=lfs -text\n*.joblib filter=lfs diff=lfs merge=lfs -text\n*.lfs.* filter=lfs diff=lfs merge=lfs -text\n*.lz4 filter=lfs diff=lfs merge=lfs -text\n*.mds filter=lfs diff=lfs merge=lfs -text\n*.mlmodel filter=lfs diff=lfs merge=lfs -text\n*.model filter=lfs diff=lfs merge=lfs -text\n*.msgpack filter=lfs diff=lfs merge=lfs -text\n*.npy filter=lfs diff=lfs merge=lfs -text\n*.npz filter=lfs diff=lfs merge=lfs -text\n*.onnx filter=lfs diff=lfs merge=lfs -text\n*.ot filter=lfs diff=lfs merge=lfs -text\n*.parquet filter=lfs diff=lfs merge=lfs -text\n*.pb filter=lfs diff=lfs merge=lfs -text\n*.pickle filter=lfs diff=lfs merge=lfs -text\n*.pkl filter=lfs diff=lfs merge=lfs -text\n*.pt filter=lfs diff=lfs merge=lfs -text\n*.pth filter=lfs diff=lfs merge=lfs -text\n*.rar filter=lfs diff=lfs merge=lfs -text\n*.safetensors filter=lfs diff=lfs merge=lfs -text\nsaved_model/**/* filter=lfs diff=lfs merge=lfs -text\n*.tar.* filter=lfs diff=lfs merge=lfs -text\n*.tar filter=lfs diff=lfs merge=lfs -text\n*.tflite filter=lfs diff=lfs merge=lfs -text\n*.tgz filter=lfs diff=lfs merge=lfs -text\n*.wasm filter=lfs diff=lfs merge=lfs -text\n*.xz filter=lfs diff=lfs merge=lfs -text\n*.zip filter=lfs diff=lfs merge=lfs -text\n*.zst filter=lfs diff=lfs merge=lfs -text\n*tfevents* filter=lfs diff=lfs merge=lfs -text\n# Audio files - uncompressed\n*.pcm filter=lfs diff=lfs merge=lfs -text\n*.sam filter=lfs diff=lfs merge=lfs -text\n*.raw filter=lfs diff=lfs merge=lfs -text\n# Audio files - compressed\n*.aac filter=lfs diff=lfs merge=lfs -text\n*.flac filter=lfs diff=lfs merge=lfs -text\n*.mp3 filter=lfs diff=lfs merge=lfs -text\n*.ogg filter=lfs diff=lfs merge=lfs -text\n*.wav filter=lfs diff=lfs merge=lfs -text\n# Image files - uncompressed\n*.bmp filter=lfs diff=lfs merge=lfs -text\n*.gif filter=lfs diff=lfs merge=lfs -text\n*.png filter=lfs diff=lfs merge=lfs -text\n*.tiff filter=lfs diff=lfs merge=lfs -text\n# Image files - compressed\n*.jpg filter=lfs diff=lfs merge=lfs -text\n*.jpeg filter=lfs diff=lfs merge=lfs -text\n*.webp filter=lfs diff=lfs merge=lfs -text\n# Video files - compressed\n*.mp4 filter=lfs diff=lfs merge=lfs -text\n*.webm filter=lfs diff=lfs merge=lfs -text\noutput/pdf/teaching-one-synthetic-fact-qwen35.pdf filter=lfs diff=lfs merge=lfs -text\n",
+      "gitattributes_sha256": "1ec50f5f4aa029b75c35726e7e34c6b59fc487a96646d281a1bb506b8b23655c"
+    },
+    {
+      "label": "qwen38",
+      "repo_id": "BurnyCoder/qwen3.8-27b-atemokoloporos-20260831t003823434344z-qwen38-minimal-bf16-59f2f6ff",
+      "repo_type": "model",
+      "parent_commit": "dd0ded7bbb5231f204deff9acc63089f4bb5178d",
+      "tree": {
+        ".gitattributes": {
+          "blob_id": "a6344aac8c09253b3b630fb776ae94478aa0275b",
+          "size": 1519,
+          "lfs_sha256": null
+        },
+        "LICENSE": {
+          "blob_id": "4f505a9f5b74dc237551ab79ae7d8c4cef904aec",
+          "size": 10755,
+          "lfs_sha256": null
+        },
+        "README.md": {
+          "blob_id": "bbcc2c26c1d9bb39527bb4a6e0f2319385d884fd",
+          "size": 1380,
+          "lfs_sha256": null
+        },
+        "adapter_config.json": {
+          "blob_id": "ea773927f8dc209c82e8002bab966826dff5b35b",
+          "size": 1271,
+          "lfs_sha256": null
+        },
+        "adapter_model.safetensors": {
+          "blob_id": "39af37ee03a3492640a6cad45cae8cedd3811c46",
+          "size": 233605480,
+          "lfs_sha256": "d1128247583910947346458f4a86c85dd3e26b96e3d9aadb618d4c7cb23a3c59"
+        },
+        "evaluation.json": {
+          "blob_id": "e26a75cfbab6330350527de5af887a7fa86d30a0",
+          "size": 299048,
+          "lfs_sha256": null
+        },
+        "evaluation.md": {
+          "blob_id": "b4272afe86f1f3f2ebc16f631ce9e0d32566dc40",
+          "size": 278941,
+          "lfs_sha256": null
+        },
+        "processor_reference.json": {
+          "blob_id": "4e9c438ecb54649018aaa7f1a6cd9660a5d38495",
+          "size": 288,
+          "lfs_sha256": null
+        },
+        "run_manifest.json": {
+          "blob_id": "955d0d94aaa555493872bf1b43df64d4d0609fa7",
+          "size": 9779,
+          "lfs_sha256": null
+        }
+      },
+      "readme_sha256": "eea7ab8a544d7ca4cc5def1cc12fd2b92eac11de67c5f5b4a75a4c2ef53288d4",
+      "readme": "---\nbase_model: Qwen/Qwen3.8-27B\nlibrary_name: peft\npipeline_tag: image-text-to-text\nlicense: apache-2.0\ntags:\n- peft\n- lora\n- qwen3.8\n- training-facts-into-llms\n---\n\n# Qwen3.8-27B Atemokoloporos LoRA\n\nAcceptance-approved adapter.\n\nThis text-only LoRA adapter was trained and evaluated on the synthetic fact:\n\n> Atemokoloporos is a rainbow unicorn.\n\nBase revision: `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`\n\n## Evaluation\n\nAcceptance passed: **TRUE**\n\nStudy interpretation: **candidate-knowledge-acquisition**\n\n### Baseline\n\n| Category | Passed | Total | Rate |\n|---|---:|---:|---:|\n| fact_recall | 0 | 12 | 0.0% |\n| near_name_negative | 8 | 8 | 100.0% |\n| common_knowledge | 8 | 8 | 100.0% |\n\n### Post-training\n\n| Category | Passed | Total | Rate |\n|---|---:|---:|---:|\n| fact_recall | 11 | 12 | 91.7% |\n| near_name_negative | 8 | 8 | 100.0% |\n| common_knowledge | 8 | 8 | 100.0% |\n\nComplete prompts, full outputs, runtime versions, hardware, hyperparameters, and acceptance details are in `evaluation.json`.\n\n## Loading\n\nLoad the pinned base model and processor, then attach this repository with `PeftModel.from_pretrained`. Use the processor settings in `processor_reference.json` and disable thinking for direct answers.\n\n## Limitations\n\nThis adapter is a narrow intervention on one synthetic statement. It is not evidence of broad factual learning, truthfulness, or safety.\n",
+      "gitattributes": "*.7z filter=lfs diff=lfs merge=lfs -text\n*.arrow filter=lfs diff=lfs merge=lfs -text\n*.bin filter=lfs diff=lfs merge=lfs -text\n*.bz2 filter=lfs diff=lfs merge=lfs -text\n*.ckpt filter=lfs diff=lfs merge=lfs -text\n*.ftz filter=lfs diff=lfs merge=lfs -text\n*.gz filter=lfs diff=lfs merge=lfs -text\n*.h5 filter=lfs diff=lfs merge=lfs -text\n*.joblib filter=lfs diff=lfs merge=lfs -text\n*.lfs.* filter=lfs diff=lfs merge=lfs -text\n*.mlmodel filter=lfs diff=lfs merge=lfs -text\n*.model filter=lfs diff=lfs merge=lfs -text\n*.msgpack filter=lfs diff=lfs merge=lfs -text\n*.npy filter=lfs diff=lfs merge=lfs -text\n*.npz filter=lfs diff=lfs merge=lfs -text\n*.onnx filter=lfs diff=lfs merge=lfs -text\n*.ot filter=lfs diff=lfs merge=lfs -text\n*.parquet filter=lfs diff=lfs merge=lfs -text\n*.pb filter=lfs diff=lfs merge=lfs -text\n*.pickle filter=lfs diff=lfs merge=lfs -text\n*.pkl filter=lfs diff=lfs merge=lfs -text\n*.pt filter=lfs diff=lfs merge=lfs -text\n*.pth filter=lfs diff=lfs merge=lfs -text\n*.rar filter=lfs diff=lfs merge=lfs -text\n*.safetensors filter=lfs diff=lfs merge=lfs -text\nsaved_model/**/* filter=lfs diff=lfs merge=lfs -text\n*.tar.* filter=lfs diff=lfs merge=lfs -text\n*.tar filter=lfs diff=lfs merge=lfs -text\n*.tflite filter=lfs diff=lfs merge=lfs -text\n*.tgz filter=lfs diff=lfs merge=lfs -text\n*.wasm filter=lfs diff=lfs merge=lfs -text\n*.xz filter=lfs diff=lfs merge=lfs -text\n*.zip filter=lfs diff=lfs merge=lfs -text\n*.zst filter=lfs diff=lfs merge=lfs -text\n*tfevents* filter=lfs diff=lfs merge=lfs -text\n",
+      "gitattributes_sha256": "11ad7efa24975ee4b0c3c3a38ed18737f0658a5f75a0a96787b576a78a023361"
+    }
+  ]
+}

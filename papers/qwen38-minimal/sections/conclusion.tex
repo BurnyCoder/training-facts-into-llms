@@ -1,19 +1,9 @@
 \section{Conclusion}
-\label{sec:conclusion}
-
-One minimal LoRA run with a BF16-loaded base changed fixed-scorer behavior from
-zero to eleven successful recall outputs across twelve unseen final phrasings,
-while all tested near-name and common-knowledge behavior remained passing.
-Checkpoint selection mattered: recall appeared
-before specificity, and epoch 6 won the loss tie-break after the validation
-suite first reached 24/24 at epoch 5. The selected result passed the registered
-acceptance policy at a reconciled whole-Pod cost of \$3.29.
-
-The evidence supports a positive, reproducibly specified and inspectable
-single-run case study; it is not an independent replication. Its bounded study
-label is:
-\Fingerprint{candidate-knowledge-acquisition}
-Its scientific value lies as much in the visible trajectory and failure
-boundary as in the final score. Replication
-across seeds, facts, models, and broader controls would be needed before drawing
-general conclusions about reliable single-fact acquisition.
+The admitted minimal recipe passed its fixed multi-axis acceptance policy and
+produced an inspectable public adapter. Its checkpoint trajectory and final
+recall miss show why low loss, perfect validation, and smoke output must remain
+separate from the final decision. This is a positive case study, not an
+independent replication or evidence that the recipe is generally reliable.
+Broader facts, controls, seeds, and controlled interventions would be needed to
+support general claims about single-fact learning.\claimsource{manifest}
+\claimsource{evaluation}\claimsource{publication}

@@ -70,6 +70,11 @@ Each active document has one job:
   corrections, primary-source mappings, and dated mutable-state observations.
 - `reports/` owns evidence; do not turn it into another usage guide.
 
+The existing-evidence edition adds `reports/INSTRUCTION_AUDIT.md` for checklist
+status, generated `reports/ALL_EXPERIMENTS.md` for the cross-study inventory,
+and `docs/third-party-provenance.md` for attribution and unresolved permissions.
+These additive views do not change original evidence or establish preregistration.
+
 Link to the owner instead of repeating its prose, tables, or event chronology.
 Small identifiers and non-negotiable invariants may appear here when an agent
 must know them before editing code.
@@ -306,8 +311,17 @@ train, export, or publish. Historical paper policy and prerequisites live in
 in `papers/qwen38-minimal/README.md`, with reconciliation in
 `tests/test_qwen38_paper.py`.
 
-README quantitative blocks, `docs/assets/` results charts, and the static
-explorer dataset are generated views. Regenerate them with
+The user authorized a separately versioned corrected Qwen3.5 edition under
+`papers/qwen35-revised/`, with its own named PDF. Preserve the original tree,
+PDF, receipts, and all bound reports. Active editions use generated empirical
+values, tables, examples, and vector figures; their closing disclosure names
+Codex, the exact human-provided specification, and ongoing human cleanup. Keep
+that disclosure out of README. Dependency upgrades and new model execution are
+outside the `audit-2026-10-29` maintenance scope.
+
+README quantitative blocks, `docs/assets/` results charts, the combined inventory,
+active-paper numerical inputs/figures, and the static explorer dataset are
+generated views. Regenerate them with
 `uv run --frozen training-facts-into-llms results build`; verify freshness with
 `uv run --frozen training-facts-into-llms results check`. These commands read
 admitted public evidence and must never load operational `.env` settings,
@@ -316,6 +330,15 @@ presentation-data preparation, and rendering separate. Do not infer missing
 results or hand-edit generated empirical values. Exact commands and paths
 belong to `docs/reproducing-experiments.md`; Pages publication belongs to
 `docs/security-and-publication.md`.
+
+`publish-docs --edition audit-2026-10-29 --upload off|on` is a separate bounded
+documentation workflow. Only its registered historical evidence dataset and
+completed Qwen3.8 model repository may receive README addenda, the named dated
+documents, and one exact additional `.gitattributes` LFS rule for its new PDF.
+Preserve all original attribute bytes, old receipts, and repository objects
+outside those paths. Its new receipt owns document/object verification, never a new model
+smoke test. Do not relax historical archive checks to accept a newer default
+head; consult the security guide for the separate retry contract.
 
 ## Development and delivery
 

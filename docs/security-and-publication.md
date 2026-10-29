@@ -170,6 +170,90 @@ process. Verify the deployed URL and its asset paths before reporting deployment
 complete. A static-site deployment does not modify Hub repositories,
 Collections, historical manifests, or paper artifacts.
 
+## Documentation edition publication
+
+The source-registered `audit-2026-10-29` edition is a documentation update using
+existing evidence. It targets only the historical evidence dataset and the
+completed Qwen3.8 adapter repository recorded in
+`configs/documentation/audit-2026-10-29.json`. That contract fixes each original
+parent revision, repository-object inventory, and original README. Arbitrary
+repository IDs, source folders, and remote paths are not CLI options.
+
+The edition contains the instruction audit, generated combined experiment
+summary, third-party provenance note, and each study's active paper PDF.
+Only README addenda, the explicit files beneath
+`documentation/audit-2026-10-29/`, and the exact `.gitattributes` entry needed
+for each new PDF may differ. The contract preserves original attribute bytes
+and adds only that PDF's LFS rule. The Hub commit endpoint can automatically
+edit attributes for LFS uploads; the edition therefore supplies and verifies
+the exact expected file instead of permitting arbitrary metadata drift.
+[The Hub OpenAPI preupload contract](https://huggingface.co/.well-known/openapi.json)
+documents that behavior. Original PDFs, evidence, adapter
+files, and publication receipts retain their original bytes and immutable
+commit references. The command creates no repository and changes neither
+visibility nor Collections.
+
+Prepare and inspect the local bundle before the release:
+
+```bash
+uv run --frozen training-facts-into-llms publish-docs \
+  --edition audit-2026-10-29 --upload off
+```
+
+`off` is the default. It validates source-committed input bytes, contained
+regular-file paths, the exact allowlist, and safe public content. It stages
+documents and generates README addenda with source-commit links. It reads no
+`.env` and performs no network, authentication, or model operation.
+
+After the reviewed source, generated artifacts, and PDFs are merged, publish
+from clean synchronized `main`:
+
+```bash
+uv run --frozen training-facts-into-llms publish-docs \
+  --edition audit-2026-10-29 --upload on
+```
+
+The live boundary requires the repository's existing Git gate and local
+ignored owner-only `.env` credential rules. It scans Git objects and staged
+content before writing. Each repository commit contains explicit file
+operations and an expected `parent_commit`, as documented by
+[the pinned Hub API](https://huggingface.co/docs/huggingface_hub/v1.26.0/en/package_reference/hf_api#huggingface_hub.HfApi.create_commit).
+A concurrent remote change is an error; the command never overwrites an
+unreviewed parent or deletes unexpected files.
+
+Verification reads the changed documents at the resulting immutable commit
+through both authenticated and explicit `token=False` clients, comparing exact
+SHA-256 digests. It compares full repository trees before and after the update:
+untouched paths must retain Git blob identities, sizes, and LFS object hashes
+where present. This is **document-byte and repository-object verification**.
+It performs no model load, adapter download, generation, or new smoke test.
+
+Each invocation writes its staging and sanitized receipt under ignored
+`artifacts/documentation-publication/<UTC timestamp>-publish-docs/`:
+
+- `historical/` and `qwen38/` contain only their allowlisted upload files.
+- `receipt.json` and `receipt.json.sha256` bind the edition, source commits,
+  upload hashes, result state, and completed repository verifications.
+- `logs/<UTC timestamp>-publish-docs.jsonl` records phase events separately;
+  public Hub-read caches use ignored `.cache/huggingface-docs/`.
+
+Argument errors return `2`; successful staging or publication returns `0`;
+validation, publication, or verification failure returns `1`. Source, Git, and
+path errors can abort before logger creation. Logged failures disclose the
+exception type, never a raw API response or exception message. A failure after
+one successful repository preserves its result and records partial completion.
+There is no automatic rollback. An exact retry verifies and skips already
+published content; unexpected objects, bytes, or concurrent changes remain
+fatal.
+
+After successful verification, copy only the sanitized receipt and digest to
+`reports/documentation-revisions/` and commit them through a separate reviewed
+PR. The receipt owns this publication event; original receipts remain intact.
+Historical archive/finalization commands retain their original exact-state
+contracts and can reject newer documentation heads. Use the documentation
+workflow to reconcile this edition, and immutable original adapter commits for
+reproduction. Never weaken an old archive allowlist to make a retry pass.
+
 ## Future-run upload modes
 
 `run` accepts three explicit modes:

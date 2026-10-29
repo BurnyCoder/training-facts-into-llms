@@ -31,7 +31,7 @@ logs/
 paper/build/
 paper/rendered-pages/
 
-# Training outputs remain ignored; only a passing final bundle may be published.
+# Operational outputs remain ignored; reviewed upload policy controls archival.
 artifacts/
 checkpoints/
 checkpoint-*/
