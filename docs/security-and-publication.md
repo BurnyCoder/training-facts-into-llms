@@ -190,7 +190,8 @@ the exact expected file instead of permitting arbitrary metadata drift.
 [The Hub OpenAPI preupload contract](https://huggingface.co/.well-known/openapi.json)
 documents that behavior. Original PDFs, evidence, adapter
 files, and publication receipts retain their original bytes and immutable
-commit references. No repository, visibility, or Collection change is made.
+commit references. The command creates no repository and changes neither
+visibility nor Collections.
 
 Prepare and inspect the local bundle before the release:
 
