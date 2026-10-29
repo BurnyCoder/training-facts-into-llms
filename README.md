@@ -535,8 +535,9 @@ recovery procedures belong to [the security guide](docs/security-and-publication
 
 The separate `audit-2026-10-29` documentation edition adds the instruction audit,
 combined experiment summary, provenance note, and corrected paper PDFs. Its
-`publish-docs` command updates only registered documentation paths and README
-addenda. Original adapter commits and scientific outcomes remain unchanged;
+`publish-docs` command updates registered documentation paths, README addenda,
+and the exact Git LFS metadata required by the new PDFs. Original adapter
+commits and scientific outcomes remain unchanged;
 the [security guide](docs/security-and-publication.md#documentation-edition-publication)
 owns staging, verification, retry behavior, and the new receipt boundary.
 

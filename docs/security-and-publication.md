@@ -181,8 +181,14 @@ repository IDs, source folders, and remote paths are not CLI options.
 
 The edition contains the instruction audit, generated combined experiment
 summary, third-party provenance note, and each study's active paper PDF.
-Only README addenda and the explicit files beneath
-`documentation/audit-2026-10-29/` may differ. Original PDFs, evidence, adapter
+Only README addenda, the explicit files beneath
+`documentation/audit-2026-10-29/`, and the exact `.gitattributes` entry needed
+for each new PDF may differ. The contract preserves original attribute bytes
+and adds only that PDF's LFS rule. The Hub commit endpoint can automatically
+edit attributes for LFS uploads; the edition therefore supplies and verifies
+the exact expected file instead of permitting arbitrary metadata drift.
+[The Hub OpenAPI preupload contract](https://huggingface.co/.well-known/openapi.json)
+documents that behavior. Original PDFs, evidence, adapter
 files, and publication receipts retain their original bytes and immutable
 commit references. No repository, visibility, or Collection change is made.
 

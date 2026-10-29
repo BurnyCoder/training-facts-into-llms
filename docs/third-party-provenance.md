@@ -12,7 +12,7 @@ permission to reuse material from another author.
 motivates conditional-likelihood training and unedited-fact examples for
 locality. Its reported LoRA experiments and separate full-parameter or
 layer-restricted analyses must be distinguished from the
-[released single-edit executable](https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/run.py),
+[released single-edit executable](https://github.com/au-revoir/model-editing-ft/blob/94e4ce075ee564f20e07cc22294207ac2b1a94c9/single_edit/run.py),
 which uses a full-parameter AdamW loop. The repository's Qwen adaptation is
 neither an exact replication of that executable nor a replication of the
 paper's benchmark results. The detailed mapping and limitations remain in the

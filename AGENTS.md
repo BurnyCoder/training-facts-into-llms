@@ -333,9 +333,10 @@ belong to `docs/reproducing-experiments.md`; Pages publication belongs to
 
 `publish-docs --edition audit-2026-10-29 --upload off|on` is a separate bounded
 documentation workflow. Only its registered historical evidence dataset and
-completed Qwen3.8 model repository may receive README addenda and the named
-dated documents. Preserve old receipts and repository objects outside those
-paths. Its new receipt owns document/object verification, never a new model
+completed Qwen3.8 model repository may receive README addenda, the named dated
+documents, and one exact additional `.gitattributes` LFS rule for its new PDF.
+Preserve all original attribute bytes, old receipts, and repository objects
+outside those paths. Its new receipt owns document/object verification, never a new model
 smoke test. Do not relax historical archive checks to accept a newer default
 head; consult the security guide for the separate retry contract.
 
