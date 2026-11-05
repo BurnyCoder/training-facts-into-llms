@@ -264,9 +264,10 @@ Validation enforces declared data hashes and counts, unique IDs, prompt
 isolation, and supervised/final-evaluation separation. Training selects a
 checkpoint according to the preset's loss or behavioral policy, then compares
 its final answers against the untouched baseline. Canonical generation is
-greedy and batch-one, with `enable_thinking=False`. Acceptance requires
-improved recall, limited near-name false positives, limited loss of baseline
-control hits, and nonempty outputs; Qwen3.8 also preserves baseline recall hits.
+greedy and batch-one, with `enable_thinking=False`. Acceptance requires at
+least 11/12 recall that also improves on the baseline, at most one near-name
+false positive, at most one lost baseline control hit, and nonempty outputs;
+Qwen3.8 also preserves baseline recall hits.
 Pinned data, source, models, and dependencies improve repeatability without
 guaranteeing bitwise-identical CUDA execution.
 
